@@ -1,2 +1,4 @@
 auth.json
 venv
+__pycache__
+database.db
