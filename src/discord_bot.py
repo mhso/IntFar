@@ -1,19 +1,20 @@
 import random
-from time import sleep
 from sqlite3 import DatabaseError, OperationalError
+import asyncio
 import discord
 import riot_api
 import game_stats
 
-DISCORD_SERVER_ID = 512363920044982272 # TODO: Change to actual server ID.
-CHANNEL_ID = 123 # TODO: Change to actual channel ID.
+DISCORD_SERVER_ID = 619073595561213953
+#DISCORD_SERVER_ID = 512363920044982272 # My server
+CHANNEL_ID = 730744358751567902
 
 INTFAR_FLAVOR_TEXTS = [
-    "And the Int-Far goes to... {nickname} :hairy_retard: He wins for {reason}!",
-    "Uh oh, stinky :happy_nono:! {nickname} has been a very naughty boi! He is awarded one Int-Far token for {reason}!",
-    "Oof {nickname}, better luck next time :smol_dave: take this Int-Far award for {reason}!",
-    "Oh heck :morton: {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!",
-    "Yikes :big_dave: unlucko game from {nickname}. Accept this pity gift of being crowned Int-Far for {reason}."
+    "And the Int-Far goes to... {nickname} {emote_hairy_retard} He wins for {reason}!",
+    "Uh oh, stinky {emote_happy_nono}! {nickname} has been a very naughty boi! He is awarded one Int-Far token for {reason}!",
+    "Oof {nickname}, better luck next time {emote_smol_dave} take this Int-Far award for {reason}!",
+    "Oh heck {emote_morton} {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!",
+    "Yikes {emote_big_dave} unlucko game from {nickname}. Accept this pity gift of being crowned Int-Far for {reason}."
 ]
 
 MOST_DEATHS_FLAVORS = [
@@ -36,7 +37,8 @@ STAT_COMMANDS = [
 
 QUANTITY_DESC = [
     ("most", "fewest"), ("fewest", "most"), ("highest", "lowest"), ("most", "least"),
-    ("most", "least"), ("most", "least"), ("most", "fewest"), ("highest", "lowest")
+    ("most", "least"), ("most", "least"), ("highest", "lowest"), ("most", "fewest"),
+    ("highest", "lowest")
 ]
 
 def get_intfar_flavor_text(nickname, reason):
@@ -61,8 +63,9 @@ class DiscordClient(discord.Client):
         self.active_users = []
         self.active_game = None
         self.channel_to_write = None
+        self.initialized = False
 
-    def poll_for_game_end(self):
+    async def poll_for_game_end(self):
         """
         This method is called periodically when a game is active.
         When this method detects that the game is no longer active,
@@ -73,18 +76,24 @@ class DiscordClient(discord.Client):
         sleep_per_loop = 0.5
         try:
             while time_slept < self.config.status_interval:
-                sleep(sleep_per_loop)
+                await asyncio.sleep(sleep_per_loop)
                 time_slept += sleep_per_loop
         except KeyboardInterrupt:
             return
 
         game_status = self.check_game_status()
+        self.config.log(game_status)
         if game_status == 2: # Game is over.
-            self.declare_intfar()
+            try:
+                self.config.log("GAME OVER!!")
+                await self.declare_intfar()
+                asyncio.create_task(self.poll_for_game_start())
+            except Exception as e:
+                print("Exception after game was over: " + str(e.with_traceback(e)))
         else:
-            self.poll_for_game_end()
+            await self.poll_for_game_end()
 
-    def poll_for_game_start(self):
+    async def poll_for_game_start(self):
         time_slept = 0
         sleep_per_loop = 0.5
         self.config.log("People are active in voice channels! Polling for games...")
@@ -92,16 +101,16 @@ class DiscordClient(discord.Client):
             while time_slept < self.config.status_interval:
                 if not self.polling_is_active(): # Stop if people leave voice channels.
                     return
-                sleep(sleep_per_loop)
+                await asyncio.sleep(sleep_per_loop)
                 time_slept += sleep_per_loop
         except KeyboardInterrupt:
             return
 
         game_status = self.check_game_status()
         if game_status == 1: # Game has started.
-            self.poll_for_game_end()
+            await self.poll_for_game_end()
         else:
-            self.poll_for_game_start()
+            await self.poll_for_game_start()
 
     def user_is_registered(self, summ_name):
         for _, name, _ in self.database.summoners:
@@ -114,7 +123,7 @@ class DiscordClient(discord.Client):
             return "User is already registered."
         summ_id = self.riot_api.get_summoner_id(summ_name.replace(" ", "%20"))
         if summ_id is None:
-            return "Error: Invalid summoner name :PepeHands:"
+            return f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
         self.database.add_user(summ_name, summ_id, discord_id)
         self.config.log(self.database.summoners)
         return f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
@@ -155,6 +164,27 @@ class DiscordClient(discord.Client):
                         return member.name
         return None
 
+    def get_emoji_by_name(self, emoji_name):
+        for guild in self.guilds:
+            if guild.id == DISCORD_SERVER_ID:
+                for emoji in guild.emojis:
+                    if emoji.name == emoji_name:
+                        return str(emoji)
+        return None
+
+    def insert_emotes(self, text):
+        replaced = text
+        emote_index = replaced.find("{emote_")
+        while emote_index > -1:
+            emote = ""
+            end_index = emote_index + 7
+            while replaced[end_index] != "}":
+                emote += replaced[end_index]
+                end_index += 1
+            replaced = replaced.replace("{emote_" + emote + "}", self.get_emoji_by_name(emote))
+            emote_index = replaced.find("{emote_")
+        return replaced
+
     def intfar_by_kda(self, data):
         """
         Returns the info of the Int-Far, if this person has a truly terribhle KDA.
@@ -169,7 +199,7 @@ class DiscordClient(discord.Client):
         deaths = stats["deaths"]
         return ((intfar, lowest_kda)
                 if lowest_kda < self.config.kda_lower_threshold and deaths > 2
-                else None, None)
+                else (None, None))
 
     def intfar_by_deaths(self, data):
         """
@@ -190,20 +220,21 @@ class DiscordClient(discord.Client):
     async def send_intfar_message(self, disc_id, reason):
         nickname = self.get_discord_nick(disc_id)
         message = get_intfar_flavor_text(nickname, reason)
+        message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
 
     def get_intfar_details(self, stats):
         intfar_disc_id, kda = self.intfar_by_kda(stats)
         if intfar_disc_id is not None:
-            return intfar_disc_id, get_reason_flavor_text(kda, "kda")
+            return intfar_disc_id, get_reason_flavor_text(f"{kda:.2f}", "kda")
 
         intfar_disc_id, deaths = self.intfar_by_deaths(stats)
         if intfar_disc_id is not None:
-            return intfar_disc_id, get_reason_flavor_text(deaths, "deaths")
+            return intfar_disc_id, get_reason_flavor_text(str(deaths), "deaths")
 
         return None, None
 
-    def declare_intfar(self): # Check final game status.
+    async def declare_intfar(self): # Check final game status.
         game_info = self.riot_api.get_game_details(self.active_game)
         filtered_stats = []
         for disc_id, _, summ_id in self.active_users:
@@ -217,17 +248,21 @@ class DiscordClient(discord.Client):
 
         intfar_disc_id, reason = self.get_intfar_details(filtered_stats)
         if intfar_disc_id is not None:
-            self.send_intfar_message(intfar_disc_id, reason)
+            await self.send_intfar_message(intfar_disc_id, reason)
+        else:
+            await self.channel_to_write.send("No one was terrible enough to be crowned Int-Far that game!")
 
-        try:
+        try: # Save stats.
             self.database.record_stats(intfar_disc_id, self.active_game, filtered_stats)
         except (DatabaseError, OperationalError) as exception:
             self.config.log("Game stats could not be saved!", self.config.log_error)
             self.config.log(exception)
+            raise exception
+
         self.config.log("Game over! Stats were saved succesfully.")
         self.active_game = None
 
-    def user_joined_voice(self, member):
+    async def user_joined_voice(self, member):
         self.config.log("User joined voice: " + str(member.id))
         summoner_info = self.database.summoner_from_discord_id(member.id)
         if summoner_info is not None:
@@ -235,9 +270,9 @@ class DiscordClient(discord.Client):
             self.config.log("Summoner joined voice: " + summoner_info[1])
             if self.polling_is_active():
                 self.config.log("Polling is now active!")
-                self.poll_for_game_start()
+                asyncio.create_task(self.poll_for_game_start())
 
-    def user_left_voice(self, member):
+    async def user_left_voice(self, member):
         self.config.log("User left voice: " + str(member.id))
         summoner_info = self.database.summoner_from_discord_id(member.id)
         if summoner_info is not None:
@@ -246,18 +281,87 @@ class DiscordClient(discord.Client):
             if not self.polling_is_active():
                 self.config.log("Polling is no longer active.")
 
+    async def test_stuff(self):
+        game_id = 4699244357
+        print("WE DOING IT", flush=True)
+        self.active_users = [
+            (347489125877809155, "Nønø", "vWqeigv3NlpebAwh309gZ8zWul9rNIv6zUKXGFeRWqih9ko"),
+            (267401734513491969, "Senile Felines", "LRjsmujd76mwUe5ki-cOhcfrpAVsMpsLeA9BZqSl6bMiOI0"),
+        ]
+        #self.active_game = game_id
+        self.config.status_interval = 10
+        asyncio.create_task(self.poll_for_game_start())
+
     async def on_ready(self):
+        if self.initialized:
+            self.config.log("Ready was called, but bot was already initialized... Weird stuff.")
+            return
+
+        await self.change_presence(
+            activity=discord.Activity(name="you inting in league",
+                                      type=discord.ActivityType.watching)
+        )
         self.config.log('Logged on as {0}!'.format(self.user))
+        self.initialized = True
         for guild in self.guilds: # Add all users currently in voice channels as active users.
             if guild.id == DISCORD_SERVER_ID:
                 for voice_channel in guild.voice_channels:
                     members_in_voice = voice_channel.members
                     for member in members_in_voice:
-                        self.user_joined_voice(member)
+                        await self.user_joined_voice(member)
                 for text_channel in guild.text_channels:
                     if text_channel.id == CHANNEL_ID:
                         self.channel_to_write = text_channel
                         return
+
+    async def handle_helper_msg(self, message):
+        valid_stats = ", ".join("'" + cmd + "'" for cmd in STAT_COMMANDS)
+        response = "I gotchu fam {emote_nazi}\n"
+        response += "The Int-Far™ Tracker™ is a highly sophisticated bot "
+        response += "that watches when people in this server plays League, "
+        response += "and judges them harshly if they int too hard {emote_simp_but_closeup}\n"
+        response += "**--- Valid commands, and their usages, are listed below ---**\n```"
+        response += (
+            "!register [summoner_name] - Sign up for the Int-Far™ Tracker™ " +
+            "by providing your summoner name (fx. '!register imaqtpie').\n\n" +
+            "!users - List all users who are currently signed up for the Int-Far™ Tracker™.\n\n" +
+            "!help - Show this helper text.\n\n" +
+            "!commands - Show this helper text.\n\n" +
+            "!intfar (summoner_name) - Show how many times you (if no summoner name is included), " +
+            "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users.\n\n"
+            "!best [stat] - Show how many times you were the best in the specific stat. " +
+            "Fx. '!best kda' shows how many times you had the best KDA in a game.\n\n" +
+            "!worst [stat] - Show how many times you were the worst at the specific stat.\n\n```" +
+            "**--- Valid stats ---**\n```"
+        )
+        response += valid_stats
+        response += "\n```"
+        await message.channel.send(self.insert_emotes(response))
+
+    async def handle_intfar_msg(self, message, second_command):
+        def get_intfar_stats(disc_id):
+            person_to_check = self.get_discord_nick(disc_id)
+            stat_value = self.database.get_stat("int_far", True, disc_id)
+            msg = f"{person_to_check} has been an Int-Far {stat_value} times "
+            msg += self.insert_emotes("{emote_unlimited_chins}")
+            return msg
+
+        response = ""
+        if second_command is not None:
+            if second_command == "all":
+                for disc_id, _, _ in self.database.summoners:
+                    response += "- " + get_intfar_stats(disc_id) + "\n"
+            else:
+                user_data = self.database.discord_id_from_summoner(second_command.strip())
+                if user_data is None:
+                    msg = f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
+                response = get_intfar_stats(user_data[0])
+        else:
+            response = get_intfar_stats(message.author.id)
+
+        await message.channel.send(response)
 
     async def on_message(self, message):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
@@ -279,48 +383,38 @@ class DiscordClient(discord.Client):
                     nickname = self.get_discord_nick(disc_id)
                     response += f"- {nickname} ({summ_name})\n"
                 if response == "":
-                    response = "No lads are currently signed up :nat_really_fine: but you can change this!!"
+                    response = "No lads are currently signed up {emote_nat_really_fine} but you can change this!!"
                 else:
                     response = "**--- Registered bois ---**\n" + response
-                await message.channel.send(response)
+                await message.channel.send(self.insert_emotes(response))
+            elif first_command == "intfar":
+                await self.handle_intfar_msg(message, second_command)
             elif first_command in ("help", "commands"):
-                valid_stats = ", ".join("'" + cmd + "'" for cmd in STAT_COMMANDS)
-                response = "I gotchu fam :nazi:\n"
-                response += "**--- Valid commands, and their usages, are listed below ---**\n```"
-                response += (
-                    "!register [summoner_name] - Sign up for the Int-Far™ Tracker™ " +
-                    "by providing your summoner name (fx. '!register imaqtpie').\n\n" +
-                    "!users - List all users who are currently signed up for the Int-Far™ Tracker™.\n\n" +
-                    "!help - Show this helper text.\n\n" +
-                    "!commands - Show this helper text.\n\n" +
-                    "!best [stat] - Show how many times you were the best in the specific stat. " +
-                    "Fx. '!best kda' shows how many times you had the best KDA in a game.\n\n" +
-                    "!worst [stat] - Show how many times you were the worst at the specific stat.\n\n```" +
-                    "**--- Valid stats ---**\n```"
-                )
-                response += valid_stats
-                response += "\n```"
-                await message.channel.send(response)
+                self.handle_helper_msg(message)
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
                 if second_command in STAT_COMMANDS:
-                    stat_index = STAT_COMMANDS.index(second_command)
-                    stat = STAT_COMMANDS[stat_index]
+                    stat = second_command
+                    stat_index = STAT_COMMANDS.index(stat)
                     self.config.log(f"Stat requested: {first_command} {stat}")
                     try:
-                        best = second_command == "best"
+                        best = first_command == "best"
                         quantity_type = 0 if best else 1
-                        stat_value = self.database.get_stat(stat, best, message.author.id)
+                        self.config.log(message.author.id)
+                        stat_value = self.database.get_stat(stat + "_id", best, message.author.id)
                         readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
-                        response = f"{message.author.name} has gotten {readable_stat} {stat_value} times."
+                        response = f"{message.author.name} has gotten {readable_stat} in a game {stat_value} times"
+                        response += self.insert_emotes("{emote_pog}")
                         await message.channel.send(response)
                     except (DatabaseError, OperationalError) as exception:
-                        await message.channel.send("Something went wrong when querying the database! :fu:", self.config.log_error)
+                        response = self.insert_emotes("Something went wrong when querying the database! {emote_fu}")
+                        await message.channel.send(response, self.config.log_error)
                         self.config.log(exception)
                 else:
-                    await message.channel.send(f"Not a valid stat: {second_command} :carole_fucking_baskin:")
+                    response = self.insert_emotes(f"Not a valid stat: '{second_command}' " + "{emote_carole_fucking_baskin}")
+                    await message.channel.send(response)
 
     async def on_voice_state_update(self, member, before, after):
         if before.channel is None and after.channel is not None: # User joined.
-            self.user_joined_voice(member)
+            await self.user_joined_voice(member)
         elif before.channel is not None and after.channel is None: # User left.
-            self.user_left_voice(member)
+            await self.user_left_voice(member)

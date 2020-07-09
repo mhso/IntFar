@@ -43,6 +43,12 @@ class Database:
                                 "VALUES (?, ?, ?)", (discord_id, summ_name, summ_id))
             db.commit()
 
+    def discord_id_from_summoner(self, name):
+        for disc_id, summ_name, summ_id in self.summoners:
+            if summ_name == name:
+                return disc_id, summ_name, summ_id
+        return None
+
     def summoner_from_discord_id(self, discord_id):
         for disc_id, summ_name, summ_id in self.summoners:
             if disc_id == discord_id:
@@ -53,7 +59,7 @@ class Database:
         table = "best_stats" if best else "worst_stats"
         query = f"SELECT Count(*) FROM {table} WHERE {stat}=?"
         with closing(self.get_connection()) as db:
-            return db.cursor().execute(query, (disc_id,)).fetchone()
+            return db.cursor().execute(query, (disc_id,)).fetchone()[0]
 
     def record_stats(self, intfar_id, game_id, data):
         (min_kills_id, min_kills,
@@ -84,7 +90,7 @@ class Database:
             """
             (game_id, int_far, kills, kills_id, deaths,
             deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, gold, gold_id,
-            kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id
+            kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         )
