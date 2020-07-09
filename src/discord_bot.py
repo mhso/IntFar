@@ -17,6 +17,13 @@ INTFAR_FLAVOR_TEXTS = [
     "Yikes {emote_big_dave} unlucko game from {nickname}. Accept this pity gift of being crowned Int-Far for {reason}."
 ]
 
+NO_INTFAR_FLAVOR_TEXTS = [
+    "Hecking good job bois, no one inted their ass off that game {emote_uwucat}",
+    "No one was sucked enough to be crowned Int-Far that game! Big doinks all around {emote_big_doinks}",
+    "Get outta my face bitch! BOW!! No Int-Fars that game {emote_Bitcoinect}",
+    "We are so god damn good at this game!! No inting = no problems {emote_main}"
+]
+
 MOST_DEATHS_FLAVORS = [
     "dying a total of {deaths} times",
     "feeding every child in Africa by giving away {deaths} kills",
@@ -56,6 +63,9 @@ QUANTITY_DESC = [
 def get_intfar_flavor_text(nickname, reason):
     flavor_text = INTFAR_FLAVOR_TEXTS[random.randint(0, len(INTFAR_FLAVOR_TEXTS)-1)]
     return flavor_text.replace("{nickname}", nickname).replace("{reason}", reason)
+
+def get_no_intfar_flavor_text():
+    return NO_INTFAR_FLAVOR_TEXTS[random.randint(0, len(NO_INTFAR_FLAVOR_TEXTS)-1)]
 
 def get_reason_flavor_text(value, reason):
     flavor_values = []
@@ -106,7 +116,7 @@ class DiscordClient(discord.Client):
                 asyncio.create_task(self.poll_for_game_start())
             except Exception as e:
                 print("Exception after game was over: " + str(e.with_traceback(e)))
-        else:
+        elif game_status == 0:
             await self.poll_for_game_end()
 
     async def poll_for_game_start(self):
@@ -126,7 +136,7 @@ class DiscordClient(discord.Client):
         game_status = self.check_game_status()
         if game_status == 1: # Game has started.
             await self.poll_for_game_end()
-        else:
+        elif game_status == 0:
             await self.poll_for_game_start()
 
     def user_is_registered(self, summ_name):
@@ -307,7 +317,8 @@ class DiscordClient(discord.Client):
         if intfar_disc_id is not None:
             await self.send_intfar_message(intfar_disc_id, reason)
         else:
-            await self.channel_to_write.send("No one was terrible enough to be crowned Int-Far that game!")
+            response = get_no_intfar_flavor_text()
+            await self.channel_to_write.send(self.insert_emotes(response))
 
         try: # Save stats.
             self.database.record_stats(intfar_disc_id, self.active_game, filtered_stats, kills_by_our_team)
@@ -319,15 +330,15 @@ class DiscordClient(discord.Client):
         self.config.log("Game over! Stats were saved succesfully.")
         self.active_game = None
 
-    async def user_joined_voice(self, member):
+    async def user_joined_voice(self, member, start_polling=True):
         self.config.log("User joined voice: " + str(member.id))
         summoner_info = self.database.summoner_from_discord_id(member.id)
         if summoner_info is not None:
-            self.active_users.append(summoner_info)
             self.config.log("Summoner joined voice: " + summoner_info[1])
-            if self.polling_is_active():
+            if not self.polling_is_active() and start_polling:
                 self.config.log("Polling is now active!")
                 asyncio.create_task(self.poll_for_game_start())
+            self.active_users.append(summoner_info)
 
     async def user_left_voice(self, member):
         self.config.log("User left voice: " + str(member.id))
@@ -362,8 +373,12 @@ class DiscordClient(discord.Client):
             if guild.id == DISCORD_SERVER_ID:
                 for voice_channel in guild.voice_channels:
                     members_in_voice = voice_channel.members
+                    count = 0
                     for member in members_in_voice:
-                        await self.user_joined_voice(member)
+                        start_polling = count == 1
+                        print(start_polling)
+                        await self.user_joined_voice(member, start_polling)
+                        count += 1
                 for text_channel in guild.text_channels:
                     if text_channel.id == CHANNEL_ID:
                         self.channel_to_write = text_channel
