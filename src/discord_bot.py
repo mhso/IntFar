@@ -12,7 +12,21 @@ INTFAR_FLAVOR_TEXTS = [
     "And the Int-Far goes to... {nickname} :hairy_retard: He wins for {reason}!",
     "Uh oh, stinky :happy_nono:! {nickname} has been a very naughty boi! He is awarded one Int-Far token for {reason}!",
     "Oof {nickname}, better luck next time :smol_dave: take this Int-Far award for {reason}!",
-    "Oh heck :morton: {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!"
+    "Oh heck :morton: {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!",
+    "Yikes :big_dave: unlucko game from {nickname}. Accept this pity gift of being crowned Int-Far for {reason}."
+]
+
+MOST_DEATHS_FLAVORS = [
+    "dying a total of {deaths} times",
+    "feeding every child in Africa by giving away {deaths} kills",
+    "being dead 69% of the game with {deaths} deaths",
+    "having a permanent gray screen with {deaths} deaths"
+]
+
+LOWEST_KDA_FLAVORS = [
+    "having a tragic KDA of {kda}",
+    "putting any Iron IV scrub to shame with a KDA of {kda}",
+    "being an anti KDA player with a KDA of {kda}"
 ]
 
 STAT_COMMANDS = [
@@ -28,6 +42,15 @@ QUANTITY_DESC = [
 def get_intfar_flavor_text(nickname, reason):
     flavor_text = INTFAR_FLAVOR_TEXTS[random.randint(0, len(INTFAR_FLAVOR_TEXTS)-1)]
     return flavor_text.replace("{nickname}", nickname).replace("{reason}", reason)
+
+def get_reason_flavor_text(value, reason):
+    flavor_values = []
+    if reason == "kda":
+        flavor_values = LOWEST_KDA_FLAVORS
+    elif reason == "deaths":
+        flavor_text = MOST_DEATHS_FLAVORS
+    flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
+    return flavor_text.replace("{" + reason + "}", value)
 
 class DiscordClient(discord.Client):
     def __init__(self, config, database):
@@ -172,11 +195,11 @@ class DiscordClient(discord.Client):
     def get_intfar_details(self, stats):
         intfar_disc_id, kda = self.intfar_by_kda(stats)
         if intfar_disc_id is not None:
-            return intfar_disc_id, f"having a tragic KDA of {kda}"
-        
+            return intfar_disc_id, get_reason_flavor_text(kda, "kda")
+
         intfar_disc_id, deaths = self.intfar_by_deaths(stats)
         if intfar_disc_id is not None:
-            return intfar_disc_id, f"dying a total of {deaths} times"
+            return intfar_disc_id, get_reason_flavor_text(deaths, "deaths")
 
         return None, None
 

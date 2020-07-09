@@ -4,7 +4,7 @@ def calc_kda(data_entry):
 
 def calc_kill_participation(data_entry, all_entries):
     total_kills = sum(entry["kills"] for entry in all_entries)
-    return float(data_entry["kills"]) / float(total_kills)
+    return int(float(data_entry["kills"]) / float(total_kills) * 100)
 
 def get_outlier(data, key, asc=True):
     if key == "kda":

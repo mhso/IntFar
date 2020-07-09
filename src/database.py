@@ -11,11 +11,10 @@ class Database:
             self.create_database()
 
         # Populate summoner names and ids lists with currently registered summoners.
-        with closing(self.get_connection()) as db:
-            users = self.get_all_registered_users()
-            for entry in users:
-                disc_id = int(entry[0])
-                self.summoners.append((disc_id, entry[1], entry[2]))
+        users = self.get_all_registered_users()
+        for entry in users:
+            disc_id = int(entry[0])
+            self.summoners.append((disc_id, entry[1], entry[2]))
 
     def get_connection(self):
         return sqlite3.connect(self.config.database)
