@@ -12,7 +12,7 @@ class Database:
 
         # Populate summoner names and ids lists with currently registered summoners.
         with closing(self.get_connection()) as db:
-            users = db.cursor().execute("SELECT * FROM registered_summoners").fetchall()
+            users = self.get_all_registered_users()
             for entry in users:
                 disc_id = int(entry[0])
                 self.summoners.append((disc_id, entry[1], entry[2]))
@@ -32,8 +32,13 @@ class Database:
                                        "WHERE summ_name=?", (summ_name,)).fetchone()
             return user
 
+    def get_all_registered_users(self):
+        with closing(self.get_connection()) as db:
+            return db.cursor().execute("SELECT disc_id, summ_name, summ_id " +
+                                       "FROM registered_summoners").fetchall()
+
     def add_user(self, summ_name, summ_id, discord_id):
-        self.summoners.append((summ_name, summ_id, discord_id))
+        self.summoners.append((discord_id, summ_name, summ_id))
         with closing(self.get_connection()) as db:
             db.cursor().execute("INSERT INTO registered_summoners(disc_id, summ_name, summ_id) " +
                                 "VALUES (?, ?, ?)", (discord_id, summ_name, summ_id))
@@ -45,44 +50,59 @@ class Database:
                 return disc_id, summ_name, summ_id
         return None
 
-    def get_stat(self, stat, disc_id):
-        query = f"SELECT Count(*) FROM game_stats WHERE {stat}=?"
+    def get_stat(self, stat, best, disc_id):
+        table = "best_stats" if best else "worst_stats"
+        query = f"SELECT Count(*) FROM {table} WHERE {stat}=?"
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchone()
 
     def record_stats(self, intfar_id, game_id, data):
-        most_kills_id, stats = game_stats.get_outlier(data, "kills", asc=False)
-        most_kills = stats["kills"]
-        fewest_deaths_id, stats = game_stats.get_outlier(data, "deaths")
-        fewest_deaths = stats["deaths"]
-        highest_kda_id, stats = game_stats.get_outlier(data, "kda", asc=False)
-        highest_kda = game_stats.calc_kda(stats)
-        most_damage_id, stats = game_stats.get_outlier(data, "totalDamageDealtToChampions", asc=False)
-        most_damage = stats["totalDamageDealtToChampions"]
-        most_cs_id, stats = game_stats.get_outlier(data, "totalMinionsKilled", asc=False)
-        most_cs = stats["totalMinionsKilled"]
-        most_gold_id, stats = game_stats.get_outlier(data, "goldEarned", asc=False)
-        most_gold = stats["goldEarned"]
-        highest_kp_id, stats = game_stats.get_outlier(data, "kp", asc=False)
-        highest_kp = game_stats.calc_kill_participation(stats, data)
-        highest_vision_score_id, stats = game_stats.get_outlier(data, "visionScore", asc=False)
-        highest_vision_score = stats["visionScore"]
+        (min_kills_id, min_kills,
+         max_kills_id, max_kills) = game_stats.get_outlier_stat("kills", data)
+        (min_deaths_id, min_deaths,
+         max_deaths_id, max_deaths) = game_stats.get_outlier_stat("deaths", data)
+        max_kda_id, stats = game_stats.get_outlier(data, "kda", asc=False)
+        max_kda = game_stats.calc_kda(stats)
+        min_kda_id, stats = game_stats.get_outlier(data, "kda", asc=True)
+        min_kda = game_stats.calc_kda(stats)
+        (min_damage_id, min_damage,
+         max_damage_id, max_damage) = game_stats.get_outlier_stat("totalDamageDealtToChampions", data)
+        (min_cs_id, min_cs,
+         max_cs_id, max_cs) = game_stats.get_outlier_stat("totalMinionsKilled", data)
+        (min_gold_id, min_gold,
+         max_gold_id, max_gold) = game_stats.get_outlier_stat("goldEarned", data)
+        max_kp_id, stats = game_stats.get_outlier(data, "kp", asc=False)
+        max_kp = game_stats.calc_kda(stats)
+        min_kp_id, stats = game_stats.get_outlier(data, "kp", asc=True)
+        min_kp = game_stats.calc_kda(stats)
+        (min_wards_id, min_wards,
+         max_wards_id, max_wards) = game_stats.get_outlier_stat("visionWardsBoughtInGame", data)
+        (min_vision_id, min_vision,
+         max_vision_id, max_vision) = game_stats.get_outlier_stat("visionScore", data)
 
-        query = (
+        query_prefix = "INSERT INTO "
+        query_cols = (
             """
-            INSERT INTO game_stats(game_id, int_far, most_kills, most_kills_id,
-            fewest_deaths, fewest_deaths_id, highest_kda, highest_kda_id,
-            most_damage, most_damage_id, most_cs, most_cs_id, most_gold, most_gold_id,
-            highest_kp, highest_kp_id, highest_vision_score, highest_vision_score_id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (game_id, int_far, kills, kills_id, deaths,
+            deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, gold, gold_id,
+            kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         )
+        query_best = query_prefix + " best_stats" + query_cols
+        query_worst = query_prefix + " worst_stats " + query_cols
 
         with closing(self.get_connection()) as db:
-            db.cursor().execute(query, (game_id, intfar_id, most_kills, most_kills_id,
-                                        fewest_deaths, fewest_deaths_id, highest_kda,
-                                        highest_kda_id, most_damage, most_damage_id,
-                                        most_cs, most_cs_id, most_gold, most_gold_id,
-                                        highest_kp, highest_kp_id, highest_vision_score,
-                                        highest_vision_score_id))
+            db.cursor().execute(query_best, (game_id, intfar_id, max_kills, max_kills_id,
+                                             min_deaths, min_deaths_id, max_kda,
+                                             max_kda_id, max_damage, max_damage_id,
+                                             max_cs, max_cs_id, max_gold, max_gold_id,
+                                             max_kp, max_kp_id, max_wards, max_wards_id,
+                                             max_vision, max_vision_id))
+            db.cursor().execute(query_worst, (game_id, intfar_id, min_kills, min_kills_id,
+                                              max_deaths, max_deaths_id, min_kda,
+                                              min_kda_id, min_damage, min_damage_id,
+                                              min_cs, min_cs_id, min_gold, min_gold_id,
+                                              min_kp, min_kp_id, min_wards, min_wards_id,
+                                              min_vision, min_vision_id))
             db.commit()

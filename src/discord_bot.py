@@ -9,17 +9,21 @@ DISCORD_SERVER_ID = 512363920044982272 # TODO: Change to actual server ID.
 CHANNEL_ID = 123 # TODO: Change to actual channel ID.
 
 INTFAR_FLAVOR_TEXTS = [
-    "And the Int-Far goes to... {nickname}! He wins for {reason}!",
-    "Uh oh, stinky! {nickname} has been a very naughty boi! He is awarded one Int-Far token for {reason}!",
-    "Oof {nickname}, better luck next time! Take this Int-Far award for {reason}!",
-    "Oh heck, {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!"
+    "And the Int-Far goes to... {nickname} :hairy_retard: He wins for {reason}!",
+    "Uh oh, stinky :happy_nono:! {nickname} has been a very naughty boi! He is awarded one Int-Far token for {reason}!",
+    "Oof {nickname}, better luck next time :smol_dave: take this Int-Far award for {reason}!",
+    "Oh heck :morton: {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!"
 ]
 
-STAT_COMMANDS = {
-    "kills": "most_kills", "deaths": "fewest_deaths", "kda": "highest_kda",
-    "damage": "most_damage", "cs": "most_cs", "gold": "most_gold",
-    "kp":"highest_kp", "vision": "highest_vision_score"
-}
+STAT_COMMANDS = [
+    "kills", "deaths", "kda", "damage",
+    "cs", "gold", "kp", "vision_wards", "vision_score"
+]
+
+QUANTITY_DESC = [
+    ("most", "fewest"), ("fewest", "most"), ("highest", "lowest"), ("most", "least"),
+    ("most", "least"), ("most", "least"), ("most", "fewest"), ("highest", "lowest")
+]
 
 def get_intfar_flavor_text(nickname, reason):
     flavor_text = INTFAR_FLAVOR_TEXTS[random.randint(0, len(INTFAR_FLAVOR_TEXTS)-1)]
@@ -85,11 +89,12 @@ class DiscordClient(discord.Client):
     def add_user(self, summ_name, discord_id):
         if self.user_is_registered(summ_name):
             return "User is already registered."
-        summ_id = self.riot_api.get_summoner_id(summ_name)
+        summ_id = self.riot_api.get_summoner_id(summ_name.replace(" ", "%20"))
         if summ_id is None:
-            return "Error: Invalid summoner name."
+            return "Error: Invalid summoner name :PepeHands:"
         self.database.add_user(summ_name, summ_id, discord_id)
-        return f"User '{summ_name}' with ID '{summ_id}' succesfully added!"
+        self.config.log(self.database.summoners)
+        return f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
 
     def polling_is_active(self): # We only check game statuses if there are two or more active users.
         return len(self.active_users) > 1
@@ -117,11 +122,14 @@ class DiscordClient(discord.Client):
         return 0
 
     def get_discord_nick(self, disc_id):
+        """
+        Return Discord nickname matching the given Discord ID.
+        """
         for guild in self.guilds:
             if guild.id == DISCORD_SERVER_ID:
                 for member in guild.members:
                     if member.id == disc_id:
-                        return member.nick
+                        return member.name
         return None
 
     def intfar_by_kda(self, data):
@@ -235,23 +243,58 @@ class DiscordClient(discord.Client):
         msg = message.content.strip()
         if msg.startswith("!"):
             split = msg.split(" ")
-            command = split[0][1:]
-            if command == "register":
+            first_command = split[0][1:]
+            second_command = None if len(split) < 2 else split[1]
+            if first_command == "register":
                 if len(split) > 1:
-                    summ_name = "%20".join(split[1:])
+                    summ_name = " ".join(split[1:])
                     status = self.add_user(summ_name, message.author.id)
                     await message.channel.send(status)
-            elif command in STAT_COMMANDS: # Get game stats.
-                stat = STAT_COMMANDS[command]
-                self.config.log(f"Stat requested: {stat}")
-                try:
-                    stat_value = self.database.get_stat(stat, message.author.id)
-                    readable_stat = stat.replace("_", " ")
-                    response = f"{message.author.nick} has gotten {readable_stat} {stat_value} times."
-                    await message.channel.send(response)
-                except (DatabaseError, OperationalError) as exception:
-                    await message.channel.send("Something went wrong when querying the database!", self.config.log_error)
-                    self.config.log(exception)
+            elif first_command == "users":
+                response = ""
+                for disc_id, summ_name, _ in self.database.summoners:
+                    nickname = self.get_discord_nick(disc_id)
+                    response += f"- {nickname} ({summ_name})\n"
+                if response == "":
+                    response = "No lads are currently signed up :nat_really_fine: but you can change this!!"
+                else:
+                    response = "**--- Registered bois ---**\n" + response
+                await message.channel.send(response)
+            elif first_command in ("help", "commands"):
+                valid_stats = ", ".join("'" + cmd + "'" for cmd in STAT_COMMANDS)
+                response = "I gotchu fam :nazi:\n"
+                response += "**--- Valid commands, and their usages, are listed below ---**\n```"
+                response += (
+                    "!register [summoner_name] - Sign up for the Int-Far™ Tracker™ " +
+                    "by providing your summoner name (fx. '!register imaqtpie').\n\n" +
+                    "!users - List all users who are currently signed up for the Int-Far™ Tracker™.\n\n" +
+                    "!help - Show this helper text.\n\n" +
+                    "!commands - Show this helper text.\n\n" +
+                    "!best [stat] - Show how many times you were the best in the specific stat. " +
+                    "Fx. '!best kda' shows how many times you had the best KDA in a game.\n\n" +
+                    "!worst [stat] - Show how many times you were the worst at the specific stat.\n\n```" +
+                    "**--- Valid stats ---**\n```"
+                )
+                response += valid_stats
+                response += "\n```"
+                await message.channel.send(response)
+            elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
+                if second_command in STAT_COMMANDS:
+                    stat_index = STAT_COMMANDS.index(second_command)
+                    stat = STAT_COMMANDS[stat_index]
+                    self.config.log(f"Stat requested: {first_command} {stat}")
+                    try:
+                        best = second_command == "best"
+                        quantity_type = 0 if best else 1
+                        stat_value = self.database.get_stat(stat, best, message.author.id)
+                        readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
+                        response = f"{message.author.name} has gotten {readable_stat} {stat_value} times."
+                        await message.channel.send(response)
+                    except (DatabaseError, OperationalError) as exception:
+                        await message.channel.send("Something went wrong when querying the database! :fu:", self.config.log_error)
+                        self.config.log(exception)
+                else:
+                    await message.channel.send(f"Not a valid stat: {second_command} :carole_fucking_baskin:")
 
     async def on_voice_state_update(self, member, before, after):
         if before.channel is None and after.channel is not None: # User joined.

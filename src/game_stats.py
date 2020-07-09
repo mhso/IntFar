@@ -15,3 +15,10 @@ def get_outlier(data, key, asc=True):
 
     sorted_data = sorted(data, key=lambda entry: entry[1][key], reverse=asc)
     return sorted_data[0]
+
+def get_outlier_stat(stat, data):
+    most_id, stats = get_outlier(data, stat, asc=True)
+    most = stats[stat]
+    least_id, stats = get_outlier(data, stat, asc=False)
+    least = stats[stat]
+    return most_id, most, least_id, least
