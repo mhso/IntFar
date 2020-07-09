@@ -57,11 +57,11 @@ class Database:
 
     def get_stat(self, stat, best, disc_id):
         table = "best_stats" if best else "worst_stats"
-        query = f"SELECT Count(*) FROM {table} WHERE {stat}=?"
+        query = f"SELECT Count(*), {stat} FROM {table} WHERE {stat}=?"
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchone()[0]
 
-    def record_stats(self, intfar_id, game_id, data):
+    def record_stats(self, intfar_id, game_id, data, kills_by_our_team):
         (min_kills_id, min_kills,
          max_kills_id, max_kills) = game_stats.get_outlier_stat("kills", data)
         (min_deaths_id, min_deaths,
@@ -76,10 +76,10 @@ class Database:
          max_cs_id, max_cs) = game_stats.get_outlier_stat("totalMinionsKilled", data)
         (min_gold_id, min_gold,
          max_gold_id, max_gold) = game_stats.get_outlier_stat("goldEarned", data)
-        max_kp_id, stats = game_stats.get_outlier(data, "kp", asc=False)
-        max_kp = game_stats.calc_kda(stats)
-        min_kp_id, stats = game_stats.get_outlier(data, "kp", asc=True)
-        min_kp = game_stats.calc_kda(stats)
+        max_kp_id, stats = game_stats.get_outlier(data, "kp", asc=False, total_kills=kills_by_our_team)
+        max_kp = game_stats.calc_kill_participation(stats, kills_by_our_team)
+        min_kp_id, stats = game_stats.get_outlier(data, "kp", asc=True, total_kills=kills_by_our_team)
+        min_kp = game_stats.calc_kill_participation(stats, kills_by_our_team)
         (min_wards_id, min_wards,
          max_wards_id, max_wards) = game_stats.get_outlier_stat("visionWardsBoughtInGame", data)
         (min_vision_id, min_vision,

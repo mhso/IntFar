@@ -8,8 +8,10 @@ class Config:
         self.riot_key = ""
         self.status_interval = 60*10 # 10 minutes wait time between checking for status.
         self.database = "database.db"
-        self.kda_lower_threshold = 1.5
+        self.kda_lower_threshold = 1.3
         self.highest_death_threshold = 9
+        self.kp_lower_threshold = 30
+        self.vision_score_lower_threshold = 9
         self.log_warning = 1
         self.log_error = 2
 

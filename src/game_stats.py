@@ -1,16 +1,15 @@
 def calc_kda(stats):
     return (stats["kills"] + stats["assists"]) / stats["deaths"]
 
-def calc_kill_participation(stats, all_entries):
-    total_kills = sum(entry[1]["kills"] for entry in all_entries)
-    return int(float(stats["kills"]) / float(total_kills) * 100)
+def calc_kill_participation(stats, total_kills):
+    return int((float(stats["kills"] + stats["assists"]) / float(total_kills)) * 100.0)
 
-def get_outlier(data, key, asc=True):
+def get_outlier(data, key, asc=True, total_kills=0):
     if key == "kda":
         sorted_data = sorted(data, key=lambda x: calc_kda(x[1]), reverse=not asc)
         return sorted_data[0]
     elif key == "kp":
-        sorted_data = sorted(data, key=lambda x: calc_kill_participation(x[1], data), reverse=not asc)
+        sorted_data = sorted(data, key=lambda x: calc_kill_participation(x[1], total_kills), reverse=not asc)
         return sorted_data[0]
 
     sorted_data = sorted(data, key=lambda entry: entry[1][key], reverse=not asc)

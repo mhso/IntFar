@@ -30,6 +30,18 @@ LOWEST_KDA_FLAVORS = [
     "being an anti KDA player with a KDA of {kda}"
 ]
 
+LOWEST_KP_FLAVORS = [
+    "living on an island and getting {kp}% kill participation",
+    "refusing to help his team, having a {kp}% kill participation",
+    "doing TOO much social distancing with {kp}% kill participation"
+]
+
+LOWEST_VISION_FLAVORS = [
+    "living with a blindfold on with {visionScore} vision score",
+    "hating winning with a vision score of {visionScore}",
+    "loving enemy death brushes a bit too much with {visionScore} vision score"
+]
+
 STAT_COMMANDS = [
     "kills", "deaths", "kda", "damage",
     "cs", "gold", "kp", "vision_wards", "vision_score"
@@ -51,6 +63,10 @@ def get_reason_flavor_text(value, reason):
         flavor_values = LOWEST_KDA_FLAVORS
     elif reason == "deaths":
         flavor_text = MOST_DEATHS_FLAVORS
+    elif reason == "kp":
+        flavor_text = LOWEST_KP_FLAVORS
+    elif reason == "visionScore":
+        flavor_text = LOWEST_VISION_FLAVORS
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     return flavor_text.replace("{" + reason + "}", value)
 
@@ -100,6 +116,7 @@ class DiscordClient(discord.Client):
         try:
             while time_slept < self.config.status_interval:
                 if not self.polling_is_active(): # Stop if people leave voice channels.
+                    self.config.log("Polling is no longer active.")
                     return
                 await asyncio.sleep(sleep_per_loop)
                 time_slept += sleep_per_loop
@@ -217,13 +234,41 @@ class DiscordClient(discord.Client):
                 if highest_deaths > self.config.highest_death_threshold and kda < 2.1
                 else None, None)
 
+    def intfar_by_kp(self, data, team_kills):
+        """
+        Returns the info of the Int-Far, if this person has very low kill participation.
+        This is determined by:
+            - Having the lowest KP in the group
+            - KP being less than 30
+        Returns None if none of these criteria matches a person.
+        """
+        intfar, stats = game_stats.get_outlier(data, "kp", total_kills=team_kills)
+        lowest_kp = game_stats.calc_kill_participation(stats, team_kills)
+        return ((intfar, lowest_kp)
+                if lowest_kp < self.config.kp_lower_threshold
+                else None, None)
+
+    def intfar_by_vision_score(self, data):
+        """
+        Returns the info of the Int-Far, if this person has very low kill vision score.
+        This is determined by:
+            - Having the lowest vision score in the group
+            - Vision score being less than 9
+        Returns None if none of these criteria matches a person.
+        """
+        intfar, stats = game_stats.get_outlier(data, "visionScore")
+        lowest_score = stats["visionScore"]
+        return ((intfar, lowest_score)
+                if lowest_score < self.config.vision_score_lower_threshold
+                else None, None)
+
     async def send_intfar_message(self, disc_id, reason):
         nickname = self.get_discord_nick(disc_id)
         message = get_intfar_flavor_text(nickname, reason)
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
 
-    def get_intfar_details(self, stats):
+    def get_intfar_details(self, stats, team_kills):
         intfar_disc_id, kda = self.intfar_by_kda(stats)
         if intfar_disc_id is not None:
             return intfar_disc_id, get_reason_flavor_text(f"{kda:.2f}", "kda")
@@ -232,28 +277,40 @@ class DiscordClient(discord.Client):
         if intfar_disc_id is not None:
             return intfar_disc_id, get_reason_flavor_text(str(deaths), "deaths")
 
+        intfar_disc_id, kp = self.intfar_by_kp(stats, team_kills)
+        if intfar_disc_id is not None:
+            return intfar_disc_id, get_reason_flavor_text(str(kp), "kp")
+
+        intfar_disc_id, vision_score = self.intfar_by_vision_score(stats)
+        if intfar_disc_id is not None:
+            return intfar_disc_id, get_reason_flavor_text(str(vision_score), "visionScore")
+
         return None, None
 
     async def declare_intfar(self): # Check final game status.
         game_info = self.riot_api.get_game_details(self.active_game)
+        kills_per_team = {100: 0, 200: 0}
+        our_team = 100
         filtered_stats = []
-        for disc_id, _, summ_id in self.active_users:
-            for part_info in game_info["participantIdentities"]:
-                if summ_id == part_info["player"]["summonerId"]:
-                    for participant in game_info["participants"]:
-                        if part_info["participantId"] == participant["participantId"]:
+        for part_info in game_info["participantIdentities"]:
+            for participant in game_info["participants"]:
+                if part_info["participantId"] == participant["participantId"]:
+                    kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
+                    for disc_id, _, summ_id in self.active_users:
+                        if summ_id == part_info["player"]["summonerId"]:
+                            our_team = participant["teamId"]
                             filtered_stats.append((disc_id, participant["stats"]))
-                            break
-                    break
 
-        intfar_disc_id, reason = self.get_intfar_details(filtered_stats)
+        kills_by_our_team = kills_per_team[our_team]
+
+        intfar_disc_id, reason = self.get_intfar_details(filtered_stats, kills_by_our_team)
         if intfar_disc_id is not None:
             await self.send_intfar_message(intfar_disc_id, reason)
         else:
             await self.channel_to_write.send("No one was terrible enough to be crowned Int-Far that game!")
 
         try: # Save stats.
-            self.database.record_stats(intfar_disc_id, self.active_game, filtered_stats)
+            self.database.record_stats(intfar_disc_id, self.active_game, filtered_stats, kills_by_our_team)
         except (DatabaseError, OperationalError) as exception:
             self.config.log("Game stats could not be saved!", self.config.log_error)
             self.config.log(exception)
@@ -278,8 +335,6 @@ class DiscordClient(discord.Client):
         if summoner_info is not None:
             self.active_users.remove(summoner_info)
             self.config.log("Summoner left voice: " + summoner_info[1])
-            if not self.polling_is_active():
-                self.config.log("Polling is no longer active.")
 
     async def test_stuff(self):
         game_id = 4699244357
@@ -347,7 +402,7 @@ class DiscordClient(discord.Client):
             return msg
 
         response = ""
-        if second_command is not None:
+        if second_command is not None: # Check intfar stats for someone else.
             if second_command == "all":
                 for disc_id, _, _ in self.database.summoners:
                     response += "- " + get_intfar_stats(disc_id) + "\n"
@@ -358,7 +413,7 @@ class DiscordClient(discord.Client):
                     await message.channel.send(msg)
                     return
                 response = get_intfar_stats(user_data[0])
-        else:
+        else: # Check intfar stats for the person sending the message.
             response = get_intfar_stats(message.author.id)
 
         await message.channel.send(response)
