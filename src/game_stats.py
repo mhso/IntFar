@@ -1,8 +1,9 @@
 import json
 from datetime import datetime
-from time import time
 
 def calc_kda(stats):
+    if stats["deaths"] == 0:
+        return stats["kills"] + stats["assists"]
     return (stats["kills"] + stats["assists"]) / stats["deaths"]
 
 def calc_kill_participation(stats, total_kills):
