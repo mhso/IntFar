@@ -299,6 +299,9 @@ class DiscordClient(discord.Client):
             self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
                             self.config.log_warning)
             nickname = f"Unknown (w/ discord ID '{disc_id}')"
+        if reason is None:
+            self.config.log(f"Int-Far reason was None!", self.config.log_warning)
+            reason = "being really, really bad"
         message = get_intfar_flavor_text(nickname, reason)
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
