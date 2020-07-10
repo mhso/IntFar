@@ -116,7 +116,6 @@ class DiscordClient(discord.Client):
             return
 
         game_status = self.check_game_status()
-        self.config.log(game_status)
         if game_status == 2: # Game is over.
             try:
                 self.config.log("GAME OVER!!")
@@ -160,7 +159,6 @@ class DiscordClient(discord.Client):
         if summ_id is None:
             return f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
         self.database.add_user(summ_name, summ_id, discord_id)
-        self.config.log(self.database.summoners)
         return f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
 
     def polling_is_active(self): # We only check game statuses if there are two or more active users.
@@ -292,6 +290,10 @@ class DiscordClient(discord.Client):
 
     async def send_intfar_message(self, disc_id, reason):
         nickname = self.get_discord_nick(disc_id)
+        if nickname is None:
+            self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
+                            self.config.log_warning)
+            nickname = f"Unknown (w/ discord ID '{disc_id}')"
         message = get_intfar_flavor_text(nickname, reason)
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
@@ -315,8 +317,7 @@ class DiscordClient(discord.Client):
 
         return None, None
 
-    async def declare_intfar(self): # Check final game status.
-        game_info = self.riot_api.get_game_details(self.active_game)
+    def get_filtered_stats(self, game_info):
         kills_per_team = {100: 0, 200: 0}
         our_team = 100
         filtered_stats = []
@@ -328,8 +329,11 @@ class DiscordClient(discord.Client):
                         if summ_id == part_info["player"]["summonerId"]:
                             our_team = participant["teamId"]
                             filtered_stats.append((disc_id, participant["stats"]))
+        return filtered_stats, kills_per_team[our_team]
 
-        kills_by_our_team = kills_per_team[our_team]
+    async def declare_intfar(self): # Check final game status.
+        game_info = self.riot_api.get_game_details(self.active_game)
+        filtered_stats, kills_by_our_team = self.get_filtered_stats(game_info)
 
         intfar_disc_id, reason = self.get_intfar_details(filtered_stats, kills_by_our_team)
         if intfar_disc_id is not None:
