@@ -55,11 +55,12 @@ class Database:
                 return disc_id, summ_name, summ_id
         return None
 
-    def get_stat(self, stat, best, disc_id):
+    def get_stat(self, stat, value, best, disc_id, maximize=True):
+        aggregator = "MAX" if maximize else "MIN"
         table = "best_stats" if best else "worst_stats"
-        query = f"SELECT Count(*), {stat} FROM {table} WHERE {stat}=?"
+        query = f"SELECT Count(*), {aggregator}({value}), game_id FROM {table} WHERE {stat}=?"
         with closing(self.get_connection()) as db:
-            return db.cursor().execute(query, (disc_id,)).fetchone()[0]
+            return db.cursor().execute(query, (disc_id,)).fetchone()
 
     def record_stats(self, intfar_id, game_id, data, kills_by_our_team):
         (min_kills_id, min_kills,

@@ -14,6 +14,7 @@ class Config:
         self.vision_score_lower_threshold = 9
         self.log_warning = 1
         self.log_error = 2
+        self.message_timeout = 1.5
 
     def log(self, data, severity=0):
         curr_time = datetime.now()

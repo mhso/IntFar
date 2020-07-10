@@ -1,4 +1,5 @@
 import random
+from time import time
 from sqlite3 import DatabaseError, OperationalError
 import asyncio
 import discord
@@ -6,7 +7,6 @@ import riot_api
 import game_stats
 
 DISCORD_SERVER_ID = 619073595561213953
-#DISCORD_SERVER_ID = 512363920044982272 # My server
 CHANNEL_ID = 730744358751567902
 
 INTFAR_FLAVOR_TEXTS = [
@@ -20,8 +20,9 @@ INTFAR_FLAVOR_TEXTS = [
 NO_INTFAR_FLAVOR_TEXTS = [
     "Hecking good job bois, no one inted their ass off that game {emote_uwucat}",
     "No one was sucked enough to be crowned Int-Far that game! Big doinks all around {emote_big_doinks}",
-    "Get outta my face bitch! BOW!! No Int-Fars that game {emote_Bitcoinect}",
-    "We are so god damn good at this game!! No inting = no problems {emote_main}"
+    "Get outta my face bitch! BOW!! No Int-Far that game {emote_Bitcoinect}",
+    "We are so god damn good at this game!! No inting = no problems {emote_main}",
+    "Being this good is not easy, but damn do we pull it off well! No Int-Far that game {emote_swell}"
 ]
 
 MOST_DEATHS_FLAVORS = [
@@ -90,6 +91,7 @@ class DiscordClient(discord.Client):
         self.active_game = None
         self.channel_to_write = None
         self.initialized = False
+        self.last_message_time = {}
 
     async def poll_for_game_end(self):
         """
@@ -376,7 +378,6 @@ class DiscordClient(discord.Client):
                     count = 0
                     for member in members_in_voice:
                         start_polling = count == 1
-                        print(start_polling)
                         await self.user_joined_voice(member, start_polling)
                         count += 1
                 for text_channel in guild.text_channels:
@@ -408,21 +409,21 @@ class DiscordClient(discord.Client):
         response += "\n```"
         await message.channel.send(self.insert_emotes(response))
 
-    async def handle_intfar_msg(self, message, second_command):
+    async def handle_intfar_msg(self, message, target_name):
         def get_intfar_stats(disc_id):
             person_to_check = self.get_discord_nick(disc_id)
-            stat_value = self.database.get_stat("int_far", True, disc_id)
+            stat_value = self.database.get_stat("int_far", "int_far", True, disc_id)[0]
             msg = f"{person_to_check} has been an Int-Far {stat_value} times "
             msg += self.insert_emotes("{emote_unlimited_chins}")
             return msg
 
         response = ""
-        if second_command is not None: # Check intfar stats for someone else.
-            if second_command == "all":
+        if target_name is not None: # Check intfar stats for someone else.
+            if target_name == "all":
                 for disc_id, _, _ in self.database.summoners:
                     response += "- " + get_intfar_stats(disc_id) + "\n"
             else:
-                user_data = self.database.discord_id_from_summoner(second_command.strip())
+                user_data = self.database.discord_id_from_summoner(target_name.strip())
                 if user_data is None:
                     msg = f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
                     await message.channel.send(msg)
@@ -433,8 +434,54 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    async def handle_stat_msg(self, message, first_cmd, second_cmd, target_name):
+        if second_cmd in STAT_COMMANDS:
+            stat = second_cmd
+            stat_index = STAT_COMMANDS.index(stat)
+            self.config.log(f"Stat requested: {first_cmd} {stat}")
+            try:
+                best = first_cmd == "best"
+                quantity_type = 0 if best else 1
+                maximize = stat != "deaths"
+                id_to_check = message.author.id
+                recepient = message.author.name
+
+                if target_name is not None: # Get someone else's stat information.
+                    user_data = self.database.discord_id_from_summoner(target_name.strip())
+                    if user_data is None:
+                        msg = f"Error: Invalid summoner name {self.get_emoji_by_name('fu')}"
+                        await message.channel.send(msg)
+                        return
+                    id_to_check = user_data[0]
+                    recepient = self.get_discord_nick(id_to_check)
+
+                stat_count, min_or_max_value, game_id = self.database.get_stat(stat + "_id", stat, best, id_to_check, maximize)
+                game_info = self.riot_api.get_game_details(game_id)
+                summ_id = self.database.summoner_from_discord_id(id_to_check)[2]
+                game_summary = game_stats.get_game_summary(game_info, summ_id)
+
+                readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
+
+                response = (f"{recepient} has gotten {readable_stat} in a game " +
+                            f"{stat_count} times " + self.insert_emotes("{emote_pog}") + "\n")
+                if min_or_max_value is not None:
+                    response += f"His {readable_stat} ever was {min_or_max_value} as {game_summary}"
+
+                await message.channel.send(response)
+            except (DatabaseError, OperationalError) as exception:
+                response = self.insert_emotes("Something went wrong when querying the database! {emote_fu}")
+                await message.channel.send(response, self.config.log_error)
+                self.config.log(exception)
+        else:
+            response = self.insert_emotes(f"Not a valid stat: '{second_cmd}' " + "{emote_carole_fucking_baskin}")
+            await message.channel.send(response)
+
     async def on_message(self, message):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
+            return
+        if time() - self.last_message_time.get(message.author.id, 0) < self.config.message_timeout:
+            # Some guy is sending messages too fast!
+            await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
             return
 
         msg = message.content.strip()
@@ -458,30 +505,19 @@ class DiscordClient(discord.Client):
                     response = "**--- Registered bois ---**\n" + response
                 await message.channel.send(self.insert_emotes(response))
             elif first_command == "intfar":
-                await self.handle_intfar_msg(message, second_command)
+                target_name = None
+                if len(split) > 1:
+                    target_name = " ".join(split[1:])
+                await self.handle_intfar_msg(message, target_name)
             elif first_command in ("help", "commands"):
-                self.handle_helper_msg(message)
+                await self.handle_helper_msg(message)
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
-                if second_command in STAT_COMMANDS:
-                    stat = second_command
-                    stat_index = STAT_COMMANDS.index(stat)
-                    self.config.log(f"Stat requested: {first_command} {stat}")
-                    try:
-                        best = first_command == "best"
-                        quantity_type = 0 if best else 1
-                        self.config.log(message.author.id)
-                        stat_value = self.database.get_stat(stat + "_id", best, message.author.id)
-                        readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
-                        response = f"{message.author.name} has gotten {readable_stat} in a game {stat_value} times"
-                        response += self.insert_emotes("{emote_pog}")
-                        await message.channel.send(response)
-                    except (DatabaseError, OperationalError) as exception:
-                        response = self.insert_emotes("Something went wrong when querying the database! {emote_fu}")
-                        await message.channel.send(response, self.config.log_error)
-                        self.config.log(exception)
-                else:
-                    response = self.insert_emotes(f"Not a valid stat: '{second_command}' " + "{emote_carole_fucking_baskin}")
-                    await message.channel.send(response)
+                target_name = None
+                if len(split) > 2:
+                    target_name = " ".join(split[2:])
+                await self.handle_stat_msg(message, first_command, second_command, target_name)
+
+        self.last_message_time[message.author.id] = time()
 
     async def on_voice_state_update(self, member, before, after):
         if before.channel is None and after.channel is not None: # User joined.

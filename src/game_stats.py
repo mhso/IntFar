@@ -1,3 +1,7 @@
+import json
+from datetime import datetime
+from time import time
+
 def calc_kda(stats):
     return (stats["kills"] + stats["assists"]) / stats["deaths"]
 
@@ -21,3 +25,28 @@ def get_outlier_stat(stat, data):
     least_id, stats = get_outlier(data, stat, asc=False)
     least = stats[stat]
     return most_id, most, least_id, least
+
+def get_game_summary(data, summ_id):
+    stats = None
+    champ_id = 0
+    with open("champions.json") as fp:
+        champion_data = json.load(fp)
+
+        for part_info in data["participantIdentities"]:
+            if part_info["player"]["summonerId"] == summ_id:
+                for participant in data["participants"]:
+                    if part_info["participantId"] == participant["participantId"]:
+                        stats = participant["stats"]
+                        champ_id = participant["championId"]
+                        break
+                break
+
+        champ_played = None
+        for champ_name in champion_data["data"]:
+            if int(champion_data["data"][champ_name]["key"]) == champ_id:
+                champ_played = champion_data["data"][champ_name]["name"]
+                break
+        date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
+
+        return (f"{champ_played} with a score of {stats['kills']}/" +
+                f"{stats['deaths']}/{stats['assists']} on {date}")
