@@ -15,7 +15,8 @@ INTFAR_FLAVOR_TEXTS = [
     "Oof {nickname}, better luck next time {emote_smol_dave} take this Int-Far award for {reason}!",
     "Oh heck {emote_morton} {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!",
     "Yikes {emote_big_dave} unlucko game from {nickname}. Accept this pity gift of being crowned Int-Far for {reason}.",
-    "Some serious smol dick energy from {nickname} that game {emote_gual_yikes} have an Int-Far for {reason}."
+    "Some serious smol dick energy from {nickname} that game {emote_gual_yikes} have an Int-Far for {reason}.",
+    "Welp... {nickname}, you really let everyone down on that one {emote_nat_really_fine} +1 Int-Far to you for {reason}!"
 ]
 
 NO_INTFAR_FLAVOR_TEXTS = [
@@ -199,6 +200,9 @@ class DiscordClient(discord.Client):
         return None
 
     def get_emoji_by_name(self, emoji_name):
+        """
+        Return the ID of the emoji matching the given name.
+        """
         for guild in self.guilds:
             if guild.id == DISCORD_SERVER_ID:
                 for emoji in guild.emojis:
@@ -207,6 +211,10 @@ class DiscordClient(discord.Client):
         return None
 
     def insert_emotes(self, text):
+        """
+        Finds all occurences of {emote_some_emote} in the given string and replaces it with
+        the id of the actual emote matching 'some_emote'.
+        """
         replaced = text
         emote_index = replaced.find("{emote_")
         while emote_index > -1:
@@ -215,7 +223,10 @@ class DiscordClient(discord.Client):
             while replaced[end_index] != "}":
                 emote += replaced[end_index]
                 end_index += 1
-            replaced = replaced.replace("{emote_" + emote + "}", self.get_emoji_by_name(emote))
+            emoji = self.get_emoji_by_name(emote)
+            if emoji is None:
+                emoji = "" # Replace with empty string if emoji could not be found.
+            replaced = replaced.replace("{emote_" + emote + "}", emoji)
             emote_index = replaced.find("{emote_")
         return replaced
 
@@ -501,12 +512,15 @@ class DiscordClient(discord.Client):
                 return
 
             second_command = None if len(split) < 2 else split[1]
-            if first_command == "register":
+            if first_command == "register": # Register the user who sent the command.
                 if len(split) > 1:
                     summ_name = " ".join(split[1:])
                     status = self.add_user(summ_name, message.author.id)
                     await message.channel.send(status)
-            elif first_command == "users":
+                else:
+                    response = "You must supply a summoner name {emote_angry_gual}"
+                    await message.channel.send(self.insert_emotes(response))
+            elif first_command == "users": # List all registered users.
                 response = ""
                 for disc_id, summ_name, _ in self.database.summoners:
                     nickname = self.get_discord_nick(disc_id)
@@ -516,7 +530,7 @@ class DiscordClient(discord.Client):
                 else:
                     response = "**--- Registered bois ---**\n" + response
                 await message.channel.send(self.insert_emotes(response))
-            elif first_command == "intfar":
+            elif first_command == "intfar": # Lookup how many intfar 'awards' the given user has.
                 target_name = None
                 if len(split) > 1:
                     target_name = " ".join(split[1:])
