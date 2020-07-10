@@ -266,12 +266,15 @@ class DiscordClient(discord.Client):
         This is determined by:
             - Having the lowest KP in the group
             - KP being less than 30
+            - Number of kills + assists being less than 10
         Returns None if none of these criteria matches a person.
         """
         intfar, stats = game_stats.get_outlier(data, "kp", total_kills=team_kills)
         lowest_kp = game_stats.calc_kill_participation(stats, team_kills)
+        kills = stats["kills"]
+        assists = stats["assists"]
         return ((intfar, lowest_kp)
-                if lowest_kp < self.config.kp_lower_threshold
+                if lowest_kp < self.config.kp_lower_threshold and kills + assists < 10
                 else None, None)
 
     def intfar_by_vision_score(self, data):
@@ -280,12 +283,14 @@ class DiscordClient(discord.Client):
         This is determined by:
             - Having the lowest vision score in the group
             - Vision score being less than 9
+            - KDA being less than 3
         Returns None if none of these criteria matches a person.
         """
         intfar, stats = game_stats.get_outlier(data, "visionScore")
         lowest_score = stats["visionScore"]
+        kda = game_stats.calc_kda(stats)
         return ((intfar, lowest_score)
-                if lowest_score < self.config.vision_score_lower_threshold
+                if lowest_score < self.config.vision_score_lower_threshold and kda < 3
                 else None, None)
 
     async def send_intfar_message(self, disc_id, reason):

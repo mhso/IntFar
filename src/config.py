@@ -10,7 +10,7 @@ class Config:
         self.database = "database.db"
         self.kda_lower_threshold = 1.3
         self.highest_death_threshold = 9
-        self.kp_lower_threshold = 30
+        self.kp_lower_threshold = 25
         self.vision_score_lower_threshold = 9
         self.log_warning = 1
         self.log_error = 2
