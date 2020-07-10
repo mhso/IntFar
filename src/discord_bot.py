@@ -369,6 +369,7 @@ class DiscordClient(discord.Client):
                 self.config.log("Polling is now active!")
                 asyncio.create_task(self.poll_for_game_start())
             self.active_users.append(summoner_info)
+            self.config.log(f"Active users: {len(self.active_users)}")
 
     async def user_left_voice(self, member):
         self.config.log("User left voice: " + str(member.id))
@@ -376,6 +377,7 @@ class DiscordClient(discord.Client):
         if summoner_info is not None:
             self.active_users.remove(summoner_info)
             self.config.log("Summoner left voice: " + summoner_info[1])
+            self.config.log(f"Active users: {len(self.active_users)}")
 
     async def test_stuff(self):
         game_id = 4699244357
@@ -472,7 +474,7 @@ class DiscordClient(discord.Client):
             try:
                 best = first_cmd == "best"
                 quantity_type = 0 if best else 1
-                maximize = stat != "deaths"
+                maximize = not ((stat != "deaths") ^ best)
                 id_to_check = message.author.id
                 recepient = message.author.name
 
