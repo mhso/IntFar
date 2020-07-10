@@ -50,6 +50,10 @@ LOWEST_VISION_FLAVORS = [
     "loving enemy death brushes a bit too much with {visionScore} vision score"
 ]
 
+VALID_COMMANDS = [
+    "register", "users", "help", "commands", "intfar", "best", "worst"
+]
+
 STAT_COMMANDS = [
     "kills", "deaths", "kda", "damage",
     "cs", "gold", "kp", "vision_wards", "vision_score"
@@ -485,12 +489,16 @@ class DiscordClient(discord.Client):
         msg = message.content.strip()
         if msg.startswith("!"):
             split = msg.split(" ")
+            first_command = split[0][1:]
+
+            if first_command not in VALID_COMMANDS:
+                return
+
             if time() - self.last_message_time.get(message.author.id, 0) < self.config.message_timeout:
                 # Some guy is sending messages too fast!
                 await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
                 return
 
-            first_command = split[0][1:]
             second_command = None if len(split) < 2 else split[1]
             if first_command == "register":
                 if len(split) > 1:
