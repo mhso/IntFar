@@ -86,6 +86,23 @@ class Database:
         (min_vision_id, min_vision,
          max_vision_id, max_vision) = game_stats.get_outlier_stat("visionScore", data)
 
+        self.config.log(
+            "Saving best stats:\n"+
+            f"({max_kills_id} - {max_kills}), ({min_deaths_id} - {min_deaths}), " +
+            f"({max_kda_id} - {max_kda}), ({max_damage_id} - {max_damage}), " +
+            f"({max_cs_id} - {max_cs}), ({max_gold_id} - {max_gold}), " +
+            f"({max_kp_id} - {max_kp}), ({max_wards_id} - {max_wards}), " +
+            f"({max_vision_id} - {max_vision})"
+        )
+        self.config.log(
+            "Saving worst stats:\n"+
+            f"({min_kills_id} - {min_kills}), ({max_deaths_id} - {max_deaths}), " +
+            f"({min_kda_id} - {min_kda}), ({min_damage_id} - {min_damage}), " +
+            f"({min_cs_id} - {min_cs}), ({min_gold_id} - {min_gold}), " +
+            f"({min_kp_id} - {min_kp}), ({min_wards_id} - {min_wards}), " +
+            f"({min_vision_id} - {min_vision})"
+        )
+
         query_prefix = "INSERT INTO "
         query_cols = (
             """

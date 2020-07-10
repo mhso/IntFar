@@ -400,9 +400,11 @@ class DiscordClient(discord.Client):
             "!commands - Show this helper text.\n\n" +
             "!intfar (summoner_name) - Show how many times you (if no summoner name is included), " +
             "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users.\n\n"
-            "!best [stat] - Show how many times you were the best in the specific stat. " +
+            "!best [stat] (summoner_name) - Show how many times you (or someone else) " +
+            "were the best in the specific stat. " +
             "Fx. '!best kda' shows how many times you had the best KDA in a game.\n\n" +
-            "!worst [stat] - Show how many times you were the worst at the specific stat.\n\n```" +
+            "!worst [stat] (summoner_name) - Show how many times you (or someone else) " +
+            "were the worst at the specific stat.\n\n```" +
             "**--- Valid stats ---**\n```"
         )
         response += valid_stats
