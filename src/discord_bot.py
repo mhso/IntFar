@@ -19,7 +19,7 @@ INTFAR_FLAVOR_TEXTS = [
 
 NO_INTFAR_FLAVOR_TEXTS = [
     "Hecking good job bois, no one inted their ass off that game {emote_uwucat}",
-    "No one was sucked enough to be crowned Int-Far that game! Big doinks all around {emote_big_doinks}",
+    "No one sucked enough to be crowned Int-Far that game! Big doinks all around {emote_big_doinks}",
     "Get outta my face bitch! BOW!! No Int-Far that game {emote_Bitcoinect}",
     "We are so god damn good at this game!! No inting = no problems {emote_main}",
     "Being this good is not easy, but damn do we pull it off well! No Int-Far that game {emote_swell}"
@@ -481,14 +481,15 @@ class DiscordClient(discord.Client):
     async def on_message(self, message):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
-        if time() - self.last_message_time.get(message.author.id, 0) < self.config.message_timeout:
-            # Some guy is sending messages too fast!
-            await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
-            return
 
         msg = message.content.strip()
         if msg.startswith("!"):
             split = msg.split(" ")
+            if time() - self.last_message_time.get(message.author.id, 0) < self.config.message_timeout:
+                # Some guy is sending messages too fast!
+                await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
+                return
+
             first_command = split[0][1:]
             second_command = None if len(split) < 2 else split[1]
             if first_command == "register":
@@ -519,7 +520,7 @@ class DiscordClient(discord.Client):
                     target_name = " ".join(split[2:])
                 await self.handle_stat_msg(message, first_command, second_command, target_name)
 
-        self.last_message_time[message.author.id] = time()
+            self.last_message_time[message.author.id] = time()
 
     async def on_voice_state_update(self, member, before, after):
         if before.channel is None and after.channel is not None: # User joined.
