@@ -3,7 +3,7 @@ import config
 import riot_api
 import game_stats
 
-game_id = 4700352835
+game_id = 4700945429
 
 auth = json.load(open("auth.json"))
 

@@ -30,7 +30,7 @@ def get_outlier_stat(stat, data):
 def get_game_summary(data, summ_id):
     stats = None
     champ_id = 0
-    with open("champions.json") as fp:
+    with open("champions.json", encoding="UTF-8") as fp:
         champion_data = json.load(fp)
 
         for part_info in data["participantIdentities"]:
@@ -41,6 +41,8 @@ def get_game_summary(data, summ_id):
                         champ_id = participant["championId"]
                         break
                 break
+
+        print(champ_id)
 
         champ_played = None
         for champ_name in champion_data["data"]:

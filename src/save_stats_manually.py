@@ -6,7 +6,7 @@ from config import Config
 from discord_bot import DiscordClient
 import riot_api
 
-GAME_ID = 4700945429
+GAME_ID = 4701070701 
 
 auth = json.load(open("auth.json"))
 
@@ -29,7 +29,7 @@ def save_stats(disc_client, api_client):
     sleep(5)
     disc_client.active_users = [
         disc_client.database.discord_id_from_summoner("Senile Felines"),
-        disc_client.database.discord_id_from_summoner("Prince Jarvan lV"),
+        disc_client.database.discord_id_from_summoner("Dumbledonger"),
     ]
     game_info = api_client.get_game_details(GAME_ID)
     filtered_stats, kills_by_our_team = disc_client.get_filtered_stats(game_info)
