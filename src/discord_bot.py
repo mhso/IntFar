@@ -14,7 +14,8 @@ INTFAR_FLAVOR_TEXTS = [
     "Uh oh, stinky {emote_happy_nono}! {nickname} has been a very naughty boi! He is awarded one Int-Far token for {reason}!",
     "Oof {nickname}, better luck next time {emote_smol_dave} take this Int-Far award for {reason}!",
     "Oh heck {emote_morton} {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!",
-    "Yikes {emote_big_dave} unlucko game from {nickname}. Accept this pity gift of being crowned Int-Far for {reason}."
+    "Yikes {emote_big_dave} unlucko game from {nickname}. Accept this pity gift of being crowned Int-Far for {reason}.",
+    "Some serious smol dick energy from {nickname} that game {emote_gual_yikes} have an Int-Far for {reason}."
 ]
 
 NO_INTFAR_FLAVOR_TEXTS = [
