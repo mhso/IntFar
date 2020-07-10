@@ -78,11 +78,11 @@ def get_reason_flavor_text(value, reason):
     if reason == "kda":
         flavor_values = LOWEST_KDA_FLAVORS
     elif reason == "deaths":
-        flavor_text = MOST_DEATHS_FLAVORS
+        flavor_values = MOST_DEATHS_FLAVORS
     elif reason == "kp":
-        flavor_text = LOWEST_KP_FLAVORS
+        flavor_values = LOWEST_KP_FLAVORS
     elif reason == "visionScore":
-        flavor_text = LOWEST_VISION_FLAVORS
+        flavor_values = LOWEST_VISION_FLAVORS
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     return flavor_text.replace("{" + reason + "}", value)
 
