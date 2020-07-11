@@ -42,8 +42,6 @@ def get_game_summary(data, summ_id):
                         break
                 break
 
-        print(champ_id)
-
         champ_played = None
         for champ_name in champion_data["data"]:
             if int(champion_data["data"][champ_name]["key"]) == champ_id:

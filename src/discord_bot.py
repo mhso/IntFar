@@ -300,7 +300,7 @@ class DiscordClient(discord.Client):
                             self.config.log_warning)
             nickname = f"Unknown (w/ discord ID '{disc_id}')"
         if reason is None:
-            self.config.log(f"Int-Far reason was None!", self.config.log_warning)
+            self.config.log("Int-Far reason was None!", self.config.log_warning)
             reason = "being really, really bad"
         message = get_intfar_flavor_text(nickname, reason)
         message = self.insert_emotes(message)
@@ -493,15 +493,14 @@ class DiscordClient(discord.Client):
                     recepient = self.get_discord_nick(id_to_check)
 
                 stat_count, min_or_max_value, game_id = self.database.get_stat(stat + "_id", stat, best, id_to_check, maximize)
-                game_info = self.riot_api.get_game_details(game_id)
-                summ_id = self.database.summoner_from_discord_id(id_to_check)[2]
-                game_summary = game_stats.get_game_summary(game_info, summ_id)
 
                 readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
-
                 response = (f"{recepient} has gotten {readable_stat} in a game " +
                             f"{stat_count} times " + self.insert_emotes("{emote_pog}") + "\n")
                 if min_or_max_value is not None:
+                    game_info = self.riot_api.get_game_details(game_id)
+                    summ_id = self.database.summoner_from_discord_id(id_to_check)[2]
+                    game_summary = game_stats.get_game_summary(game_info, summ_id)
                     response += f"His {readable_stat} ever was {min_or_max_value} as {game_summary}"
 
                 await message.channel.send(response)
