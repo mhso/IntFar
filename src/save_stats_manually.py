@@ -4,9 +4,10 @@ from time import sleep
 from database import Database
 from config import Config
 from discord_bot import DiscordClient
+import game_stats
 import riot_api
 
-GAME_ID = 4701070701 
+GAME_ID = 4701602782 
 
 auth = json.load(open("auth.json"))
 
@@ -26,7 +27,8 @@ client = DiscordClient(conf, database_client)
 api = riot_api.APIClient(conf)
 
 def save_stats(disc_client, api_client):
-    sleep(5)
+    sleep(10)
+    print(disc_client.database.summoners)
     disc_client.active_users = [
         disc_client.database.discord_id_from_summoner("Senile Felines"),
         disc_client.database.discord_id_from_summoner("Dumbledonger"),

@@ -1,3 +1,4 @@
+from time import sleep
 import requests
 
 API_ROUTE = "https://euw1.api.riotgames.com"
@@ -28,9 +29,12 @@ class APIClient:
             return None
         return response.json()["gameId"]
 
-    def get_game_details(self, game_id):
+    def get_game_details(self, game_id, tries=0):
         endpoint = "/lol/match/v4/matches/{0}"
         response = self.make_request(endpoint, game_id)
         if response.status_code != 200:
-            return None
+            if tries == 0:
+                return None
+            sleep(0.2)
+            return self.get_game_details(game_id, tries - 1) # Try again.
         return response.json()

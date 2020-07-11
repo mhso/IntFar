@@ -47,7 +47,7 @@ LOWEST_KP_FLAVORS = [
 ]
 
 LOWEST_VISION_FLAVORS = [
-    "living with a blindfold on with {visionScore} vision score",
+    "playing with a blindfold on with {visionScore} vision score",
     "hating winning with a vision score of {visionScore}",
     "loving enemy death brushes a bit too much with {visionScore} vision score"
 ]
@@ -240,9 +240,9 @@ class DiscordClient(discord.Client):
         intfar, stats = game_stats.get_outlier(data, "kda")
         lowest_kda = game_stats.calc_kda(stats)
         deaths = stats["deaths"]
-        return ((intfar, lowest_kda)
-                if lowest_kda < self.config.kda_lower_threshold and deaths > 2
-                else (None, None))
+        if lowest_kda < self.config.kda_lower_threshold and deaths > 2:
+            return (intfar, lowest_kda)
+        return (None, None)
 
     def intfar_by_deaths(self, data):
         """
@@ -256,9 +256,9 @@ class DiscordClient(discord.Client):
         intfar, stats = game_stats.get_outlier(data, "deaths", asc=False)
         highest_deaths = stats["deaths"]
         kda = game_stats.calc_kda(stats)
-        return ((intfar, highest_deaths)
-                if highest_deaths > self.config.highest_death_threshold and kda < 2.1
-                else None, None)
+        if highest_deaths > self.config.highest_death_threshold and kda < 2.1:
+            return (intfar, highest_deaths)
+        return (None, None)
 
     def intfar_by_kp(self, data, team_kills):
         """
@@ -273,9 +273,9 @@ class DiscordClient(discord.Client):
         lowest_kp = game_stats.calc_kill_participation(stats, team_kills)
         kills = stats["kills"]
         assists = stats["assists"]
-        return ((intfar, lowest_kp)
-                if lowest_kp < self.config.kp_lower_threshold and kills + assists < 10
-                else None, None)
+        if lowest_kp < self.config.kp_lower_threshold and kills + assists < 10:
+            return (intfar, lowest_kp)
+        return (None, None)
 
     def intfar_by_vision_score(self, data):
         """
@@ -289,9 +289,9 @@ class DiscordClient(discord.Client):
         intfar, stats = game_stats.get_outlier(data, "visionScore")
         lowest_score = stats["visionScore"]
         kda = game_stats.calc_kda(stats)
-        return ((intfar, lowest_score)
-                if lowest_score < self.config.vision_score_lower_threshold and kda < 3
-                else None, None)
+        if lowest_score < self.config.vision_score_lower_threshold and kda < 3:
+            return (intfar, lowest_score)
+        return (None, None)
 
     async def send_intfar_message(self, disc_id, reason):
         nickname = self.get_discord_nick(disc_id)
@@ -309,18 +309,22 @@ class DiscordClient(discord.Client):
     def get_intfar_details(self, stats, team_kills):
         intfar_disc_id, kda = self.intfar_by_kda(stats)
         if intfar_disc_id is not None:
+            self.config.log("Int-Far because of KDA.")
             return intfar_disc_id, get_reason_flavor_text(f"{kda:.2f}", "kda")
 
         intfar_disc_id, deaths = self.intfar_by_deaths(stats)
         if intfar_disc_id is not None:
+            self.config.log("Int-Far because of deaths.")
             return intfar_disc_id, get_reason_flavor_text(str(deaths), "deaths")
 
         intfar_disc_id, kp = self.intfar_by_kp(stats, team_kills)
         if intfar_disc_id is not None:
+            self.config.log("Int-Far because of kill participation.")
             return intfar_disc_id, get_reason_flavor_text(str(kp), "kp")
 
         intfar_disc_id, vision_score = self.intfar_by_vision_score(stats)
         if intfar_disc_id is not None:
+            self.config.log("Int-Far because of vision score.")
             return intfar_disc_id, get_reason_flavor_text(str(vision_score), "visionScore")
 
         return None, None
@@ -340,13 +344,14 @@ class DiscordClient(discord.Client):
         return filtered_stats, kills_per_team[our_team]
 
     async def declare_intfar(self): # Check final game status.
-        game_info = self.riot_api.get_game_details(self.active_game)
+        game_info = self.riot_api.get_game_details(self.active_game, tries=2)
         filtered_stats, kills_by_our_team = self.get_filtered_stats(game_info)
 
         intfar_disc_id, reason = self.get_intfar_details(filtered_stats, kills_by_our_team)
         if intfar_disc_id is not None:
             await self.send_intfar_message(intfar_disc_id, reason)
         else:
+            self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
             await self.channel_to_write.send(self.insert_emotes(response))
 
