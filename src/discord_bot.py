@@ -454,12 +454,12 @@ class DiscordClient(discord.Client):
             intfar_reason_ids = self.database.get_intfar_stats(disc_id)
             intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
             for reason_id in intfar_reason_ids:
-                intfar_counts[reason_id] += 1
+                intfar_counts[reason_id[0]] += 1
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             msg += self.insert_emotes("{emote_unlimited_chins}") + "\n"
             reaons_desc = "Int-Fars awarded so far:"
             for reason_id, reason in enumerate(INTFAR_REASONS):
-                reaons_desc += f"\n - {reason}: {intfar_counts[reason_id]}\n"
+                reaons_desc += f"\n - {reason}: **{intfar_counts[reason_id]}**"
             return msg + reaons_desc
 
         response = ""
