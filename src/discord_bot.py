@@ -566,8 +566,9 @@ class DiscordClient(discord.Client):
             intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
             for reason_id in intfar_reason_ids:
                 intfar_ids = [int(x) for x in str(reason_id[0])]
-                for intfar_id in intfar_ids:
-                    intfar_counts[intfar_id] += 1
+                for index, intfar_id in enumerate(intfar_ids):
+                    if intfar_id == 1:
+                        intfar_counts[index] += 1
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             msg += self.insert_emotes("{emote_unlimited_chins}")
             if expanded:
