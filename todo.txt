@@ -1,3 +1,4 @@
 - Int-Far (og stat?) streak (efter 3 gange i træk maybe)
 - Besked efter streak er blevet brudt?
 - Få fjernet en Int-Far med exceptional plays (penta-kill, over 10 KDA, etc.)
+- Breakdown af hvad man fik Int-Far for, og hvor mange af hver type?

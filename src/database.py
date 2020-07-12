@@ -62,6 +62,11 @@ class Database:
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchone()
 
+    def get_intfar_stats(self, disc_id):
+        query = "SELECT intfar_reason FROM best_stats WHERE int_far=?"
+        with closing(self.get_connection()) as db:
+            return db.cursor().execute(query, (disc_id,)).fetchall()
+
     def record_stats(self, intfar_id, game_id, data, kills_by_our_team):
         (min_kills_id, min_kills,
          max_kills_id, max_kills) = game_stats.get_outlier_stat("kills", data)
@@ -88,6 +93,7 @@ class Database:
 
         self.config.log(
             "Saving best stats:\n"+
+            f"{game_id}, {intfar_id}, " + 
             f"({max_kills_id} - {max_kills}), ({min_deaths_id} - {min_deaths}), " +
             f"({max_kda_id} - {max_kda}), ({max_damage_id} - {max_damage}), " +
             f"({max_cs_id} - {max_cs}), ({max_gold_id} - {max_gold}), " +

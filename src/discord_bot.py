@@ -27,6 +27,8 @@ NO_INTFAR_FLAVOR_TEXTS = [
     "Being this good is not easy, but damn do we pull it off well! No Int-Far that game {emote_swell}"
 ]
 
+INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
+
 MOST_DEATHS_FLAVORS = [
     "dying a total of {deaths} times",
     "feeding every child in Africa by giving away {deaths} kills",
@@ -230,7 +232,7 @@ class DiscordClient(discord.Client):
 
     def intfar_by_kda(self, data):
         """
-        Returns the info of the Int-Far, if this person has a truly terribhle KDA.
+        Returns the info of the Int-Far, if this person has a truly terrible KDA.
         This is determined by:
             - KDA being the lowest of the group
             - KDA being less than 1.0
@@ -449,10 +451,16 @@ class DiscordClient(discord.Client):
     async def handle_intfar_msg(self, message, target_name):
         def get_intfar_stats(disc_id):
             person_to_check = self.get_discord_nick(disc_id)
-            stat_value = self.database.get_stat("int_far", "int_far", True, disc_id)[0]
-            msg = f"{person_to_check} has been an Int-Far {stat_value} times "
-            msg += self.insert_emotes("{emote_unlimited_chins}")
-            return msg
+            intfar_reason_ids = self.database.get_intfar_stats(disc_id)
+            intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
+            for reason_id in intfar_reason_ids:
+                intfar_counts[reason_id] += 1
+            msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
+            msg += self.insert_emotes("{emote_unlimited_chins}") + "\n"
+            reaons_desc = "Int-Fars awarded so far:"
+            for reason_id in intfar_reason_ids:
+                reaons_desc += f"\n - {INTFAR_REASONS[reason_id[0]]}: {intfar_counts[reason_id]}\n"
+            return msg + reaons_desc
 
         response = ""
         if target_name is not None: # Check intfar stats for someone else.
