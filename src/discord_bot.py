@@ -212,7 +212,7 @@ class DiscordClient(discord.Client):
             if guild.id == DISCORD_SERVER_ID:
                 for member in guild.members:
                     if member.id == disc_id:
-                        return member.display_name
+                        return member.mention
         return None
 
     def get_discord_nick(self, disc_id):
@@ -276,7 +276,7 @@ class DiscordClient(discord.Client):
             if stats["role"] != "DUO_SUPPORT" and damage_dealt < 6000:
                 mentions[disc_id].append((1, damage_dealt))
             cs_per_min = (stats["creepsPerMinDeltas"]["0-10"] + stats["creepsPerMinDeltas"]["10-20"]) / 2.0
-            if cs_per_min < 4.0:
+            if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 4.0:
                 mentions[disc_id].append((2, round_digits(cs_per_min)))
             epic_monsters_secured = stats["baronKills"] + stats["dragonKills"]
             if stats["lane"] == "JUNGLE" and epic_monsters_secured == 0:
@@ -287,14 +287,15 @@ class DiscordClient(discord.Client):
         for disc_id in mentions:
             user_str = ""
             if mentions[disc_id] != []:
-                user_str = f" - {self.get_mention_str(disc_id)} for "
+                prefix = "\n" if any_mentions else ""
+                user_str = f"{prefix}- {self.get_mention_str(disc_id)} for "
                 any_mentions = True
             for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
                 prefix = " *and* " if count > 0 else ""
                 user_str += prefix + get_honorable_mentions_flavor_text(stat_index, stat_value)
             mentions_str += user_str
 
-        return None if not any_mentions else mentions_str + "."
+        return None if not any_mentions else mentions_str
 
     def intfar_by_kda(self, data):
         """
@@ -413,10 +414,14 @@ class DiscordClient(discord.Client):
                             combined_stats = participant["stats"]
                             combined_stats.update(participant["timeline"])
                             filtered_stats.append((disc_id, combined_stats))
+
         for _, stats in filtered_stats:
             stats["kills_by_team"] = kills_per_team[our_team]
-            stats["baronKills"] = game_info["teams"]["baronKills"]
-            stats["dragonKills"] = game_info["teams"]["dragonKills"]
+            for team in game_info["teams"]:
+                if team["teamId"] == our_team:
+                    stats["baronKills"] = team["baronKills"]
+                    stats["dragonKills"] = team["dragonKills"]
+
         return filtered_stats
 
     async def declare_intfar(self): # Check final game status.
@@ -445,18 +450,18 @@ class DiscordClient(discord.Client):
                     max_count_intfar = intfar_disc_id
                 intfar_data[intfar_disc_id].append((index, stat_value))
 
-        reason = ""
         reason_ids = [0, 0, 0, 0]
-        # Go through the criteria the chosen int-far met and list them in a readable format.
-        for (count, (reason_index, stat_value)) in enumerate(intfar_data[max_count_intfar]):
-            key = reason_keys[reason_index]
-            reason_text = get_reason_flavor_text(round_digits(stat_value), key)
-            reason_ids[reason_index] = 1
-            if count > 0:
-                reason_text = " **AND** " + reason_text
-            reason += reason_text
-
         if max_count_intfar is not None: # Save data for the current game and send int-far message.
+            reason = ""
+            # Go through the criteria the chosen int-far met and list them in a readable format.
+            for (count, (reason_index, stat_value)) in enumerate(intfar_data[max_count_intfar]):
+                key = reason_keys[reason_index]
+                reason_text = get_reason_flavor_text(round_digits(stat_value), key)
+                reason_ids[reason_index] = 1
+                if count > 0:
+                    reason_text = " **AND** " + reason_text
+                reason += reason_text
+
             intfar_streak = self.database.get_current_intfar_streak(max_count_intfar)
             await self.send_intfar_message(max_count_intfar, reason, intfar_streak)
         else:
@@ -497,17 +502,6 @@ class DiscordClient(discord.Client):
             self.active_users.remove(summoner_info)
             self.config.log("Summoner left voice: " + summoner_info[1])
             self.config.log(f"Active users: {len(self.active_users)}")
-
-    async def test_stuff(self):
-        game_id = 4699244357
-        print("WE DOING IT", flush=True)
-        self.active_users = [
-            (347489125877809155, "Nønø", "vWqeigv3NlpebAwh309gZ8zWul9rNIv6zUKXGFeRWqih9ko"),
-            (267401734513491969, "Senile Felines", "LRjsmujd76mwUe5ki-cOhcfrpAVsMpsLeA9BZqSl6bMiOI0"),
-        ]
-        #self.active_game = game_id
-        self.config.status_interval = 10
-        asyncio.create_task(self.poll_for_game_start())
 
     async def on_ready(self):
         if self.initialized:
@@ -646,13 +640,13 @@ class DiscordClient(discord.Client):
         self.config.testing = True
         self.active_users = [
             self.database.discord_id_from_summoner("Prince Jarvan lV"),
-            self.database.discord_id_from_summoner("Stirred Martini"),
-            self.database.discord_id_from_summoner("Dumbledonger"),
-            self.database.discord_id_from_summoner("Senile Felines"),
-            self.database.discord_id_from_summoner("Kazpariuz"),
+            self.database.discord_id_from_summoner("Senile Felines")
+            #self.database.discord_id_from_summoner("Stirred Martini"),
+            #self.database.discord_id_from_summoner("Dumbledonger"),
+            #self.database.discord_id_from_summoner("Kazpariuz")
         ]
-        self.active_game = 4703181863 # Martin double Int-Far.
-        #self.active_game = 4700945429 # Me honorable mention.
+        #self.active_game = 4703181863 # Martin double Int-Far.
+        self.active_game = 4700945429 # Me honorable mention.
         await self.declare_intfar()
         self.config.testing = False
 
