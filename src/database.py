@@ -63,19 +63,19 @@ class Database:
             return db.cursor().execute(query, (disc_id,)).fetchone()
 
     def get_longest_intfar_streak(self, disc_id):
-        query = "SELECT int_far FROM best_stats WHERE int_far != 'None' ORDER BY id DESC"
+        query = "SELECT int_far FROM best_stats WHERE int_far != 'None' ORDER BY id"
         with closing(self.get_connection()) as db:
             int_fars = db.cursor().execute(query).fetchall()
             max_count = 0
             count = 0
             for int_far in int_fars:
                 if disc_id != int_far[0]:
-                    if count > max_count:
-                        max_count = count
                     count = 0
                 else:
                     count += 1
-            return count
+                if count > max_count:
+                    max_count = count
+            return max_count
 
     def get_current_intfar_streak(self, disc_id):
         query = "SELECT int_far FROM best_stats WHERE int_far != 'None' ORDER BY id DESC"
