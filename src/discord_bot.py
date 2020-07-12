@@ -212,7 +212,7 @@ class DiscordClient(discord.Client):
             if guild.id == DISCORD_SERVER_ID:
                 for member in guild.members:
                     if member.id == disc_id:
-                        return member.mention
+                        return member.display_name
         return None
 
     def get_discord_nick(self, disc_id):
@@ -642,11 +642,12 @@ class DiscordClient(discord.Client):
             response = self.insert_emotes(f"Not a valid stat: '{second_cmd}' " + "{emote_carole_fucking_baskin}")
             await message.channel.send(response)
 
-    def handle_test_msg(self):
+    async def handle_test_msg(self):
         self.config.testing = True
         self.active_game = 4703181863 # Martin double Int-Far.
         #self.active_game = 4700945429 # Me honorable mention.
-        self.declare_intfar()
+        await self.declare_intfar()
+        self.config.testing = False
 
     async def on_message(self, message):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
@@ -657,7 +658,7 @@ class DiscordClient(discord.Client):
             split = msg.split(" ")
             first_command = split[0][1:]
 
-            if first_command not in VALID_COMMANDS:
+            if first_command not in VALID_COMMANDS and first_command != "test":
                 return
 
             if time() - self.last_message_time.get(message.author.id, 0) < self.config.message_timeout:
@@ -697,7 +698,7 @@ class DiscordClient(discord.Client):
                     target_name = " ".join(split[2:])
                 await self.handle_stat_msg(message, first_command, second_command, target_name)
             elif first_command == "test" and message.author.id == 267401734513491969:
-                self.handle_test_msg()
+                await self.handle_test_msg()
 
             self.last_message_time[message.author.id] = time()
 
