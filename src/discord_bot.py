@@ -575,22 +575,27 @@ class DiscordClient(discord.Client):
                 streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
                 streak_desc = self.insert_emotes(streak_desc)
                 msg += reason_desc + streak_desc
-            return msg
+            return msg, len(intfar_reason_ids)
 
         response = ""
         if target_name is not None: # Check intfar stats for someone else.
             if target_name == "all":
+                messages = []
                 for disc_id, _, _ in self.database.summoners:
-                    response += "- " + get_intfar_stats(disc_id, expanded=False) + "\n"
+                    resp_str, intfars = get_intfar_stats(disc_id, expanded=False)
+                    messages.append((resp_str, intfars))
+                messages.sort(key=lambda x: x[1], reverse=True)
+                for resp_str, _ in messages:
+                    response += "- " + resp_str + "\n"
             else:
                 user_data = self.database.discord_id_from_summoner(target_name.strip())
                 if user_data is None:
                     msg = f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
                     await message.channel.send(msg)
                     return
-                response = get_intfar_stats(user_data[0])
+                response = get_intfar_stats(user_data[0])[0]
         else: # Check intfar stats for the person sending the message.
-            response = get_intfar_stats(message.author.id)
+            response = get_intfar_stats(message.author.id)[0]
 
         await message.channel.send(response)
 
