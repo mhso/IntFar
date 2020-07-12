@@ -644,6 +644,13 @@ class DiscordClient(discord.Client):
 
     async def handle_test_msg(self):
         self.config.testing = True
+        self.active_users = [
+            self.database.discord_id_from_summoner("Prince Jarvan lV"),
+            self.database.discord_id_from_summoner("Stirred Martini"),
+            self.database.discord_id_from_summoner("Dumbledonger"),
+            self.database.discord_id_from_summoner("Senile Felines"),
+            self.database.discord_id_from_summoner("Kazpariuz"),
+        ]
         self.active_game = 4703181863 # Martin double Int-Far.
         #self.active_game = 4700945429 # Me honorable mention.
         await self.declare_intfar()
