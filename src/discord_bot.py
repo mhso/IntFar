@@ -295,7 +295,7 @@ class DiscordClient(discord.Client):
             return (intfar, lowest_score)
         return (None, None)
 
-    async def send_intfar_message(self, disc_id, reason):
+    async def send_intfar_message(self, disc_id, reason, intfar_streak):
         nickname = self.get_discord_nick(disc_id)
         if nickname is None:
             self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
@@ -305,6 +305,9 @@ class DiscordClient(discord.Client):
             self.config.log("Int-Far reason was None!", self.config.log_warning)
             reason = "being really, really bad"
         message = get_intfar_flavor_text(nickname, reason)
+        if intfar_streak > 0:
+            message += f"\n{nickname} is on a roll! He has been Int-Far {intfar_streak + 1} "
+            message += "games in a row {emote_cummies}"
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
 
@@ -351,7 +354,8 @@ class DiscordClient(discord.Client):
 
         intfar_disc_id, reason, reason_id = self.get_intfar_details(filtered_stats, kills_by_our_team)
         if intfar_disc_id is not None:
-            await self.send_intfar_message(intfar_disc_id, reason)
+            intfar_streak = self.database.get_intfar_streak(intfar_disc_id)
+            await self.send_intfar_message(intfar_disc_id, reason, intfar_streak)
         else:
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()

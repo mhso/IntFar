@@ -62,11 +62,14 @@ class Database:
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchone()
 
-    def get_latest_intfar(self):
-        query = "SELECT int_far FROM best_stats WHERE int_far != 'None'"
+    def get_intfar_streak(self, disc_id):
+        query = "SELECT int_far FROM best_stats WHERE int_far != 'None' ORDER BY id DESC"
         with closing(self.get_connection()) as db:
-            intfars = db.cursor().execute(query).fetchall()
-            return intfars[-1]
+            int_fars = db.cursor().execute(query).fetchall()
+            for count, int_far in enumerate(int_fars):
+                if disc_id != int_far[0]:
+                    return count
+            return len(int_fars) # All the int-fars is the current int-far!
 
     def get_intfar_stats(self, disc_id):
         query = "SELECT intfar_reason FROM best_stats WHERE int_far=?"
