@@ -54,6 +54,13 @@ LOWEST_VISION_FLAVORS = [
     "loving enemy death brushes a bit too much with {visionScore} vision score"
 ]
 
+HONORABLE_MENTIONS_FLAVORS = [
+    "hating PinkWard (the streamer AND the ward) with {value} control wards purchased",
+    "being a pacifist with a measly {value} damage dealt to champions",
+    "miss-timing a whole bunch of auto-attacks, therefore only getting {value} cs/min",
+    "refusing to hurt any epic monsters, securing {value} barons and dragons"
+]
+
 VALID_COMMANDS = [
     "register", "users", "help", "commands", "intfar", "best", "worst"
 ]
@@ -88,6 +95,15 @@ def get_reason_flavor_text(value, reason):
         flavor_values = LOWEST_VISION_FLAVORS
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     return flavor_text.replace("{" + reason + "}", value)
+
+def get_honorable_mentions_flavor_text(index, value):
+    flavor_text = HONORABLE_MENTIONS_FLAVORS[index]
+    return flavor_text.replace("{value}", str(value))
+
+def round_digits(number):
+    if type(number) == float:
+        return f"{number:.2f}"
+    return str(number)
 
 class DiscordClient(discord.Client):
     def __init__(self, config, database):
@@ -188,6 +204,17 @@ class DiscordClient(discord.Client):
             return 2 # Game is over.
         return 0
 
+    def get_mention_str(self, disc_id):
+        """
+        Return a string that allows for @mention of the given user.
+        """
+        for guild in self.guilds:
+            if guild.id == DISCORD_SERVER_ID:
+                for member in guild.members:
+                    if member.id == disc_id:
+                        return member.mention
+        return None
+
     def get_discord_nick(self, disc_id):
         """
         Return Discord nickname matching the given Discord ID.
@@ -196,7 +223,7 @@ class DiscordClient(discord.Client):
             if guild.id == DISCORD_SERVER_ID:
                 for member in guild.members:
                     if member.id == disc_id:
-                        return member.name
+                        return member.display_name
         return None
 
     def get_emoji_by_name(self, emoji_name):
@@ -229,6 +256,45 @@ class DiscordClient(discord.Client):
             replaced = replaced.replace("{emote_" + emote + "}", emoji)
             emote_index = replaced.find("{emote_")
         return replaced
+
+    def get_honorable_mentions(self, data):
+        """
+        Returns a string describing honorable mentions (questionable stats),
+        that wasn't quite bad enough to be named Int-Far for.
+        Honorable mentions are given for:
+            - Having 0 control wards purchased.
+            - Being adc/mid/top/jungle and doing less than 6000 damage.
+            - Being adc/mid/top and having less than 4 cs/min.
+            - Being jungle and securing no epic monsters.
+        """
+        mentions = {} # List of mentioned users for the different criteria.
+        for disc_id, stats in data:
+            mentions[disc_id] = []
+            if stats["visionWardsBoughtInGame"] == 0:
+                mentions[disc_id].append((0, stats["visionWardsBoughtInGame"]))
+            damage_dealt = stats["totalDamageDealtToChampions"]
+            if stats["role"] != "DUO_SUPPORT" and damage_dealt < 6000:
+                mentions[disc_id].append((1, damage_dealt))
+            cs_per_min = (stats["creepsPerMinDeltas"]["0-10"] + stats["creepsPerMinDeltas"]["10-20"]) / 2.0
+            if cs_per_min < 4.0:
+                mentions[disc_id].append((2, round_digits(cs_per_min)))
+            epic_monsters_secured = stats["baronKills"] + stats["dragonKills"]
+            if stats["lane"] == "JUNGLE" and epic_monsters_secured == 0:
+                mentions[disc_id].append((3, epic_monsters_secured))
+
+        mentions_str = "Honorable mentions goes out to:\n"
+        any_mentions = False
+        for disc_id in mentions:
+            user_str = ""
+            if mentions[disc_id] != []:
+                user_str = f" - {self.get_mention_str(disc_id)} for "
+                any_mentions = True
+            for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
+                prefix = " *and* " if count > 0 else ""
+                user_str += prefix + get_honorable_mentions_flavor_text(stat_index, stat_value)
+            mentions_str += user_str
+
+        return None if not any_mentions else mentions_str + "."
 
     def intfar_by_kda(self, data):
         """
@@ -296,7 +362,7 @@ class DiscordClient(discord.Client):
         return (None, None)
 
     async def send_intfar_message(self, disc_id, reason, intfar_streak):
-        nickname = self.get_discord_nick(disc_id)
+        nickname = self.get_mention_str(disc_id)
         if nickname is None:
             self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
                             self.config.log_warning)
@@ -312,27 +378,26 @@ class DiscordClient(discord.Client):
         await self.channel_to_write.send(message)
 
     def get_intfar_details(self, stats, team_kills):
-        intfar_disc_id, kda = self.intfar_by_kda(stats)
-        if intfar_disc_id is not None:
+        intfar_kda_id, kda = self.intfar_by_kda(stats)
+        if intfar_kda_id is not None:
             self.config.log("Int-Far because of KDA.")
-            return intfar_disc_id, get_reason_flavor_text(f"{kda:.2f}", "kda"), 0
 
-        intfar_disc_id, deaths = self.intfar_by_deaths(stats)
-        if intfar_disc_id is not None:
+        intfar_deaths_id, deaths = self.intfar_by_deaths(stats)
+        if intfar_deaths_id is not None:
             self.config.log("Int-Far because of deaths.")
-            return intfar_disc_id, get_reason_flavor_text(str(deaths), "deaths"), 1
 
-        intfar_disc_id, kp = self.intfar_by_kp(stats, team_kills)
-        if intfar_disc_id is not None:
+        intfar_kp_id, kp = self.intfar_by_kp(stats, team_kills)
+        if intfar_kp_id is not None:
             self.config.log("Int-Far because of kill participation.")
-            return intfar_disc_id, get_reason_flavor_text(str(kp), "kp"), 2
 
-        intfar_disc_id, vision_score = self.intfar_by_vision_score(stats)
-        if intfar_disc_id is not None:
+        intfar_vision_id, vision_score = self.intfar_by_vision_score(stats)
+        if intfar_vision_id is not None:
             self.config.log("Int-Far because of vision score.")
-            return intfar_disc_id, get_reason_flavor_text(str(vision_score), "visionScore"), 3
 
-        return None, None, None
+        return [
+            (intfar_kda_id, kda), (intfar_deaths_id, deaths),
+            (intfar_kp_id, kp), (intfar_vision_id, vision_score)
+        ]
 
     def get_filtered_stats(self, game_info):
         kills_per_team = {100: 0, 200: 0}
@@ -345,25 +410,66 @@ class DiscordClient(discord.Client):
                     for disc_id, _, summ_id in self.active_users:
                         if summ_id == part_info["player"]["summonerId"]:
                             our_team = participant["teamId"]
-                            filtered_stats.append((disc_id, participant["stats"]))
-        return filtered_stats, kills_per_team[our_team]
+                            combined_stats = participant["stats"]
+                            combined_stats.update(participant["timeline"])
+                            filtered_stats.append((disc_id, combined_stats))
+        for _, stats in filtered_stats:
+            stats["kills_by_team"] = kills_per_team[our_team]
+            stats["baronKills"] = game_info["teams"]["baronKills"]
+            stats["dragonKills"] = game_info["teams"]["dragonKills"]
+        return filtered_stats
 
     async def declare_intfar(self): # Check final game status.
         game_info = self.riot_api.get_game_details(self.active_game, tries=2)
-        filtered_stats, kills_by_our_team = self.get_filtered_stats(game_info)
+        filtered_stats = self.get_filtered_stats(game_info)
 
-        intfar_disc_id, reason, reason_id = self.get_intfar_details(filtered_stats, kills_by_our_team)
-        if intfar_disc_id is not None:
-            intfar_streak = self.database.get_current_intfar_streak(intfar_disc_id)
-            await self.send_intfar_message(intfar_disc_id, reason, intfar_streak)
+        intfar_details = self.get_intfar_details(filtered_stats,
+                                                 filtered_stats[0][1]["kills_by_team"])
+        reason_keys = ["kda", "deaths", "kp", "visionScore"]
+        intfar_counts = {}
+        max_intfar_count = 0
+        max_count_intfar = None
+        intfar_data = {}
+
+        # Look through details for the people qualifying for int-far.
+        # The one with most criteria met gets chosen.
+        for (index, (intfar_disc_id, stat_value)) in enumerate(intfar_details):
+            if intfar_disc_id is not None:
+                if intfar_disc_id not in intfar_counts:
+                    intfar_counts[intfar_disc_id] = 0
+                    intfar_data[intfar_disc_id] = []
+                current_intfar_count = intfar_counts[intfar_disc_id] + 1
+                intfar_counts[intfar_disc_id] = current_intfar_count
+                if current_intfar_count > max_intfar_count:
+                    max_intfar_count = current_intfar_count
+                    max_count_intfar = intfar_disc_id
+                intfar_data[intfar_disc_id].append((index, stat_value))
+
+        reason = ""
+        reason_ids = [0, 0, 0, 0]
+        # Go through the criteria the chosen int-far met and list them in a readable format.
+        for (count, (reason_index, stat_value)) in enumerate(intfar_data[max_count_intfar]):
+            key = reason_keys[reason_index]
+            reason_text = get_reason_flavor_text(round_digits(stat_value), key)
+            reason_ids[reason_index] = 1
+            if count > 0:
+                reason_text = " **AND** " + reason_text
+            reason += reason_text
+
+        if max_count_intfar is not None: # Save data for the current game and send int-far message.
+            intfar_streak = self.database.get_current_intfar_streak(max_count_intfar)
+            await self.send_intfar_message(max_count_intfar, reason, intfar_streak)
         else:
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
+            honorable_mention_text = self.get_honorable_mentions(filtered_stats)
+            if honorable_mention_text is not None:
+                response += "\n" + honorable_mention_text
             await self.channel_to_write.send(self.insert_emotes(response))
 
         try: # Save stats.
-            self.database.record_stats(intfar_disc_id, reason_id, self.active_game,
-                                       filtered_stats, kills_by_our_team)
+            self.database.record_stats(max_count_intfar, int("".join(reason_ids)), self.active_game,
+                                       filtered_stats, filtered_stats[0][1]["kills_by_team"])
         except (DatabaseError, OperationalError) as exception:
             self.config.log("Game stats could not be saved!", self.config.log_error)
             self.config.log(exception)
@@ -459,7 +565,9 @@ class DiscordClient(discord.Client):
             intfar_reason_ids = self.database.get_intfar_stats(disc_id)
             intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
             for reason_id in intfar_reason_ids:
-                intfar_counts[reason_id[0]] += 1
+                intfar_ids = [int(x) for x in str(reason_id[0])]
+                for intfar_id in intfar_ids:
+                    intfar_counts[intfar_id] += 1
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             msg += self.insert_emotes("{emote_unlimited_chins}")
             if expanded:
@@ -520,7 +628,8 @@ class DiscordClient(discord.Client):
                     game_info = self.riot_api.get_game_details(game_id)
                     summ_id = self.database.summoner_from_discord_id(id_to_check)[2]
                     game_summary = game_stats.get_game_summary(game_info, summ_id)
-                    response += f"His {readable_stat} ever was {min_or_max_value} as {game_summary}"
+                    response += f"His {readable_stat} ever was "
+                    response += f"{round_digits(min_or_max_value)} as {game_summary}"
 
                 await message.channel.send(response)
             except (DatabaseError, OperationalError) as exception:
