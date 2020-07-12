@@ -354,7 +354,7 @@ class DiscordClient(discord.Client):
 
         intfar_disc_id, reason, reason_id = self.get_intfar_details(filtered_stats, kills_by_our_team)
         if intfar_disc_id is not None:
-            intfar_streak = self.database.get_intfar_streak(intfar_disc_id)
+            intfar_streak = self.database.get_current_intfar_streak(intfar_disc_id)
             await self.send_intfar_message(intfar_disc_id, reason, intfar_streak)
         else:
             self.config.log("No Int-Far that game!")
@@ -462,10 +462,14 @@ class DiscordClient(discord.Client):
                 intfar_counts[reason_id[0]] += 1
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             msg += self.insert_emotes("{emote_unlimited_chins}") + "\n"
-            reaons_desc = "Int-Fars awarded so far:"
+            reaons_desc = "Int-Fars awarded so far:\n"
             for reason_id, reason in enumerate(INTFAR_REASONS):
-                reaons_desc += f"\n - {reason}: **{intfar_counts[reason_id]}**"
-            return msg + reaons_desc
+                reaons_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
+            longest_streak = self.database.get_longest_intfar_streak(disc_id)
+            streak_desc = f"His longest Int-far streak was {longest_streak} "
+            streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
+            streak_desc = self.insert_emotes(streak_desc)
+            return msg + reaons_desc + streak_desc
 
         response = ""
         if target_name is not None: # Check intfar stats for someone else.
