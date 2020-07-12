@@ -454,28 +454,30 @@ class DiscordClient(discord.Client):
         await message.channel.send(self.insert_emotes(response))
 
     async def handle_intfar_msg(self, message, target_name):
-        def get_intfar_stats(disc_id):
+        def get_intfar_stats(disc_id, expanded=True):
             person_to_check = self.get_discord_nick(disc_id)
             intfar_reason_ids = self.database.get_intfar_stats(disc_id)
             intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
             for reason_id in intfar_reason_ids:
                 intfar_counts[reason_id[0]] += 1
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
-            msg += self.insert_emotes("{emote_unlimited_chins}") + "\n"
-            reaons_desc = "Int-Fars awarded so far:\n"
-            for reason_id, reason in enumerate(INTFAR_REASONS):
-                reaons_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
-            longest_streak = self.database.get_longest_intfar_streak(disc_id)
-            streak_desc = f"His longest Int-far streak was {longest_streak} "
-            streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
-            streak_desc = self.insert_emotes(streak_desc)
-            return msg + reaons_desc + streak_desc
+            msg += self.insert_emotes("{emote_unlimited_chins}")
+            if expanded:
+                reason_desc = "\n" + "Int-Fars awarded so far:\n"
+                for reason_id, reason in enumerate(INTFAR_REASONS):
+                    reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
+                longest_streak = self.database.get_longest_intfar_streak(disc_id)
+                streak_desc = f"His longest Int-Far streak was {longest_streak} "
+                streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
+                streak_desc = self.insert_emotes(streak_desc)
+                msg += reason_desc + streak_desc
+            return msg
 
         response = ""
         if target_name is not None: # Check intfar stats for someone else.
             if target_name == "all":
                 for disc_id, _, _ in self.database.summoners:
-                    response += "- " + get_intfar_stats(disc_id) + "\n"
+                    response += "- " + get_intfar_stats(disc_id, expanded=False) + "\n"
             else:
                 user_data = self.database.discord_id_from_summoner(target_name.strip())
                 if user_data is None:
