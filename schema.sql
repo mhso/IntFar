@@ -6,6 +6,7 @@ CREATE TABLE [registered_summoners] (
 CREATE TABLE [best_stats] (
     [game_id] INTEGER NOT NULL PRIMARY KEY,
     [int_far] INTEGER,
+    [intfar_reason] INTEGER,
     [kills] INTEGER,
     [kills_id] INTEGER,
     [deaths] INTEGER,
@@ -28,6 +29,7 @@ CREATE TABLE [best_stats] (
 CREATE TABLE [worst_stats] (
     [game_id] INTEGER NOT NULL PRIMARY KEY,
     [int_far] INTEGER,
+    [intfar_reason] INTEGER,
     [kills] INTEGER,
     [kills_id] INTEGER,
     [deaths] INTEGER,

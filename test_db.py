@@ -1,6 +1,12 @@
+from sys import argv
 import sqlite3
 
-conn = sqlite3.connect("database.db")
+if len(argv) == 1:
+    exit(0)
+
+database = argv[1]
+
+conn = sqlite3.connect(database + ".db")
 
 try:
     while True:
