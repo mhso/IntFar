@@ -312,24 +312,24 @@ class DiscordClient(discord.Client):
         intfar_disc_id, kda = self.intfar_by_kda(stats)
         if intfar_disc_id is not None:
             self.config.log("Int-Far because of KDA.")
-            return intfar_disc_id, get_reason_flavor_text(f"{kda:.2f}", "kda")
+            return intfar_disc_id, get_reason_flavor_text(f"{kda:.2f}", "kda"), 0
 
         intfar_disc_id, deaths = self.intfar_by_deaths(stats)
         if intfar_disc_id is not None:
             self.config.log("Int-Far because of deaths.")
-            return intfar_disc_id, get_reason_flavor_text(str(deaths), "deaths")
+            return intfar_disc_id, get_reason_flavor_text(str(deaths), "deaths"), 1
 
         intfar_disc_id, kp = self.intfar_by_kp(stats, team_kills)
         if intfar_disc_id is not None:
             self.config.log("Int-Far because of kill participation.")
-            return intfar_disc_id, get_reason_flavor_text(str(kp), "kp")
+            return intfar_disc_id, get_reason_flavor_text(str(kp), "kp"), 2
 
         intfar_disc_id, vision_score = self.intfar_by_vision_score(stats)
         if intfar_disc_id is not None:
             self.config.log("Int-Far because of vision score.")
-            return intfar_disc_id, get_reason_flavor_text(str(vision_score), "visionScore")
+            return intfar_disc_id, get_reason_flavor_text(str(vision_score), "visionScore"), 3
 
-        return None, None
+        return None, None, None
 
     def get_filtered_stats(self, game_info):
         kills_per_team = {100: 0, 200: 0}
@@ -349,7 +349,7 @@ class DiscordClient(discord.Client):
         game_info = self.riot_api.get_game_details(self.active_game, tries=2)
         filtered_stats, kills_by_our_team = self.get_filtered_stats(game_info)
 
-        intfar_disc_id, reason = self.get_intfar_details(filtered_stats, kills_by_our_team)
+        intfar_disc_id, reason, reason_id = self.get_intfar_details(filtered_stats, kills_by_our_team)
         if intfar_disc_id is not None:
             await self.send_intfar_message(intfar_disc_id, reason)
         else:
@@ -358,7 +358,8 @@ class DiscordClient(discord.Client):
             await self.channel_to_write.send(self.insert_emotes(response))
 
         try: # Save stats.
-            self.database.record_stats(intfar_disc_id, self.active_game, filtered_stats, kills_by_our_team)
+            self.database.record_stats(intfar_disc_id, reason_id, self.active_game,
+                                       filtered_stats, kills_by_our_team)
         except (DatabaseError, OperationalError) as exception:
             self.config.log("Game stats could not be saved!", self.config.log_error)
             self.config.log(exception)

@@ -4,7 +4,8 @@ CREATE TABLE [registered_summoners] (
     [summ_id] NVARCHAR(64) NOT NULL
 );
 CREATE TABLE [best_stats] (
-    [game_id] INTEGER NOT NULL PRIMARY KEY,
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [game_id] INTEGER NOT NULL,
     [int_far] INTEGER,
     [intfar_reason] INTEGER,
     [kills] INTEGER,
@@ -27,7 +28,8 @@ CREATE TABLE [best_stats] (
     [vision_score_id] INTEGER
 );
 CREATE TABLE [worst_stats] (
-    [game_id] INTEGER NOT NULL PRIMARY KEY,
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [game_id] INTEGER NOT NULL,
     [int_far] INTEGER,
     [intfar_reason] INTEGER,
     [kills] INTEGER,

@@ -62,12 +62,18 @@ class Database:
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchone()
 
+    def get_latest_intfar(self):
+        query = "SELECT int_far FROM best_stats WHERE int_far != 'None'"
+        with closing(self.get_connection()) as db:
+            intfars = db.cursor().execute(query).fetchall()
+            return intfars[-1]
+
     def get_intfar_stats(self, disc_id):
         query = "SELECT intfar_reason FROM best_stats WHERE int_far=?"
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchall()
 
-    def record_stats(self, intfar_id, game_id, data, kills_by_our_team):
+    def record_stats(self, intfar_id, intfar_reason, game_id, data, kills_by_our_team):
         (min_kills_id, min_kills,
          max_kills_id, max_kills) = game_stats.get_outlier_stat("kills", data)
         (min_deaths_id, min_deaths,
@@ -93,7 +99,7 @@ class Database:
 
         self.config.log(
             "Saving best stats:\n"+
-            f"{game_id}, {intfar_id}, " + 
+            f"{game_id}, {intfar_id}, {intfar_reason}, " +
             f"({max_kills_id} - {max_kills}), ({min_deaths_id} - {min_deaths}), " +
             f"({max_kda_id} - {max_kda}), ({max_damage_id} - {max_damage}), " +
             f"({max_cs_id} - {max_cs}), ({max_gold_id} - {max_gold}), " +
@@ -102,6 +108,7 @@ class Database:
         )
         self.config.log(
             "Saving worst stats:\n"+
+            f"{game_id}, {intfar_id}, {intfar_reason}, " +
             f"({min_kills_id} - {min_kills}), ({max_deaths_id} - {max_deaths}), " +
             f"({min_kda_id} - {min_kda}), ({min_damage_id} - {min_damage}), " +
             f"({min_cs_id} - {min_cs}), ({min_gold_id} - {min_gold}), " +
@@ -112,24 +119,24 @@ class Database:
         query_prefix = "INSERT INTO "
         query_cols = (
             """
-            (game_id, int_far, kills, kills_id, deaths,
+            (game_id, int_far, intfar_reason, kills, kills_id, deaths,
             deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, gold, gold_id,
             kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         )
         query_best = query_prefix + " best_stats" + query_cols
         query_worst = query_prefix + " worst_stats " + query_cols
 
         with closing(self.get_connection()) as db:
-            db.cursor().execute(query_best, (game_id, intfar_id, max_kills, max_kills_id,
-                                             min_deaths, min_deaths_id, max_kda,
+            db.cursor().execute(query_best, (game_id, intfar_id, intfar_reason, max_kills,
+                                             max_kills_id, min_deaths, min_deaths_id, max_kda,
                                              max_kda_id, max_damage, max_damage_id,
                                              max_cs, max_cs_id, max_gold, max_gold_id,
                                              max_kp, max_kp_id, max_wards, max_wards_id,
                                              max_vision, max_vision_id))
-            db.cursor().execute(query_worst, (game_id, intfar_id, min_kills, min_kills_id,
-                                              max_deaths, max_deaths_id, min_kda,
+            db.cursor().execute(query_worst, (game_id, intfar_id, intfar_reason, min_kills,
+                                              min_kills_id, max_deaths, max_deaths_id, min_kda,
                                               min_kda_id, min_damage, min_damage_id,
                                               min_cs, min_cs_id, min_gold, min_gold_id,
                                               min_kp, min_kp_id, min_wards, min_wards_id,
