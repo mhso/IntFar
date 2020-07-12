@@ -306,7 +306,7 @@ class DiscordClient(discord.Client):
             reason = "being really, really bad"
         message = get_intfar_flavor_text(nickname, reason)
         if intfar_streak > 0:
-            message += f"\n{nickname} is on a roll! He has been Int-Far {intfar_streak + 1} "
+            message += f"\n{nickname} is on a feeding frenzy! He has been Int-Far {intfar_streak + 1} "
             message += "games in a row {emote_cummies}"
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
