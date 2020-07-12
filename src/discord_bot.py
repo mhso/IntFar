@@ -458,8 +458,8 @@ class DiscordClient(discord.Client):
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             msg += self.insert_emotes("{emote_unlimited_chins}") + "\n"
             reaons_desc = "Int-Fars awarded so far:"
-            for reason_id in intfar_reason_ids:
-                reaons_desc += f"\n - {INTFAR_REASONS[reason_id[0]]}: {intfar_counts[reason_id]}\n"
+            for reason in INTFAR_REASONS:
+                reaons_desc += f"\n - {reason}: {intfar_counts[reason_id]}\n"
             return msg + reaons_desc
 
         response = ""
