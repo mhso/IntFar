@@ -4,6 +4,7 @@ class Config:
     def __init__(self):
         self.use_dev_token = False
         self.debug = True
+        self.testing = False
         self.discord_token = ""
         self.riot_key = ""
         self.status_interval = 60*10 # 10 minutes wait time between checking for status.

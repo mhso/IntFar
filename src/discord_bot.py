@@ -467,15 +467,16 @@ class DiscordClient(discord.Client):
                 response += "\n" + honorable_mention_text
             await self.channel_to_write.send(self.insert_emotes(response))
 
-        try: # Save stats.
-            self.database.record_stats(max_count_intfar, int("".join(reason_ids)), self.active_game,
-                                       filtered_stats, filtered_stats[0][1]["kills_by_team"])
-        except (DatabaseError, OperationalError) as exception:
-            self.config.log("Game stats could not be saved!", self.config.log_error)
-            self.config.log(exception)
-            raise exception
+        if not self.config.testing:
+            try: # Save stats.
+                self.database.record_stats(max_count_intfar, int("".join(reason_ids)), self.active_game,
+                                        filtered_stats, filtered_stats[0][1]["kills_by_team"])
+            except (DatabaseError, OperationalError) as exception:
+                self.config.log("Game stats could not be saved!", self.config.log_error)
+                self.config.log(exception)
+                raise exception
 
-        self.config.log("Game over! Stats were saved succesfully.")
+            self.config.log("Game over! Stats were saved succesfully.")
         self.active_game = None
 
     async def user_joined_voice(self, member, start_polling=True):
@@ -576,7 +577,7 @@ class DiscordClient(discord.Client):
                 for reason_id, reason in enumerate(INTFAR_REASONS):
                     reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
                 longest_streak = self.database.get_longest_intfar_streak(disc_id)
-                streak_desc = f"His longest Int-Far streak was {longest_streak} "
+                streak_desc = f"His longest Int-Far streak was **{longest_streak}** "
                 streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
                 streak_desc = self.insert_emotes(streak_desc)
                 msg += reason_desc + streak_desc
@@ -641,6 +642,12 @@ class DiscordClient(discord.Client):
             response = self.insert_emotes(f"Not a valid stat: '{second_cmd}' " + "{emote_carole_fucking_baskin}")
             await message.channel.send(response)
 
+    def handle_test_msg(self):
+        self.config.testing = True
+        self.active_game = 4703181863 # Martin double Int-Far.
+        #self.active_game = 4700945429 # Me honorable mention.
+        self.declare_intfar()
+
     async def on_message(self, message):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
@@ -689,6 +696,8 @@ class DiscordClient(discord.Client):
                 if len(split) > 2:
                     target_name = " ".join(split[2:])
                 await self.handle_stat_msg(message, first_command, second_command, target_name)
+            elif first_command == "test" and message.author.id == 267401734513491969:
+                self.handle_test_msg()
 
             self.last_message_time[message.author.id] = time()
 
