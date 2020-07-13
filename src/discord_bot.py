@@ -241,6 +241,12 @@ class DiscordClient(discord.Client):
                         return member.display_name
         return None
 
+    def get_all_emojis(self):
+        for guild in self.guilds:
+            if guild.id == DISCORD_SERVER_ID:
+                return [emoji.url for emoji in guild.emojis]
+        return None
+
     def get_emoji_by_name(self, emoji_name):
         """
         Return the ID of the emoji matching the given name.
@@ -540,6 +546,7 @@ class DiscordClient(discord.Client):
                 intfar_data[intfar_disc_id].append((index, stat_value))
 
         reason_ids = ["0", "0", "0", "0"]
+        intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
         if max_count_intfar is not None: # Save data for the current game and send int-far message.
             reason = ""
             # Go through the criteria the chosen int-far met and list them in a readable format.
@@ -551,7 +558,6 @@ class DiscordClient(discord.Client):
                     reason_text = " **AND** " + reason_text
                 reason += reason_text
 
-            intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
             await self.send_intfar_message(max_count_intfar, reason, intfar_streak, prev_intfar)
         else:
             self.config.log("No Int-Far that game!")
