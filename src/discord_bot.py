@@ -61,6 +61,15 @@ HONORABLE_MENTIONS_FLAVORS = [
     "refusing to hurt any epic monsters, securing {value} barons and dragons"
 ]
 
+REDEEMING_ACTIONS_FLAVORS = [
+    "having a big dick KDA of {value}",
+    ("single-handedly dishing out the pain with {value} damage. " +
+     "More than double the rest of the team combined!"),
+    "wiping the floor with the enemy team, getting a JUICY pentakill!",
+    "providing insane map control with a vision score of {value}!",
+    "being absolutely EVERYWHERE with a kill-participation of {value}%"
+]
+
 VALID_COMMANDS = [
     "register", "users", "help", "commands", "intfar", "best", "worst"
 ]
@@ -98,6 +107,12 @@ def get_reason_flavor_text(value, reason):
 
 def get_honorable_mentions_flavor_text(index, value):
     flavor_text = HONORABLE_MENTIONS_FLAVORS[index]
+    return flavor_text.replace("{value}", str(value))
+
+def get_redeeming_flavor_text(index, value):
+    flavor_text = REDEEMING_ACTIONS_FLAVORS[index]
+    if value is None:
+        return flavor_text
     return flavor_text.replace("{value}", str(value))
 
 def round_digits(number):
@@ -257,6 +272,53 @@ class DiscordClient(discord.Client):
             emote_index = replaced.find("{emote_")
         return replaced
 
+    def get_redeemed_people(self, data):
+        """
+        Returns a string describing people who have been redeemed by playing
+        exceptionally well. These people will also have one Int-Far removed from
+        their total tally.
+        Criteria for being redeemed:
+            - Having a KDA of 10+
+            - Doing twice as much damage as the rest of the team combined
+            - Getting a penta-kill
+            - Having a vision score of 120+
+            - Having a kill-participation of 90%+
+        """
+        mentions = {} # List of mentioned users for the different criteria.
+        for disc_id, stats in data:
+            mentions[disc_id] = []
+            kda = game_stats.calc_kda(stats)
+            if kda > 10.0:
+                mentions[disc_id].append((0, round_digits(kda)))
+            damage_dealt = stats["totalDamageDealtToChampions"]
+            if damage_dealt > stats["damage_by_team"] * 2:
+                mentions[disc_id].append((1, damage_dealt))
+            if stats["pentaKills"] > 0:
+                mentions[disc_id].append((2, None))
+            if stats["visionScore"] > 120:
+                mentions[disc_id].append((3, stats["visionScore"]))
+            kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
+            if kp > 90:
+                mentions[disc_id].append((4, kp))
+
+        mentions_str = ""
+        any_mentions = False
+        for disc_id in mentions:
+            user_str = ""
+            if mentions[disc_id] != []:
+                prefix = "\n" if any_mentions else ""
+                user_str = f"{prefix} {self.get_mention_str(disc_id)} was insane that game! "
+                intfars_removed = len(mentions[disc_id])
+                user_str += f"He is awarded {intfars_removed} " + "{emote_Doinks} for "
+                any_mentions = True
+
+            for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
+                prefix = " *and* " if count > 0 else ""
+                user_str += prefix + get_redeeming_flavor_text(stat_index, stat_value)
+            mentions_str += user_str
+
+        return None if not any_mentions else mentions_str
+
     def get_honorable_mentions(self, data):
         """
         Returns a string describing honorable mentions (questionable stats),
@@ -290,6 +352,7 @@ class DiscordClient(discord.Client):
                 prefix = "\n" if any_mentions else ""
                 user_str = f"{prefix}- {self.get_mention_str(disc_id)} for "
                 any_mentions = True
+
             for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
                 prefix = " *and* " if count > 0 else ""
                 user_str += prefix + get_honorable_mentions_flavor_text(stat_index, stat_value)
@@ -407,12 +470,14 @@ class DiscordClient(discord.Client):
 
     def get_filtered_stats(self, game_info):
         kills_per_team = {100: 0, 200: 0}
+        damage_per_team = {100: 0, 200: 0}
         our_team = 100
         filtered_stats = []
         for part_info in game_info["participantIdentities"]:
             for participant in game_info["participants"]:
                 if part_info["participantId"] == participant["participantId"]:
                     kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
+                    damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
                     for disc_id, _, summ_id in self.active_users:
                         if summ_id == part_info["player"]["summonerId"]:
                             our_team = participant["teamId"]
@@ -422,6 +487,7 @@ class DiscordClient(discord.Client):
 
         for _, stats in filtered_stats:
             stats["kills_by_team"] = kills_per_team[our_team]
+            stats["damage_by_team"] = damage_per_team[our_team]
             for team in game_info["teams"]:
                 if team["teamId"] == our_team:
                     stats["baronKills"] = team["baronKills"]
@@ -475,6 +541,9 @@ class DiscordClient(discord.Client):
             honorable_mention_text = self.get_honorable_mentions(filtered_stats)
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
+            redeemed_text = self.get_redeemed_people(filtered_stats)
+            if redeemed_text is not None:
+                response += "\n" + redeemed_text
             await self.channel_to_write.send(self.insert_emotes(response))
 
         if not self.config.testing:
