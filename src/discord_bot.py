@@ -214,7 +214,7 @@ class DiscordClient(discord.Client):
             self.active_game = active_game
             self.config.status_interval = 30 # Check status every 30 seconds.
             return 1 # Game is now active.
-        elif active_game is None and self.active_game is not None: # The current game is over.
+        if active_game is None and self.active_game is not None: # The current game is over.
             self.config.status_interval = 60*10
             return 2 # Game is over.
         return 0
@@ -425,23 +425,39 @@ class DiscordClient(discord.Client):
             return (intfar, lowest_score)
         return (None, None)
 
+    def get_streak_broken_msg(self, intfar_id, intfar_streak, prev_intfar):
+        current_nick = self.get_discord_nick(intfar_id)
+        current_mention = self.get_mention_str(intfar_id)
+        prev_mention = self.get_mention_str(prev_intfar)
+        if intfar_id is None and intfar_streak > 1:
+            for disc_id, _, _ in self.active_users:
+                if disc_id == prev_intfar:
+                    return (f"{prev_mention} has redeemed himself! " +
+                            f"His Int-Far streak of {intfar_streak} has been broken. " +
+                            "Well done, my son {emote_uwu}")
+            return None
+        if intfar_id == prev_intfar: # Current Int-Far was also previous Int-Far.
+            return (f"{current_mention} is on a feeding frenzy! " +
+                    f"He has been Int-Far {intfar_streak + 1} " +
+                    "games in a row {emote_cummies}")
+        if intfar_streak > 1: # Previous Int-Far has broken his streak!
+            return (f"Thanks to {current_nick}, the {intfar_streak} games Int-Far streak of " +
+                    f"{prev_mention} is over " + "{emote_woahpikachu}")
+        return None
+
     async def send_intfar_message(self, disc_id, reason, intfar_streak, prev_intfar):
-        nickname = self.get_mention_str(disc_id)
-        if nickname is None:
+        mention_str = self.get_mention_str(disc_id)
+        if mention_str is None:
             self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
                             self.config.log_warning)
-            nickname = f"Unknown (w/ discord ID '{disc_id}')"
+            mention_str = f"Unknown (w/ discord ID '{disc_id}')"
         if reason is None:
             self.config.log("Int-Far reason was None!", self.config.log_warning)
             reason = "being really, really bad"
-        message = get_intfar_flavor_text(nickname, reason)
-        if disc_id == prev_intfar: # Current Int-Far was also previous Int-Far.
-            message += f"\n{nickname} is on a feeding frenzy! He has been Int-Far {intfar_streak + 1} "
-            message += "games in a row {emote_cummies}"
-        elif intfar_streak > 1: # Previous Int-Far has broken his streak!
-            previous_nickname = self.get_mention_str(prev_intfar)
-            message += f"\n{previous_nickname} has broken his Int-Far streak of {intfar_streak} "
-            message += "games! Good job, my son {emote_uwu}"
+        message = get_intfar_flavor_text(mention_str, reason)
+        streak_msg = self.get_streak_broken_msg(disc_id, intfar_streak, prev_intfar)
+        if streak_msg is not None:
+            message += "\n" + streak_msg
 
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
@@ -478,7 +494,9 @@ class DiscordClient(discord.Client):
                 if part_info["participantId"] == participant["participantId"]:
                     kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
                     damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
-                    for disc_id, _, summ_id in self.active_users:
+                    # We loop through the static 'database.summoners' list and not the dynamic
+                    # 'self.active_players' for safety.
+                    for disc_id, _, summ_id in self.database.summoners:
                         if summ_id == part_info["player"]["summonerId"]:
                             our_team = participant["teamId"]
                             combined_stats = participant["stats"]
@@ -544,6 +562,10 @@ class DiscordClient(discord.Client):
             redeemed_text = self.get_redeemed_people(filtered_stats)
             if redeemed_text is not None:
                 response += "\n" + redeemed_text
+            streak_msg = self.get_streak_broken_msg(None, intfar_streak, prev_intfar)
+            if streak_msg is not None:
+                response += streak_msg
+
             await self.channel_to_write.send(self.insert_emotes(response))
 
         if not self.config.testing:
