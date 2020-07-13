@@ -362,7 +362,7 @@ class DiscordClient(discord.Client):
             return (intfar, lowest_score)
         return (None, None)
 
-    async def send_intfar_message(self, disc_id, reason, intfar_streak):
+    async def send_intfar_message(self, disc_id, reason, intfar_streak, prev_intfar):
         nickname = self.get_mention_str(disc_id)
         if nickname is None:
             self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
@@ -372,9 +372,14 @@ class DiscordClient(discord.Client):
             self.config.log("Int-Far reason was None!", self.config.log_warning)
             reason = "being really, really bad"
         message = get_intfar_flavor_text(nickname, reason)
-        if intfar_streak > 0:
+        if disc_id == prev_intfar: # Current Int-Far was also previous Int-Far.
             message += f"\n{nickname} is on a feeding frenzy! He has been Int-Far {intfar_streak + 1} "
             message += "games in a row {emote_cummies}"
+        elif intfar_streak > 1: # Previous Int-Far has broken his streak!
+            previous_nickname = self.get_mention_str(prev_intfar)
+            message += f"\n{previous_nickname} has broken his Int-Far streak of {intfar_streak} "
+            message += "games! Good job, my son {emote_uwu}"
+
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
 
@@ -462,8 +467,8 @@ class DiscordClient(discord.Client):
                     reason_text = " **AND** " + reason_text
                 reason += reason_text
 
-            intfar_streak = self.database.get_current_intfar_streak(max_count_intfar)
-            await self.send_intfar_message(max_count_intfar, reason, intfar_streak)
+            intfar_streak, prev_intfar = self.database.get_current_intfar_streak(max_count_intfar)
+            await self.send_intfar_message(max_count_intfar, reason, intfar_streak, prev_intfar)
         else:
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
