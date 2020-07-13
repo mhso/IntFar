@@ -521,19 +521,19 @@ class DiscordClient(discord.Client):
                     max_count_intfar = intfar_disc_id
                 intfar_data[intfar_disc_id].append((index, stat_value))
 
-        reason_ids = [0, 0, 0, 0]
+        reason_ids = ["0", "0", "0", "0"]
         if max_count_intfar is not None: # Save data for the current game and send int-far message.
             reason = ""
             # Go through the criteria the chosen int-far met and list them in a readable format.
             for (count, (reason_index, stat_value)) in enumerate(intfar_data[max_count_intfar]):
                 key = reason_keys[reason_index]
                 reason_text = get_reason_flavor_text(round_digits(stat_value), key)
-                reason_ids[reason_index] = 1
+                reason_ids[reason_index] = "1"
                 if count > 0:
                     reason_text = " **AND** " + reason_text
                 reason += reason_text
 
-            intfar_streak, prev_intfar = self.database.get_current_intfar_streak(max_count_intfar)
+            intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
             await self.send_intfar_message(max_count_intfar, reason, intfar_streak, prev_intfar)
         else:
             self.config.log("No Int-Far that game!")
