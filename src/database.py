@@ -82,9 +82,9 @@ class Database:
         with closing(self.get_connection()) as db:
             int_fars = db.cursor().execute(query).fetchall()
             prev_intfar = int_fars[0][0]
-            for count, int_far in enumerate(int_fars):
+            for count, int_far in enumerate(int_fars[1:], start=1):
                 if int_far[0] is None or prev_intfar != int_far[0]:
-                    return count+1, prev_intfar
+                    return count, prev_intfar
             return len(int_fars), prev_intfar # All the int-fars is the current int-far!
 
     def get_intfar_stats(self, disc_id):
