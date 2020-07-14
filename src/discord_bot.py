@@ -431,16 +431,17 @@ class DiscordClient(discord.Client):
             return (intfar, lowest_score)
         return (None, None)
 
-    def get_streak_broken_msg(self, intfar_id, intfar_streak, prev_intfar):
+    def get_streak_msg(self, intfar_id, intfar_streak, prev_intfar):
         current_nick = self.get_discord_nick(intfar_id)
         current_mention = self.get_mention_str(intfar_id)
         prev_mention = self.get_mention_str(prev_intfar)
-        if intfar_id is None and intfar_streak > 1:
-            for disc_id, _, _ in self.active_users:
-                if disc_id == prev_intfar:
-                    return (f"{prev_mention} has redeemed himself! " +
-                            f"His Int-Far streak of {intfar_streak} has been broken. " +
-                            "Well done, my son {emote_uwu}")
+        if intfar_id is None:
+            if intfar_streak > 1:
+                for disc_id, _, _ in self.active_users:
+                    if disc_id == prev_intfar:
+                        return (f"{prev_mention} has redeemed himself! " +
+                                f"His Int-Far streak of {intfar_streak} has been broken. " +
+                                "Well done, my son {emote_uwu}")
             return None
         if intfar_id == prev_intfar: # Current Int-Far was also previous Int-Far.
             return (f"{current_mention} is on a feeding frenzy! " +
@@ -461,7 +462,7 @@ class DiscordClient(discord.Client):
             self.config.log("Int-Far reason was None!", self.config.log_warning)
             reason = "being really, really bad"
         message = get_intfar_flavor_text(mention_str, reason)
-        streak_msg = self.get_streak_broken_msg(disc_id, intfar_streak, prev_intfar)
+        streak_msg = self.get_streak_msg(disc_id, intfar_streak, prev_intfar)
         if streak_msg is not None:
             message += "\n" + streak_msg
 
@@ -568,7 +569,7 @@ class DiscordClient(discord.Client):
             redeemed_text = self.get_redeemed_people(filtered_stats)
             if redeemed_text is not None:
                 response += "\n" + redeemed_text
-            streak_msg = self.get_streak_broken_msg(None, intfar_streak, prev_intfar)
+            streak_msg = self.get_streak_msg(None, intfar_streak, prev_intfar)
             if streak_msg is not None:
                 response += "\n" + streak_msg
 
