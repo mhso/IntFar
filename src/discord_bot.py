@@ -570,7 +570,7 @@ class DiscordClient(discord.Client):
                 response += "\n" + redeemed_text
             streak_msg = self.get_streak_broken_msg(None, intfar_streak, prev_intfar)
             if streak_msg is not None:
-                response += streak_msg
+                response += "\n" + streak_msg
 
             await self.channel_to_write.send(self.insert_emotes(response))
 
