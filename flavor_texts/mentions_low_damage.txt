@@ -1,0 +1,3 @@
+being a pacifist with a measly {value} damage dealt to champions
+barely tickling the enemy team, dealing a total of {value} damage to champions
+playing full on PvE with {value} damage to champions

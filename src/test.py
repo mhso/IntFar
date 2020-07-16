@@ -145,6 +145,11 @@ conf.log("Starting Discord Client...")
 
 client = discord_bot.DiscordClient(conf, database_client)
 
+def load_flavor_texts(filename):
+    path = f"flavor_texts/{filename}.txt"
+    with open(path, "r", encoding="UTF-8") as f:
+        return [x.replace("\n", "") for x in f.readlines()]
+
 def check_stuff(disc_client):
     disc_client.active_users = [
         disc_client.database.discord_id_from_summoner("Senile Felines"),
@@ -166,4 +171,5 @@ def check_stuff(disc_client):
     #print(response)
     print(disc_client.database.get_current_intfar_streak())
 
-check_stuff(client)
+
+print(load_flavor_texts("intfar"))

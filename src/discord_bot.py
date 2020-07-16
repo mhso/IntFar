@@ -9,66 +9,34 @@ import game_stats
 DISCORD_SERVER_ID = 619073595561213953
 CHANNEL_ID = 730744358751567902
 
-INTFAR_FLAVOR_TEXTS = [
-    "And the Int-Far goes to... {nickname} {emote_hairy_retard} He wins for {reason}!",
-    "Uh oh, stinky {emote_happy_nono}! {nickname} has been a very naughty boi! He is awarded one Int-Far token for {reason}!",
-    "Oof {nickname}, better luck next time {emote_smol_dave} take this Int-Far award for {reason}!",
-    "Oh heck {emote_morton} {nickname} did a fucky-wucky that game! He is awarded Int-Far for {reason}!",
-    "Yikes {emote_big_dave} unlucko game from {nickname}. Accept this pity gift of being crowned Int-Far for {reason}.",
-    "Some serious smol dick energy from {nickname} that game {emote_gual_yikes} have an Int-Far for {reason}.",
-    "Welp... {nickname}, you really let everyone down on that one {emote_nat_really_fine} +1 Int-Far to you for {reason}!"
-]
+def load_flavor_texts(filename):
+    path = f"flavor_texts/{filename}.txt"
+    with open(path, "r", encoding="UTF-8") as f:
+        return [x.replace("\n", "") for x in f.readlines()]
 
-NO_INTFAR_FLAVOR_TEXTS = [
-    "Hecking good job bois, no one inted their ass off that game {emote_uwucat}",
-    "No one sucked enough to be crowned Int-Far that game! Big doinks all around {emote_big_doinks}",
-    "Get outta my face bitch! BOW!! No Int-Far that game {emote_Bitcoinect}",
-    "We are so god damn good at this game!! No inting = no problems {emote_main}",
-    "Being this good is not easy, but damn do we pull it off well! No Int-Far that game {emote_swell}"
-]
+INTFAR_FLAVOR_TEXTS = load_flavor_texts("intfar")
+
+NO_INTFAR_FLAVOR_TEXTS = load_flavor_texts("no_intfar")
 
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
-MOST_DEATHS_FLAVORS = [
-    "dying a total of {deaths} times",
-    "feeding every child in Africa by giving away {deaths} kills",
-    "being dead 69% of the game with {deaths} deaths",
-    "having a permanent gray screen with {deaths} deaths"
-]
+MOST_DEATHS_FLAVORS = load_flavor_texts("most_deaths")
 
-LOWEST_KDA_FLAVORS = [
-    "having a tragic KDA of {kda}",
-    "putting any Iron IV scrub to shame with a KDA of {kda}",
-    "being an anti KDA player with a KDA of {kda}"
-]
+LOWEST_KDA_FLAVORS = load_flavor_texts("lowest_kda")
 
-LOWEST_KP_FLAVORS = [
-    "living on an island and getting {kp}% kill participation",
-    "refusing to help his team, having a {kp}% kill participation",
-    "doing TOO much social distancing with {kp}% kill participation"
-]
+LOWEST_KP_FLAVORS = load_flavor_texts("lowest_kp")
 
-LOWEST_VISION_FLAVORS = [
-    "playing with a blindfold on with {visionScore} vision score",
-    "hating winning with a vision score of {visionScore}",
-    "loving enemy death brushes a bit too much with {visionScore} vision score"
-]
+LOWEST_VISION_FLAVORS = load_flavor_texts("lowest_vision")
 
-HONORABLE_MENTIONS_FLAVORS = [
-    "hating PinkWard (the streamer AND the ward) with {value} control wards purchased",
-    "being a pacifist with a measly {value} damage dealt to champions",
-    "miss-timing a whole bunch of auto-attacks, therefore only getting {value} cs/min",
-    "refusing to hurt any epic monsters, securing {value} barons and dragons"
-]
+MENTIONS_NO_PINKWARDS = load_flavor_texts("mentions_no_vision_ward")
 
-REDEEMING_ACTIONS_FLAVORS = [
-    "having a big dick KDA of {value}",
-    ("single-handedly dishing out the pain with {value} damage. " +
-     "More than double the rest of the team combined!"),
-    "wiping the floor with the enemy team, getting a JUICY pentakill!",
-    "providing insane map control with a vision score of {value}!",
-    "being absolutely EVERYWHERE with a kill-participation of {value}%"
-]
+MENTIONS_LOW_DAMAGE = load_flavor_texts("mentions_low_damage")
+
+MENTIONS_LOW_CS_MIN = load_flavor_texts("mentions_low_cs_min")
+
+MENTIONS_NO_EPIC_MONSTERS = load_flavor_texts("mentions_no_epic_monsters")
+
+REDEEMING_ACTIONS_FLAVORS = load_flavor_texts("redeeming_actions")
 
 VALID_COMMANDS = [
     "register", "users", "help", "commands", "intfar", "best", "worst"
@@ -106,7 +74,16 @@ def get_reason_flavor_text(value, reason):
     return flavor_text.replace("{" + reason + "}", value)
 
 def get_honorable_mentions_flavor_text(index, value):
-    flavor_text = HONORABLE_MENTIONS_FLAVORS[index]
+    flavor_values = []
+    if index == 0:
+        flavor_values = MENTIONS_NO_PINKWARDS
+    elif index == 1:
+        flavor_values = MENTIONS_LOW_DAMAGE
+    elif index == 2:
+        flavor_values = MENTIONS_LOW_CS_MIN
+    elif index == 3:
+        flavor_values = MENTIONS_NO_EPIC_MONSTERS
+    flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     return flavor_text.replace("{value}", str(value))
 
 def get_redeeming_flavor_text(index, value):
@@ -285,9 +262,9 @@ class DiscordClient(discord.Client):
         their total tally.
         Criteria for being redeemed:
             - Having a KDA of 10+
-            - Doing twice as much damage as the rest of the team combined
+            - Doing more damage than the rest of the team combined
             - Getting a penta-kill
-            - Having a vision score of 120+
+            - Having a vision score of 100+
             - Having a kill-participation of 90%+
         """
         mentions = {} # List of mentioned users for the different criteria.
@@ -297,11 +274,11 @@ class DiscordClient(discord.Client):
             if kda > 10.0:
                 mentions[disc_id].append((0, round_digits(kda)))
             damage_dealt = stats["totalDamageDealtToChampions"]
-            if damage_dealt > stats["damage_by_team"] * 2:
+            if damage_dealt > stats["damage_by_team"]:
                 mentions[disc_id].append((1, damage_dealt))
             if stats["pentaKills"] > 0:
                 mentions[disc_id].append((2, None))
-            if stats["visionScore"] > 120:
+            if stats["visionScore"] > 100:
                 mentions[disc_id].append((3, stats["visionScore"]))
             kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
             if kp > 90:
