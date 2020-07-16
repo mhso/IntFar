@@ -38,6 +38,8 @@ MENTIONS_NO_EPIC_MONSTERS = load_flavor_texts("mentions_no_epic_monsters")
 
 REDEEMING_ACTIONS_FLAVORS = load_flavor_texts("redeeming_actions")
 
+STREAK_FLAVORS = load_flavor_texts("streak")
+
 VALID_COMMANDS = [
     "register", "users", "help", "commands", "intfar", "best", "worst"
 ]
@@ -91,6 +93,10 @@ def get_redeeming_flavor_text(index, value):
     if value is None:
         return flavor_text
     return flavor_text.replace("{value}", str(value))
+
+def get_streak_flavor_text(nickname, streak):
+    index = streak - 2 if streak - 2 < len(STREAK_FLAVORS) else len(STREAK_FLAVORS) - 1
+    return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", streak)
 
 def round_digits(number):
     if type(number) == float:
@@ -421,9 +427,7 @@ class DiscordClient(discord.Client):
                                 "Well done, my son {emote_uwu}")
             return None
         if intfar_id == prev_intfar: # Current Int-Far was also previous Int-Far.
-            return (f"{current_mention} is on a feeding frenzy! " +
-                    f"He has been Int-Far {intfar_streak + 1} " +
-                    "games in a row {emote_cummies}")
+            return get_streak_flavor_text(current_mention, intfar_streak + 1)
         if intfar_streak > 1: # Previous Int-Far has broken his streak!
             return (f"Thanks to {current_nick}, the {intfar_streak} games Int-Far streak of " +
                     f"{prev_mention} is over " + "{emote_woahpikachu}")
