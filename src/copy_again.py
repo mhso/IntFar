@@ -22,10 +22,10 @@ with closing(database_client_1.get_connection()) as db_1:
     query_prefix = "INSERT INTO "
     query_cols = (
         """
-        (game_id, int_far, intfar_reason, kills, kills_id, deaths,
+        (id, game_id, int_far, intfar_reason, kills, kills_id, deaths,
         deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, gold, gold_id,
         kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
     )
 

@@ -561,7 +561,7 @@ class DiscordClient(discord.Client):
 
         if not self.config.testing:
             try: # Save stats.
-                self.database.record_stats(max_count_intfar, int("".join(reason_ids)), self.active_game,
+                self.database.record_stats(max_count_intfar, "".join(reason_ids), self.active_game,
                                         filtered_stats, filtered_stats[0][1]["kills_by_team"])
             except (DatabaseError, OperationalError) as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
@@ -653,7 +653,7 @@ class DiscordClient(discord.Client):
             intfar_reason_ids = self.database.get_intfar_stats(disc_id)
             intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
             for reason_id in intfar_reason_ids:
-                intfar_ids = [int(x) for x in str(reason_id[0])]
+                intfar_ids = [int(x) for x in reason_id[0]]
                 for index, intfar_id in enumerate(intfar_ids):
                     if intfar_id == 1:
                         intfar_counts[index] += 1
