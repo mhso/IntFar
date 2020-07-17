@@ -17,4 +17,5 @@ database_client = Database(conf)
 conf.log("Starting Discord Client...")
 
 client = DiscordClient(conf, database_client)
+
 client.run(conf.discord_token)

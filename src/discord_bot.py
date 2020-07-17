@@ -8,6 +8,7 @@ import game_stats
 
 DISCORD_SERVER_ID = 619073595561213953
 CHANNEL_ID = 730744358751567902
+MY_DISC_ID = 267401734513491969
 
 def load_flavor_texts(filename):
     path = f"flavor_texts/{filename}.txt"
@@ -96,7 +97,7 @@ def get_redeeming_flavor_text(index, value):
 
 def get_streak_flavor_text(nickname, streak):
     index = streak - 2 if streak - 2 < len(STREAK_FLAVORS) else len(STREAK_FLAVORS) - 1
-    return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", streak)
+    return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 def round_digits(number):
     if type(number) == float:
@@ -138,7 +139,9 @@ class DiscordClient(discord.Client):
                 await self.declare_intfar()
                 asyncio.create_task(self.poll_for_game_start())
             except Exception as e:
-                print("Exception after game was over: " + str(e.with_traceback(e)))
+                self.config.log("Exception after game was over!!!", self.config.log_error)
+                await self.send_error_msg()
+                raise e
         elif game_status == 0:
             await self.poll_for_game_end()
 
@@ -587,6 +590,12 @@ class DiscordClient(discord.Client):
             self.config.log("Summoner left voice: " + summoner_info[1])
             self.config.log(f"Active users: {len(self.active_users)}")
 
+    async def send_error_msg(self):
+        mention_me = self.get_mention_str(MY_DISC_ID)
+        message = "Oh frick, It appears I've crashed {emote_nat_really_fine} "
+        message += f"{mention_me}, come and fix me!!! " + "{emote_angry_gual}"
+        await self.channel_to_write.send(message)
+
     async def on_ready(self):
         if self.initialized:
             self.config.log("Ready was called, but bot was already initialized... Weird stuff.")
@@ -787,7 +796,7 @@ class DiscordClient(discord.Client):
                 if len(split) > 2:
                     target_name = " ".join(split[2:])
                 await self.handle_stat_msg(message, first_command, second_command, target_name)
-            elif first_command == "test" and message.author.id == 267401734513491969:
+            elif first_command == "test" and message.author.id == MY_DISC_ID:
                 await self.handle_test_msg()
 
             self.last_message_time[message.author.id] = time()
