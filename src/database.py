@@ -13,8 +13,7 @@ class Database:
         # Populate summoner names and ids lists with currently registered summoners.
         users = self.get_all_registered_users()
         for entry in users:
-            disc_id = int(entry[0])
-            self.summoners.append((disc_id, entry[1], entry[2]))
+            self.summoners.append(entry)
 
     def get_connection(self):
         return sqlite3.connect(self.config.database)
@@ -88,11 +87,16 @@ class Database:
             return len(int_fars), prev_intfar # All the int-fars is the current int-far!
 
     def get_intfar_stats(self, disc_id):
-        query = "SELECT intfar_reason FROM best_stats WHERE int_far=?"
+        query_total = "SELECT Count(*) FROM participants WHERE disc_id=?"
+        query_intfar = "SELECT intfar_reason FROM best_stats WHERE int_far=?"
         with closing(self.get_connection()) as db:
-            return db.cursor().execute(query, (disc_id,)).fetchall()
+            total_games = db.cursor().execute(query_total, (disc_id,)).fetchone()[0]
+            intfar_games = db.cursor().execute(query_intfar, (disc_id,)).fetchall()
+            return total_games, intfar_games
 
-    def record_stats(self, intfar_id, intfar_reason, game_id, data, kills_by_our_team):
+    def record_stats(self, intfar_id, intfar_reason, game_id, data, users_in_game):
+        kills_by_our_team = data[0][1]["kills_by_team"]
+        timestamp = data[0][1]["timestamp"]
         (min_kills_id, min_kills,
          max_kills_id, max_kills) = game_stats.get_outlier_stat("kills", data)
         (min_deaths_id, min_deaths,
@@ -160,4 +164,7 @@ class Database:
                                               min_cs, min_cs_id, min_gold, min_gold_id,
                                               min_kp, min_kp_id, min_wards, min_wards_id,
                                               min_vision, min_vision_id))
+            query = "INSERT INTO participants(game_id, disc_id, timestamp) VALUES (?, ?, ?)"
+            for disc_id, _, _ in users_in_game:
+                db.cursor().execute(query, (game_id, disc_id, timestamp))
             db.commit()
