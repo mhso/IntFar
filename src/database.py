@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 import sqlite3
 from contextlib import closing
 import game_stats
@@ -61,6 +62,23 @@ class Database:
         query = f"SELECT Count(*), {aggregator}({value}), game_id FROM {table} WHERE {stat}=?"
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchone()
+
+    def get_intfars_of_the_month(self):
+        min_time = datetime.utcnow()
+        current_month = min_time.month
+        next_month = 1 if current_month == 12 else current_month + 1
+        min_time = min_time.replace(min_time.year, current_month,
+                                    1, 0, 0, 0, 0, timezone.utc)
+        max_time = min_time.replace(min_time.year, next_month,
+                                    1, 14, 0, 0, 0, timezone.utc)
+        min_timestamp = int(min_time.timestamp())
+        max_timestamp = int(max_time.timestamp())
+        query = "SELECT Count(*) as c, int_far FROM best_stats bs, participants p "
+        query += "WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=disc_id "
+        query += "AND timestamp > ? AND timestamp < ? "
+        query += "GROUP BY int_far ORDER BY c DESC LIMIT 3"
+        with closing(self.get_connection()) as db:
+            return db.cursor().execute(query, (min_timestamp, max_timestamp)).fetchall()
 
     def get_longest_intfar_streak(self, disc_id):
         query = "SELECT int_far FROM best_stats ORDER BY id"

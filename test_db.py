@@ -11,7 +11,13 @@ conn = sqlite3.connect(database + ".db")
 try:
     while True:
         query = input(">")
-        for row in conn.cursor().execute(query):
+        result = None
+        if query.startswith("!"):
+            with open(query[1:] + ".sql") as f:
+                result = conn().cursor().executescript(f.read())
+        else:
+            result = conn.cursor().execute(query)
+        for row in result:
             print(row)
         conn.commit()
 finally:

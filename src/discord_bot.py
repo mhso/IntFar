@@ -5,6 +5,7 @@ import asyncio
 import discord
 import riot_api
 import game_stats
+from montly_intfar import MonthlyIntfar
 
 DISCORD_SERVER_ID = 619073595561213953
 CHANNEL_ID = 730744358751567902
@@ -590,6 +591,27 @@ class DiscordClient(discord.Client):
             self.config.log("Summoner left voice: " + summoner_info[1])
             self.config.log(f"Active users: {len(self.active_users)}")
 
+    async def sleep_until_montly_infar(self):
+        """
+        Sleeps until the first of the next month (run in seperate thread).
+        When the next month rolls around, this method announces the Int-Far of the month.
+        """
+        monitor = MonthlyIntfar()
+        time_to_sleep = 60
+        while monitor.get_seconds_left() > 0:
+            await asyncio.sleep(time_to_sleep)
+
+        intfar_details = self.database.get_intfars_of_the_month()
+        intfar_details = [(count, self.get_mention_str(disc_id))
+                          for (count, disc_id) in intfar_details]
+        intro_desc = "THE RESULTS ARE IN!!! Int-Far of the month is...\n"
+        intro_desc += "*DRUM ROLL*\n"
+        message = monitor.get_description(intfar_details)
+        message += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
+        message += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
+        final_msg = intro_desc + self.insert_emotes(message)
+        await self.channel_to_write.send(final_msg)
+
     async def send_error_msg(self):
         mention_me = self.get_mention_str(MY_DISC_ID)
         message = "Oh frick, It appears I've crashed {emote_nat_really_fine} "
@@ -619,6 +641,7 @@ class DiscordClient(discord.Client):
                 for text_channel in guild.text_channels:
                     if text_channel.id == CHANNEL_ID:
                         self.channel_to_write = text_channel
+                        asyncio.create_task(self.sleep_until_montly_infar())
                         return
 
     async def handle_helper_msg(self, message):

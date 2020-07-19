@@ -1,5 +1,7 @@
 auth.json
 venv
+queries.sql
+.vscode
 __pycache__
 *.db
 champions.json
