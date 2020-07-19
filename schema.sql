@@ -1,13 +1,18 @@
 CREATE TABLE [registered_summoners] (
-    [disc_id] NVARCHAR(64) NOT NULL PRIMARY KEY,
+    [disc_id] INTEGER NOT NULL PRIMARY KEY,
     [summ_name] NVARCHAR(64) NOT NULL,
     [summ_id] NVARCHAR(64) NOT NULL
+);
+CREATE TABLE [participants] (
+  [game_id] INTEGER NOT NULL,
+  [disc_id] INTEGER NOT NULL,  
+  [timestamp] INTEGER
 );
 CREATE TABLE [best_stats] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
     [game_id] INTEGER NOT NULL,
     [int_far] INTEGER,
-    [intfar_reason] INTEGER,
+    [intfar_reason] NVARCHAR(4),
     [kills] INTEGER,
     [kills_id] INTEGER,
     [deaths] INTEGER,
@@ -31,7 +36,7 @@ CREATE TABLE [worst_stats] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
     [game_id] INTEGER NOT NULL,
     [int_far] INTEGER,
-    [intfar_reason] INTEGER,
+    [intfar_reason] NVARCHAR(4),
     [kills] INTEGER,
     [kills_id] INTEGER,
     [deaths] INTEGER,

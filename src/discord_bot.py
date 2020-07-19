@@ -112,6 +112,7 @@ class DiscordClient(discord.Client):
         self.config = config
         self.database = database
         self.active_users = []
+        self.users_in_game = None
         self.active_game = None
         self.channel_to_write = None
         self.initialized = False
@@ -138,6 +139,8 @@ class DiscordClient(discord.Client):
             try:
                 self.config.log("GAME OVER!!")
                 await self.declare_intfar()
+                self.active_game = None
+                self.users_in_game = None # Reset the list of users who are in a game.
                 asyncio.create_task(self.poll_for_game_start())
             except Exception as e:
                 self.config.log("Exception after game was over!!!", self.config.log_error)
@@ -162,6 +165,7 @@ class DiscordClient(discord.Client):
 
         game_status = self.check_game_status()
         if game_status == 1: # Game has started.
+            self.users_in_game = [x for x in self.active_users]
             await self.poll_for_game_end()
         elif game_status == 0:
             await self.poll_for_game_start()
@@ -188,7 +192,8 @@ class DiscordClient(discord.Client):
         active_game = None
         game_ids = set()
         # First check if users are in the same game (or all are in no games).
-        for _, _, summ_id in self.active_users:
+        user_list = self.active_users if self.users_in_game is None else self.users_in_game
+        for _, _, summ_id in user_list:
             game_id = self.riot_api.get_active_game(summ_id)
             if game_id is not None:
                 game_ids.add(game_id)
@@ -424,7 +429,7 @@ class DiscordClient(discord.Client):
         prev_mention = self.get_mention_str(prev_intfar)
         if intfar_id is None:
             if intfar_streak > 1:
-                for disc_id, _, _ in self.active_users:
+                for disc_id, _, _ in self.users_in_game:
                     if disc_id == prev_intfar:
                         return (f"{prev_mention} has redeemed himself! " +
                                 f"His Int-Far streak of {intfar_streak} has been broken. " +
@@ -486,12 +491,13 @@ class DiscordClient(discord.Client):
                 if part_info["participantId"] == participant["participantId"]:
                     kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
                     damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
-                    # We loop through the static 'database.summoners' list and not the dynamic
+                    # We loop through the static 'self.users_in_game' list and not the dynamic
                     # 'self.active_players' for safety.
-                    for disc_id, _, summ_id in self.database.summoners:
+                    for disc_id, _, summ_id in self.users_in_game:
                         if summ_id == part_info["player"]["summonerId"]:
                             our_team = participant["teamId"]
                             combined_stats = participant["stats"]
+                            combined_stats["timestamp"] = game_info["gameCreation"]
                             combined_stats.update(participant["timeline"])
                             filtered_stats.append((disc_id, combined_stats))
 
@@ -562,15 +568,17 @@ class DiscordClient(discord.Client):
 
         if not self.config.testing:
             try: # Save stats.
-                self.database.record_stats(max_count_intfar, int("".join(reason_ids)), self.active_game,
-                                        filtered_stats, filtered_stats[0][1]["kills_by_team"])
+                reasons_str = "".join(reason_ids)
+                if reasons_str == "0000":
+                    reasons_str = None
+                self.database.record_stats(max_count_intfar, reasons_str, self.active_game,
+                                           filtered_stats, self.users_in_game)
             except (DatabaseError, OperationalError) as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
                 self.config.log(exception)
                 raise exception
 
             self.config.log("Game over! Stats were saved succesfully.")
-        self.active_game = None
 
     async def user_joined_voice(self, member, start_polling=True):
         self.config.log("User joined voice: " + str(member.id))
@@ -673,16 +681,19 @@ class DiscordClient(discord.Client):
     async def handle_intfar_msg(self, message, target_name):
         def get_intfar_stats(disc_id, expanded=True):
             person_to_check = self.get_discord_nick(disc_id)
-            intfar_reason_ids = self.database.get_intfar_stats(disc_id)
+            total_games, intfar_reason_ids = self.database.get_intfar_stats(disc_id)
             intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
             for reason_id in intfar_reason_ids:
-                intfar_ids = [int(x) for x in str(reason_id[0])]
+                intfar_ids = [int(x) for x in reason_id[0]]
                 for index, intfar_id in enumerate(intfar_ids):
                     if intfar_id == 1:
                         intfar_counts[index] += 1
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             msg += self.insert_emotes("{emote_unlimited_chins}")
             if expanded:
+                pct_intfar = (0 if total_games == 0
+                                else int(len(intfar_reason_ids) / total_games * 100))
+                ratio_desc = "\n" + f"He was Int-Far in **{pct_intfar}%** of his {total_games} total games played"
                 reason_desc = "\n" + "Int-Fars awarded so far:\n"
                 for reason_id, reason in enumerate(INTFAR_REASONS):
                     reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
@@ -690,7 +701,8 @@ class DiscordClient(discord.Client):
                 streak_desc = f"His longest Int-Far streak was **{longest_streak}** "
                 streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
                 streak_desc = self.insert_emotes(streak_desc)
-                msg += reason_desc + streak_desc
+                msg += ratio_desc + reason_desc + streak_desc
+
             return msg, len(intfar_reason_ids)
 
         response = ""
