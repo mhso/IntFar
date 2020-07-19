@@ -19,6 +19,4 @@ conf.log("Starting Discord Client...")
 
 client = DiscordClient(conf, database_client)
 
-monthly_monitor = MonthlyIntfar(client)
-
 client.run(conf.discord_token)
