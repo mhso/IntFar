@@ -606,8 +606,9 @@ class DiscordClient(discord.Client):
         """
         monitor = MonthlyIntfar()
         self.config.log("Starting Int-Far-of-the-month monitor... ")
-        self.config.log("Monthly Int-Far will be crowned at ", end="")
-        self.config.log(monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S UTC+1"))
+        format_time = monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S")
+        self.config.log(f"Monthly Int-Far will be crowned at {format_time} UTC+1", end="")
+
         time_to_sleep = 60
         while monitor.get_seconds_left() > 0:
             await asyncio.sleep(time_to_sleep)
