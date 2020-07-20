@@ -273,8 +273,7 @@ class DiscordClient(discord.Client):
     def get_redeemed_people(self, data):
         """
         Returns a string describing people who have been redeemed by playing
-        exceptionally well. These people will also have one Int-Far removed from
-        their total tally.
+        exceptionally well.
         Criteria for being redeemed:
             - Having a KDA of 10+
             - Doing more damage than the rest of the team combined
@@ -323,7 +322,7 @@ class DiscordClient(discord.Client):
         that wasn't quite bad enough to be named Int-Far for.
         Honorable mentions are given for:
             - Having 0 control wards purchased.
-            - Being adc/mid/top/jungle and doing less than 6000 damage.
+            - Being adc/mid/top/jungle and doing less than 8000 damage.
             - Being adc/mid/top and having less than 4 cs/min.
             - Being jungle and securing no epic monsters.
         """
@@ -333,7 +332,7 @@ class DiscordClient(discord.Client):
             if stats["visionWardsBoughtInGame"] == 0:
                 mentions[disc_id].append((0, stats["visionWardsBoughtInGame"]))
             damage_dealt = stats["totalDamageDealtToChampions"]
-            if stats["role"] != "DUO_SUPPORT" and damage_dealt < 6000:
+            if stats["role"] != "DUO_SUPPORT" and damage_dealt < 8000:
                 mentions[disc_id].append((1, damage_dealt))
             cs_per_min = (stats["creepsPerMinDeltas"]["0-10"] + stats["creepsPerMinDeltas"]["10-20"]) / 2.0
             if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 4.0:
@@ -363,7 +362,7 @@ class DiscordClient(discord.Client):
         Returns the info of the Int-Far, if this person has a truly terrible KDA.
         This is determined by:
             - KDA being the lowest of the group
-            - KDA being less than 1.0
+            - KDA being less than 1.3
             - Number of deaths being more than 2.
         Returns None if none of these criteria matches a person.
         """
@@ -395,7 +394,7 @@ class DiscordClient(discord.Client):
         Returns the info of the Int-Far, if this person has very low kill participation.
         This is determined by:
             - Having the lowest KP in the group
-            - KP being less than 30
+            - KP being less than 25
             - Number of kills + assists being less than 10
         Returns None if none of these criteria matches a person.
         """
@@ -419,16 +418,22 @@ class DiscordClient(discord.Client):
         intfar, stats = game_stats.get_outlier(data, "visionScore")
         lowest_score = stats["visionScore"]
         kda = game_stats.calc_kda(stats)
-        if lowest_score < self.config.vision_score_lower_threshold and kda < 3:
+        if lowest_score < self.config.vision_score_lower_threshold and kda < 3.0:
             return (intfar, lowest_score)
         return (None, None)
 
     def get_streak_msg(self, intfar_id, intfar_streak, prev_intfar):
+        """
+        Return a message describing the current Int-Far streak.
+        This happens if someone ends his Int-Far streak, either by playing well,
+        or by someone else getting Int-Far.
+        It also describes whether someone is currently on an Int-Far streak.
+        """
         current_nick = self.get_discord_nick(intfar_id)
         current_mention = self.get_mention_str(intfar_id)
         prev_mention = self.get_mention_str(prev_intfar)
         if intfar_id is None:
-            if intfar_streak > 1:
+            if intfar_streak > 1: # No one was Int-Far this game, but a streak was active.
                 for disc_id, _, _ in self.users_in_game:
                     if disc_id == prev_intfar:
                         return (f"{prev_mention} has redeemed himself! " +
@@ -443,6 +448,9 @@ class DiscordClient(discord.Client):
         return None
 
     async def send_intfar_message(self, disc_id, reason, intfar_streak, prev_intfar):
+        """
+        Send Int-Far message to the #int-far-spam Discord channel.
+        """
         mention_str = self.get_mention_str(disc_id)
         if mention_str is None:
             self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
@@ -482,6 +490,10 @@ class DiscordClient(discord.Client):
         ]
 
     def get_filtered_stats(self, game_info):
+        """
+        Get relevant stats from the given game data and filter the data
+        that is relevant for the Discord users that participated in the game.
+        """
         kills_per_team = {100: 0, 200: 0}
         damage_per_team = {100: 0, 200: 0}
         our_team = 100
@@ -511,7 +523,13 @@ class DiscordClient(discord.Client):
 
         return filtered_stats
 
-    async def declare_intfar(self): # Check final game status.
+    async def declare_intfar(self):
+        """
+        Called when the currently active game is over.
+        Determines if an Int-Far should be crowned and for what,
+        and sends out a status message about the potential Int-Far (if there was one).
+        Also saves worst/best stats for the current game.
+        """
         game_info = self.riot_api.get_game_details(self.active_game, tries=2)
         filtered_stats = self.get_filtered_stats(game_info)
 
@@ -523,7 +541,7 @@ class DiscordClient(discord.Client):
         max_count_intfar = None
         intfar_data = {}
 
-        # Look through details for the people qualifying for int-far.
+        # Look through details for the people qualifying for Int-Far.
         # The one with most criteria met gets chosen.
         for (index, (intfar_disc_id, stat_value)) in enumerate(intfar_details):
             if intfar_disc_id is not None:
@@ -551,7 +569,7 @@ class DiscordClient(discord.Client):
                 reason += reason_text
 
             await self.send_intfar_message(max_count_intfar, reason, intfar_streak, prev_intfar)
-        else:
+        else: # No one was bad enough to be Int-Far.
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
             honorable_mention_text = self.get_honorable_mentions(filtered_stats)
@@ -599,10 +617,11 @@ class DiscordClient(discord.Client):
             self.config.log("Summoner left voice: " + summoner_info[1])
             self.config.log(f"Active users: {len(self.active_users)}")
 
-    async def sleep_until_montly_infar(self):
+    async def sleep_until_monthly_infar(self):
         """
         Sleeps until the first of the next month (run in seperate thread).
-        When the next month rolls around, this method announces the Int-Far of the month.
+        When the next month rolls around,
+        this method announces the Int-Far of the previous month.
         """
         monitor = MonthlyIntfar()
         self.config.log("Starting Int-Far-of-the-month monitor... ")
@@ -625,6 +644,10 @@ class DiscordClient(discord.Client):
         await self.channel_to_write.send(final_msg)
 
     async def send_error_msg(self):
+        """
+        This method is called whenenver a critical error occurs.
+        It causes the bot to post an error message to the channel, pinging me to fix it.
+        """
         mention_me = self.get_mention_str(MY_DISC_ID)
         message = "Oh frick, It appears I've crashed {emote_nat_really_fine} "
         message += f"{mention_me}, come and fix me!!! " + "{emote_angry_gual}"
@@ -635,7 +658,7 @@ class DiscordClient(discord.Client):
             self.config.log("Ready was called, but bot was already initialized... Weird stuff.")
             return
 
-        await self.change_presence(
+        await self.change_presence( # Change Discord activity.
             activity=discord.Activity(name="you inting in league",
                                       type=discord.ActivityType.watching)
         )
@@ -647,16 +670,21 @@ class DiscordClient(discord.Client):
                     members_in_voice = voice_channel.members
                     count = 0
                     for member in members_in_voice:
+                        # Start polling for an active game
+                        # if more than one user is active in voice.
                         start_polling = count == 1
                         await self.user_joined_voice(member, start_polling)
                         count += 1
                 for text_channel in guild.text_channels:
-                    if text_channel.id == CHANNEL_ID:
+                    if text_channel.id == CHANNEL_ID: # Find the 'int-far-spam' channel.
                         self.channel_to_write = text_channel
                         asyncio.create_task(self.sleep_until_montly_infar())
                         return
 
     async def handle_helper_msg(self, message):
+        """
+        Write the helper/commands message to Discord.
+        """
         valid_stats = ", ".join("'" + cmd + "'" for cmd in STAT_COMMANDS)
         response = "I gotchu fam {emote_nazi}\n"
         response += "The Int-Far™ Tracker™ is a highly sophisticated bot "

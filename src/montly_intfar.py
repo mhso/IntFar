@@ -4,6 +4,9 @@ import config
 import database
 
 class TimeZone(tzinfo):
+    """
+    Class for representing the time zone of Copenhagen (UTC+1).
+    """
     def tzname(self, dt):
         return "Europe/Copenhagen"
 
@@ -20,7 +23,10 @@ class TimeZone(tzinfo):
         return timedelta(0, 0, 0, 0, 0, 1, 0)
 
 class MonthlyIntfar:
-    HOUR_OF_ANNOUNCEMENT = 12
+    """
+    Class for handling the tracking of when to announce Int-Far of the month.
+    """
+    HOUR_OF_ANNOUNCEMENT = 12 # Hour of the day on which to announce IFOTM.
 
     def __init__(self):
         self.cph_timezone = TimeZone()
@@ -28,6 +34,9 @@ class MonthlyIntfar:
         current_month = current_time.month
         next_month = 1 if current_month == 12 else current_month + 1
         next_year = current_time.year if next_month != 1 else current_time.year + 1
+        # If today is the first day of the month and the time if before 14:00,
+        # we should announce the Int-Far at the current month (and year).
+        # Otherwise, we should announce it at the first day of the next month.
         month_to_announce = (current_month
                              if current_time.day == 1 and current_time.hour < HOUR_OF_ANNOUNCEMENT
                              else next_month)
@@ -37,6 +46,9 @@ class MonthlyIntfar:
                                                          self.cph_timezone)
 
     def get_seconds_left(self):
+        """
+        Get seconds left until announcement time (first of the month at 14:00).
+        """
         return (self.time_at_announcement - datetime.now(self.cph_timezone)).seconds
 
     def get_description(self, intfar_details):
@@ -53,25 +65,25 @@ class MonthlyIntfar:
             tie_count = 3
         elif count_1st == count_2nd:
             tie_count = 2
-        if tie_count == 0:
+        if tie_count == 0: # Int-Far #1 and Int-Far #2 values are distinct.
             winner_str = f"{nickname_1st}!!! "
             desc_str = f"He has \"won\" a total of **{count_1st}** Int-Far awards this month!!!\n"
             runner_up_str = "Runner up goes to "
-            if count_2nd == count_3rd:
+            if count_2nd == count_3rd: # Int-Far #2 and Int-Far #3 values are equal.
                 runner_up_str += f"both {nickname_2nd} and {nickname_3rd} "
                 runner_up_str += f"for a tied **{count_2nd}** Int-Far awards!\n"
-            else:
+            else: # All three Int-Far values are distinct.
                 runner_up_str += f"{nickname_2nd} for being almost as bad with "
                 runner_up_str += f"**{count_2nd}** Int-Far awards!\n"
                 runner_up_str += f"Finally, {nickname_3rd} gets a bronze medal for "
                 runner_up_str += f"a bad-but-no-as-terrible {count_3rd} Int-Far awards!\n"
             desc_str += runner_up_str
-        if tie_count == 2:
+        if tie_count == 2: # Int-Far #1 and Int-Far #2 values are equal.
             winner_str += f"{nickname_1st} **AND** {nickname_2nd}!!! "
             desc_str = f"They are both equally terrible with a tied **{count_1st}** "
             desc_str += "Int-Far awards this month!!!\n"
             desc_str += f"Second place goes to {nickname_3rd} with **{count_3rd}** Int-Far awards!\n"
-        if tie_count == 3:
+        if tie_count == 3: # Int-Far values for all three 'winners' are equal.
             winner_str += f"{nickname_1st}, {nickname_2nd} **AND** {nickname_3rd}!!! "
             desc_str = f"They are ALL equally terrible with a tied **{count_1st}** "
             desc_str += "Int-Far awards this month!!!\n"
@@ -84,4 +96,6 @@ if __name__ == "__main__":
     conf = config.Config()
     db_client = database.Database(conf)
     details = db_client.get_intfars_of_the_month()
-    print(details)
+    intfar_details = [(count, "Guy" + str(disc_id))
+                      for (count, disc_id) in details]
+    print(monthly_monitor.get_description(intfar_details))
