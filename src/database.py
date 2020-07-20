@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from montly_intfar import TimeZone, MonthlyIntfar
 import sqlite3
 from contextlib import closing
 import game_stats
@@ -63,15 +64,25 @@ class Database:
             return db.cursor().execute(query, (disc_id,)).fetchone()
 
     def get_intfars_of_the_month(self):
-        min_time = datetime.utcnow()
-        current_month = min_time.month
-        next_month = 1 if current_month == 12 else current_month + 1
-        min_time = min_time.replace(min_time.year, current_month,
-                                    1, 0, 0, 0, 0, timezone.utc)
-        max_time = min_time.replace(min_time.year, next_month,
-                                    1, 14, 0, 0, 0, timezone.utc)
-        min_timestamp = int(min_time.timestamp())
-        max_timestamp = int(max_time.timestamp())
+        tz_cph = TimeZone()
+        curr_time = datetime.now(tz_cph)
+        current_month = curr_time.month
+        min_timestamp = None
+        if curr_time.day == 1 and curr_time.hour < MonthlyIntfar.HOUR_OF_ANNOUNCEMENT:
+            # Get Int-Far stats for previous month.
+            prev_month = 12 if current_month == 1 else current_month - 1
+            prev_year = curr_time.year if prev_month != 12 else curr_time.year - 1
+            prev_time = curr_time.replace(prev_year, prev_month, 1,
+                                          0, 0, 0, 0, tz_cph)
+            min_timestamp = int(prev_time.timestamp())
+        else:
+            # Get Int-Far stats for current month.
+            prev_time = curr_time.replace(curr_time.year, current_month, 1,
+                                          0, 0, 0, 0, tz_cph)
+            min_timestamp = int(prev_time.timestamp())
+
+        max_timestamp = int(curr_time.timestamp())
+
         query = "SELECT Count(*) as c, int_far FROM best_stats bs, participants p "
         query += "WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=disc_id "
         query += "AND timestamp > ? AND timestamp < ? "

@@ -20,15 +20,23 @@ class TimeZone(tzinfo):
         return timedelta(0, 0, 0, 0, 0, 1, 0)
 
 class MonthlyIntfar:
+    HOUR_OF_ANNOUNCEMENT = 12
+
     def __init__(self):
         self.cph_timezone = TimeZone()
         current_time = datetime.now(self.cph_timezone)
         current_month = current_time.month
         next_month = 1 if current_month == 12 else current_month + 1
-        self.time_at_announcement = current_time.replace(current_time.year, next_month,
-                                                         1, 12, 0, 0, 0, self.cph_timezone)
+        next_year = current_time.year if next_month != 1 else current_time.year + 1
+        month_to_announce = (current_month
+                             if current_time.day == 1 and current_time.hour < HOUR_OF_ANNOUNCEMENT
+                             else next_month)
+        year_to_announce = current_time.year if month_to_announce == current_month else next_year
+        self.time_at_announcement = current_time.replace(year_to_announce, month_to_announce, 1,
+                                                         self.HOUR_OF_ANNOUNCEMENT, 0, 0, 0,
+                                                         self.cph_timezone)
         print("Starting Int-Far-of-the-month monitor... Monthly Int-Far will be crowned at ", end="")
-        print(self.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S"))
+        print(self.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S UTC+1"))
 
     def get_seconds_left(self):
         return (self.time_at_announcement - datetime.now(self.cph_timezone)).seconds
