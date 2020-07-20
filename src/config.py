@@ -17,7 +17,7 @@ class Config:
         self.log_error = 2
         self.message_timeout = 1.5
 
-    def log(self, data, severity=0):
+    def log(self, data, severity=0, end="\n"):
         curr_time = datetime.now()
         prefix = curr_time.strftime("%Y-%m-%d %H:%M:%S")
         if severity == self.log_warning:
@@ -26,4 +26,4 @@ class Config:
             prefix = " - [ERROR]"
 
         if self.debug:
-            print(prefix + " - " + str(data), flush=True)
+            print(prefix + " - " + str(data), flush=True, end=end)

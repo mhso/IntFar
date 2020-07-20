@@ -35,8 +35,6 @@ class MonthlyIntfar:
         self.time_at_announcement = current_time.replace(year_to_announce, month_to_announce, 1,
                                                          self.HOUR_OF_ANNOUNCEMENT, 0, 0, 0,
                                                          self.cph_timezone)
-        print("Starting Int-Far-of-the-month monitor... Monthly Int-Far will be crowned at ", end="")
-        print(self.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S UTC+1"))
 
     def get_seconds_left(self):
         return (self.time_at_announcement - datetime.now(self.cph_timezone)).seconds

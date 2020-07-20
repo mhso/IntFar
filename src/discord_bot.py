@@ -605,6 +605,9 @@ class DiscordClient(discord.Client):
         When the next month rolls around, this method announces the Int-Far of the month.
         """
         monitor = MonthlyIntfar()
+        self.config.log("Starting Int-Far-of-the-month monitor... ")
+        self.config.log("Monthly Int-Far will be crowned at ", end="")
+        self.config.log(monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S UTC+1"))
         time_to_sleep = 60
         while monitor.get_seconds_left() > 0:
             await asyncio.sleep(time_to_sleep)
