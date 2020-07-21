@@ -233,6 +233,16 @@ class DiscordClient(discord.Client):
                         return member.display_name
         return None
 
+    def get_discord_id(self, nickname):
+        for guild in self.guilds:
+            if guild.id == DISCORD_SERVER_ID:
+                for member in guild.members:
+                    if nickname in (member.nick.lower(),
+                                    member.display_name.lower(),
+                                    member.name.lower()):
+                        return member.id
+        return None
+
     def get_all_emojis(self):
         for guild in self.guilds:
             if guild.id == DISCORD_SERVER_ID:
@@ -678,7 +688,7 @@ class DiscordClient(discord.Client):
                 for text_channel in guild.text_channels:
                     if text_channel.id == CHANNEL_ID: # Find the 'int-far-spam' channel.
                         self.channel_to_write = text_channel
-                        asyncio.create_task(self.sleep_until_montly_infar())
+                        asyncio.create_task(self.sleep_until_monthly_infar())
                         return
 
     async def handle_helper_msg(self, message):
@@ -709,6 +719,12 @@ class DiscordClient(discord.Client):
         response += valid_stats
         response += "\n```"
         await message.channel.send(self.insert_emotes(response))
+
+    def try_get_user_data(self, name):
+        user_data = self.database.discord_id_from_summoner(name)
+        if user_data is None: # Summoner name gave no result, try Discord name.
+            return self.get_discord_id(name)
+        return user_data
 
     async def handle_intfar_msg(self, message, target_name):
         def get_intfar_stats(disc_id, expanded=True):
@@ -748,12 +764,13 @@ class DiscordClient(discord.Client):
                 for resp_str, _ in messages:
                     response += "- " + resp_str + "\n"
             else:
-                user_data = self.database.discord_id_from_summoner(target_name.strip())
-                if user_data is None:
-                    msg = f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
                     await message.channel.send(msg)
                     return
-                response = get_intfar_stats(user_data[0])[0]
+                response = get_intfar_stats(target_id)[0]
         else: # Check intfar stats for the person sending the message.
             response = get_intfar_stats(message.author.id)[0]
 
@@ -768,26 +785,26 @@ class DiscordClient(discord.Client):
                 best = first_cmd == "best"
                 quantity_type = 0 if best else 1
                 maximize = not ((stat != "deaths") ^ best)
-                id_to_check = message.author.id
+                target_id = message.author.id
                 recepient = message.author.name
 
                 if target_name is not None: # Get someone else's stat information.
-                    user_data = self.database.discord_id_from_summoner(target_name.strip())
-                    if user_data is None:
-                        msg = f"Error: Invalid summoner name {self.get_emoji_by_name('fu')}"
+                    target_id = self.try_get_user_data(target_name.strip())
+                    if target_id is None:
+                        msg = "Error: Invalid summoner or Discord name "
+                        msg += f"{self.get_emoji_by_name('PepeHands')}"
                         await message.channel.send(msg)
                         return
-                    id_to_check = user_data[0]
-                    recepient = self.get_discord_nick(id_to_check)
+                    recepient = self.get_discord_nick(target_id)
 
-                stat_count, min_or_max_value, game_id = self.database.get_stat(stat + "_id", stat, best, id_to_check, maximize)
+                stat_count, min_or_max_value, game_id = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
 
                 readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
                 response = (f"{recepient} has gotten {readable_stat} in a game " +
                             f"{stat_count} times " + self.insert_emotes("{emote_pog}") + "\n")
                 if min_or_max_value is not None:
                     game_info = self.riot_api.get_game_details(game_id)
-                    summ_id = self.database.summoner_from_discord_id(id_to_check)[2]
+                    summ_id = self.database.summoner_from_discord_id(target_id)[2]
                     game_summary = game_stats.get_game_summary(game_info, summ_id)
                     response += f"His {readable_stat} ever was "
                     response += f"{round_digits(min_or_max_value)} as {game_summary}"
@@ -822,7 +839,7 @@ class DiscordClient(discord.Client):
         msg = message.content.strip()
         if msg.startswith("!"):
             split = msg.split(" ")
-            first_command = split[0][1:]
+            first_command = split[0][1:].lower()
 
             if first_command not in VALID_COMMANDS and first_command != "test":
                 return
@@ -832,7 +849,7 @@ class DiscordClient(discord.Client):
                 await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
                 return
 
-            second_command = None if len(split) < 2 else split[1]
+            second_command = None if len(split) < 2 else split[1].lower()
             if first_command == "register": # Register the user who sent the command.
                 if len(split) > 1:
                     summ_name = " ".join(split[1:])
@@ -855,14 +872,14 @@ class DiscordClient(discord.Client):
                 target_name = None
                 if len(split) > 1:
                     target_name = " ".join(split[1:])
-                await self.handle_intfar_msg(message, target_name)
+                await self.handle_intfar_msg(message, target_name.lower())
             elif first_command in ("help", "commands"):
                 await self.handle_helper_msg(message)
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
                 target_name = None
                 if len(split) > 2:
                     target_name = " ".join(split[2:])
-                await self.handle_stat_msg(message, first_command, second_command, target_name)
+                await self.handle_stat_msg(message, first_command, second_command, target_name.lower())
             elif first_command == "test" and message.author.id == MY_DISC_ID:
                 await self.handle_test_msg()
 

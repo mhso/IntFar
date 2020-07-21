@@ -46,7 +46,7 @@ class Database:
 
     def discord_id_from_summoner(self, name):
         for disc_id, summ_name, summ_id in self.summoners:
-            if summ_name == name:
+            if summ_name.lower() == name:
                 return disc_id, summ_name, summ_id
         return None
 
