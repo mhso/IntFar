@@ -237,9 +237,11 @@ class DiscordClient(discord.Client):
         for guild in self.guilds:
             if guild.id == DISCORD_SERVER_ID:
                 for member in guild.members:
-                    if nickname in (member.nick.lower(),
-                                    member.display_name.lower(),
-                                    member.name.lower()):
+                    if member.nick is not None and member.nick.lower() == nickname:
+                        return member.id
+                    if member.display_name is not None and member.display_name.lower() == nickname:
+                        return member.id
+                    if member.name is not None and member.name.lower() == nickname:
                         return member.id
         return None
 
@@ -724,7 +726,7 @@ class DiscordClient(discord.Client):
         user_data = self.database.discord_id_from_summoner(name)
         if user_data is None: # Summoner name gave no result, try Discord name.
             return self.get_discord_id(name)
-        return user_data
+        return user_data[0]
 
     async def handle_intfar_msg(self, message, target_name):
         def get_intfar_stats(disc_id, expanded=True):
