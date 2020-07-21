@@ -781,45 +781,52 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_stat_msg(self, message, first_cmd, second_cmd, target_name):
-        if second_cmd in STAT_COMMANDS:
+        """
+        Get the value of the requested stat for the requested player.
+        F.x. '!best damage dumbledonger'.
+        """
+        if second_cmd in STAT_COMMANDS: # Check if the requested stat is a valid stat.
             stat = second_cmd
             stat_index = STAT_COMMANDS.index(stat)
             self.config.log(f"Stat requested: {first_cmd} {stat}")
-            try:
-                best = first_cmd == "best"
-                quantity_type = 0 if best else 1
-                maximize = not ((stat != "deaths") ^ best)
-                target_id = message.author.id
-                recepient = message.author.name
+            best = first_cmd == "best"
+            quantity_type = 0 if best else 1
+            # Check whether to find the max or min of some value, when returning
+            # 'his most/lowest [stat] ever was ... Usually highest is best,
+            # lowest is worse, except with deaths, where the opposite is the case.
+            maximize = not ((stat != "deaths") ^ best)
+            target_id = message.author.id
+            recepient = message.author.name
 
-                if target_name is not None: # Get someone else's stat information.
-                    target_id = self.try_get_user_data(target_name.strip())
-                    if target_id is None:
-                        msg = "Error: Invalid summoner or Discord name "
-                        msg += f"{self.get_emoji_by_name('PepeHands')}"
-                        await message.channel.send(msg)
-                        return
-                    recepient = self.get_discord_nick(target_id)
+            if target_name is not None: # Get someone else's stat information.
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
+                recepient = self.get_discord_nick(target_id)
 
-                stat_count, min_or_max_value, game_id = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
+            (stat_count, # <- How many times the stat has occured.
+                min_or_max_value, # <- Highest/lowest occurance of the stat value.
+                game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
 
-                readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
-                response = (f"{recepient} has gotten {readable_stat} in a game " +
-                            f"{stat_count} times " + self.insert_emotes("{emote_pog}") + "\n")
-                if min_or_max_value is not None:
-                    game_info = self.riot_api.get_game_details(game_id)
-                    summ_id = self.database.summoner_from_discord_id(target_id)[2]
-                    game_summary = game_stats.get_game_summary(game_info, summ_id)
-                    response += f"His {readable_stat} ever was "
-                    response += f"{round_digits(min_or_max_value)} as {game_summary}"
+            # Get a readable description, such as 'most deaths' or 'lowest kp'.
+            readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
+            response = (f"{recepient} has gotten {readable_stat} in a game " +
+                        f"{stat_count} times " + self.insert_emotes("{emote_pog}") + "\n")
+            if min_or_max_value is not None:
+                # The target user has gotten most/fewest of 'stat' in at least one game.
+                game_info = self.riot_api.get_game_details(game_id)
+                summ_id = self.database.summoner_from_discord_id(target_id)[2]
+                game_summary = game_stats.get_game_summary(game_info, summ_id)
+                response += f"His {readable_stat} ever was "
+                response += f"{round_digits(min_or_max_value)} as {game_summary}"
 
-                await message.channel.send(response)
-            except (DatabaseError, OperationalError) as exception:
-                response = self.insert_emotes("Something went wrong when querying the database! {emote_fu}")
-                await message.channel.send(response, self.config.log_error)
-                self.config.log(exception)
+            await message.channel.send(response)
         else:
-            response = self.insert_emotes(f"Not a valid stat: '{second_cmd}' " + "{emote_carole_fucking_baskin}")
+            response = f"Not a valid stat: '{second_cmd}' "
+            response += self.insert_emotes("{emote_carole_fucking_baskin}")
             await message.channel.send(response)
 
     async def handle_test_msg(self):
@@ -876,14 +883,26 @@ class DiscordClient(discord.Client):
                 target_name = None
                 if len(split) > 1:
                     target_name = " ".join(split[1:])
-                await self.handle_intfar_msg(message, target_name.lower())
+                try:
+                    await self.handle_intfar_msg(message, target_name.lower())
+                except (DatabaseError, OperationalError) as exception:
+                    response = "Something went wrong when querying the database! "
+                    response += self.insert_emotes("{emote_fu}")
+                    await message.channel.send(response)
+                    self.config.log(exception, self.config.log_error)
             elif first_command in ("help", "commands"):
                 await self.handle_helper_msg(message)
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
                 target_name = None
                 if len(split) > 2:
                     target_name = " ".join(split[2:])
-                await self.handle_stat_msg(message, first_command, second_command, target_name.lower())
+                try:
+                    await self.handle_stat_msg(message, first_command, second_command, target_name.lower())
+                except (DatabaseError, OperationalError) as exception:
+                    response = "Something went wrong when querying the database! "
+                    response += self.insert_emotes("{emote_fu}")
+                    await message.channel.send(response)
+                    self.config.log(exception, self.config.log_error)
             elif first_command == "test" and message.author.id == MY_DISC_ID:
                 await self.handle_test_msg()
 
