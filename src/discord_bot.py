@@ -654,6 +654,8 @@ class DiscordClient(discord.Client):
         message += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
         final_msg = intro_desc + self.insert_emotes(message)
         await self.channel_to_write.send(final_msg)
+        await asyncio.sleep(3600) # Sleep for an hour before resetting.
+        asyncio.create_task(self.sleep_until_monthly_infar())
 
     async def send_error_msg(self):
         """
