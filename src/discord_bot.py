@@ -759,6 +759,7 @@ class DiscordClient(discord.Client):
 
         response = ""
         if target_name is not None: # Check intfar stats for someone else.
+            target_name = target_name.lower()
             if target_name == "all":
                 messages = []
                 for disc_id, _, _ in self.database.summoners:
@@ -793,6 +794,7 @@ class DiscordClient(discord.Client):
                 recepient = message.author.name
 
                 if target_name is not None: # Get someone else's stat information.
+                    target_name = target_name.lower()
                     target_id = self.try_get_user_data(target_name.strip())
                     if target_id is None:
                         msg = "Error: Invalid summoner or Discord name "
@@ -876,14 +878,14 @@ class DiscordClient(discord.Client):
                 target_name = None
                 if len(split) > 1:
                     target_name = " ".join(split[1:])
-                await self.handle_intfar_msg(message, target_name.lower())
+                await self.handle_intfar_msg(message, target_name)
             elif first_command in ("help", "commands"):
                 await self.handle_helper_msg(message)
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
                 target_name = None
                 if len(split) > 2:
                     target_name = " ".join(split[2:])
-                await self.handle_stat_msg(message, first_command, second_command, target_name.lower())
+                await self.handle_stat_msg(message, first_command, second_command, target_name)
             elif first_command == "test" and message.author.id == MY_DISC_ID:
                 await self.handle_test_msg()
 
