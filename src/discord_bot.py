@@ -788,7 +788,7 @@ class DiscordClient(discord.Client):
                 streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
                 streak_desc = self.insert_emotes(streak_desc) + "\n"
                 
-                relations_data = self.get_intfar_relation_stats(target_id)[0]
+                relations_data = self.get_intfar_relation_stats(disc_id)[0]
                 most_intfars_nick = self.get_discord_nick(relations_data[0])
                 relations_desc = f"He has inted the most when playing with {most_intfars_nick} "
                 relations_desc += f"where he inted {relations_data[2]} games ({relations_data[3]}% "
