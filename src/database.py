@@ -123,6 +123,20 @@ class Database:
             intfar_games = db.cursor().execute(query_intfar, (disc_id,)).fetchall()
             return total_games, intfar_games
 
+    def get_intfar_relations(self, disc_id):
+        query = """
+        SELECT disc_id, Count(*) FROM best_stats bs, participants p
+        WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=?
+        GROUP BY disc_id
+        """
+        with closing(self.get_connection()) as db:
+            count_per_person = {}
+            for part_id, games in db.cursor().execute(query, (disc_id,)):
+                if disc_id == part_id:
+                    continue
+                count_per_person[part_id] = games
+            return count_per_person
+
     def record_stats(self, intfar_id, intfar_reason, game_id, data, users_in_game):
         kills_by_our_team = data[0][1]["kills_by_team"]
         timestamp = data[0][1]["timestamp"]
