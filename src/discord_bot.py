@@ -43,7 +43,7 @@ REDEEMING_ACTIONS_FLAVORS = load_flavor_texts("redeeming_actions")
 STREAK_FLAVORS = load_flavor_texts("streak")
 
 VALID_COMMANDS = [
-    "register", "users", "help", "commands", "intfar", "best", "worst"
+    "register", "users", "help", "commands", "intfar", "intfar_relations", "best", "worst"
 ]
 
 STAT_COMMANDS = [
@@ -712,7 +712,8 @@ class DiscordClient(discord.Client):
             "!help - Show this helper text.\n\n" +
             "!commands - Show this helper text.\n\n" +
             "!intfar (summoner_name) - Show how many times you (if no summoner name is included), " +
-            "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users.\n\n"
+            "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users.\n\n" +
+            "!intfar_relations (summoner_name) - Show who you (or someone else) int the most games with.\n\n" +
             "!best [stat] (summoner_name) - Show how many times you (or someone else) " +
             "were the best in the specific stat. " +
             "Fx. '!best kda' shows how many times you had the best KDA in a game.\n\n" +
@@ -729,6 +730,37 @@ class DiscordClient(discord.Client):
         if user_data is None: # Summoner name gave no result, try Discord name.
             return self.get_discord_id(name)
         return user_data[0]
+
+    async def handle_intfar_relations_msg(self, message, target_name):
+        target_id = None
+        if target_name is not None: # Check intfar stats for someone else.
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+        else: # Check intfar stats for the person sending the message.
+            target_id = message.author.id
+
+        ratios = []
+        games_relations, intfars_relations = self.database.get_intfar_relations(target_id)
+        for disc_id, total_games in games_relations.values():
+            intfars = intfars_relations[disc_id]
+            ratios.append((disc_id, int((intfars / total_games) * 100)))
+        
+        ratios.sort(key=lambda x: x[1], reverse=True)
+
+        response = f"Breakdown of players {self.get_discord_nick(target_id)} has inted with:\n"
+        for disc_id, ratio in ratios:
+            total_games = games_relations[disc_id]
+            intfars = intfars_relations[disc_id]
+            nick = self.get_discord_nick(disc_id)
+            response += f"- {nick}: **{intfars}** times "
+            response += f"(**{ratio}%** of **{total_games}** games)\n"
+
+        await message.channel.send(response)
 
     async def handle_intfar_msg(self, message, target_name):
         def get_intfar_stats(disc_id, expanded=True):
@@ -887,6 +919,17 @@ class DiscordClient(discord.Client):
                     target_name = " ".join(split[1:])
                 try:
                     await self.handle_intfar_msg(message, target_name)
+                except (DatabaseError, OperationalError) as exception:
+                    response = "Something went wrong when querying the database! "
+                    response += self.insert_emotes("{emote_fu}")
+                    await message.channel.send(response)
+                    self.config.log(exception, self.config.log_error)
+            elif first_command == "intfar_relations":
+                target_name = None
+                if len(split) > 1:
+                    target_name = " ".join(split[1:])
+                try:
+                    await self.handle_intfar_relations_msg(message, target_name)
                 except (DatabaseError, OperationalError) as exception:
                     response = "Something went wrong when querying the database! "
                     response += self.insert_emotes("{emote_fu}")

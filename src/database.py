@@ -124,18 +124,26 @@ class Database:
             return total_games, intfar_games
 
     def get_intfar_relations(self, disc_id):
-        query = """
-        SELECT disc_id, Count(*) FROM best_stats bs, participants p
+        query_games = """
+        SELECT p2.disc_id, Count(*) as c FROM participants p1, participants p2
+        WHERE p1.disc_id != p2.disc_id AND p1.game_id = p2.game_id AND p1.disc_id=172757468814770176
+        GROUP BY p1.disc_id, p2.disc_id ORDER BY c DESC;
+        """
+        query_intfars = """
+        SELECT disc_id, Count(*) as c FROM best_stats bs, participants p
         WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=?
-        GROUP BY disc_id
+        GROUP BY disc_id ORDER BY c DESC
         """
         with closing(self.get_connection()) as db:
-            count_per_person = {}
-            for part_id, games in db.cursor().execute(query, (disc_id,)):
+            games_with_person = {}
+            intfars_with_person = {}
+            for part_id, intfars in db.cursor().execute(query_intfars, (disc_id,)):
                 if disc_id == part_id:
                     continue
-                count_per_person[part_id] = games
-            return count_per_person
+                intfars_with_person[part_id] = intfars
+            for part_id, games in db.cursor().execute(query_games, (disc_id,)):
+                games_with_person[part_id] = games
+            return games_with_person, intfars_with_person
 
     def record_stats(self, intfar_id, intfar_reason, game_id, data, users_in_game):
         kills_by_our_team = data[0][1]["kills_by_team"]
