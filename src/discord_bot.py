@@ -731,6 +731,15 @@ class DiscordClient(discord.Client):
             return self.get_discord_id(name)
         return user_data[0]
 
+    def get_intfar_relation_stats(self, target_id):
+        data = []
+        games_relations, intfars_relations = self.database.get_intfar_relations(target_id)
+        for disc_id, total_games in games_relations.items():
+            intfars = intfars_relations.get(disc_id, 0)
+            data.append((disc_id, total_games, intfars, int((intfars / total_games) * 100)))
+
+        return sorted(data, key=lambda x: x[2], reverse=True)
+
     async def handle_intfar_relations_msg(self, message, target_name):
         target_id = None
         if target_name is not None: # Check intfar stats for someone else.
@@ -744,13 +753,7 @@ class DiscordClient(discord.Client):
         else: # Check intfar stats for the person sending the message.
             target_id = message.author.id
 
-        data = []
-        games_relations, intfars_relations = self.database.get_intfar_relations(target_id)
-        for disc_id, total_games in games_relations.items():
-            intfars = intfars_relations.get(disc_id, 0)
-            data.append((disc_id, total_games, intfars, int((intfars / total_games) * 100)))
-        
-        data.sort(key=lambda x: x[2], reverse=True)
+        data = self.get_intfar_relation_stats(target_id)
 
         response = f"Breakdown of players {self.get_discord_nick(target_id)} has inted with:\n"
         for disc_id, total_games, intfars, ratio in data:
@@ -779,11 +782,20 @@ class DiscordClient(discord.Client):
                 reason_desc = "\n" + "Int-Fars awarded so far:\n"
                 for reason_id, reason in enumerate(INTFAR_REASONS):
                     reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
+                
                 longest_streak = self.database.get_longest_intfar_streak(disc_id)
                 streak_desc = f"His longest Int-Far streak was **{longest_streak}** "
                 streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
-                streak_desc = self.insert_emotes(streak_desc)
-                msg += ratio_desc + reason_desc + streak_desc
+                streak_desc = self.insert_emotes(streak_desc) + "\n"
+                
+                relations_data = self.get_intfar_relation_stats(target_id)[0]
+                most_intfars_nick = self.get_discord_nick(relations_data[0])
+                relations_desc = f"He has inted the most when playing with {most_intfars_nick} "
+                relations_desc += f"where he inted {relations_data[2]} games ({relations_data[3]}% "
+                relations_desc += f"of {relations_data[1]} games)"
+                relations_desc += self.insert_emotes("{emote_smol_gual}")
+
+                msg += ratio_desc + reason_desc + streak_desc + relations_desc
 
             return msg, len(intfar_reason_ids)
 
