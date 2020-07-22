@@ -8,15 +8,19 @@ database = argv[1]
 
 conn = sqlite3.connect(database + ".db")
 
+if len(argv) > 2:
+    filename = argv[2]
+    with open(filename + ".sql", "r") as fp:
+        result = conn.cursor().execute(fp.read())
+        for row in result:
+            print(row)
+        conn.commit()
+    exit(0)
+
 try:
     while True:
         query = input(">")
-        result = None
-        if query.startswith("!"):
-            with open(query[1:] + ".sql") as f:
-                result = conn().cursor().executescript(f.read())
-        else:
-            result = conn.cursor().execute(query)
+        result = conn.cursor().execute(query)
         for row in result:
             print(row)
         conn.commit()
