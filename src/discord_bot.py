@@ -744,18 +744,16 @@ class DiscordClient(discord.Client):
         else: # Check intfar stats for the person sending the message.
             target_id = message.author.id
 
-        ratios = []
+        data = []
         games_relations, intfars_relations = self.database.get_intfar_relations(target_id)
-        for disc_id, total_games in games_relations.values():
-            intfars = intfars_relations[disc_id]
-            ratios.append((disc_id, int((intfars / total_games) * 100)))
+        for disc_id, total_games in games_relations.items():
+            intfars = intfars_relations.get(disc_id, 0)
+            data.append((disc_id, total_games, intfars, int((intfars / total_games) * 100)))
         
-        ratios.sort(key=lambda x: x[1], reverse=True)
+        data.sort(key=lambda x: x[2], reverse=True)
 
         response = f"Breakdown of players {self.get_discord_nick(target_id)} has inted with:\n"
-        for disc_id, ratio in ratios:
-            total_games = games_relations[disc_id]
-            intfars = intfars_relations[disc_id]
+        for disc_id, total_games, intfars, ratio in data:
             nick = self.get_discord_nick(disc_id)
             response += f"- {nick}: **{intfars}** times "
             response += f"(**{ratio}%** of **{total_games}** games)\n"
