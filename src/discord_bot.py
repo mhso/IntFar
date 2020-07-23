@@ -401,20 +401,24 @@ class DiscordClient(discord.Client):
             return (intfar, highest_deaths)
         return (None, None)
 
-    def intfar_by_kp(self, data, team_kills):
+    def intfar_by_kp(self, data):
         """
         Returns the info of the Int-Far, if this person has very low kill participation.
         This is determined by:
             - Having the lowest KP in the group
             - KP being less than 25
             - Number of kills + assists being less than 10
+            - Turrets + Inhibitors destroyed < 3
         Returns None if none of these criteria matches a person.
         """
+        team_kills = data[0][1]["kills_by_team"]
         intfar, stats = game_stats.get_outlier(data, "kp", total_kills=team_kills)
         lowest_kp = game_stats.calc_kill_participation(stats, team_kills)
         kills = stats["kills"]
         assists = stats["assists"]
-        if lowest_kp < self.config.kp_lower_threshold and kills + assists < 10:
+        structures_destroyed = stats["turretKills"] + stats["inhibitorKills"]
+        if (lowest_kp < self.config.kp_lower_threshold and kills + assists < 10
+                and structures_destroyed < 3):
             return (intfar, lowest_kp)
         return (None, None)
 
@@ -479,7 +483,7 @@ class DiscordClient(discord.Client):
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
 
-    def get_intfar_details(self, stats, team_kills):
+    def get_intfar_details(self, stats):
         intfar_kda_id, kda = self.intfar_by_kda(stats)
         if intfar_kda_id is not None:
             self.config.log("Int-Far because of KDA.")
@@ -488,7 +492,7 @@ class DiscordClient(discord.Client):
         if intfar_deaths_id is not None:
             self.config.log("Int-Far because of deaths.")
 
-        intfar_kp_id, kp = self.intfar_by_kp(stats, team_kills)
+        intfar_kp_id, kp = self.intfar_by_kp(stats)
         if intfar_kp_id is not None:
             self.config.log("Int-Far because of kill participation.")
 
@@ -545,8 +549,7 @@ class DiscordClient(discord.Client):
         game_info = self.riot_api.get_game_details(self.active_game, tries=2)
         filtered_stats = self.get_filtered_stats(game_info)
 
-        intfar_details = self.get_intfar_details(filtered_stats,
-                                                 filtered_stats[0][1]["kills_by_team"])
+        intfar_details = self.get_intfar_details(filtered_stats)
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
         intfar_counts = {}
         max_intfar_count = 0
@@ -782,12 +785,12 @@ class DiscordClient(discord.Client):
                 reason_desc = "\n" + "Int-Fars awarded so far:\n"
                 for reason_id, reason in enumerate(INTFAR_REASONS):
                     reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
-                
+
                 longest_streak = self.database.get_longest_intfar_streak(disc_id)
                 streak_desc = f"His longest Int-Far streak was **{longest_streak}** "
                 streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
                 streak_desc = self.insert_emotes(streak_desc) + "\n"
-                
+
                 relations_data = self.get_intfar_relation_stats(disc_id)[0]
                 most_intfars_nick = self.get_discord_nick(relations_data[0])
                 relations_desc = f"He has inted the most when playing with {most_intfars_nick} "
