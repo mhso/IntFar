@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 
 def calc_kda(stats):
@@ -27,27 +26,20 @@ def get_outlier_stat(stat, data):
     least = stats[stat]
     return most_id, most, least_id, least
 
-def get_game_summary(data, summ_id):
+def get_game_summary(data, summ_id, riot_api):
     stats = None
     champ_id = 0
-    with open("champions.json", encoding="UTF-8") as fp:
-        champion_data = json.load(fp)
+    for part_info in data["participantIdentities"]:
+        if part_info["player"]["summonerId"] == summ_id:
+            for participant in data["participants"]:
+                if part_info["participantId"] == participant["participantId"]:
+                    stats = participant["stats"]
+                    champ_id = participant["championId"]
+                    break
+            break
 
-        for part_info in data["participantIdentities"]:
-            if part_info["player"]["summonerId"] == summ_id:
-                for participant in data["participants"]:
-                    if part_info["participantId"] == participant["participantId"]:
-                        stats = participant["stats"]
-                        champ_id = participant["championId"]
-                        break
-                break
+    champ_played = riot_api.get_champ_name(champ_id)
+    date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
 
-        champ_played = None
-        for champ_name in champion_data["data"]:
-            if int(champion_data["data"][champ_name]["key"]) == champ_id:
-                champ_played = champion_data["data"][champ_name]["name"]
-                break
-        date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
-
-        return (f"{champ_played} with a score of {stats['kills']}/" +
-                f"{stats['deaths']}/{stats['assists']} on {date}")
+    return (f"{champ_played} with a score of {stats['kills']}/" +
+            f"{stats['deaths']}/{stats['assists']} on {date}")

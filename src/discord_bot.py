@@ -547,6 +547,14 @@ class DiscordClient(discord.Client):
         Also saves worst/best stats for the current game.
         """
         game_info = self.riot_api.get_game_details(self.active_game, tries=2)
+
+        if not self.riot_api.is_summoners_rift(game_info["mapId"]):
+            response = "That game was not on Summoner's Rift "
+            response += "{emote_woahpikachu} no Int-Far will be crowned "
+            response += "and no stats will be saved."
+            await self.channel_to_write.send(self.insert_emotes(response))
+            return
+
         filtered_stats = self.get_filtered_stats(game_info)
 
         intfar_details = self.get_intfar_details(filtered_stats)
@@ -668,7 +676,7 @@ class DiscordClient(discord.Client):
         mention_me = self.get_mention_str(MY_DISC_ID)
         message = "Oh frick, It appears I've crashed {emote_nat_really_fine} "
         message += f"{mention_me}, come and fix me!!! " + "{emote_angry_gual}"
-        await self.channel_to_write.send(message)
+        await self.channel_to_write.send(self.insert_emotes(message))
 
     async def on_ready(self):
         if self.initialized:
@@ -866,7 +874,7 @@ class DiscordClient(discord.Client):
                 # The target user has gotten most/fewest of 'stat' in at least one game.
                 game_info = self.riot_api.get_game_details(game_id)
                 summ_id = self.database.summoner_from_discord_id(target_id)[2]
-                game_summary = game_stats.get_game_summary(game_info, summ_id)
+                game_summary = game_stats.get_game_summary(game_info, summ_id, self.riot_api)
                 response += f"His {readable_stat} ever was "
                 response += f"{round_digits(min_or_max_value)} as {game_summary}"
 

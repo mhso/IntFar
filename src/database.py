@@ -147,7 +147,7 @@ class Database:
 
     def record_stats(self, intfar_id, intfar_reason, game_id, data, users_in_game):
         kills_by_our_team = data[0][1]["kills_by_team"]
-        timestamp = data[0][1]["timestamp"]
+        timestamp = data[0][1]["timestamp"] // 1000
         (min_kills_id, min_kills,
          max_kills_id, max_kills) = game_stats.get_outlier_stat("kills", data)
         (min_deaths_id, min_deaths,
