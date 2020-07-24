@@ -1,5 +1,6 @@
 import random
 from time import time
+from datetime import datetime
 from sqlite3 import DatabaseError, OperationalError
 import asyncio
 import discord
@@ -43,7 +44,8 @@ REDEEMING_ACTIONS_FLAVORS = load_flavor_texts("redeeming_actions")
 STREAK_FLAVORS = load_flavor_texts("streak")
 
 VALID_COMMANDS = [
-    "register", "users", "help", "commands", "intfar", "intfar_relations", "best", "worst"
+    "register", "users", "help", "commands", "intfar",
+    "intfar_relations", "best", "worst", "uptime", "status"
 ]
 
 STAT_COMMANDS = [
@@ -100,6 +102,11 @@ def get_streak_flavor_text(nickname, streak):
     index = streak - 2 if streak - 2 < len(STREAK_FLAVORS) else len(STREAK_FLAVORS) - 1
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
+def zero_pad(number):
+    if number < 10:
+        return "0" + str(number)
+    return str(number)
+
 def round_digits(number):
     if type(number) == float:
         return f"{number:.2f}"
@@ -117,6 +124,7 @@ class DiscordClient(discord.Client):
         self.channel_to_write = None
         self.initialized = False
         self.last_message_time = {}
+        self.time_initialized = datetime.now()
 
     async def poll_for_game_end(self):
         """
@@ -736,6 +744,62 @@ class DiscordClient(discord.Client):
         response += "\n```"
         await message.channel.send(self.insert_emotes(response))
 
+    def get_uptime(self, dt_init):
+        dt_now = datetime.now()
+        normed_dt = dt_now.replace(year=dt_init.year, month=dt_init.month)
+        month_normed = dt_now.month if dt_now.month >= dt_init.month else dt_now.month + 12
+        months = month_normed - dt_init.month
+        if normed_dt < dt_init:
+            months -= 1
+        years = dt_now.year - dt_init.year
+        if dt_now.month < dt_init.month:
+            years -= 1
+        td = normed_dt - dt_init
+        days = td.days
+        seconds = td.seconds
+        hours, remainder = divmod(seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        response = f"{zero_pad(hours)}h {zero_pad(minutes)}m {zero_pad(seconds)}s"
+        if minutes == 0:
+            response = f"{seconds} seconds"
+        else:
+            response = f"{zero_pad(minutes)} minutes & {zero_pad(seconds)} seconds"
+        if hours > 0:
+            response = f"{zero_pad(hours)}h {zero_pad(minutes)}m {zero_pad(seconds)}s "
+        if days > 0:
+            response = f"{days} days, " + response
+        if months > 0:
+            response = f"{months} months, " + response
+        if years > 0:
+            response = f"{years} years, " + response
+        return response
+
+    async def handle_uptime_msg(self, message):
+        uptime_formatted = self.get_uptime(self.time_initialized)
+        await message.channel.send(f"Int-Far™ Tracker™ has been online for {uptime_formatted}")
+
+    async def handle_status_msg(self, message):
+        """
+        Gather meta stats about this bot and write them to Discord.
+        """
+        response = f"**Uptime:** {self.get_uptime(self.time_initialized)}\n"
+
+        (games, earliest_game, users,
+         intfars, twos, threes, fours, fives) = self.database.get_meta_stats()
+
+        earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
+        response += f"Since {earliest_time}:\n"
+        response += f"- **{games}** games have been played\n"
+        response += f"- **{users}** users have signed up\n"
+        response += f"- **{intfars}** Int-Far awards have been given\n"
+        response += "Of all games played:\n"
+        response += f"- **{twos}%** were as a duo\n"
+        response += f"- **{threes}%** were as a three-man\n"
+        response += f"- **{fours}%** were as a four-man\n"
+        response += f"- **{fives}%** were as a five-man stack"
+
+        await message.channel.send(response)
+
     def try_get_user_data(self, name):
         user_data = self.database.discord_id_from_summoner(name)
         if user_data is None: # Summoner name gave no result, try Discord name.
@@ -958,6 +1022,10 @@ class DiscordClient(discord.Client):
                     self.config.log(exception, self.config.log_error)
             elif first_command in ("help", "commands"):
                 await self.handle_helper_msg(message)
+            elif first_command == "status":
+                await self.handle_status_msg(message)
+            elif first_command == "uptime":
+                await self.handle_uptime_msg(message)
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
                 target_name = None
                 if len(split) > 2:

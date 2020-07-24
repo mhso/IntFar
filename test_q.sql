@@ -1,0 +1,1 @@
+SELECT Count(*) FROM participants GROUP BY game_id;

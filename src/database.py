@@ -63,6 +63,28 @@ class Database:
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchone()
 
+    def get_meta_stats(self):
+        query_games = """
+        SELECT Count(DISTINCT bs.game_id), timestamp FROM best_stats bs, participants p
+        WHERE bs.game_id = p.game_id ORDER BY id
+        """
+        query_intfars = "SELECT Count(int_far) FROM best_stats WHERE int_far != 'None'"
+        query_persons = "SELECT Count(*) FROM participants GROUP BY game_id"
+        users = (len(self.summoners),)
+        with closing(self.get_connection()) as db:
+            game_data = db.cursor().execute(query_games).fetchone()
+            intfar_data = db.cursor().execute(query_intfars).fetchone()
+            persons_counts = db.cursor().execute(query_persons)
+            persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
+            for persons in persons_counts:
+                persons_count[persons[0]] += 1
+            twos_ratio = (int(persons_count[2] / game_data[0] * 100))
+            threes_ratio = (int(persons_count[3] / game_data[0] * 100))
+            fours_ratio = (int(persons_count[4] / game_data[0] * 100))
+            fives_ratio = (int(persons_count[5] / game_data[0] * 100))
+            return (game_data + users + intfar_data +
+                    (twos_ratio, threes_ratio, fours_ratio, fives_ratio))
+
     def get_intfars_of_the_month(self):
         tz_cph = TimeZone()
         curr_time = datetime.now(tz_cph)
