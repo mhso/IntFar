@@ -793,6 +793,8 @@ class DiscordClient(discord.Client):
         response += f"- **{users}** users have signed up\n"
         response += f"- **{intfars}** Int-Far awards have been given\n"
         response += "Of all games played:\n"
+        pct_intfar = int((intfars / games) * 100)
+        response += f"- **{pct_intfar}** resulted in someone being Int-Far\n"
         response += f"- **{twos}%** were as a duo\n"
         response += f"- **{threes}%** were as a three-man\n"
         response += f"- **{fours}%** were as a four-man\n"
