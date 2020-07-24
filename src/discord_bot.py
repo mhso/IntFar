@@ -649,7 +649,7 @@ class DiscordClient(discord.Client):
         monitor = MonthlyIntfar()
         self.config.log("Starting Int-Far-of-the-month monitor... ")
         format_time = monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S")
-        self.config.log(f"Monthly Int-Far will be crowned at {format_time} UTC+1", end="")
+        self.config.log(f"Monthly Int-Far will be crowned at {format_time} UTC+1")
 
         time_to_sleep = 60
         while monitor.get_seconds_left() > 0:
