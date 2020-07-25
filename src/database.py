@@ -105,12 +105,32 @@ class Database:
 
         max_timestamp = int(curr_time.timestamp())
 
-        query = "SELECT Count(*) as c, int_far FROM best_stats bs, participants p "
-        query += "WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=disc_id "
-        query += "AND timestamp > ? AND timestamp < ? "
-        query += "GROUP BY int_far ORDER BY c DESC LIMIT 3"
+        query_intfars = """
+        SELECT Count(*) as c, int_far FROM best_stats bs, participants p 
+        WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=disc_id 
+        AND timestamp > ? AND timestamp < ? 
+        GROUP BY int_far ORDER BY c DESC LIMIT 3
+        """
+        query_games = """
+        SELECT Count(*) as c, disc_id FROM best_stats bs, participants p 
+        WHERE bs.game_id=p.game_id
+        AND timestamp > ? AND timestamp < ? 
+        GROUP BY disc_id ORDER BY c;
+        """
         with closing(self.get_connection()) as db:
-            return db.cursor().execute(query, (min_timestamp, max_timestamp)).fetchall()
+            games_per_person = db.cursor().execute(query_games,
+                                                   (min_timestamp, max_timestamp)).fetchall()
+            intfars_per_person = db.cursor().execute(query_intfars, (min_timestamp, max_timestamp))
+            data_per_person = []
+            for intfars, intfar_id in intfars_per_person:
+                total_games = 0
+                for games_played, disc_id in games_per_person:
+                    if disc_id == intfar_id:
+                        total_games = games_played
+                        break
+                pct_intfar = int((intfars / total_games) * 100)
+                data_per_person.append((intfar_id, total_games, intfars, pct_intfar))
+            return data_per_person
 
     def get_longest_intfar_streak(self, disc_id):
         query = "SELECT int_far FROM best_stats ORDER BY id"
@@ -166,6 +186,11 @@ class Database:
             for part_id, games in db.cursor().execute(query_games, (disc_id,)):
                 games_with_person[part_id] = games
             return games_with_person, intfars_with_person
+
+    def get_doinks_stats(self, disc_id):
+        query = "SELECT doinks FROM participants WHERE disc_id=?"
+        with closing(self.get_connection()) as db:
+            return db.cursor().execute(query, (disc_id,)).fetchall()
 
     def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game):
         kills_by_our_team = data[0][1]["kills_by_team"]

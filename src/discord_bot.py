@@ -23,6 +23,11 @@ NO_INTFAR_FLAVOR_TEXTS = load_flavor_texts("no_intfar")
 
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
+DOINKS_REASONS = [
+    "KDA > 10", "More damage than rest of the team", "Getting a pentakill",
+    "Vision score > 100", "KP% > 90"
+]
+
 MOST_DEATHS_FLAVORS = load_flavor_texts("most_deaths")
 
 LOWEST_KDA_FLAVORS = load_flavor_texts("lowest_kda")
@@ -671,8 +676,9 @@ class DiscordClient(discord.Client):
             await asyncio.sleep(time_to_sleep)
 
         intfar_details = self.database.get_intfars_of_the_month()
-        intfar_details = [(count, self.get_mention_str(disc_id))
-                          for (count, disc_id) in intfar_details]
+        intfar_details.sort(key=lambda x: (x[3], x[2]), reverse=True) # Sort by pct of games being Int-Far.
+        intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
+                          for (disc_id, games, intfars, ratio) in intfar_details]
         intro_desc = "THE RESULTS ARE IN!!! Int-Far of the month is...\n"
         intro_desc += "*DRUM ROLL*\n"
         message = monitor.get_description(intfar_details)
@@ -859,7 +865,7 @@ class DiscordClient(discord.Client):
                         intfar_counts[index] += 1
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             msg += self.insert_emotes("{emote_unlimited_chins}")
-            if expanded:
+            if expanded and len(intfar_reason_ids) > 0:
                 pct_intfar = (0 if total_games == 0
                                 else int(len(intfar_reason_ids) / total_games * 100))
                 ratio_desc = "\n" + f"He was Int-Far in **{pct_intfar}%** of his {total_games} total games played"
@@ -907,6 +913,51 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    async def handle_doinks_msg(self, message, target_name):
+        def get_doinks_stats(disc_id, expanded=True):
+            person_to_check = self.get_discord_nick(disc_id)
+            doink_reason_ids = self.database.get_intfar_stats(disc_id)
+            intfar_counts = {x: 0 for x in range(len(DOINKS_REASONS))}
+            for reason_id in doink_reason_ids:
+                intfar_ids = [int(x) for x in reason_id[0]]
+                for index, intfar_id in enumerate(intfar_ids):
+                    if intfar_id == 1:
+                        intfar_counts[index] += 1
+            msg = f"{person_to_check} has earned {len(doink_reason_ids)} "
+            msg += self.insert_emotes("{emote_Doinks}")
+            if expanded and len(doink_reason_ids) > 0:
+                reason_desc = "\n" + "Big doinks awarded so far:"
+                for reason_id, reason in enumerate(DOINKS_REASONS):
+                    reason_desc += f"\n - {reason}: **{intfar_counts[reason_id]}**"
+
+                msg += reason_desc
+
+            return msg, len(doink_reason_ids)
+
+        response = ""
+        if target_name is not None: # Check intfar stats for someone else.
+            target_name = target_name.lower()
+            if target_name == "all":
+                messages = []
+                for disc_id, _, _ in self.database.summoners:
+                    resp_str, intfars = get_doinks_stats(disc_id, expanded=False)
+                    messages.append((resp_str, intfars))
+                messages.sort(key=lambda x: x[1], reverse=True)
+                for resp_str, _ in messages:
+                    response += "- " + resp_str + "\n"
+            else:
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
+                response = get_doinks_stats(target_id)[0]
+        else: # Check intfar stats for the person sending the message.
+            response = get_doinks_stats(message.author.id)[0]
+
+        await message.channel.send(response)
+
     async def handle_stat_msg(self, message, first_cmd, second_cmd, target_name):
         """
         Get the value of the requested stat for the requested player.
@@ -936,8 +987,8 @@ class DiscordClient(discord.Client):
                 recepient = self.get_discord_nick(target_id)
 
             (stat_count, # <- How many times the stat has occured.
-                min_or_max_value, # <- Highest/lowest occurance of the stat value.
-                game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
+             min_or_max_value, # <- Highest/lowest occurance of the stat value.
+             game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
 
             # Get a readable description, such as 'most deaths' or 'lowest kp'.
             readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
@@ -970,6 +1021,20 @@ class DiscordClient(discord.Client):
         self.active_game = 4700945429 # Me honorable mention.
         await self.declare_intfar()
         self.config.testing = False
+
+    def get_target_name(self, split, start_index):
+        if len(split) > start_index:
+            return " ".join(split[start_index:])
+        return None
+
+    async def get_data_and_respond(self, handler, *args):
+        try:
+            await handler(*args)
+        except (DatabaseError, OperationalError) as exception:
+            response = "Something went wrong when querying the database! "
+            response += self.insert_emotes("{emote_fu}")
+            await args[0].channel.send(response)
+            self.config.log(exception, self.config.log_error)
 
     async def on_message(self, message):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
@@ -1008,27 +1073,14 @@ class DiscordClient(discord.Client):
                     response = "**--- Registered bois ---**\n" + response
                 await message.channel.send(self.insert_emotes(response))
             elif first_command == "intfar": # Lookup how many intfar 'awards' the given user has.
-                target_name = None
-                if len(split) > 1:
-                    target_name = " ".join(split[1:])
-                try:
-                    await self.handle_intfar_msg(message, target_name)
-                except (DatabaseError, OperationalError) as exception:
-                    response = "Something went wrong when querying the database! "
-                    response += self.insert_emotes("{emote_fu}")
-                    await message.channel.send(response)
-                    self.config.log(exception, self.config.log_error)
+                target_name = self.get_target_name(split, 1)
+                self.get_data_and_respond(self.handle_intfar_msg, message, target_name)
             elif first_command == "intfar_relations":
-                target_name = None
-                if len(split) > 1:
-                    target_name = " ".join(split[1:])
-                try:
-                    await self.handle_intfar_relations_msg(message, target_name)
-                except (DatabaseError, OperationalError) as exception:
-                    response = "Something went wrong when querying the database! "
-                    response += self.insert_emotes("{emote_fu}")
-                    await message.channel.send(response)
-                    self.config.log(exception, self.config.log_error)
+                target_name = self.get_target_name(split, 1)
+                self.get_data_and_respond(self.handle_intfar_relations_msg, message, target_name)
+            elif first_command == "doinks":
+                target_name = self.get_target_name(split, 1)
+                self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
             elif first_command in ("help", "commands"):
                 await self.handle_helper_msg(message)
             elif first_command == "status":
@@ -1036,16 +1088,8 @@ class DiscordClient(discord.Client):
             elif first_command == "uptime":
                 await self.handle_uptime_msg(message)
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
-                target_name = None
-                if len(split) > 2:
-                    target_name = " ".join(split[2:])
-                try:
-                    await self.handle_stat_msg(message, first_command, second_command, target_name)
-                except (DatabaseError, OperationalError) as exception:
-                    response = "Something went wrong when querying the database! "
-                    response += self.insert_emotes("{emote_fu}")
-                    await message.channel.send(response)
-                    self.config.log(exception, self.config.log_error)
+                target_name = self.get_target_name(split, 2)
+                self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
             elif first_command == "test" and message.author.id == MY_DISC_ID:
                 await self.handle_test_msg()
 

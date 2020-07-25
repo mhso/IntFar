@@ -51,42 +51,57 @@ class MonthlyIntfar:
         """
         return (self.time_at_announcement - datetime.now(self.cph_timezone)).seconds
 
+    def get_pct_desc(self, games, intfars, pct):
+        return f"**{pct}%** ({intfars}/{games})"
+
     def get_description(self, intfar_details):
-        nickname_1st = intfar_details[0][1]
-        count_1st = intfar_details[0][0]
-        nickname_2nd = intfar_details[1][1]
-        count_2nd = intfar_details[1][0]
-        nickname_3rd = intfar_details[2][1]
-        count_3rd = intfar_details[2][0]
+        nickname_1st = intfar_details[0][0]
+        games_1st = intfar_details[0][1]
+        intfars_1st = intfar_details[0][2]
+        pct_1st = intfar_details[0][3]
+        nickname_2nd = intfar_details[1][0]
+        games_2nd = intfar_details[1][1]
+        intfars_2nd = intfar_details[1][2]
+        pct_2nd = intfar_details[1][3]
+        nickname_3rd = intfar_details[2][0]
+        games_3rd = intfar_details[2][1]
+        intfars_3rd = intfar_details[2][2]
+        pct_3rd = intfar_details[2][3]
+
+        pct_desc_1st = self.get_pct_desc(games_1st, intfars_1st, pct_1st)
+        pct_desc_2nd = self.get_pct_desc(games_2nd, intfars_2nd, pct_2nd)
+        pct_desc_3rd = self.get_pct_desc(games_3rd, intfars_3rd, pct_3rd)
+
         winner_str = ""
         desc_str = ""
         tie_count = 0
-        if count_1st == count_2nd == count_3rd:
+        if pct_1st == pct_2nd == pct_3rd and intfars_1st == intfars_2nd == intfars_3rd:
             tie_count = 3
-        elif count_1st == count_2nd:
+        elif pct_1st == pct_2nd and intfars_1st == intfars_2nd:
             tie_count = 2
         if tie_count == 0: # Int-Far #1 and Int-Far #2 values are distinct.
             winner_str = f"{nickname_1st}!!! "
-            desc_str = f"He has \"won\" a total of **{count_1st}** Int-Far awards this month!!!\n"
+            desc_str = f"He has inted in {pct_desc_1st} of his games this month!!!\n"
             runner_up_str = "Runner up goes to "
-            if count_2nd == count_3rd: # Int-Far #2 and Int-Far #3 values are equal.
+            if pct_2nd == pct_3rd and intfars_2nd == intfars_3rd: # Int-Far #2 and Int-Far #3 values are equal.
                 runner_up_str += f"both {nickname_2nd} and {nickname_3rd} "
-                runner_up_str += f"for a tied **{count_2nd}** Int-Far awards!\n"
+                runner_up_str += f"for a tied {pct_desc_2nd} of games where they were Int-Far!\n"
             else: # All three Int-Far values are distinct.
                 runner_up_str += f"{nickname_2nd} for being almost as bad with "
-                runner_up_str += f"**{count_2nd}** Int-Far awards!\n"
+                runner_up_str += f"{pct_desc_2nd} of games being Int-Far!\n"
                 runner_up_str += f"Finally, {nickname_3rd} gets a bronze medal for "
-                runner_up_str += f"a bad-but-no-as-terrible {count_3rd} Int-Far awards!\n"
+                runner_up_str += f"a bad-but-no-as-terrible {pct_desc_3rd} of inted games!\n"
             desc_str += runner_up_str
         if tie_count == 2: # Int-Far #1 and Int-Far #2 values are equal.
             winner_str += f"{nickname_1st} **AND** {nickname_2nd}!!! "
-            desc_str = f"They are both equally terrible with a tied **{count_1st}** "
-            desc_str += "Int-Far awards this month!!!\n"
-            desc_str += f"Second place goes to {nickname_3rd} with **{count_3rd}** Int-Far awards!\n"
+            desc_str = f"They are both equally terrible with a tied {pct_desc_1st} "
+            desc_str += "of games were they were Int-Far this month!!!\n"
+            desc_str += f"Second place goes to {nickname_3rd} for inting in {pct_desc_3rd} "
+            desc_str += "of his games!\n"
         if tie_count == 3: # Int-Far values for all three 'winners' are equal.
             winner_str += f"{nickname_1st}, {nickname_2nd} **AND** {nickname_3rd}!!! "
-            desc_str = f"They are ALL equally terrible with a tied **{count_1st}** "
-            desc_str += "Int-Far awards this month!!!\n"
+            desc_str = f"They are ALL equally terrible with a tied {pct_desc_1st} "
+            desc_str += "of games in which they were Int-Far this month!!!\n"
 
         desc_str += "GIVE THEM A ROUND OF APPLAUSE, LADIES AND GENTLEMEN!!\n"
         return winner_str + desc_str
@@ -95,7 +110,13 @@ if __name__ == "__main__":
     monthly_monitor = MonthlyIntfar()
     conf = config.Config()
     db_client = database.Database(conf)
-    details = db_client.get_intfars_of_the_month()
-    intfar_details = [(count, "Guy" + str(disc_id))
-                      for (count, disc_id) in details]
+    #details = db_client.get_intfars_of_the_month()
+    details = [
+        (1, 20, 6, 30),
+        (2, 20, 6, 30),
+        (3, 5, 1, 20),
+    ]
+    details.sort(key=lambda x: (x[3], x[2]), reverse=True) # Sort by pct of games being Int-Far.
+    intfar_details = [("Guy" + str(disc_id), games, intfars, ratio)
+                      for (disc_id, games, intfars, ratio) in details]
     print(monthly_monitor.get_description(intfar_details))
