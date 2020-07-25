@@ -188,7 +188,7 @@ class Database:
             return games_with_person, intfars_with_person
 
     def get_doinks_stats(self, disc_id):
-        query = "SELECT doinks FROM participants WHERE disc_id=?"
+        query = "SELECT doinks FROM participants WHERE doinks != 'None' AND disc_id=?"
         with closing(self.get_connection()) as db:
             return db.cursor().execute(query, (disc_id,)).fetchall()
 

@@ -24,8 +24,8 @@ NO_INTFAR_FLAVOR_TEXTS = load_flavor_texts("no_intfar")
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
-    "KDA > 10", "More damage than rest of the team", "Getting a pentakill",
-    "Vision score > 100", "KP% > 90"
+    "KDA larger than 10", "More damage than rest of the team", "Getting a pentakill",
+    "Vision score larger than 100", "Kill participation larger than 90"
 ]
 
 MOST_DEATHS_FLAVORS = load_flavor_texts("most_deaths")
@@ -49,7 +49,7 @@ REDEEMING_ACTIONS_FLAVORS = load_flavor_texts("redeeming_actions")
 STREAK_FLAVORS = load_flavor_texts("streak")
 
 VALID_COMMANDS = [
-    "register", "users", "help", "commands", "intfar",
+    "register", "users", "help", "commands", "intfar", "doinks",
     "intfar_relations", "best", "worst", "uptime", "status"
 ]
 
@@ -746,6 +746,7 @@ class DiscordClient(discord.Client):
             "!intfar (summoner_name) - Show how many times you (if no summoner name is included), " +
             "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users.\n\n" +
             "!intfar_relations (summoner_name) - Show who you (or someone else) int the most games with.\n\n" +
+            "!doinks (summoner_name) - Show big doinks plays you (or someone else) did!\n\n" +
             "!best [stat] (summoner_name) - Show how many times you (or someone else) " +
             "were the best in the specific stat. " +
             "Fx. '!best kda' shows how many times you had the best KDA in a game.\n\n" +
@@ -916,7 +917,7 @@ class DiscordClient(discord.Client):
     async def handle_doinks_msg(self, message, target_name):
         def get_doinks_stats(disc_id, expanded=True):
             person_to_check = self.get_discord_nick(disc_id)
-            doink_reason_ids = self.database.get_intfar_stats(disc_id)
+            doink_reason_ids = self.database.get_doinks_stats(disc_id)
             intfar_counts = {x: 0 for x in range(len(DOINKS_REASONS))}
             for reason_id in doink_reason_ids:
                 intfar_ids = [int(x) for x in reason_id[0]]
