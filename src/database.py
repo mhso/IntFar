@@ -70,10 +70,12 @@ class Database:
         """
         query_intfars = "SELECT Count(int_far) FROM best_stats WHERE int_far != 'None'"
         query_persons = "SELECT Count(*) FROM participants GROUP BY game_id"
+        query_doinks = "SELECT Count(*) FROM participants WHERE doinks != 'None'"
         users = (len(self.summoners),)
         with closing(self.get_connection()) as db:
             game_data = db.cursor().execute(query_games).fetchone()
             intfar_data = db.cursor().execute(query_intfars).fetchone()
+            doinks_data = db.cursor().execute(query_doinks).fetchone()
             persons_counts = db.cursor().execute(query_persons)
             persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
             for persons in persons_counts:
@@ -82,10 +84,9 @@ class Database:
             threes_ratio = (int(persons_count[3] / game_data[0] * 100))
             fours_ratio = (int(persons_count[4] / game_data[0] * 100))
             fives_ratio = (int(persons_count[5] / game_data[0] * 100))
-            return (game_data + users + intfar_data +
+            return (game_data + users + intfar_data + doinks_data +
                     (twos_ratio, threes_ratio, fours_ratio, fives_ratio))
 
-    def get_intfars_of_the_month(self):
         tz_cph = TimeZone()
         curr_time = datetime.now(tz_cph)
         current_month = curr_time.month

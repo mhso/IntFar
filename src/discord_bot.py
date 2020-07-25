@@ -798,14 +798,15 @@ class DiscordClient(discord.Client):
         """
         response = f"**Uptime:** {self.get_uptime(self.time_initialized)}\n"
 
-        (games, earliest_game, users,
-         intfars, twos, threes, fours, fives) = self.database.get_meta_stats()
+        (games, earliest_game, users, intfars,
+         doinks, twos, threes, fours, fives) = self.database.get_meta_stats()
 
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         response += f"Since {earliest_time}:\n"
         response += f"- **{games}** games have been played\n"
         response += f"- **{users}** users have signed up\n"
         response += f"- **{intfars}** Int-Far awards have been given\n"
+        response += f"- **{doinks}** " + self.insert_emotes("{emote_Doinks} has been earned\n")
         response += "Of all games played:\n"
         pct_intfar = int((intfars / games) * 100)
         response += f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
