@@ -24,8 +24,8 @@ NO_INTFAR_FLAVOR_TEXTS = load_flavor_texts("no_intfar")
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
-    "KDA larger than 10", "More damage than rest of the team", "Getting a pentakill",
-    "Vision score larger than 100", "Kill participation larger than 90"
+    "KDA larger than 10", "More than 30 kills", "More damage than rest of the team",
+    "Getting a pentakill", "Vision score larger than 100", "Kill participation larger than 90"
 ]
 
 MOST_DEATHS_FLAVORS = load_flavor_texts("most_deaths")
@@ -312,20 +312,22 @@ class DiscordClient(discord.Client):
             kda = game_stats.calc_kda(stats)
             if kda > 10.0:
                 mentions[disc_id].append((0, round_digits(kda)))
+            if stats["kills"] > 30:
+                mentions[disc_id].append((1, stats["kills"]))
             damage_dealt = stats["totalDamageDealtToChampions"]
             if damage_dealt > stats["damage_by_team"]:
-                mentions[disc_id].append((1, damage_dealt))
+                mentions[disc_id].append((2, damage_dealt))
             if stats["pentaKills"] > 0:
-                mentions[disc_id].append((2, None))
+                mentions[disc_id].append((3, None))
             if stats["visionScore"] > 100:
-                mentions[disc_id].append((3, stats["visionScore"]))
+                mentions[disc_id].append((4, stats["visionScore"]))
             kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
             if kp > 90:
-                mentions[disc_id].append((4, kp))
+                mentions[disc_id].append((5, kp))
 
         mentions_str = ""
         any_mentions = False
-        mentions_by_reason = {d_id: ["0", "0", "0", "0", "0"] for d_id in mentions}
+        mentions_by_reason = {d_id: ["0" for _ in DOINKS_REASONS] for d_id in mentions}
         for disc_id in mentions:
             user_str = ""
             if mentions[disc_id] != []:

@@ -38,7 +38,7 @@ class MonthlyIntfar:
         # we should announce the Int-Far at the current month (and year).
         # Otherwise, we should announce it at the first day of the next month.
         month_to_announce = (current_month
-                             if current_time.day == 1 and current_time.hour < HOUR_OF_ANNOUNCEMENT
+                             if current_time.day == 1 and current_time.hour < self.HOUR_OF_ANNOUNCEMENT
                              else next_month)
         year_to_announce = current_time.year if month_to_announce == current_month else next_year
         self.time_at_announcement = current_time.replace(year_to_announce, month_to_announce, 1,
