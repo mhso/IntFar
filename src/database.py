@@ -1,8 +1,8 @@
 import os
-from datetime import datetime, timezone
-from montly_intfar import TimeZone, MonthlyIntfar
+from datetime import datetime
 import sqlite3
 from contextlib import closing
+from montly_intfar import TimeZone, MonthlyIntfar
 import game_stats
 
 class Database:
@@ -87,6 +87,7 @@ class Database:
             return (game_data + users + intfar_data + doinks_data +
                     (twos_ratio, threes_ratio, fours_ratio, fives_ratio))
 
+    def get_intfars_of_the_month(self):
         tz_cph = TimeZone()
         curr_time = datetime.now(tz_cph)
         current_month = curr_time.month
@@ -110,13 +111,13 @@ class Database:
         SELECT Count(*) as c, int_far FROM best_stats bs, participants p 
         WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=disc_id 
         AND timestamp > ? AND timestamp < ? 
-        GROUP BY int_far ORDER BY c DESC LIMIT 3
+        GROUP BY int_far ORDER BY c DESC
         """
         query_games = """
         SELECT Count(*) as c, disc_id FROM best_stats bs, participants p 
         WHERE bs.game_id=p.game_id
         AND timestamp > ? AND timestamp < ? 
-        GROUP BY disc_id ORDER BY c;
+        GROUP BY disc_id;
         """
         with closing(self.get_connection()) as db:
             games_per_person = db.cursor().execute(query_games,
@@ -129,8 +130,12 @@ class Database:
                     if disc_id == intfar_id:
                         total_games = games_played
                         break
+                if total_games < 5: # Disqualify people with less than 5 games played this month.
+                    continue
                 pct_intfar = int((intfars / total_games) * 100)
                 data_per_person.append((intfar_id, total_games, intfars, pct_intfar))
+                if len(data_per_person) == 3:
+                    return data_per_person
             return data_per_person
 
     def get_longest_intfar_streak(self, disc_id):
