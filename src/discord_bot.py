@@ -1074,13 +1074,13 @@ class DiscordClient(discord.Client):
                 await message.channel.send(self.insert_emotes(response))
             elif first_command == "intfar": # Lookup how many intfar 'awards' the given user has.
                 target_name = self.get_target_name(split, 1)
-                self.get_data_and_respond(self.handle_intfar_msg, message, target_name)
+                await self.get_data_and_respond(self.handle_intfar_msg, message, target_name)
             elif first_command == "intfar_relations":
                 target_name = self.get_target_name(split, 1)
-                self.get_data_and_respond(self.handle_intfar_relations_msg, message, target_name)
+                await self.get_data_and_respond(self.handle_intfar_relations_msg, message, target_name)
             elif first_command == "doinks":
                 target_name = self.get_target_name(split, 1)
-                self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
+                await self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
             elif first_command in ("help", "commands"):
                 await self.handle_helper_msg(message)
             elif first_command == "status":
@@ -1089,7 +1089,7 @@ class DiscordClient(discord.Client):
                 await self.handle_uptime_msg(message)
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
                 target_name = self.get_target_name(split, 2)
-                self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
+                await self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
             elif first_command == "test" and message.author.id == MY_DISC_ID:
                 await self.handle_test_msg()
 
