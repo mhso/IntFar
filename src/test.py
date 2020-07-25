@@ -1,21 +1,36 @@
-from datetime import datetime
-import config
-import database
+import json
+from database import Database
+from config import Config
+from discord_bot import DiscordClient
 
-database = database.Database(config.Config())
+class TestMock(DiscordClient):
+    async def on_ready(self):
+        super().on_ready()
+        self.users_in_game = [
+            self.database.discord_id_from_summoner("prince jarvan lv"),
+            self.database.discord_id_from_summoner("senile felines"),
+            self.database.discord_id_from_summoner("kazpariuz"),
+            self.database.discord_id_from_summoner("stirred martini"),
+            self.database.discord_id_from_summoner("zapiens")
+        ]
+        game = self.riot_api.get_game_details(4725659303)
+        filtered = self.get_filtered_stats(game)
+        donks_data = self.get_big_doinks(filtered)
+        print(donks_data)
 
-(games, earliest_game, users,
- intfars, twos, threes, fours, fives) = database.get_meta_stats()
+auth = json.load(open("auth.json"))
 
-response = ""
-earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
-response += f"Since {earliest_time}:\n"
-response += f"- **{games}** games have been played\n"
-response += f"- **{users}** users have signed up\n"
-response += f"- **{intfars}** Int-Far awards have been given\n"
-response += "Of all games played:\n"
-response += f"- **{twos}%** were as a duo\n"
-response += f"- **{threes}%** were as a three-man\n"
-response += f"- **{fours}%** were as a four-man\n"
-response += f"- **{fives}%** were as a five-man stack"
-print(response)
+conf = Config()
+
+conf.discord_token = auth["discordToken"]
+conf.riot_key = auth["riotDevKey"] if conf.use_dev_token else auth["riotAPIKey"]
+
+conf.log("Initializing database...")
+
+database_client = Database(conf)
+
+conf.log("Starting Discord Client...")
+
+client = TestMock(conf, database_client)
+
+client.run(conf.discord_token)

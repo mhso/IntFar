@@ -167,7 +167,7 @@ class Database:
                 games_with_person[part_id] = games
             return games_with_person, intfars_with_person
 
-    def record_stats(self, intfar_id, intfar_reason, game_id, data, users_in_game):
+    def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game):
         kills_by_our_team = data[0][1]["kills_by_team"]
         timestamp = data[0][1]["timestamp"] // 1000
         (min_kills_id, min_kills,
@@ -211,6 +211,10 @@ class Database:
             f"({min_kp_id} - {min_kp}), ({min_wards_id} - {min_wards}), " +
             f"({min_vision_id} - {min_vision})"
         )
+        self.config.log(
+            "Saving participants:\n"+
+            f"{game_id}, {users_in_game}, {timestamp}, {doinks}"
+        )
 
         query_prefix = "INSERT INTO "
         query_cols = (
@@ -237,7 +241,8 @@ class Database:
                                               min_cs, min_cs_id, min_gold, min_gold_id,
                                               min_kp, min_kp_id, min_wards, min_wards_id,
                                               min_vision, min_vision_id))
-            query = "INSERT INTO participants(game_id, disc_id, timestamp) VALUES (?, ?, ?)"
+            query = "INSERT INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"
             for disc_id, _, _ in users_in_game:
-                db.cursor().execute(query, (game_id, disc_id, timestamp))
+                doink = doinks.get(disc_id, None)
+                db.cursor().execute(query, (game_id, disc_id, timestamp, doink))
             db.commit()

@@ -5,8 +5,9 @@ CREATE TABLE [registered_summoners] (
 );
 CREATE TABLE [participants] (
   [game_id] INTEGER NOT NULL,
-  [disc_id] INTEGER NOT NULL,  
-  [timestamp] INTEGER
+  [disc_id] INTEGER NOT NULL,
+  [timestamp] INTEGER,
+  [doinks] NVARCHAR(5)
 );
 CREATE TABLE [best_stats] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,

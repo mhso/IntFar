@@ -290,7 +290,7 @@ class DiscordClient(discord.Client):
             emote_index = replaced.find("{emote_")
         return replaced
 
-    def get_redeemed_people(self, data):
+    def get_big_doinks(self, data):
         """
         Returns a string describing people who have been redeemed by playing
         exceptionally well.
@@ -320,6 +320,7 @@ class DiscordClient(discord.Client):
 
         mentions_str = ""
         any_mentions = False
+        mentions_by_reason = {d_id: ["0", "0", "0", "0", "0"] for d_id in mentions}
         for disc_id in mentions:
             user_str = ""
             if mentions[disc_id] != []:
@@ -331,10 +332,14 @@ class DiscordClient(discord.Client):
 
             for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
                 prefix = " *and* " if count > 0 else ""
+                mentions_by_reason[disc_id][stat_index] = "1"
                 user_str += prefix + get_redeeming_flavor_text(stat_index, stat_value)
             mentions_str += user_str
 
-        return None if not any_mentions else mentions_str
+        formatted_mentions = {d_id: "".join(mentions_by_reason[d_id])
+                              for d_id in mentions_by_reason}
+
+        return None if not any_mentions else mentions_str, formatted_mentions
 
     def get_honorable_mentions(self, data):
         """
@@ -587,6 +592,7 @@ class DiscordClient(discord.Client):
                 intfar_data[intfar_disc_id].append((index, stat_value))
 
         reason_ids = ["0", "0", "0", "0"]
+        doinks = {}
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
         if max_count_intfar is not None: # Save data for the current game and send int-far message.
             reason = ""
@@ -606,8 +612,9 @@ class DiscordClient(discord.Client):
             honorable_mention_text = self.get_honorable_mentions(filtered_stats)
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
-            redeemed_text = self.get_redeemed_people(filtered_stats)
-            if redeemed_text is not None:
+            doinks_data = self.get_big_doinks(filtered_stats)
+            if doinks_data is not None:
+                redeemed_text, doinks = doinks_data
                 response += "\n" + redeemed_text
             streak_msg = self.get_streak_msg(None, intfar_streak, prev_intfar)
             if streak_msg is not None:
@@ -620,8 +627,8 @@ class DiscordClient(discord.Client):
                 reasons_str = "".join(reason_ids)
                 if reasons_str == "0000":
                     reasons_str = None
-                self.database.record_stats(max_count_intfar, reasons_str, self.active_game,
-                                           filtered_stats, self.users_in_game)
+                self.database.record_stats(max_count_intfar, reasons_str, doinks,
+                                           self.active_game, filtered_stats, self.users_in_game)
             except (DatabaseError, OperationalError) as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
                 self.config.log(exception)

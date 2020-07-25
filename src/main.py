@@ -2,7 +2,6 @@ import json
 from database import Database
 from config import Config
 from discord_bot import DiscordClient
-from montly_intfar import MonthlyIntfar
 
 auth = json.load(open("auth.json"))
 
