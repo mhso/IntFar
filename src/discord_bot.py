@@ -48,10 +48,40 @@ REDEEMING_ACTIONS_FLAVORS = load_flavor_texts("redeeming_actions")
 
 STREAK_FLAVORS = load_flavor_texts("streak")
 
-VALID_COMMANDS = [
-    "register", "users", "help", "commands", "intfar", "doinks",
-    "intfar_relations", "best", "worst", "uptime", "status"
-]
+VALID_COMMANDS = {
+    "register": (
+        "[summoner_name] - Sign up for the Int-Far™ Tracker™ " +
+        "by providing your summoner name (fx. '!register imaqtpie')."
+    ),
+    "users": "List all users who are currently signed up for the Int-Far™ Tracker™.",
+    "help": "Show this helper text.",
+    "commands": "Show this helper text.",
+    "intfar": (
+        "(summoner_name) - Show how many times you (if no summoner name is included), " +
+        "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users."
+    ),
+    "intfar_relations": "(summoner_name) - Show who you (or someone else) int the most games with.",
+    "doinks": "(summoner_name) - Show big doinks plays you (or someone else) did!",
+    "best": (
+        "[stat] (summoner_name) - Show how many times you (or someone else) " +
+        "were the best in the specific stat. " +
+        "Fx. '!best kda' shows how many times you had the best KDA in a game."
+    ),
+    "worst": (
+        "[stat] (summoner_name) - Show how many times you (or someone else) " +
+        "were the worst at the specific stat."
+    ),
+    "uptime": "Show for how long the bot has been up and running.",
+    "status": (
+        "Show overall stats about how many games have been played, " +
+        "how many people were Int-Far, etc."
+    )
+}
+
+CUTE_COMMANDS = {
+    "intdaddy": "Flirt with the Int-Far.",
+    "intpapi": "Flirt with the Int-Far in spanish."
+}
 
 STAT_COMMANDS = [
     "kills", "deaths", "kda", "damage",
@@ -308,22 +338,24 @@ class DiscordClient(discord.Client):
         """
         mentions = {} # List of mentioned users for the different criteria.
         for disc_id, stats in data:
-            mentions[disc_id] = []
+            mention_list = []
             kda = game_stats.calc_kda(stats)
             if kda > 10.0:
-                mentions[disc_id].append((0, round_digits(kda)))
+                mention_list.append((0, round_digits(kda)))
             if stats["kills"] > 30:
-                mentions[disc_id].append((1, stats["kills"]))
+                mention_list.append((1, stats["kills"]))
             damage_dealt = stats["totalDamageDealtToChampions"]
             if damage_dealt > stats["damage_by_team"]:
-                mentions[disc_id].append((2, damage_dealt))
+                mention_list.append((2, damage_dealt))
             if stats["pentaKills"] > 0:
-                mentions[disc_id].append((3, None))
+                mention_list.append((3, None))
             if stats["visionScore"] > 100:
-                mentions[disc_id].append((4, stats["visionScore"]))
+                mention_list.append((4, stats["visionScore"]))
             kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
             if kp > 90:
-                mentions[disc_id].append((5, kp))
+                mention_list.append((5, kp))
+            if mention_list != []:
+                mentions[disc_id] = mention_list
 
         mentions_str = ""
         any_mentions = False
@@ -787,24 +819,12 @@ class DiscordClient(discord.Client):
         response += "The Int-Far™ Tracker™ is a highly sophisticated bot "
         response += "that watches when people in this server plays League, "
         response += "and judges them harshly if they int too hard {emote_simp_but_closeup}\n"
+
         response += "**--- Valid commands, and their usages, are listed below ---**\n```"
-        response += (
-            "!register [summoner_name] - Sign up for the Int-Far™ Tracker™ " +
-            "by providing your summoner name (fx. '!register imaqtpie').\n\n" +
-            "!users - List all users who are currently signed up for the Int-Far™ Tracker™.\n\n" +
-            "!help - Show this helper text.\n\n" +
-            "!commands - Show this helper text.\n\n" +
-            "!intfar (summoner_name) - Show how many times you (if no summoner name is included), " +
-            "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users.\n\n" +
-            "!intfar_relations (summoner_name) - Show who you (or someone else) int the most games with.\n\n" +
-            "!doinks (summoner_name) - Show big doinks plays you (or someone else) did!\n\n" +
-            "!best [stat] (summoner_name) - Show how many times you (or someone else) " +
-            "were the best in the specific stat. " +
-            "Fx. '!best kda' shows how many times you had the best KDA in a game.\n\n" +
-            "!worst [stat] (summoner_name) - Show how many times you (or someone else) " +
-            "were the worst at the specific stat.\n\n```" +
-            "**--- Valid stats ---**\n```"
-        )
+        for cmd, desc in VALID_COMMANDS.items():
+            response += f"!{cmd} - {desc}\n\n"
+
+        response += "**--- Valid stats ---**\n```"
         response += valid_stats
         response += "\n```"
         await message.channel.send(self.insert_emotes(response))
