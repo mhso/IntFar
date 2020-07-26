@@ -346,7 +346,7 @@ class DiscordClient(discord.Client):
         formatted_mentions = {d_id: "".join(mentions_by_reason[d_id])
                               for d_id in mentions_by_reason}
 
-        return None if not any_mentions else mentions_str, formatted_mentions
+        return (None, None) if not any_mentions else (mentions_str, formatted_mentions)
 
     def get_honorable_mentions(self, data):
         """
@@ -619,9 +619,8 @@ class DiscordClient(discord.Client):
             honorable_mention_text = self.get_honorable_mentions(filtered_stats)
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
-            doinks_data = self.get_big_doinks(filtered_stats)
-            if doinks_data is not None:
-                redeemed_text, doinks = doinks_data
+            redeemed_text, doinks = self.get_big_doinks(filtered_stats)
+            if redeemed_text is not None:
                 response += "\n" + redeemed_text
             streak_msg = self.get_streak_msg(None, intfar_streak, prev_intfar)
             if streak_msg is not None:
@@ -657,7 +656,7 @@ class DiscordClient(discord.Client):
     async def user_left_voice(self, member):
         self.config.log("User left voice: " + str(member.id))
         summoner_info = self.database.summoner_from_discord_id(member.id)
-        if summoner_info is not None:
+        if summoner_info is not None and summoner_info in self.active_users:
             self.active_users.remove(summoner_info)
             self.config.log("Summoner left voice: " + summoner_info[1])
             self.config.log(f"Active users: {len(self.active_users)}")
