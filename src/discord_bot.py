@@ -346,7 +346,7 @@ class DiscordClient(discord.Client):
         formatted_mentions = {d_id: "".join(mentions_by_reason[d_id])
                               for d_id in mentions_by_reason}
 
-        return (None, None) if not any_mentions else (mentions_str, formatted_mentions)
+        return (None, {}) if not any_mentions else (mentions_str, formatted_mentions)
 
     def get_honorable_mentions(self, data):
         """
