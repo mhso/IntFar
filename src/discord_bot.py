@@ -661,6 +661,51 @@ class DiscordClient(discord.Client):
             self.config.log("Summoner left voice: " + summoner_info[1])
             self.config.log(f"Active users: {len(self.active_users)}")
 
+    async def remove_intfar_role(self, intfar_id, role_id):
+        nibs_guild = None
+        for guild in self.guilds: # Add all users currently in voice channels as active users.
+            if guild.id == DISCORD_SERVER_ID:
+                nibs_guild = guild
+                break
+
+        member = nibs_guild.get_member(intfar_id)
+        role = nibs_guild.get_role(role_id)
+        await member.remove_roles(role)
+
+    async def assign_monthly_intfar_role(self, month, intfar_id):
+        prev_month = month - 1 if month != 1 else 12
+
+        months = [
+            "January", "February", "March", "April", "May", "June", "July",
+            "August", "September", "October", "November", "December"
+        ]
+        # Colors:
+        # Light blue, dark blue, cyan, mint,
+        # light green, dark green, red, pink,
+        # gold, yellow, orange, purple
+        colors = [
+            (0, 102, 204), (0, 0, 204), (0, 255, 255), (51, 255, 153),
+            (0, 204, 0), (0, 51, 0), (255, 0, 0), (255, 102, 255),
+            (153, 153, 0), (255, 255, 51), (255, 128, 0), (127, 0, 255)
+        ]
+
+        nibs_guild = None
+        for guild in self.guilds: # Add all users currently in voice channels as active users.
+            if guild.id == DISCORD_SERVER_ID:
+                nibs_guild = guild
+                break
+
+        month_name = months[prev_month-1]
+        color = discord.Color.from_rgb(*colors[prev_month-1])
+        role_name = f"Int-Far of the Month - {month_name}"
+
+        role = await nibs_guild.create_role(name=role_name, colour=color)
+        member = nibs_guild.get_member(intfar_id)
+        if member is not None:
+            await member.add_roles(role)
+        else:
+            self.config.log("Int-Far to add badge to was None!", self.config.log_error)
+
     async def sleep_until_monthly_infar(self):
         """
         Sleeps until the first of the next month (run in seperate thread).
@@ -676,10 +721,10 @@ class DiscordClient(discord.Client):
         while monitor.get_seconds_left() > 0:
             await asyncio.sleep(time_to_sleep)
 
-        intfar_details = self.database.get_intfars_of_the_month()
-        intfar_details.sort(key=lambda x: (x[3], x[2]), reverse=True) # Sort by pct of games being Int-Far.
+        intfar_data = self.database.get_intfars_of_the_month()
+        intfar_data.sort(key=lambda x: (x[3], x[2]), reverse=True) # Sort by pct of games being Int-Far.
         intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
-                          for (disc_id, games, intfars, ratio) in intfar_details]
+                          for (disc_id, games, intfars, ratio) in intfar_data]
         intro_desc = "THE RESULTS ARE IN!!! Int-Far of the month is...\n"
         intro_desc += "*DRUM ROLL*\n"
         message = monitor.get_description(intfar_details)
@@ -687,6 +732,11 @@ class DiscordClient(discord.Client):
         message += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
         final_msg = intro_desc + self.insert_emotes(message)
         await self.channel_to_write.send(final_msg)
+
+        # Assign Int-Far of the Month 'badge' (role) to the top Int-Far.
+        current_month = monitor.time_at_announcement.month
+        await self.assign_monthly_intfar_role(current_month, intfar_data[0][0])
+
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
         asyncio.create_task(self.sleep_until_monthly_infar())
 
