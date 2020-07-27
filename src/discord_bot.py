@@ -726,10 +726,6 @@ class DiscordClient(discord.Client):
     async def assign_monthly_intfar_role(self, month, intfar_id):
         prev_month = month - 1 if month != 1 else 12
 
-        months = [
-            "January", "February", "March", "April", "May", "June", "July",
-            "August", "September", "October", "November", "December"
-        ]
         # Colors:
         # Light blue, dark blue, cyan, mint,
         # light green, dark green, red, pink,
@@ -746,7 +742,7 @@ class DiscordClient(discord.Client):
                 nibs_guild = guild
                 break
 
-        month_name = months[prev_month-1]
+        month_name = MonthlyIntfar.MONTH_NAMES[prev_month-1]
         color = discord.Color.from_rgb(*colors[prev_month-1])
         role_name = f"Int-Far of the Month - {month_name}"
 
@@ -772,11 +768,15 @@ class DiscordClient(discord.Client):
         while monitor.get_seconds_left() > 0:
             await asyncio.sleep(time_to_sleep)
 
+        month = monitor.time_at_announcement.month
+        prev_month = month - 1 if month != 1 else 12
+        month_name = MonthlyIntfar.MONTH_NAMES[prev_month-1]
+
         intfar_data = self.database.get_intfars_of_the_month()
         intfar_data.sort(key=lambda x: (x[3], x[2]), reverse=True) # Sort by pct of games being Int-Far.
         intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
                           for (disc_id, games, intfars, ratio) in intfar_data]
-        intro_desc = "THE RESULTS ARE IN!!! Int-Far of the month is...\n"
+        intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"
         intro_desc += "*DRUM ROLL*\n"
         message = monitor.get_description(intfar_details)
         message += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
@@ -1156,15 +1156,11 @@ class DiscordClient(discord.Client):
                     await message.channel.send(self.insert_emotes(response))
             elif first_command == "users": # List all registered users.
                 response = ""
-                listed_users = set()
                 for disc_id, summ_name, _ in self.database.summoners:
-                    if disc_id in listed_users:
-                        continue
                     summ_names = self.database.summoner_from_discord_id(disc_id)[1]
                     formatted_names = ", ".join(summ_names)
                     nickname = self.get_discord_nick(disc_id)
                     response += f"- {nickname} ({formatted_names})\n"
-                    listed_users.add(disc_id)
                 if response == "":
                     response = "No lads are currently signed up {emote_nat_really_fine} but you can change this!!"
                 else:

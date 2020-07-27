@@ -14,8 +14,15 @@ class Database:
 
         # Populate summoner names and ids lists with currently registered summoners.
         users = self.get_all_registered_users()
-        for entry in users:
-            self.summoners.append(entry)
+        user_entries = {x[0]: ([], []) for x in users}
+        for disc_id, summ_name, summ_id in users:
+            user_entries[disc_id][0].append(summ_name)
+            user_entries[disc_id][1].append(summ_id)
+
+        for k, v in user_entries.items():
+            self.summoners.append((k, v[0], v[1]))
+
+        print(self.summoners)
 
     def get_connection(self):
         return sqlite3.connect(self.config.database)
@@ -38,29 +45,31 @@ class Database:
                                        "FROM registered_summoners").fetchall()
 
     def add_user(self, summ_name, summ_id, discord_id):
-        self.summoners.append((discord_id, summ_name, summ_id))
+        if self.summoner_from_discord_id(discord_id) is not None:
+            for disc_id, summ_names, summ_ids in self.summoners:
+                if disc_id == discord_id:
+                    summ_names.append(summ_name)
+                    summ_ids.append(summ_id)
+                    break
+        else:
+            self.summoners.append((discord_id, [summ_name], [summ_id]))
         with closing(self.get_connection()) as db:
             db.cursor().execute("INSERT INTO registered_summoners(disc_id, summ_name, summ_id) " +
                                 "VALUES (?, ?, ?)", (discord_id, summ_name, summ_id))
             db.commit()
 
     def discord_id_from_summoner(self, name):
-        for disc_id, summ_name, summ_id in self.summoners:
-            if summ_name.lower() == name:
-                return disc_id, summ_name, summ_id
+        for disc_id, summ_names, summ_ids in self.summoners:
+            for summ_name in summ_names:
+                if summ_name.lower() == name:
+                    return disc_id, summ_names, summ_ids
         return None
 
     def summoner_from_discord_id(self, discord_id):
-        data = []
-        for disc_id, summ_name, summ_id in self.summoners:
+        for disc_id, summ_names, summ_ids in self.summoners:
             if disc_id == discord_id:
-                data.append((disc_id, summ_name, summ_id))
-        if data == []:
-            return None
-        disc_id = data[0][0]
-        summ_names = [name for d_id, name, s_id in data]
-        summ_ids = [s_id for d_id, name, s_id in data]
-        return (disc_id, summ_names, summ_ids)
+                return (disc_id, summ_names, summ_ids)
+        return None
 
     def get_stat(self, stat, value, best, disc_id, maximize=True):
         aggregator = "MAX" if maximize else "MIN"

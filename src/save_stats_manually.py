@@ -4,7 +4,6 @@ from time import sleep
 from database import Database
 from config import Config
 from discord_bot import DiscordClient
-import game_stats
 import riot_api
 
 GAME_ID = 4730151627

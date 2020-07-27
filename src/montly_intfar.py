@@ -27,6 +27,10 @@ class MonthlyIntfar:
     Class for handling the tracking of when to announce Int-Far of the month.
     """
     HOUR_OF_ANNOUNCEMENT = 12 # Hour of the day on which to announce IFOTM.
+    MONTH_NAMES = [
+        "January", "February", "March", "April", "May", "June", "July",
+        "August", "September", "October", "November", "December"
+    ]
 
     def __init__(self):
         self.cph_timezone = TimeZone()
