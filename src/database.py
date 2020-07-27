@@ -57,7 +57,7 @@ class Database:
                 data.append((disc_id, summ_name, summ_id))
         if data == []:
             return None
-        disc_id = data[0]
+        disc_id = data[0][0]
         summ_names = [name for d_id, name, s_id in data]
         summ_ids = [s_id for d_id, name, s_id in data]
         return (disc_id, summ_names, summ_ids)
