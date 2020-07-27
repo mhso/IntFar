@@ -624,6 +624,8 @@ class DiscordClient(discord.Client):
             await self.channel_to_write.send(self.insert_emotes(response))
             return
 
+        print(self.users_in_game)
+
         filtered_stats = self.get_filtered_stats(game_info)
 
         intfar_details = self.get_intfar_details(filtered_stats)
