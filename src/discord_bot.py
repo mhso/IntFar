@@ -226,7 +226,7 @@ class DiscordClient(discord.Client):
         is_smurf = self.database.summoner_from_discord_id(discord_id) is not None
         self.database.add_user(summ_name, summ_id, discord_id)
         if is_smurf:
-            return f"Added smurf '{summ_name}' with  summoner ID'{summ_id}'."
+            return f"Added smurf '{summ_name}' with  summoner ID '{summ_id}'."
         return f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
 
     def polling_is_active(self): # We only check game statuses if there are two or more active users.
