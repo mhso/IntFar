@@ -7,7 +7,7 @@ from discord_bot import DiscordClient
 import game_stats
 import riot_api
 
-GAME_ID = 4727422254
+GAME_ID = 4729704140
 
 auth = json.load(open("auth.json"))
 
@@ -22,18 +22,14 @@ database_client = Database(conf)
 
 class TestMock(DiscordClient):
     async def on_ready(self):
-        super().on_ready()
+        await super(TestMock, self).on_ready()
         self.users_in_game = [
             self.database.discord_id_from_summoner("prince jarvan lv"),
-            self.database.discord_id_from_summoner("senile felines"),
-            self.database.discord_id_from_summoner("dumbledonger"),
-            self.database.discord_id_from_summoner("stirred martini"),
-            self.database.discord_id_from_summoner("nønø")
+            self.database.discord_id_from_summoner("dumbledonger")
         ]
-        game = self.riot_api.get_game_details(GAME_ID)
-        filtered = self.get_filtered_stats(game)
-        _, doinks = self.get_big_doinks(filtered)
-        self.database.record_stats(None, "0000", doinks, GAME_ID, filtered, self.users_in_game)
+
+        self.active_game = GAME_ID
+        await self.declare_intfar()
 
 conf.log("Starting Discord Client...")
 

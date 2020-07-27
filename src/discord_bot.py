@@ -183,6 +183,7 @@ class DiscordClient(discord.Client):
                 self.config.log("GAME OVER!!")
                 await self.declare_intfar()
                 self.active_game = None
+                self.users_in_game = None # Reset the list of users who are in a game.
                 asyncio.create_task(self.poll_for_game_start())
             except Exception as e:
                 self.config.log("Exception after game was over!!!", self.config.log_error)
@@ -265,7 +266,6 @@ class DiscordClient(discord.Client):
             return 1 # Game is now active.
         if active_game is None and self.active_game is not None: # The current game is over.
             self.config.status_interval = 60*10
-            self.users_in_game = None # Reset the list of users who are in a game.
             return 2 # Game is over.
         return 0
 
@@ -413,7 +413,9 @@ class DiscordClient(discord.Client):
             damage_dealt = stats["totalDamageDealtToChampions"]
             if stats["role"] != "DUO_SUPPORT" and damage_dealt < 8000:
                 mentions[disc_id].append((1, damage_dealt))
-            cs_per_min = (stats["creepsPerMinDeltas"]["0-10"] + stats["creepsPerMinDeltas"]["10-20"]) / 2.0
+            cs_per_min = stats["creepsPerMinDeltas"]["0-10"]
+            if "10-20" in stats["creepsPerMinDeltas"]:
+                cs_per_min = (cs_per_min + stats["creepsPerMinDeltas"]["10-20"]) / 2
             if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 4.0:
                 mentions[disc_id].append((2, round_digits(cs_per_min)))
             epic_monsters_secured = stats["baronKills"] + stats["dragonKills"]
@@ -839,7 +841,7 @@ class DiscordClient(discord.Client):
         for cmd, desc in VALID_COMMANDS.items():
             response += f"!{cmd} - {desc}\n\n"
 
-        response += "**--- Valid stats ---**\n```"
+        response += "```**--- Valid stats ---**\n```"
         response += valid_stats
         response += "\n```"
         await message.channel.send(self.insert_emotes(response))
@@ -1152,9 +1154,15 @@ class DiscordClient(discord.Client):
                     await message.channel.send(self.insert_emotes(response))
             elif first_command == "users": # List all registered users.
                 response = ""
+                listed_users = set()
                 for disc_id, summ_name, _ in self.database.summoners:
+                    if disc_id in listed_users:
+                        continue
+                    summ_names = self.database.summoner_from_discord_id(disc_id)[1]
+                    formatted_names = ", ".join(summ_names)
                     nickname = self.get_discord_nick(disc_id)
-                    response += f"- {nickname} ({summ_name})\n"
+                    response += f"- {nickname} ({formatted_names})\n"
+                    listed_users.add(disc_id)
                 if response == "":
                     response = "No lads are currently signed up {emote_nat_really_fine} but you can change this!!"
                 else:
