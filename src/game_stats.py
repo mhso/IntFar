@@ -26,11 +26,11 @@ def get_outlier_stat(stat, data):
     least = stats[stat]
     return most_id, most, least_id, least
 
-def get_game_summary(data, summ_id, riot_api):
+def get_game_summary(data, summ_ids, riot_api):
     stats = None
     champ_id = 0
     for part_info in data["participantIdentities"]:
-        if part_info["player"]["summonerId"] == summ_id:
+        if part_info["player"]["summonerId"] in summ_ids:
             for participant in data["participants"]:
                 if part_info["participantId"] == participant["participantId"]:
                     stats = participant["stats"]

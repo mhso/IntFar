@@ -51,10 +51,16 @@ class Database:
         return None
 
     def summoner_from_discord_id(self, discord_id):
+        data = []
         for disc_id, summ_name, summ_id in self.summoners:
             if disc_id == discord_id:
-                return disc_id, summ_name, summ_id
-        return None
+                data.append((disc_id, summ_name, summ_id))
+        if data == []:
+            return None
+        disc_id = data[0]
+        summ_names = [name for d_id, name, s_id in data]
+        summ_ids = [s_id for d_id, name, s_id in data]
+        return (disc_id, summ_names, summ_ids)
 
     def get_stat(self, stat, value, best, disc_id, maximize=True):
         aggregator = "MAX" if maximize else "MIN"

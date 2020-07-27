@@ -1,7 +1,8 @@
 CREATE TABLE [registered_summoners] (
-    [disc_id] INTEGER NOT NULL PRIMARY KEY,
+    [disc_id] INTEGER NOT NULL,
     [summ_name] NVARCHAR(64) NOT NULL,
-    [summ_id] NVARCHAR(64) NOT NULL
+    [summ_id] NVARCHAR(64) NOT NULL,
+    PRIMARY KEY (disc_id, summ_name)
 );
 CREATE TABLE [participants] (
   [game_id] INTEGER NOT NULL,

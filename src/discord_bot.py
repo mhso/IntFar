@@ -183,7 +183,6 @@ class DiscordClient(discord.Client):
                 self.config.log("GAME OVER!!")
                 await self.declare_intfar()
                 self.active_game = None
-                self.users_in_game = None # Reset the list of users who are in a game.
                 asyncio.create_task(self.poll_for_game_start())
             except Exception as e:
                 self.config.log("Exception after game was over!!!", self.config.log_error)
@@ -208,7 +207,6 @@ class DiscordClient(discord.Client):
 
         game_status = self.check_game_status()
         if game_status == 1: # Game has started.
-            self.users_in_game = [x for x in self.active_users]
             await self.poll_for_game_end()
         elif game_status == 0:
             await self.poll_for_game_start()
@@ -225,7 +223,10 @@ class DiscordClient(discord.Client):
         summ_id = self.riot_api.get_summoner_id(summ_name.replace(" ", "%20"))
         if summ_id is None:
             return f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
+        is_smurf = self.database.summoner_from_discord_id(discord_id) is not None
         self.database.add_user(summ_name, summ_id, discord_id)
+        if is_smurf:
+            return f"Added smurf '{summ_name}' with  summoner ID'{summ_id}'."
         return f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
 
     def polling_is_active(self): # We only check game statuses if there are two or more active users.
@@ -236,21 +237,35 @@ class DiscordClient(discord.Client):
         game_ids = set()
         # First check if users are in the same game (or all are in no games).
         user_list = self.active_users if self.users_in_game is None else self.users_in_game
-        for _, _, summ_id in user_list:
-            game_id = self.riot_api.get_active_game(summ_id)
-            if game_id is not None:
-                game_ids.add(game_id)
-                active_game = game_id
+        users_in_current_game = []
+        for disc_id, summ_names, summ_ids in user_list:
+            game_for_summoner = None
+            active_name = None
+            active_id = None
+            # Check if any of the summ_names/summ_ids for a given player is in a game.
+            for summ_name, summ_id in zip(summ_names, summ_ids):
+                game_id = self.riot_api.get_active_game(summ_id)
+                if game_id is not None:
+                    game_for_summoner = game_id
+                    active_name = summ_name
+                    active_id = summ_id
+                    break
+            if game_for_summoner is not None:
+                game_ids.add(game_for_summoner)
+                users_in_current_game.append((disc_id, [active_name], [active_id]))
+                active_game = game_for_summoner
 
         if len(game_ids) > 1: # People are in different games.
             return 0
 
         if active_game is not None and self.active_game is None:
             self.active_game = active_game
+            self.users_in_game = users_in_current_game
             self.config.status_interval = 30 # Check status every 30 seconds.
             return 1 # Game is now active.
         if active_game is None and self.active_game is not None: # The current game is over.
             self.config.status_interval = 60*10
+            self.users_in_game = None # Reset the list of users who are in a game.
             return 2 # Game is over.
         return 0
 
@@ -573,8 +588,8 @@ class DiscordClient(discord.Client):
                     damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
                     # We loop through the static 'self.users_in_game' list and not the dynamic
                     # 'self.active_players' for safety.
-                    for disc_id, _, summ_id in self.users_in_game:
-                        if summ_id == part_info["player"]["summonerId"]:
+                    for disc_id, _, summ_ids in self.users_in_game:
+                        if part_info["player"]["summonerId"] in summ_ids:
                             our_team = participant["teamId"]
                             combined_stats = participant["stats"]
                             combined_stats["timestamp"] = game_info["gameCreation"]
@@ -678,7 +693,7 @@ class DiscordClient(discord.Client):
         self.config.log("User joined voice: " + str(member.id))
         summoner_info = self.database.summoner_from_discord_id(member.id)
         if summoner_info is not None:
-            self.config.log("Summoner joined voice: " + summoner_info[1])
+            self.config.log("Summoner joined voice: " + summoner_info[1][0])
             if not self.polling_is_active() and start_polling:
                 self.config.log("Polling is now active!")
                 asyncio.create_task(self.poll_for_game_start())
@@ -690,7 +705,7 @@ class DiscordClient(discord.Client):
         summoner_info = self.database.summoner_from_discord_id(member.id)
         if summoner_info is not None and summoner_info in self.active_users:
             self.active_users.remove(summoner_info)
-            self.config.log("Summoner left voice: " + summoner_info[1])
+            self.config.log("Summoner left voice: " + summoner_info[1][0])
             self.config.log(f"Active users: {len(self.active_users)}")
 
     async def remove_intfar_role(self, intfar_id, role_id):
@@ -1070,8 +1085,8 @@ class DiscordClient(discord.Client):
             if min_or_max_value is not None:
                 # The target user has gotten most/fewest of 'stat' in at least one game.
                 game_info = self.riot_api.get_game_details(game_id)
-                summ_id = self.database.summoner_from_discord_id(target_id)[2]
-                game_summary = game_stats.get_game_summary(game_info, summ_id, self.riot_api)
+                summ_ids = self.database.summoner_from_discord_id(target_id)[2]
+                game_summary = game_stats.get_game_summary(game_info, summ_ids, self.riot_api)
                 response += f"His {readable_stat} ever was "
                 response += f"{round_digits(min_or_max_value)} as {game_summary}"
 
