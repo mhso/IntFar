@@ -219,23 +219,22 @@ class DiscordClient(discord.Client):
         time_slept = 0
         sleep_per_loop = 0.5
         self.config.log("People are active in voice channels! Polling for games...")
+        try:
+            while time_slept < self.config.status_interval:
+                if not self.polling_is_active(): # Stop if people leave voice channels.
+                    self.config.log("Polling is no longer active.")
+                    return
+                await asyncio.sleep(sleep_per_loop)
+                time_slept += sleep_per_loop
+        except KeyboardInterrupt:
+            return
 
         game_status = self.check_game_status()
 
         if game_status == 1: # Game has started.
             await self.poll_for_game_end()
         elif game_status == 0: # Sleep for 10 minutes and check game status again.
-            try:
-                while time_slept < self.config.status_interval:
-                    if not self.polling_is_active(): # Stop if people leave voice channels.
-                        self.config.log("Polling is no longer active.")
-                        return
-                    await asyncio.sleep(sleep_per_loop)
-                    time_slept += sleep_per_loop
-
-                await self.poll_for_game_start()
-            except KeyboardInterrupt:
-                return
+            await self.poll_for_game_start()
 
     def user_is_registered(self, summ_name):
         for _, name, _ in self.database.summoners:
