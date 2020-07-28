@@ -474,7 +474,9 @@ class DiscordClient(discord.Client):
         intfar, stats = game_stats.get_outlier(data, "kda")
         lowest_kda = game_stats.calc_kda(stats)
         deaths = stats["deaths"]
-        if lowest_kda < self.config.kda_lower_threshold and deaths > 2:
+        kda_criteria = self.config.kda_lower_threshold
+        death_criteria = self.config.kda_kda_death_criteria
+        if lowest_kda < kda_criteria and deaths > death_criteria:
             return (intfar, lowest_kda)
         return (None, None)
 
@@ -490,7 +492,9 @@ class DiscordClient(discord.Client):
         intfar, stats = game_stats.get_outlier(data, "deaths", asc=False)
         highest_deaths = stats["deaths"]
         kda = game_stats.calc_kda(stats)
-        if highest_deaths > self.config.highest_death_threshold and kda < 2.1:
+        death_criteria = self.config.death_kda_criteria
+        kda_criteria = self.config.death_kda_criteria
+        if highest_deaths > death_criteria and kda < kda_criteria:
             return (intfar, highest_deaths)
         return (None, None)
 
@@ -510,8 +514,11 @@ class DiscordClient(discord.Client):
         kills = stats["kills"]
         assists = stats["assists"]
         structures_destroyed = stats["turretKills"] + stats["inhibitorKills"]
-        if (lowest_kp < self.config.kp_lower_threshold and kills + assists < 10
-                and structures_destroyed < 3):
+        kp_criteria = self.config.kp_lower_threshold
+        takedowns_criteria = self.config.kp_takedowns_criteria
+        structures_criteria = self.config.kp_structures_criteria
+        if (lowest_kp < kp_criteria and kills + assists < takedowns_criteria
+                and structures_destroyed < structures_criteria):
             return (intfar, lowest_kp)
         return (None, None)
 
@@ -527,7 +534,9 @@ class DiscordClient(discord.Client):
         intfar, stats = game_stats.get_outlier(data, "visionScore")
         lowest_score = stats["visionScore"]
         kda = game_stats.calc_kda(stats)
-        if lowest_score < self.config.vision_score_lower_threshold and kda < 3.0:
+        vision_criteria = self.config.vision_score_lower_threshold
+        kda_criteria = self.config.vision_kda_criteria
+        if lowest_score < vision_criteria and kda < kda_criteria:
             return (intfar, lowest_score)
         return (None, None)
 
@@ -652,8 +661,6 @@ class DiscordClient(discord.Client):
             response += "and no stats will be saved."
             await self.channel_to_write.send(self.insert_emotes(response))
             return
-
-        print(self.users_in_game)
 
         filtered_stats = self.get_filtered_stats(game_info)
 
@@ -1139,6 +1146,44 @@ class DiscordClient(discord.Client):
         mention = self.get_mention_str(message.author.id)
         await message.channel.send(f"{mention} {flirt_msg}")
 
+    async def handle_criteria_msg(self, message, criteria):
+        response = ""
+        if criteria is None:
+            response = "You must specify a criteria. This can be one of:\n"
+            response += "'kda', 'deaths', 'kp', 'vision'"
+        elif criteria == "kda":
+            crit_1 = self.config.kda_lower_threshold
+            crit_2 = self.config.kda_death_criteria
+            response = ("Criteria for being Int-Far by low KDA:\n" +
+                        " - Having the lowest KDA of the people playing\n" +
+                        f" - Having a KDA of less than {crit_1}\n" +
+                        f" - Having more than {crit_2} deaths")
+        elif criteria == "deaths":
+            crit_1 = self.config.death_lower_threshold
+            crit_2 = self.config.death_kda_criteria
+            response = ("Criteria for being Int-Far by many deaths:\n" +
+                        " - Having the most deaths of the people playing\n" +
+                        f" - Having more than {crit_1} deaths\n"
+                        f" - Having less than {crit_2} KDA")
+        elif criteria == "kp":
+            crit_1 = self.config.kp_lower_threshold
+            crit_2 = self.config.kp_takedowns_criteria
+            crit_3 = self.config.kp_structures_criteria
+            response = ("Criteria for being Int-Far by low KP:\n" +
+                        " - Having the lowest KP of the people playing\n" +
+                        f" - Having a KP of less than {crit_1}%\n" +
+                        f" - Having less than {crit_2} kills + assists\n" +
+                        f" - Having less than {crit_3} structures destroyed")
+        elif criteria == "vision":
+            crit_1 = self.config.vision_score_lower_threshold
+            crit_2 = self.config.vision_kda_criteria
+            response = ("Criteria for being Int-Far by many deaths:\n" +
+                        " - Having the lowest vision score of the people playing\n" +
+                        f" - Having less than {crit_1} vision score\n"
+                        f" - Having less than {crit_2} KDA")
+
+        await message.channel.send(response)
+
     def get_target_name(self, split, start_index):
         if len(split) > start_index:
             return " ".join(split[start_index:])
@@ -1211,6 +1256,9 @@ class DiscordClient(discord.Client):
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
+            elif first_command == "intfar_criteria":
+                criteria = self.get_target_name(split, 1)
+                await self.handle_criteria_msg(message, criteria)
             elif first_command == "intdaddy":
                 await self.handle_flirtation_msg(message, "english")
             elif first_command == "intpapi":

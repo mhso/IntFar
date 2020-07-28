@@ -10,9 +10,14 @@ class Config:
         self.status_interval = 60*10 # 10 minutes wait time between checking for status.
         self.database = "database.db"
         self.kda_lower_threshold = 1.3
-        self.highest_death_threshold = 9
+        self.kda_death_criteria = 2
+        self.death_lower_threshold = 9
+        self.death_kda_criteria = 2.1
         self.kp_lower_threshold = 25
+        self.kp_takedowns_criteria = 10
+        self.kp_structures_criteria = 3
         self.vision_score_lower_threshold = 11
+        self.vision_kda_criteria = 3.0
         self.log_warning = 1
         self.log_error = 2
         self.message_timeout = 1.5

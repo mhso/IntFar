@@ -1,5 +1,4 @@
-from datetime import datetime, timezone, tzinfo, timedelta
-import asyncio
+from datetime import datetime, tzinfo, timedelta
 import config
 import database
 
