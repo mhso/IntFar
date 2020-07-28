@@ -22,8 +22,6 @@ class Database:
         for k, v in user_entries.items():
             self.summoners.append((k, v[0], v[1]))
 
-        print(self.summoners)
-
     def get_connection(self):
         return sqlite3.connect(self.config.database)
 

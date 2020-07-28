@@ -25,7 +25,8 @@ INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
     "KDA larger than 10", "More than 30 kills", "More damage than rest of the team",
-    "Getting a pentakill", "Vision score larger than 100", "Kill participation larger than 90"
+    "Getting a pentakill", "Vision score larger than 100",
+    "Kill participation larger than 85", "Securing all epic monsters"
 ]
 
 MOST_DEATHS_FLAVORS = load_flavor_texts("most_deaths")
@@ -346,10 +347,12 @@ class DiscordClient(discord.Client):
         exceptionally well.
         Criteria for being redeemed:
             - Having a KDA of 10+
+            - Getting more than 30 kills
             - Doing more damage than the rest of the team combined
             - Getting a penta-kill
             - Having a vision score of 100+
-            - Having a kill-participation of 90%+
+            - Having a kill-participation of 85%+
+            - Securing all epic monsters
         """
         mentions = {} # List of mentioned users for the different criteria.
         for disc_id, stats in data:
@@ -367,8 +370,12 @@ class DiscordClient(discord.Client):
             if stats["visionScore"] > 100:
                 mention_list.append((4, stats["visionScore"]))
             kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
-            if kp > 90:
+            if kp > 85:
                 mention_list.append((5, kp))
+            own_epics = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
+            enemy_epics = stats["enemyBaronKills"] + stats["enemyDragonKills"] + stats["enemyHeraldKills"]
+            if stats["lane"] == "JUNGLE" and own_epics > 3 and enemy_epics == 0:
+                mention_list.append((6, kp))
             if mention_list != []:
                 mentions[disc_id] = mention_list
 
@@ -402,7 +409,7 @@ class DiscordClient(discord.Client):
         Honorable mentions are given for:
             - Having 0 control wards purchased.
             - Being adc/mid/top/jungle and doing less than 8000 damage.
-            - Being adc/mid/top and having less than 4 cs/min.
+            - Being adc/mid/top and having less than 5 cs/min.
             - Being jungle and securing no epic monsters.
         """
         mentions = {} # List of mentioned users for the different criteria.
@@ -416,7 +423,7 @@ class DiscordClient(discord.Client):
             cs_per_min = stats["creepsPerMinDeltas"]["0-10"]
             if "10-20" in stats["creepsPerMinDeltas"]:
                 cs_per_min = (cs_per_min + stats["creepsPerMinDeltas"]["10-20"]) / 2
-            if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 4.0:
+            if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
                 mentions[disc_id].append((2, round_digits(cs_per_min)))
             epic_monsters_secured = stats["baronKills"] + stats["dragonKills"]
             if stats["lane"] == "JUNGLE" and epic_monsters_secured == 0:
@@ -605,6 +612,11 @@ class DiscordClient(discord.Client):
                 if team["teamId"] == our_team:
                     stats["baronKills"] = team["baronKills"]
                     stats["dragonKills"] = team["dragonKills"]
+                    stats["heraldKills"] = team["riftHeraldKills"]
+                else:
+                    stats["enemyBaronKills"] = team["baronKills"]
+                    stats["enemyDragonKills"] = team["dragonKills"]
+                    stats["enemyHeraldKills"] = team["riftHeraldKills"]
 
         return filtered_stats
 
@@ -891,15 +903,19 @@ class DiscordClient(discord.Client):
         (games, earliest_game, users, intfars,
          doinks, twos, threes, fours, fives) = self.database.get_meta_stats()
 
+        pct_intfar = int((intfars / games) * 100)
+        pct_doinks = int((doinks / games) * 100)
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
+        doinks_emote = self.insert_emotes("{emote_Doinks}")
+
         response += f"Since {earliest_time}:\n"
         response += f"- **{games}** games have been played\n"
         response += f"- **{users}** users have signed up\n"
         response += f"- **{intfars}** Int-Far awards have been given\n"
-        response += f"- **{doinks}** " + self.insert_emotes("{emote_Doinks} has been earned\n")
+        response += f"- **{doinks}** {doinks_emote} have been earned\n"
         response += "Of all games played:\n"
-        pct_intfar = int((intfars / games) * 100)
         response += f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
+        response += f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
         response += f"- **{twos}%** were as a duo\n"
         response += f"- **{threes}%** were as a three-man\n"
         response += f"- **{fours}%** were as a four-man\n"
@@ -1100,19 +1116,11 @@ class DiscordClient(discord.Client):
             response += self.insert_emotes("{emote_carole_fucking_baskin}")
             await message.channel.send(response)
 
-    async def handle_test_msg(self):
-        self.config.testing = True
-        self.active_users = [
-            self.database.discord_id_from_summoner("Prince Jarvan lV"),
-            self.database.discord_id_from_summoner("Senile Felines")
-            #self.database.discord_id_from_summoner("Stirred Martini"),
-            #self.database.discord_id_from_summoner("Dumbledonger"),
-            #self.database.discord_id_from_summoner("Kazpariuz")
-        ]
-        #self.active_game = 4703181863 # Martin double Int-Far.
-        self.active_game = 4700945429 # Me honorable mention.
-        await self.declare_intfar()
-        self.config.testing = False
+    def handle_flirtation_msg(self, message, language="english"):
+        flirt_pos_eng = ""
+        chance_of_positive = 0.95 if message.author.id == MY_DISC_ID else 0.5
+        if random.uniform(0.0, 1.0) < chance_of_positive:
+            pass
 
     def get_target_name(self, split, start_index):
         if len(split) > start_index:
@@ -1137,7 +1145,9 @@ class DiscordClient(discord.Client):
             split = msg.split(" ")
             first_command = split[0][1:].lower()
 
-            if first_command not in VALID_COMMANDS and first_command != "test":
+            if (first_command not in VALID_COMMANDS
+                    and first_command not in CUTE_COMMANDS
+                    and first_command != "test"):
                 return
 
             if time() - self.last_message_time.get(message.author.id, 0) < self.config.message_timeout:
@@ -1184,8 +1194,10 @@ class DiscordClient(discord.Client):
             elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
-            elif first_command == "test" and message.author.id == MY_DISC_ID:
-                await self.handle_test_msg()
+            elif first_command == "intdaddy":
+                pass
+            elif first_command == "intpapi":
+                pass
 
             self.last_message_time[message.author.id] = time()
 

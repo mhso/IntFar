@@ -8,7 +8,7 @@ CREATE TABLE [participants] (
   [game_id] INTEGER NOT NULL,
   [disc_id] INTEGER NOT NULL,
   [timestamp] INTEGER,
-  [doinks] NVARCHAR(6)
+  [doinks] NVARCHAR(10)
 );
 CREATE TABLE [best_stats] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
