@@ -481,7 +481,7 @@ class DiscordClient(discord.Client):
         lowest_kda = game_stats.calc_kda(stats)
         deaths = stats["deaths"]
         kda_criteria = self.config.kda_lower_threshold
-        death_criteria = self.config.kda_kda_death_criteria
+        death_criteria = self.config.kda_death_criteria
         if lowest_kda < kda_criteria and deaths > death_criteria:
             return (intfar, lowest_kda)
         return (None, None)
@@ -498,7 +498,7 @@ class DiscordClient(discord.Client):
         intfar, stats = game_stats.get_outlier(data, "deaths", asc=False)
         highest_deaths = stats["deaths"]
         kda = game_stats.calc_kda(stats)
-        death_criteria = self.config.death_kda_criteria
+        death_criteria = self.config.death_lower_threshold
         kda_criteria = self.config.death_kda_criteria
         if highest_deaths > death_criteria and kda < kda_criteria:
             return (intfar, highest_deaths)
@@ -659,8 +659,11 @@ class DiscordClient(discord.Client):
         and sends out a status message about the potential Int-Far (if there was one).
         Also saves worst/best stats for the current game.
         """
+        self.config.log(f"Active game: {self.active_game}")
         game_info = self.riot_api.get_game_details(self.active_game, tries=2)
 
+        if game_info is None:
+            self.config.log("Game info is None! Weird stuff.", self.config.log_error)
         if not self.riot_api.is_summoners_rift(game_info["mapId"]):
             response = "That game was not on Summoner's Rift "
             response += "{emote_woahpikachu} no Int-Far will be crowned "

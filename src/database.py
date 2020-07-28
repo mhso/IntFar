@@ -60,7 +60,7 @@ class Database:
         for disc_id, summ_names, summ_ids in self.summoners:
             for summ_name in summ_names:
                 if summ_name.lower() == name:
-                    return disc_id, summ_names, summ_ids
+                    return (disc_id, summ_names, summ_ids)
         return None
 
     def summoner_from_discord_id(self, discord_id):
