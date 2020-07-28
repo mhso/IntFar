@@ -77,6 +77,10 @@ VALID_COMMANDS = {
         "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users."
     ),
     "intfar_relations": "(summoner_name) - Show who you (or someone else) int the most games with.",
+    "intfar_criteria": (
+        "[criteria] - List the things that need to happen for a person to get " +
+        "Int-Far because of a specific criteria. Fx. '!intfar_criteria kda'."
+    ),
     "doinks": "(summoner_name) - Show big doinks plays you (or someone else) did!",
     "best": (
         "[stat] (summoner_name) - Show how many times you (or someone else) " +
