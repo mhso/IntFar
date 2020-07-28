@@ -215,19 +215,20 @@ class DiscordClient(discord.Client):
         elif game_status == 0:
             await self.poll_for_game_end()
 
-    async def poll_for_game_start(self):
+    async def poll_for_game_start(self, immediately=False):
         time_slept = 0
         sleep_per_loop = 0.5
         self.config.log("People are active in voice channels! Polling for games...")
-        try:
-            while time_slept < self.config.status_interval:
-                if not self.polling_is_active(): # Stop if people leave voice channels.
-                    self.config.log("Polling is no longer active.")
-                    return
-                await asyncio.sleep(sleep_per_loop)
-                time_slept += sleep_per_loop
-        except KeyboardInterrupt:
-            return
+        if not immediately:
+            try:
+                while time_slept < self.config.status_interval:
+                    if not self.polling_is_active(): # Stop if people leave voice channels.
+                        self.config.log("Polling is no longer active.")
+                        return
+                    await asyncio.sleep(sleep_per_loop)
+                    time_slept += sleep_per_loop
+            except KeyboardInterrupt:
+                return
 
         game_status = self.check_game_status()
 
@@ -745,7 +746,7 @@ class DiscordClient(discord.Client):
             self.config.log("Summoner joined voice: " + summoner_info[1][0])
             if not self.polling_is_active() and start_polling:
                 self.config.log("Polling is now active!")
-                asyncio.create_task(self.poll_for_game_start())
+                asyncio.create_task(self.poll_for_game_start(True))
             self.active_users.append(summoner_info)
             self.config.log(f"Active users: {len(self.active_users)}")
 
@@ -1004,11 +1005,14 @@ class DiscordClient(discord.Client):
                 for index, intfar_id in enumerate(intfar_ids):
                     if intfar_id == 1:
                         intfar_counts[index] += 1
+
+            pct_intfar = (0 if total_games == 0
+                          else int(len(intfar_reason_ids) / total_games * 100))
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
+            if not expanded:
+                msg += f"({pct_intfar}%) "
             msg += self.insert_emotes("{emote_unlimited_chins}")
             if expanded and len(intfar_reason_ids) > 0:
-                pct_intfar = (0 if total_games == 0
-                                else int(len(intfar_reason_ids) / total_games * 100))
                 ratio_desc = "\n" + f"He was Int-Far in **{pct_intfar}%** of his {total_games} total games played"
                 reason_desc = "\n" + "Int-Fars awarded so far:\n"
                 for reason_id, reason in enumerate(INTFAR_REASONS):
