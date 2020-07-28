@@ -49,6 +49,21 @@ REDEEMING_ACTIONS_FLAVORS = load_flavor_texts("redeeming_actions")
 
 STREAK_FLAVORS = load_flavor_texts("streak")
 
+FLIRT_MESSAGES = {
+    "english": [
+        "Hey there... I'm a bot, why don't you get on top? {emote_hairy_retard}",
+        "You like that, you fucking retard? {emote_cummies}",
+        "You're goddamn right. I am your robot daddy {emote_robot}",
+        "You look so pretty when you get dicked in league {emote_kapepe}"
+    ],
+    "spanish": [
+        "Hola ... Soy un bot, ¿por qué no te subes? {emote_hairy_retard}",
+        "¿Te gusta eso, retrasado? {emote_cummies}",
+        "Estás jodidamente en lo cierto. Soy tu robot papi {emote_robot}",
+        "Te ves tan bonita cuando te follan en la league {emote_kapepe}"
+    ]
+}
+
 VALID_COMMANDS = {
     "register": (
         "[summoner_name] - Sign up for the Int-Far™ Tracker™ " +
@@ -197,21 +212,23 @@ class DiscordClient(discord.Client):
         time_slept = 0
         sleep_per_loop = 0.5
         self.config.log("People are active in voice channels! Polling for games...")
-        try:
-            while time_slept < self.config.status_interval:
-                if not self.polling_is_active(): # Stop if people leave voice channels.
-                    self.config.log("Polling is no longer active.")
-                    return
-                await asyncio.sleep(sleep_per_loop)
-                time_slept += sleep_per_loop
-        except KeyboardInterrupt:
-            return
 
         game_status = self.check_game_status()
+
         if game_status == 1: # Game has started.
             await self.poll_for_game_end()
-        elif game_status == 0:
-            await self.poll_for_game_start()
+        elif game_status == 0: # Sleep for 10 minutes and check game status again.
+            try:
+                while time_slept < self.config.status_interval:
+                    if not self.polling_is_active(): # Stop if people leave voice channels.
+                        self.config.log("Polling is no longer active.")
+                        return
+                    await asyncio.sleep(sleep_per_loop)
+                    time_slept += sleep_per_loop
+
+                await self.poll_for_game_start()
+            except KeyboardInterrupt:
+                return
 
     def user_is_registered(self, summ_name):
         for _, name, _ in self.database.summoners:
@@ -1116,11 +1133,11 @@ class DiscordClient(discord.Client):
             response += self.insert_emotes("{emote_carole_fucking_baskin}")
             await message.channel.send(response)
 
-    def handle_flirtation_msg(self, message, language="english"):
-        flirt_pos_eng = ""
-        chance_of_positive = 0.95 if message.author.id == MY_DISC_ID else 0.5
-        if random.uniform(0.0, 1.0) < chance_of_positive:
-            pass
+    async def handle_flirtation_msg(self, message, language):
+        messages = FLIRT_MESSAGES[language]
+        flirt_msg = self.insert_emotes(messages[random.randint(0, len(messages)-1)])
+        mention = self.get_mention_str(message.author.id)
+        await message.channel.send(f"{mention} {flirt_msg}")
 
     def get_target_name(self, split, start_index):
         if len(split) > start_index:
@@ -1195,9 +1212,9 @@ class DiscordClient(discord.Client):
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
             elif first_command == "intdaddy":
-                pass
+                await self.handle_flirtation_msg(message, "english")
             elif first_command == "intpapi":
-                pass
+                await self.handle_flirtation_msg(message, "spanish")
 
             self.last_message_time[message.author.id] = time()
 
