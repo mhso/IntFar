@@ -6,7 +6,7 @@ from config import Config
 from discord_bot import DiscordClient
 import riot_api
 
-GAME_ID = 4730151627
+GAME_ID = 4730793698
 
 auth = json.load(open("auth.json"))
 
@@ -24,15 +24,15 @@ class TestMock(DiscordClient):
         await super(TestMock, self).on_ready()
         d1, sm1, si1 = self.database.discord_id_from_summoner("prince jarvan lv")
         d2, sm2, si2 = self.database.discord_id_from_summoner("dumbledonger")
-        d3, sm3, si3 = self.database.discord_id_from_summoner("nønø")
-        d4, sm4, si4 = self.database.discord_id_from_summoner("stirred martini")
+        #d3, sm3, si3 = self.database.discord_id_from_summoner("nønø")
+        #d4, sm4, si4 = self.database.discord_id_from_summoner("stirred martini")
         d5, sm5, si5 = self.database.discord_id_from_summoner("senile felines")
         self.users_in_game = [
-            (d1, [sm1], [si1]),
-            (d2, [sm2], [si2]),
-            (d3, [sm3], [si3]),
-            (d4, [sm4], [si4]),
-            (d5, [sm5], [si5])
+            (d1, sm1, si1),
+            (d2, sm2, si2),
+            #(d3, [sm3], [si3]),
+            #(d4, [sm4], [si4]),
+            (d5, sm5, si5)
         ]
 
         self.active_game = GAME_ID
