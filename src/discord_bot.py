@@ -81,7 +81,10 @@ VALID_COMMANDS = {
         "[criteria] - List the things that need to happen for a person to get " +
         "Int-Far because of a specific criteria. Fx. '!intfar_criteria kda'."
     ),
-    "doinks": "(summoner_name) - Show big doinks plays you (or someone else) did!",
+    "doinks": (
+        "(summoner_name) - Show big doinks plays you (or someone else) did! " +
+        "'!doinks all' lists all doinks stats for all users."
+    ),
     "best": (
         "[stat] (summoner_name) - Show how many times you (or someone else) " +
         "were the best in the specific stat. " +
@@ -357,7 +360,7 @@ class DiscordClient(discord.Client):
                 end_index += 1
             emoji = self.get_emoji_by_name(emote)
             if emoji is None:
-                emoji = "" # Replace with empty string if emoji could not be found.
+                emoji = f":{emote}:" # Replace with empty string if emoji could not be found.
             replaced = replaced.replace("{emote_" + emote + "}", emoji)
             emote_index = replaced.find("{emote_")
         return replaced
@@ -1181,7 +1184,7 @@ class DiscordClient(discord.Client):
         elif criteria == "vision":
             crit_1 = self.config.vision_score_lower_threshold
             crit_2 = self.config.vision_kda_criteria
-            response = ("Criteria for being Int-Far by many deaths:\n" +
+            response = ("Criteria for being Int-Far by low vision score:\n" +
                         " - Having the lowest vision score of the people playing\n" +
                         f" - Having less than {crit_1} vision score\n"
                         f" - Having less than {crit_2} KDA")
