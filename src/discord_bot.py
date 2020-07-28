@@ -739,14 +739,14 @@ class DiscordClient(discord.Client):
 
             self.config.log("Game over! Stats were saved succesfully.")
 
-    async def user_joined_voice(self, member, start_polling=True):
+    async def user_joined_voice(self, member, start_polling=True, poll_immediately=False):
         self.config.log("User joined voice: " + str(member.id))
         summoner_info = self.database.summoner_from_discord_id(member.id)
         if summoner_info is not None:
             self.config.log("Summoner joined voice: " + summoner_info[1][0])
             if not self.polling_is_active() and start_polling:
                 self.config.log("Polling is now active!")
-                asyncio.create_task(self.poll_for_game_start(True))
+                asyncio.create_task(self.poll_for_game_start(poll_immediately))
             self.active_users.append(summoner_info)
             self.config.log(f"Active users: {len(self.active_users)}")
 
@@ -867,7 +867,7 @@ class DiscordClient(discord.Client):
                         # Start polling for an active game
                         # if more than one user is active in voice.
                         start_polling = count == 1
-                        await self.user_joined_voice(member, start_polling)
+                        await self.user_joined_voice(member, start_polling, True)
                         count += 1
                 for text_channel in guild.text_channels:
                     if text_channel.id == CHANNEL_ID: # Find the 'int-far-spam' channel.
