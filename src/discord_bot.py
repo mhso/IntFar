@@ -739,12 +739,12 @@ class DiscordClient(discord.Client):
 
             self.config.log("Game over! Stats were saved succesfully.")
 
-    async def user_joined_voice(self, member, start_polling=True, poll_immediately=False):
+    async def user_joined_voice(self, member, poll_immediately=False):
         self.config.log("User joined voice: " + str(member.id))
         summoner_info = self.database.summoner_from_discord_id(member.id)
         if summoner_info is not None:
             self.config.log("Summoner joined voice: " + summoner_info[1][0])
-            if not self.polling_is_active() and start_polling:
+            if len(self.active_users) != 0 and not self.polling_is_active():
                 self.config.log("Polling is now active!")
                 asyncio.create_task(self.poll_for_game_start(poll_immediately))
             self.active_users.append(summoner_info)
@@ -769,7 +769,7 @@ class DiscordClient(discord.Client):
         role = nibs_guild.get_role(role_id)
         await member.remove_roles(role)
 
-    async def assign_monthly_intfar_role(self, month, intfar_id):
+    async def assign_monthly_intfar_role(self, month, winner_ids):
         prev_month = month - 1 if month != 1 else 12
 
         # Colors:
@@ -793,11 +793,13 @@ class DiscordClient(discord.Client):
         role_name = f"Int-Far of the Month - {month_name}"
 
         role = await nibs_guild.create_role(name=role_name, colour=color)
-        member = nibs_guild.get_member(intfar_id)
-        if member is not None:
-            await member.add_roles(role)
-        else:
-            self.config.log("Int-Far to add badge to was None!", self.config.log_error)
+
+        for intfar_id in winner_ids:
+            member = nibs_guild.get_member(intfar_id)
+            if member is not None:
+                await member.add_roles(role)
+            else:
+                self.config.log("Int-Far to add badge to was None!", self.config.log_error)
 
     async def sleep_until_monthly_infar(self):
         """
@@ -824,15 +826,17 @@ class DiscordClient(discord.Client):
                           for (disc_id, games, intfars, ratio) in intfar_data]
         intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"
         intro_desc += "*DRUM ROLL*\n"
-        message = monitor.get_description(intfar_details)
-        message += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
-        message += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
-        final_msg = intro_desc + self.insert_emotes(message)
+        desc, num_winners = monitor.get_description_and_winners(intfar_details)
+        desc += ":clap: :clap: :clap: :clap: :clap: \n"
+        desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
+        desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
+        final_msg = intro_desc + self.insert_emotes(desc)
         await self.channel_to_write.send(final_msg)
 
         # Assign Int-Far of the Month 'badge' (role) to the top Int-Far.
         current_month = monitor.time_at_announcement.month
-        await self.assign_monthly_intfar_role(current_month, intfar_data[0][0])
+        winners = [tupl[0] for tupl in intfar_data[:num_winners]]
+        await self.assign_monthly_intfar_role(current_month, winners)
 
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
         asyncio.create_task(self.sleep_until_monthly_infar())
@@ -862,13 +866,10 @@ class DiscordClient(discord.Client):
             if guild.id == DISCORD_SERVER_ID:
                 for voice_channel in guild.voice_channels:
                     members_in_voice = voice_channel.members
-                    count = 0
                     for member in members_in_voice:
                         # Start polling for an active game
                         # if more than one user is active in voice.
-                        start_polling = count == 1
-                        await self.user_joined_voice(member, start_polling, True)
-                        count += 1
+                        await self.user_joined_voice(member, True)
                 for text_channel in guild.text_channels:
                     if text_channel.id == CHANNEL_ID: # Find the 'int-far-spam' channel.
                         self.channel_to_write = text_channel
