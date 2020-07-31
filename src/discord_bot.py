@@ -854,6 +854,9 @@ class DiscordClient(discord.Client):
         self.config.log("Starting Int-Far-of-the-month monitor... ")
         format_time = monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S")
         self.config.log(f"Monthly Int-Far will be crowned at {format_time} UTC+1")
+        dt_now = datetime.now()
+        duration = self.format_duration(dt_now, monitor.time_at_announcement)
+        self.config.log(f"Time until then: {duration}")
 
         time_to_sleep = 60
         while monitor.get_seconds_left() > 0:
@@ -938,17 +941,16 @@ class DiscordClient(discord.Client):
         response += "\n```"
         await message.channel.send(self.insert_emotes(response))
 
-    def get_uptime(self, dt_init):
-        dt_now = datetime.now()
-        normed_dt = dt_now.replace(year=dt_init.year, month=dt_init.month)
-        month_normed = dt_now.month if dt_now.month >= dt_init.month else dt_now.month + 12
-        months = month_normed - dt_init.month
-        if normed_dt < dt_init:
+    def format_duration(self, dt_1, dt_2):
+        normed_dt = dt_2.replace(year=dt_1.year, month=dt_1.month)
+        month_normed = dt_2.month if dt_2.month >= dt_1.month else dt_2.month + 12
+        months = month_normed - dt_1.month
+        if normed_dt < dt_1:
             months -= 1
-        years = dt_now.year - dt_init.year
-        if dt_now.month < dt_init.month:
+        years = dt_2.year - dt_1.year
+        if dt_2.month < dt_1.month:
             years -= 1
-        td = normed_dt - dt_init
+        td = normed_dt - dt_1
         days = td.days
         seconds = td.seconds
         hours, remainder = divmod(seconds, 3600)
@@ -967,6 +969,10 @@ class DiscordClient(discord.Client):
         if years > 0:
             response = f"{years} years, " + response
         return response
+
+    def get_uptime(self, dt_init):
+        dt_now = datetime.now()
+        return self.format_duration(dt_init, dt_now)
 
     async def handle_uptime_msg(self, message):
         uptime_formatted = self.get_uptime(self.time_initialized)
