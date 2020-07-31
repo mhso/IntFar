@@ -167,16 +167,20 @@ class Database:
             return max_count
 
     def get_longest_no_intfar_streak(self, disc_id):
-        query = "SELECT int_far FROM best_stats ORDER BY id"
+        query = """
+        SELECT int_far FROM best_stats bs, participants p
+        WHERE bs.game_id = p.game_id and disc_id=?
+        ORDER BY id
+        """
         with closing(self.get_connection()) as db:
-            int_fars = db.cursor().execute(query).fetchall()
+            int_fars = db.cursor().execute(query, (disc_id,)).fetchall()
             max_count = 0
             count = 0
             for int_far in int_fars:
-                if int_far[0] is None or disc_id != int_far[0]:
-                    count += 0
-                else:
+                if disc_id == int_far[0]:
                     count = 0
+                else:
+                    count += 1
                 if count > max_count:
                     max_count = count
             return max_count

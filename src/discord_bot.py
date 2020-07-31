@@ -854,7 +854,7 @@ class DiscordClient(discord.Client):
         self.config.log("Starting Int-Far-of-the-month monitor... ")
         format_time = monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S")
         self.config.log(f"Monthly Int-Far will be crowned at {format_time} UTC+1")
-        dt_now = datetime.now()
+        dt_now = datetime.now(monitor.cph_timezone)
         duration = self.format_duration(dt_now, monitor.time_at_announcement)
         self.config.log(f"Time until then: {duration}")
 
@@ -1074,8 +1074,8 @@ class DiscordClient(discord.Client):
                 streak_desc += "games in a row " + "{emote_suk_a_hotdok}\n"
 
                 longest_non_streak = self.database.get_longest_no_intfar_streak(disc_id)
-                no_streak_desc = "His longest streak of **not** being Int-Far was "
-                no_streak_desc += f"{longest_non_streak} games in a row " + "{emote_pog}\n"
+                no_streak_desc = "His longest streak of *not* being Int-Far was "
+                no_streak_desc += f"**{longest_non_streak}** games in a row " + "{emote_pog}\n"
 
                 relations_data = self.get_intfar_relation_stats(disc_id)[0]
                 most_intfars_nick = self.get_discord_nick(relations_data[0])
@@ -1084,7 +1084,7 @@ class DiscordClient(discord.Client):
                 relations_desc += f"of {relations_data[1]} games)"
                 relations_desc += "{emote_smol_gual}"
 
-                msg += ratio_desc + reason_desc + streak_desc + relations_desc
+                msg += ratio_desc + reason_desc + streak_desc + no_streak_desc + relations_desc
             
             msg = self.insert_emotes(msg)
 
