@@ -90,6 +90,7 @@ VALID_COMMANDS = {
         "(summoner_name) - Show big doinks plays you (or someone else) did! " +
         "'!doinks all' lists all doinks stats for all users."
     ),
+    "doinks_criteria": "Show the different criterias needed for acquiring a doink.",
     "best": (
         "[stat] (summoner_name) - Show how many times you (or someone else) " +
         "were the best in the specific stat. " +
@@ -1202,7 +1203,19 @@ class DiscordClient(discord.Client):
         mention = self.get_mention_str(message.author.id)
         await message.channel.send(f"{mention} {flirt_msg}")
 
-    async def handle_criteria_msg(self, message, criteria):
+    async def handle_doinks_criteria_msg(self, message):
+        response = (
+            "Criteria for being awarded {emote_Doinks}:\n" +
+            " - More than 30 kills\n" +
+            " - Doing more damage than the rest of the team combined\n" +
+            " - Getting a pentakill\n" +
+            " - Having a vision score of over 100\n" +
+            " - Having a kill participation of over 80%\n" +
+            " - Securing all epic monsters"
+        )
+        await message.channel.send(response)
+
+    async def handle_intfar_criteria_msg(self, message, criteria):
         response = ""
         if criteria is None:
             response = "You must specify a criteria. This can be one of:\n"
@@ -1303,6 +1316,8 @@ class DiscordClient(discord.Client):
             elif first_command == "doinks":
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
+            elif first_command == "doinks_criteria":
+                await self.handle_doinks_criteria_msg(message)
             elif first_command in ("help", "commands"):
                 await self.handle_helper_msg(message)
             elif first_command == "status":
@@ -1314,7 +1329,7 @@ class DiscordClient(discord.Client):
                 await self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
             elif first_command == "intfar_criteria":
                 criteria = self.get_target_name(split, 1)
-                await self.handle_criteria_msg(message, criteria)
+                await self.handle_intfar_criteria_msg(message, criteria)
             elif first_command == "intdaddy":
                 await self.handle_flirtation_msg(message, "english")
             elif first_command == "intpapi":
