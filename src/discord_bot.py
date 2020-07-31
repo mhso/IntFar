@@ -10,6 +10,7 @@ import game_stats
 from montly_intfar import MonthlyIntfar
 
 DISCORD_SERVER_ID = 619073595561213953
+MY_SERVER_ID = 512363920044982272
 CHANNEL_ID = 730744358751567902
 MY_DISC_ID = 267401734513491969
 
@@ -54,7 +55,7 @@ FLIRT_MESSAGES = {
     "english": [
         "Hey there... I'm a bot, why don't you get on top? {emote_hairy_retard}",
         "You like that, you fucking retard? {emote_cummies}",
-        "You're goddamn right. I am your robot daddy {emote_robot}",
+        "You're goddamn right. I am your robot daddy :robot:",
         "You look so pretty when you get dicked in league {emote_kapepe}",
         "You might have heard of AI, but have you heard of DP?",
         "I'm not just nuts and bolts... ",
@@ -64,7 +65,7 @@ FLIRT_MESSAGES = {
     "spanish": [
         "Hola ... Soy un bot, ¿por qué no te subes? {emote_hairy_retard}",
         "¿Te gusta eso, retrasado? {emote_cummies}",
-        "Estás jodidamente en lo cierto. Soy tu robot papi {emote_robot}",
+        "Estás jodidamente en lo cierto. Soy tu robot papi :robot:",
         "Te ves tan bonita cuando te follan en la league {emote_kapepe}"
     ]
 }
@@ -186,6 +187,7 @@ class DiscordClient(discord.Client):
         self.users_in_game = None
         self.active_game = None
         self.channel_to_write = None
+        self.test_channel = None
         self.initialized = False
         self.last_message_time = {}
         self.time_initialized = datetime.now()
@@ -368,7 +370,7 @@ class DiscordClient(discord.Client):
                 end_index += 1
             emoji = self.get_emoji_by_name(emote)
             if emoji is None:
-                emoji = f":{emote}:" # Replace with empty string if emoji could not be found.
+                emoji = f"" # Replace with empty string if emoji could not be found.
             replaced = replaced.replace("{emote_" + emote + "}", emoji)
             emote_index = replaced.find("{emote_")
         return replaced
@@ -859,7 +861,7 @@ class DiscordClient(discord.Client):
         self.config.log(f"Time until then: {duration}")
 
         time_to_sleep = 60
-        while monitor.get_seconds_left() > 0:
+        while not monitor.should_announce():
             await asyncio.sleep(time_to_sleep)
 
         month = monitor.time_at_announcement.month
@@ -871,7 +873,7 @@ class DiscordClient(discord.Client):
         intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
                           for (disc_id, games, intfars, ratio) in intfar_data]
         intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"
-        intro_desc += "*DRUM ROLL*\n"
+        intro_desc += "***DRUM ROLL***\n"
         desc, num_winners = monitor.get_description_and_winners(intfar_details)
         desc += ":clap: :clap: :clap: :clap: :clap: \n"
         desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
@@ -920,7 +922,10 @@ class DiscordClient(discord.Client):
                     if text_channel.id == CHANNEL_ID: # Find the 'int-far-spam' channel.
                         self.channel_to_write = text_channel
                         asyncio.create_task(self.sleep_until_monthly_infar())
-                        return
+                        break
+            elif guild.id == MY_SERVER_ID:
+                self.test_channel = guild.text_channels[0]
+        await self.test_channel.send(":robot:")
 
     async def handle_helper_msg(self, message):
         """

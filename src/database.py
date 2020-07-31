@@ -133,19 +133,13 @@ class Database:
         tz_cph = TimeZone()
         curr_time = datetime.now(tz_cph)
         current_month = curr_time.month
-        min_timestamp = None
-        if curr_time.day == 1 and curr_time.hour < MonthlyIntfar.HOUR_OF_ANNOUNCEMENT:
-            # Get Int-Far stats for previous month.
-            prev_month = 12 if current_month == 1 else current_month - 1
-            prev_year = curr_time.year if prev_month != 12 else curr_time.year - 1
-            prev_time = curr_time.replace(prev_year, prev_month, 1,
-                                          0, 0, 0, 0, tz_cph)
-            min_timestamp = int(prev_time.timestamp())
-        else:
-            # Get Int-Far stats for current month.
-            prev_time = curr_time.replace(curr_time.year, current_month, 1,
-                                          0, 0, 0, 0, tz_cph)
-            min_timestamp = int(prev_time.timestamp())
+        min_timestamp = ModuleNotFoundError
+        # Get Int-Far stats for previous month.
+        prev_month = 12 if current_month == 1 else current_month - 1
+        prev_year = curr_time.year if prev_month != 12 else curr_time.year - 1
+        prev_time = curr_time.replace(prev_year, prev_month, 1,
+                                      0, 0, 0, 0, tz_cph)
+        min_timestamp = int(prev_time.timestamp())
 
         max_timestamp = int(curr_time.timestamp())
 

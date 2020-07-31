@@ -48,11 +48,11 @@ class MonthlyIntfar:
                                                          self.HOUR_OF_ANNOUNCEMENT, 0, 0, 0,
                                                          self.cph_timezone)
 
-    def get_seconds_left(self):
+    def should_announce(self):
         """
         Get seconds left until announcement time (first of the month at 14:00).
         """
-        return (self.time_at_announcement - datetime.now(self.cph_timezone)).seconds
+        return self.time_at_announcement < datetime.now(self.cph_timezone)
 
     def get_pct_desc(self, games, intfars, pct):
         return f"**{pct}%** ({intfars}/{games})"
@@ -118,24 +118,34 @@ class MonthlyIntfar:
             desc_str += "You will also all receive a badge of shame on Discord {emote_main}\n"
             winners = 3
 
-        desc_str += "\nGIVE THEM A ROUND OF APPLAUSE, LADIES AND GENTLEMEN!!\n"
+        desc_str += "\nGIVE THEM A ROUND OF APPLAUSE, LADIES AND GENTLEMEN!!!!!!\n"
         return winner_str + desc_str, winners
 
 if __name__ == "__main__":
     monthly_monitor = MonthlyIntfar()
     conf = config.Config()
     db_client = database.Database(conf)
-    #details = db_client.get_intfars_of_the_month()
-    details = [
-        (1, 40, 12, 30),
-        (2, 20, 6, 30),
-        (3, 20, 6, 20),
-    ]
+    details = db_client.get_intfars_of_the_month()
+    # details = [
+    #     (1, 40, 12, 30),
+    #     (2, 20, 6, 30),
+    #     (3, 20, 6, 20),
+    # ]
     details.sort(key=lambda x: (x[3], x[2]), reverse=True) # Sort by pct of games being Int-Far.
     intfar_details = [("Guy" + str(disc_id), games, intfars, ratio)
                       for (disc_id, games, intfars, ratio) in details]
+
+    month = monthly_monitor.time_at_announcement.month
+    prev_month = month - 1 if month != 1 else 12
+    month_name = MonthlyIntfar.MONTH_NAMES[prev_month-1]
+
+    intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"
+    intro_desc += "*DRUM ROLL*\n"
     desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
     winners = [tupl[0] for tupl in details[:num_winners]]
+    desc += ":clap: :clap: :clap: :clap: :clap: \n"
+    desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
+    desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
 
-    print(desc)
-    print(winners)
+    print(intro_desc + desc)
+    print(num_winners)
