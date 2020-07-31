@@ -1219,7 +1219,7 @@ class DiscordClient(discord.Client):
             " - Having a kill participation of over 80%\n" +
             " - Securing all epic monsters"
         )
-        await message.channel.send(response)
+        await message.channel.send(self.insert_emotes(response))
 
     async def handle_intfar_criteria_msg(self, message, criteria):
         response = ""
