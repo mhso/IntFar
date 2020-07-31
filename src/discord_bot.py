@@ -1,5 +1,6 @@
 import random
 from time import time
+from traceback import print_exc
 from datetime import datetime
 from sqlite3 import DatabaseError, OperationalError
 import asyncio
@@ -54,7 +55,11 @@ FLIRT_MESSAGES = {
         "Hey there... I'm a bot, why don't you get on top? {emote_hairy_retard}",
         "You like that, you fucking retard? {emote_cummies}",
         "You're goddamn right. I am your robot daddy {emote_robot}",
-        "You look so pretty when you get dicked in league {emote_kapepe}"
+        "You look so pretty when you get dicked in league {emote_kapepe}",
+        "You might have heard of AI, but have you heard of DP?",
+        "I'm not just nuts and bolts... ",
+        "Even though you are inting so hard, it's not the hardest thing around",
+        "How about I get over there and put my 1 in your 0?"
     ],
     "spanish": [
         "Hola ... Soy un bot, ¿por qué no te subes? {emote_hairy_retard}",
@@ -211,6 +216,8 @@ class DiscordClient(discord.Client):
             except Exception as e:
                 self.config.log("Exception after game was over!!!", self.config.log_error)
                 await self.send_error_msg()
+                with open("errorlog.txt", "a", encoding="UTF-8") as fp:
+                    print_exc(file=fp)
                 raise e
         elif game_status == 0:
             await self.poll_for_game_end()
@@ -375,7 +382,7 @@ class DiscordClient(discord.Client):
             - Doing more damage than the rest of the team combined
             - Getting a penta-kill
             - Having a vision score of 100+
-            - Having a kill-participation of 85%+
+            - Having a kill-participation of 80%+
             - Securing all epic monsters
         """
         mentions = {} # List of mentioned users for the different criteria.
@@ -394,7 +401,7 @@ class DiscordClient(discord.Client):
             if stats["visionScore"] > 100:
                 mention_list.append((4, stats["visionScore"]))
             kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
-            if kp > 85:
+            if kp > 80:
                 mention_list.append((5, kp))
             own_epics = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
             enemy_epics = stats["enemyBaronKills"] + stats["enemyDragonKills"] + stats["enemyHeraldKills"]
@@ -478,13 +485,13 @@ class DiscordClient(discord.Client):
             - Number of deaths being more than 2.
         Returns None if none of these criteria matches a person.
         """
-        intfar, stats = game_stats.get_outlier(data, "kda")
+        tied_intfars, stats = game_stats.get_outlier(data, "kda", include_ties=True)
         lowest_kda = game_stats.calc_kda(stats)
         deaths = stats["deaths"]
         kda_criteria = self.config.kda_lower_threshold
         death_criteria = self.config.kda_death_criteria
         if lowest_kda < kda_criteria and deaths > death_criteria:
-            return (intfar, lowest_kda)
+            return (tied_intfars, lowest_kda)
         return (None, None)
 
     def intfar_by_deaths(self, data):
@@ -496,13 +503,13 @@ class DiscordClient(discord.Client):
             - KDA being less than 2.1
         Returns None if none of these criteria matches a person.
         """
-        intfar, stats = game_stats.get_outlier(data, "deaths", asc=False)
+        tied_intfars, stats = game_stats.get_outlier(data, "deaths", asc=False, include_ties=True)
         highest_deaths = stats["deaths"]
         kda = game_stats.calc_kda(stats)
         death_criteria = self.config.death_lower_threshold
         kda_criteria = self.config.death_kda_criteria
         if highest_deaths > death_criteria and kda < kda_criteria:
-            return (intfar, highest_deaths)
+            return (tied_intfars, highest_deaths)
         return (None, None)
 
     def intfar_by_kp(self, data):
@@ -516,7 +523,7 @@ class DiscordClient(discord.Client):
         Returns None if none of these criteria matches a person.
         """
         team_kills = data[0][1]["kills_by_team"]
-        intfar, stats = game_stats.get_outlier(data, "kp", total_kills=team_kills)
+        tied_intfars, stats = game_stats.get_outlier(data, "kp", total_kills=team_kills, include_ties=True)
         lowest_kp = game_stats.calc_kill_participation(stats, team_kills)
         kills = stats["kills"]
         assists = stats["assists"]
@@ -526,7 +533,7 @@ class DiscordClient(discord.Client):
         structures_criteria = self.config.kp_structures_criteria
         if (lowest_kp < kp_criteria and kills + assists < takedowns_criteria
                 and structures_destroyed < structures_criteria):
-            return (intfar, lowest_kp)
+            return (tied_intfars, lowest_kp)
         return (None, None)
 
     def intfar_by_vision_score(self, data):
@@ -538,13 +545,13 @@ class DiscordClient(discord.Client):
             - KDA being less than 3
         Returns None if none of these criteria matches a person.
         """
-        intfar, stats = game_stats.get_outlier(data, "visionScore")
+        tied_intfars, stats = game_stats.get_outlier(data, "visionScore", include_ties=True)
         lowest_score = stats["visionScore"]
         kda = game_stats.calc_kda(stats)
         vision_criteria = self.config.vision_score_lower_threshold
         kda_criteria = self.config.vision_kda_criteria
         if lowest_score < vision_criteria and kda < kda_criteria:
-            return (intfar, lowest_score)
+            return (tied_intfars, lowest_score)
         return (None, None)
 
     def get_streak_msg(self, intfar_id, intfar_streak, prev_intfar):
@@ -653,6 +660,39 @@ class DiscordClient(discord.Client):
 
         return filtered_stats
 
+    def resolve_intfar_ties(self, intfar_data, max_count, game_stats):
+        """
+        Resolve a potential tie in who should be Int-Far. This can happen if two or more
+        people meet the same criteria, with the same stats within these criteria.
+        If so, the one with either most deaths or least gold gets chosen as Int-Far.
+        """
+        ties = []
+        for disc_id in intfar_data:
+            if len(intfar_data[disc_id]) == max_count:
+                ties.append(disc_id)
+
+        if len(ties) == 1:
+            self.config.log("There are not ties.")
+            return ties[0]
+
+        self.config.log("There are Int-Far ties!")
+
+        sorted_by_deaths = sorted(game_stats, key=lambda x: x[1]["deaths"], reverse=True)
+        max_count = sorted_by_deaths[0][1]["deaths"]
+        ties = []
+        for disc_id, stats in sorted_by_deaths:
+            if stats["deaths"] == max_count:
+                ties.append(disc_id)
+
+        if len(ties) == 1:
+            self.config.log("Ties resolved by amount of deaths.")
+            return ties[0]
+
+        self.config.log("Ties resolved by gold earned.")
+
+        sorted_by_gold = sorted(game_stats, key=lambda x: x[1]["goldEarned"])
+        return sorted_by_gold[0][0]
+
     async def declare_intfar(self):
         """
         Called when the currently active game is over.
@@ -677,31 +717,33 @@ class DiscordClient(discord.Client):
         intfar_details = self.get_intfar_details(filtered_stats)
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
         intfar_counts = {}
-        max_intfar_count = 0
+        max_intfar_count = 1
         max_count_intfar = None
         intfar_data = {}
 
         # Look through details for the people qualifying for Int-Far.
         # The one with most criteria met gets chosen.
-        for (index, (intfar_disc_id, stat_value)) in enumerate(intfar_details):
-            if intfar_disc_id is not None:
-                if intfar_disc_id not in intfar_counts:
-                    intfar_counts[intfar_disc_id] = 0
-                    intfar_data[intfar_disc_id] = []
-                current_intfar_count = intfar_counts[intfar_disc_id] + 1
-                intfar_counts[intfar_disc_id] = current_intfar_count
-                if current_intfar_count > max_intfar_count:
-                    max_intfar_count = current_intfar_count
-                    max_count_intfar = intfar_disc_id
-                intfar_data[intfar_disc_id].append((index, stat_value))
+        for (index, (tied_intfars, stat_value)) in enumerate(intfar_details):
+            if tied_intfars is not None:
+                for intfar_disc_id in tied_intfars:
+                    if intfar_disc_id not in intfar_counts:
+                        intfar_counts[intfar_disc_id] = 0
+                        intfar_data[intfar_disc_id] = []
+                    current_intfar_count = intfar_counts[intfar_disc_id] + 1
+                    intfar_counts[intfar_disc_id] = current_intfar_count
+                    if current_intfar_count >= max_intfar_count:
+                        max_intfar_count = current_intfar_count
+                        max_count_intfar = intfar_disc_id
+                    intfar_data[intfar_disc_id].append((index, stat_value))
 
         reason_ids = ["0", "0", "0", "0"]
         doinks = {}
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
         if max_count_intfar is not None: # Save data for the current game and send int-far message.
+            final_intfar = self.resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)
             reason = ""
             # Go through the criteria the chosen int-far met and list them in a readable format.
-            for (count, (reason_index, stat_value)) in enumerate(intfar_data[max_count_intfar]):
+            for (count, (reason_index, stat_value)) in enumerate(intfar_data[final_intfar]):
                 key = reason_keys[reason_index]
                 reason_text = get_reason_flavor_text(round_digits(stat_value), key)
                 reason_ids[reason_index] = "1"
@@ -709,7 +751,7 @@ class DiscordClient(discord.Client):
                     reason_text = " **AND** " + reason_text
                 reason += reason_text
 
-            await self.send_intfar_message(max_count_intfar, reason, intfar_streak, prev_intfar)
+            await self.send_intfar_message(final_intfar, reason, intfar_streak, prev_intfar)
         else: # No one was bad enough to be Int-Far.
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()

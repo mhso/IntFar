@@ -8,15 +8,40 @@ def calc_kda(stats):
 def calc_kill_participation(stats, total_kills):
     return int((float(stats["kills"] + stats["assists"]) / float(total_kills)) * 100.0)
 
-def get_outlier(data, key, asc=True, total_kills=0):
+def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):
+    sorted_data = None
     if key == "kda":
         sorted_data = sorted(data, key=lambda x: calc_kda(x[1]), reverse=not asc)
-        return sorted_data[0]
+        if include_ties:
+            outlier = calc_kda(sorted_data[0][1])
+            ties = []
+            index = 0
+            while index < len(sorted_data) and calc_kda(sorted_data[index][1]) == outlier:
+                ties.append(sorted_data[index][0])
+                index += 1
+            return ties, sorted_data[0][1]
     elif key == "kp":
-        sorted_data = sorted(data, key=lambda x: calc_kill_participation(x[1], total_kills), reverse=not asc)
-        return sorted_data[0]
-
+        sorted_data = sorted(data, key=lambda x: calc_kill_participation(x[1], total_kills),
+                             reverse=not asc)
+        if include_ties:
+            outlier = calc_kill_participation(sorted_data[0][1], total_kills)
+            ties = []
+            index = 0
+            while index < len(sorted_data) and calc_kill_participation(sorted_data[index][1], total_kills) == outlier:
+                ties.append(sorted_data[index][0])
+                index += 1
+            return ties, sorted_data[0][1]
+    
     sorted_data = sorted(data, key=lambda entry: entry[1][key], reverse=not asc)
+    if include_ties:
+        outlier = sorted_data[0][1][key]
+        ties = []
+        index = 0
+        while index < len(sorted_data) and sorted_data[index][1][key] == outlier:
+            ties.append(sorted_data[index][0])
+            index += 1
+        return ties, sorted_data[0][1]
+
     return sorted_data[0]
 
 def get_outlier_stat(stat, data):

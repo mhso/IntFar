@@ -58,9 +58,9 @@ class Database:
 
     def discord_id_from_summoner(self, name):
         for disc_id, summ_names, summ_ids in self.summoners:
-            for summ_name in summ_names:
+            for (summ_name, summ_id) in zip(summ_names, summ_ids):
                 if summ_name.lower() == name:
-                    return (disc_id, summ_names, summ_ids)
+                    return (disc_id, summ_name, summ_id)
         return None
 
     def summoner_from_discord_id(self, discord_id):
