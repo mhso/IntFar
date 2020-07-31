@@ -1055,7 +1055,8 @@ class DiscordClient(discord.Client):
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             if not expanded:
                 msg += f"({pct_intfar}%) "
-            msg += self.insert_emotes("{emote_unlimited_chins}")
+            msg += "{emote_unlimited_chins}"
+
             if expanded and len(intfar_reason_ids) > 0:
                 ratio_desc = "\n" + f"He was Int-Far in **{pct_intfar}%** of his {total_games} total games played"
                 reason_desc = "\n" + "Int-Fars awarded so far:\n"
@@ -1064,17 +1065,22 @@ class DiscordClient(discord.Client):
 
                 longest_streak = self.database.get_longest_intfar_streak(disc_id)
                 streak_desc = f"His longest Int-Far streak was **{longest_streak}** "
-                streak_desc += "games in a row " + "{emote_suk_a_hotdok}"
-                streak_desc = self.insert_emotes(streak_desc) + "\n"
+                streak_desc += "games in a row " + "{emote_suk_a_hotdok}\n"
+
+                longest_non_streak = self.database.get_longest_no_intfar_streak(disc_id)
+                no_streak_desc = "His longest streak of **not** being Int-Far was "
+                no_streak_desc += f"{longest_non_streak} games in a row " + "{emote_pog}\n"
 
                 relations_data = self.get_intfar_relation_stats(disc_id)[0]
                 most_intfars_nick = self.get_discord_nick(relations_data[0])
                 relations_desc = f"He has inted the most when playing with {most_intfars_nick} "
                 relations_desc += f"where he inted {relations_data[2]} games ({relations_data[3]}% "
                 relations_desc += f"of {relations_data[1]} games)"
-                relations_desc += self.insert_emotes("{emote_smol_gual}")
+                relations_desc += "{emote_smol_gual}"
 
                 msg += ratio_desc + reason_desc + streak_desc + relations_desc
+            
+            msg = self.insert_emotes(msg)
 
             return msg, len(intfar_reason_ids)
 
