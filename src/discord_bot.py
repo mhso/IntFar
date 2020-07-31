@@ -26,9 +26,9 @@ NO_INTFAR_FLAVOR_TEXTS = load_flavor_texts("no_intfar")
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
-    "KDA larger than 10", "More than 30 kills", "More damage than rest of the team",
+    "KDA larger than 10", "More than 30 kills", "More damage than rest of the team combined",
     "Getting a pentakill", "Vision score larger than 100",
-    "Kill participation larger than 85", "Securing all epic monsters"
+    "Kill participation larger than 80%", "Securing all epic monsters"
 ]
 
 MOST_DEATHS_FLAVORS = load_flavor_texts("most_deaths")
@@ -925,7 +925,6 @@ class DiscordClient(discord.Client):
                         break
             elif guild.id == MY_SERVER_ID:
                 self.test_channel = guild.text_channels[0]
-        await self.test_channel.send(":robot:")
 
     async def handle_helper_msg(self, message):
         """
@@ -1231,15 +1230,9 @@ class DiscordClient(discord.Client):
         await message.channel.send(f"{mention} {flirt_msg}")
 
     async def handle_doinks_criteria_msg(self, message):
-        response = (
-            "Criteria for being awarded {emote_Doinks}:\n" +
-            " - More than 30 kills\n" +
-            " - Doing more damage than the rest of the team combined\n" +
-            " - Getting a pentakill\n" +
-            " - Having a vision score of over 100\n" +
-            " - Having a kill participation of over 80%\n" +
-            " - Securing all epic monsters"
-        )
+        response = "Criteria for being awarded {emote_Doinks}:"
+        for reason in DOINKS_REASONS:
+            response += f"\n - {reason}"
         await message.channel.send(self.insert_emotes(response))
 
     async def handle_intfar_criteria_msg(self, message, criteria):
