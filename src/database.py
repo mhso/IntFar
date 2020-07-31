@@ -84,21 +84,50 @@ class Database:
         query_intfars = "SELECT Count(int_far) FROM best_stats WHERE int_far != 'None'"
         query_persons = "SELECT Count(*) FROM participants GROUP BY game_id"
         query_doinks = "SELECT Count(*) FROM participants WHERE doinks != 'None'"
+        query_intfar_multis = "SELECT intfar_reason FROM best_stats WHERE intfar_reason != 'None'"
         users = (len(self.summoners),)
         with closing(self.get_connection()) as db:
             game_data = db.cursor().execute(query_games).fetchone()
             intfar_data = db.cursor().execute(query_intfars).fetchone()
             doinks_data = db.cursor().execute(query_doinks).fetchone()
             persons_counts = db.cursor().execute(query_persons)
+            intfar_multis_data = db.cursor().execute(query_intfar_multis)
             persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
             for persons in persons_counts:
                 persons_count[persons[0]] += 1
-            twos_ratio = (int(persons_count[2] / game_data[0] * 100))
-            threes_ratio = (int(persons_count[3] / game_data[0] * 100))
-            fours_ratio = (int(persons_count[4] / game_data[0] * 100))
-            fives_ratio = (int(persons_count[5] / game_data[0] * 100))
+            twos_ratio = int((persons_count[2] / game_data[0]) * 100)
+            threes_ratio = int((persons_count[3] / game_data[0]) * 100)
+            fours_ratio = int((persons_count[4] / game_data[0]) * 100)
+            fives_ratio = int((persons_count[5] / game_data[0]) * 100)
+            games_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
+
+            intfar_counts = [0, 0, 0, 0]
+            intfar_multi_counts = {
+                1: 0, 2: 0, 3: 0, 4: 0
+            }
+            for reason in intfar_multis_data:
+                amount = 0
+                for index, c in enumerate(reason):
+                    if c == "1":
+                        intfar_counts[index] += 1
+                        amount += 1
+                if amount > 0:
+                    intfar_multi_counts[amount] += 1
+            total_intfars = len(intfar_multis_data)
+            twos_ratio = int((intfar_counts[0] / total_intfars) * 100)
+            threes_ratio = int((intfar_counts[1] / total_intfars) * 100)
+            fours_ratio = int((intfar_counts[2] / total_intfars) * 100)
+            fives_ratio = int((intfar_counts[3] / total_intfars) * 100)
+            intfars_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
+
+            twos_ratio = int((intfar_multi_counts[1] / total_intfars) * 100)
+            threes_ratio = int((intfar_multi_counts[2] / total_intfars) * 100)
+            fours_ratio = int((intfar_multi_counts[3] / total_intfars) * 100)
+            fives_ratio = int((intfar_multi_counts[4] / total_intfars) * 100)
+            intfar_multis_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
+
             return (game_data + users + intfar_data + doinks_data +
-                    (twos_ratio, threes_ratio, fours_ratio, fives_ratio))
+                    (games_ratios, intfars_ratios, intfar_multis_ratios))
 
     def get_intfars_of_the_month(self):
         tz_cph = TimeZone()

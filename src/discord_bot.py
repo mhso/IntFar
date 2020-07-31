@@ -985,25 +985,35 @@ class DiscordClient(discord.Client):
         response = f"**Uptime:** {self.get_uptime(self.time_initialized)}\n"
 
         (games, earliest_game, users, intfars,
-         doinks, twos, threes, fours, fives) = self.database.get_meta_stats()
+         doinks, games_ratios, intfar_ratios,
+         intfar_multi_ratios) = self.database.get_meta_stats()
 
         pct_intfar = int((intfars / games) * 100)
         pct_doinks = int((doinks / games) * 100)
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         doinks_emote = self.insert_emotes("{emote_Doinks}")
 
-        response += f"Since {earliest_time}:\n"
+        response += f"--- Since {earliest_time}: ---\n"
         response += f"- **{games}** games have been played\n"
         response += f"- **{users}** users have signed up\n"
         response += f"- **{intfars}** Int-Far awards have been given\n"
         response += f"- **{doinks}** {doinks_emote} have been earned\n"
-        response += "Of all games played:\n"
+        response += "--- Of all games played: ---\n"
         response += f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
         response += f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
-        response += f"- **{twos}%** were as a duo\n"
-        response += f"- **{threes}%** were as a three-man\n"
-        response += f"- **{fours}%** were as a four-man\n"
-        response += f"- **{fives}%** were as a five-man stack"
+        response += f"- **{games_ratios[0]}%** were as a duo\n"
+        response += f"- **{games_ratios[1]}%** were as a three-man\n"
+        response += f"- **{games_ratios[2]}%** were as a four-man\n"
+        response += f"- **{games_ratios[3]}%** were as a five-man stack\n"
+        response += "--- When Int-Fars were earned: ---\n"
+        response += f"- **{intfar_ratios[0]}% were for dying a ton\n"
+        response += f"- **{intfar_ratios[1]}% were for having an awful KDA\n"
+        response += f"- **{intfar_ratios[2]}% were for having a low KP\n"
+        response += f"- **{intfar_ratios[3]}% were for having a low vision score\n"
+        response += f"- **{intfar_multi_ratios[0]}% of Int-Fars met just one criteria\n"
+        response += f"- **{intfar_multi_ratios[1]}% of Int-Fars met two criterias\n"
+        response += f"- **{intfar_multi_ratios[2]}% of Int-Fars met three criterias\n"
+        response += f"- **{intfar_multi_ratios[3]}% of Int-Fars swept and met all four criterias"
 
         await message.channel.send(response)
 
