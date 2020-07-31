@@ -470,7 +470,7 @@ class DiscordClient(discord.Client):
                 any_mentions = True
 
             for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
-                prefix = " *and* " if count > 0 else ""
+                prefix = " **and** " if count > 0 else ""
                 user_str += prefix + get_honorable_mentions_flavor_text(stat_index, stat_value)
             mentions_str += user_str
 

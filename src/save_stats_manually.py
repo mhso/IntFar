@@ -6,7 +6,7 @@ from config import Config
 from discord_bot import DiscordClient
 import riot_api
 
-GAME_ID = 4730793698
+GAME_ID = 4736364024
 
 auth = json.load(open("auth.json"))
 
@@ -35,8 +35,11 @@ class TestMock(DiscordClient):
             (d5, sm5, si5)
         ]
 
+        game_stats = self.riot_api.get_game_details(GAME_ID)
+        filtered_stats = self.get_filtered_stats(game_stats)
         self.active_game = GAME_ID
-        await self.declare_intfar()
+        self.database.record_stats(None, "0000", {},
+                                   self.active_game, filtered_stats, self.users_in_game)
 
 conf.log("Starting Discord Client...")
 
