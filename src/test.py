@@ -96,7 +96,9 @@ database_client = Database(conf)
 
 conf.log("Starting Discord Client...")
 
-print(database_client.get_longest_no_intfar_streak(115142485579137029))
+data = database_client.get_meta_stats()
+print(data[-2])
+print(data[-1])
 
 #client = TestMock(conf, database_client)
 

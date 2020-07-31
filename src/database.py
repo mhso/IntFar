@@ -91,7 +91,7 @@ class Database:
             intfar_data = db.cursor().execute(query_intfars).fetchone()
             doinks_data = db.cursor().execute(query_doinks).fetchone()
             persons_counts = db.cursor().execute(query_persons)
-            intfar_multis_data = db.cursor().execute(query_intfar_multis)
+            intfar_multis_data = db.cursor().execute(query_intfar_multis).fetchall()
             persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
             for persons in persons_counts:
                 persons_count[persons[0]] += 1
@@ -107,7 +107,7 @@ class Database:
             }
             for reason in intfar_multis_data:
                 amount = 0
-                for index, c in enumerate(reason):
+                for index, c in enumerate(reason[0]):
                     if c == "1":
                         intfar_counts[index] += 1
                         amount += 1
