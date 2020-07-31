@@ -27,20 +27,21 @@ def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):
             outlier = calc_kill_participation(sorted_data[0][1], total_kills)
             ties = []
             index = 0
-            while index < len(sorted_data) and calc_kill_participation(sorted_data[index][1], total_kills) == outlier:
+            while (index < len(sorted_data)
+                   and calc_kill_participation(sorted_data[index][1], total_kills) == outlier):
                 ties.append(sorted_data[index][0])
                 index += 1
             return ties, sorted_data[0][1]
-    
-    sorted_data = sorted(data, key=lambda entry: entry[1][key], reverse=not asc)
-    if include_ties:
-        outlier = sorted_data[0][1][key]
-        ties = []
-        index = 0
-        while index < len(sorted_data) and sorted_data[index][1][key] == outlier:
-            ties.append(sorted_data[index][0])
-            index += 1
-        return ties, sorted_data[0][1]
+    else:
+        sorted_data = sorted(data, key=lambda entry: entry[1][key], reverse=not asc)
+        if include_ties:
+            outlier = sorted_data[0][1][key]
+            ties = []
+            index = 0
+            while index < len(sorted_data) and sorted_data[index][1][key] == outlier:
+                ties.append(sorted_data[index][0])
+                index += 1
+            return ties, sorted_data[0][1]
 
     return sorted_data[0]
 
