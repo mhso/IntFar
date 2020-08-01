@@ -1089,7 +1089,7 @@ class DiscordClient(discord.Client):
                           else int(len(intfar_reason_ids) / total_games * 100))
             msg = f"{person_to_check} has been an Int-Far {len(intfar_reason_ids)} times "
             if not expanded:
-                msg += f"({pct_intfar}%) "
+                msg += f"({pct_intfar}% of {total_games} games) "
             msg += "{emote_unlimited_chins}"
 
             if expanded and len(intfar_reason_ids) > 0:
