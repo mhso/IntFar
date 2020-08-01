@@ -95,11 +95,13 @@ VALID_COMMANDS = {
     "best": (
         "[stat] (summoner_name) - Show how many times you (or someone else) " +
         "were the best in the specific stat. " +
-        "Fx. '!best kda' shows how many times you had the best KDA in a game."
+        "Fx. '!best kda' shows how many times you had the best KDA in a game." +
+        "'!best [stat] all' shows what the best ever was for that stat, and who got it."
     ),
     "worst": (
         "[stat] (summoner_name) - Show how many times you (or someone else) " +
-        "were the worst at the specific stat."
+        "were the worst at the specific stat." +
+        "'!worst [stat] all' shows what the worst ever was for that stat, and who got it."
     ),
     "uptime": "Show for how long the bot has been up and running.",
     "status": (
@@ -1242,8 +1244,8 @@ class DiscordClient(discord.Client):
                 game_summary = game_stats.get_game_summary(game_info, summ_ids, self.riot_api)
 
             if target_name == "all":
-                response = f"The {readable_stat} ever was {min_or_max_value} by {recepient} "
-                response += self.insert_emotes("{emote_pog}\n")
+                response = f"The {readable_stat} ever in a game was {min_or_max_value} "
+                response += f"by {recepient} " + self.insert_emotes("{emote_pog}\n")
                 response += f"He got this as {game_summary}"
             else:
                 response = (f"{recepient} has gotten {readable_stat} in a game " +
