@@ -6,7 +6,7 @@ from config import Config
 from discord_bot import DiscordClient
 import riot_api
 
-GAME_ID = 4736364024
+GAME_ID = 4738155900
 
 auth = json.load(open("auth.json"))
 
@@ -23,7 +23,7 @@ class TestMock(DiscordClient):
     async def on_ready(self):
         await super(TestMock, self).on_ready()
         d1, sm1, si1 = self.database.discord_id_from_summoner("prince jarvan lv")
-        d2, sm2, si2 = self.database.discord_id_from_summoner("dumbledonger")
+        d2, sm2, si2 = self.database.discord_id_from_summoner("kazpariuz")
         #d3, sm3, si3 = self.database.discord_id_from_summoner("nønø")
         #d4, sm4, si4 = self.database.discord_id_from_summoner("stirred martini")
         d5, sm5, si5 = self.database.discord_id_from_summoner("senile felines")
@@ -34,12 +34,8 @@ class TestMock(DiscordClient):
             #(d4, [sm4], [si4]),
             (d5, sm5, si5)
         ]
-
-        game_stats = self.riot_api.get_game_details(GAME_ID)
-        filtered_stats = self.get_filtered_stats(game_stats)
         self.active_game = GAME_ID
-        self.database.record_stats(None, "0000", {},
-                                   self.active_game, filtered_stats, self.users_in_game)
+        await self.declare_intfar()
 
 conf.log("Starting Discord Client...")
 
