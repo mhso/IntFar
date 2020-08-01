@@ -669,6 +669,11 @@ class DiscordClient(discord.Client):
         people meet the same criteria, with the same stats within these criteria.
         If so, the one with either most deaths or least gold gets chosen as Int-Far.
         """
+        filtered_data = []
+        for disc_id, stats in game_data:
+            if disc_id in intfar_data:
+                filtered_data.append((disc_id, stats))
+
         ties = []
         for disc_id in intfar_data:
             if len(intfar_data[disc_id]) == max_count:
@@ -680,7 +685,7 @@ class DiscordClient(discord.Client):
 
         self.config.log("There are Int-Far ties!")
 
-        sorted_by_deaths = sorted(game_data, key=lambda x: x[1]["deaths"], reverse=True)
+        sorted_by_deaths = sorted(filtered_data, key=lambda x: x[1]["deaths"], reverse=True)
         max_count = sorted_by_deaths[0][1]["deaths"]
         ties = []
         for disc_id, stats in sorted_by_deaths:
@@ -691,7 +696,7 @@ class DiscordClient(discord.Client):
             self.config.log("Ties resolved by amount of deaths.")
             return ties[0]
 
-        sorted_by_kda = sorted(game_data, key=lambda x: game_stats.calc_kda(x[1]))
+        sorted_by_kda = sorted(filtered_data, key=lambda x: game_stats.calc_kda(x[1]))
         max_count = game_stats.calc_kda(sorted_by_deaths[0][1])
         ties = []
         for disc_id, stats in sorted_by_kda:
@@ -704,7 +709,7 @@ class DiscordClient(discord.Client):
 
         self.config.log("Ties resolved by gold earned.")
 
-        sorted_by_gold = sorted(game_data, key=lambda x: x[1]["goldEarned"])
+        sorted_by_gold = sorted(filtered_data, key=lambda x: x[1]["goldEarned"])
         return sorted_by_gold[0][0]
 
     async def declare_intfar(self):

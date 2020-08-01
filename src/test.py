@@ -11,6 +11,7 @@ def generate_game_data(kills, deaths, assists, vision, damages, summ_names):
         partIds.append({"participantId": p_id, "player": {"summonerId": data[2]}})
 
     participants = []
+    golds = [200, 150, 100]
     for (p_id, (k, d, a, v, dmg)) in enumerate(zip(kills, deaths, assists, vision, damages), start=1):
         participants.append(
             {
@@ -18,7 +19,8 @@ def generate_game_data(kills, deaths, assists, vision, damages, summ_names):
                 "teamId": 100,
                 "stats" : {
                     "kills": k, "deaths": d, "assists": a, "visionScore" : v,
-                    "totalDamageDealtToChampions": dmg, "turretKills": 3, "inhibitorKills": 3
+                    "totalDamageDealtToChampions": dmg, "turretKills": 3, "inhibitorKills": 3,
+                    "goldEarned": golds[p_id-1]
                 },
                 "timeline": {}
             }
@@ -48,15 +50,15 @@ def generate_game_data(kills, deaths, assists, vision, damages, summ_names):
 class TestMock(DiscordClient):
     async def on_ready(self):
         await super().on_ready()
-        summoners = ["prince jarvan lv", "senile felines", "nønø", "stirred martini", "kazpariuz"]
+        summoners = ["prince jarvan lv", "senile felines", "kazpariuz"]
         self.users_in_game = [
             self.database.discord_id_from_summoner(name) for name in summoners
         ]
-        kills = [5, 8, 11, 10, 3]
-        deaths = [3, 12, 8, 9, 7]
-        assists = [12, 13, 8, 15, 28]
-        visions = [20, 20, 20, 20, 20]
-        damages = [30000, 30000, 30000, 30000, 30000]
+        kills = [11, 11, 4]
+        deaths = [11, 11, 6]
+        assists = [4, 14, 16]
+        visions = [20, 20, 20]
+        damages = [30000, 30000, 30000]
         data = generate_game_data(kills, deaths, assists, visions, damages, summoners)
         filtered = self.get_filtered_stats(data)
         intfar_details = self.get_intfar_details(filtered)
@@ -81,6 +83,7 @@ class TestMock(DiscordClient):
                     intfar_data[intfar_disc_id].append((index, stat_value))
 
         final_intfar = self.resolve_intfar_ties(intfar_data, max_intfar_count, filtered)
+        print(intfar_data)
         print(final_intfar, flush=True)
 
 auth = json.load(open("auth.json"))
@@ -96,10 +99,6 @@ database_client = Database(conf)
 
 conf.log("Starting Discord Client...")
 
-data = database_client.get_meta_stats()
-print(data[-2])
-print(data[-1])
+client = TestMock(conf, database_client)
 
-#client = TestMock(conf, database_client)
-
-#client.run(conf.discord_token)
+client.run(conf.discord_token)
