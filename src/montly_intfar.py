@@ -99,7 +99,7 @@ class MonthlyIntfar:
                 runner_up_str += f"{pct_desc_2nd} of games being Int-Far!\n"
                 runner_up_str += "Take this medal for your troubles: :second_place: \n\n"
                 runner_up_str += f"Finally, {nickname_3rd} gets a :third_place: for "
-                runner_up_str += f"a bad-but-no-as-terrible {pct_desc_3rd} of inted games! \n"
+                runner_up_str += f"a bad-but-not-as-terrible {pct_desc_3rd} of inted games! \n"
             desc_str += runner_up_str
         if tie_count == 2: # Int-Far #1 and Int-Far #2 values are equal.
             winner_str += f"--- {nickname_1st} **AND** {nickname_2nd}!!! ---\n"
@@ -126,7 +126,6 @@ if __name__ == "__main__":
     conf = config.Config()
     db_client = database.Database(conf)
     details = db_client.get_intfars_of_the_month()
-    print(details)
     # details = [
     #     (1, 40, 12, 30),
     #     (2, 20, 6, 30),
