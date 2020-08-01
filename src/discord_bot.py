@@ -869,7 +869,6 @@ class DiscordClient(discord.Client):
         month_name = MonthlyIntfar.MONTH_NAMES[prev_month-1]
 
         intfar_data = self.database.get_intfars_of_the_month()
-        intfar_data.sort(key=lambda x: (x[3], x[2]), reverse=True) # Sort by pct of games being Int-Far.
         intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
                           for (disc_id, games, intfars, ratio) in intfar_data]
         intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"

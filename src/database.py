@@ -158,8 +158,8 @@ class Database:
         with closing(self.get_connection()) as db:
             games_per_person = db.cursor().execute(query_games,
                                                    (min_timestamp, max_timestamp)).fetchall()
-            intfars_per_person = db.cursor().execute(query_intfars, (min_timestamp, max_timestamp))
-            data_per_person = []
+            intfars_per_person = db.cursor().execute(query_intfars, (min_timestamp, max_timestamp)).fetchall()
+            pct_intfars = []
             for intfars, intfar_id in intfars_per_person:
                 total_games = 0
                 for games_played, disc_id in games_per_person:
@@ -168,11 +168,8 @@ class Database:
                         break
                 if total_games < 5: # Disqualify people with less than 5 games played this month.
                     continue
-                pct_intfar = int((intfars / total_games) * 100)
-                data_per_person.append((intfar_id, total_games, intfars, pct_intfar))
-                if len(data_per_person) == 3:
-                    return data_per_person
-            return data_per_person
+                pct_intfars.append((intfar_id, total_games, intfars, int((intfars / total_games) * 100)))
+            return sorted(pct_intfars, key=lambda x: (x[3], x[2]), reverse=True)
 
     def get_longest_intfar_streak(self, disc_id):
         query = "SELECT int_far FROM best_stats ORDER BY id"

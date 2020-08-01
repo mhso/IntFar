@@ -126,12 +126,12 @@ if __name__ == "__main__":
     conf = config.Config()
     db_client = database.Database(conf)
     details = db_client.get_intfars_of_the_month()
+    print(details)
     # details = [
     #     (1, 40, 12, 30),
     #     (2, 20, 6, 30),
     #     (3, 20, 6, 20),
     # ]
-    details.sort(key=lambda x: (x[3], x[2]), reverse=True) # Sort by pct of games being Int-Far.
     intfar_details = [("Guy" + str(disc_id), games, intfars, ratio)
                       for (disc_id, games, intfars, ratio) in details]
 
@@ -147,5 +147,4 @@ if __name__ == "__main__":
     desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
     desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
 
-    print(intro_desc + desc)
     print(num_winners)
