@@ -1241,7 +1241,7 @@ class DiscordClient(discord.Client):
                 summ_ids = self.database.summoner_from_discord_id(target_id)[2]
                 game_summary = game_stats.get_game_summary(game_info, summ_ids, self.riot_api)
 
-            if target_id is None:
+            if target_name == "all":
                 response = f"The {readable_stat} ever was {min_or_max_value} by {recepient} "
                 response += self.insert_emotes("{emote_pog}\n")
                 response += f"He got this as {game_summary}"
