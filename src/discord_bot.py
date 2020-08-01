@@ -969,7 +969,10 @@ class DiscordClient(discord.Client):
         years = dt_2.year - dt_1.year
         if dt_2.month < dt_1.month:
             years -= 1
-        td = normed_dt - dt_1
+        if months == 0 and years == 0:
+            td = dt_2 - dt_1
+        else:
+            td = normed_dt - dt_1
         days = td.days
         seconds = td.seconds
         hours, remainder = divmod(seconds, 3600)
@@ -1203,34 +1206,52 @@ class DiscordClient(discord.Client):
             # 'his most/lowest [stat] ever was ... Usually highest is best,
             # lowest is worse, except with deaths, where the opposite is the case.
             maximize = not ((stat != "deaths") ^ best)
+            # Get a readable description, such as 'most deaths' or 'lowest kp'.
+            readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
+
+            response = ""
             target_id = message.author.id
             recepient = message.author.name
 
             if target_name is not None: # Get someone else's stat information.
                 target_name = target_name.lower()
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
+                if target_name == "all":
+                    target_id = None
+                else:
+                    target_id = self.try_get_user_data(target_name.strip())
+                    if target_id is None:
+                        msg = "Error: Invalid summoner or Discord name "
+                        msg += f"{self.get_emoji_by_name('PepeHands')}"
+                        await message.channel.send(msg)
+                        return
+                    recepient = self.get_discord_nick(target_id)
+
+            if target_id is None:
+                (target_id,
+                 min_or_max_value,
+                 game_id) = self.database.get_most_extreme_stat(stat, best, maximize)
                 recepient = self.get_discord_nick(target_id)
+            else:
+                (stat_count, # <- How many times the stat has occured.
+                 min_or_max_value, # <- Highest/lowest occurance of the stat value.
+                 game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
 
-            (stat_count, # <- How many times the stat has occured.
-             min_or_max_value, # <- Highest/lowest occurance of the stat value.
-             game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
-
-            # Get a readable description, such as 'most deaths' or 'lowest kp'.
-            readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
-            response = (f"{recepient} has gotten {readable_stat} in a game " +
-                        f"{stat_count} times " + self.insert_emotes("{emote_pog}") + "\n")
             if min_or_max_value is not None:
-                # The target user has gotten most/fewest of 'stat' in at least one game.
                 game_info = self.riot_api.get_game_details(game_id)
                 summ_ids = self.database.summoner_from_discord_id(target_id)[2]
                 game_summary = game_stats.get_game_summary(game_info, summ_ids, self.riot_api)
-                response += f"His {readable_stat} ever was "
-                response += f"{round_digits(min_or_max_value)} as {game_summary}"
+
+            if target_id is None:
+                response = f"The {readable_stat} ever was {min_or_max_value} by {recepient} "
+                response += self.insert_emotes("{emote_pog}\n")
+                response += f"He got this as {game_summary}"
+            else:
+                response = (f"{recepient} has gotten {readable_stat} in a game " +
+                            f"{stat_count} times " + self.insert_emotes("{emote_pog}") + "\n")
+                if min_or_max_value is not None:
+                    # The target user has gotten most/fewest of 'stat' in at least one game.
+                    response += f"His {readable_stat} ever was "
+                    response += f"{round_digits(min_or_max_value)} as {game_summary}"
 
             await message.channel.send(response)
         else:

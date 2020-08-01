@@ -69,6 +69,13 @@ class Database:
                 return (disc_id, summ_names, summ_ids)
         return None
 
+    def get_most_extreme_stat(self, stat, best, maximize=True):
+        aggregator = "MAX" if maximize else "MIN"
+        table = "best_stats" if best else "worst_stats"
+        query = f"SELECT {stat}_id, {aggregator}({stat}), game_id FROM {table}"
+        with closing(self.get_connection()) as db:
+            return db.cursor().execute(query).fetchone()
+
     def get_stat(self, stat, value, best, disc_id, maximize=True):
         aggregator = "MAX" if maximize else "MIN"
         table = "best_stats" if best else "worst_stats"
