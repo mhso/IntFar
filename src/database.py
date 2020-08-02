@@ -136,36 +136,42 @@ class Database:
             return (game_data + users + intfar_data + doinks_data +
                     (games_ratios, intfars_ratios, intfar_multis_ratios))
 
-    def get_intfars_of_the_month(self):
+    def get_monthly_delimiter(self):
         tz_cph = TimeZone()
         curr_time = datetime.now(tz_cph)
         current_month = curr_time.month
         min_timestamp = ModuleNotFoundError
-        # Get Int-Far stats for previous month.
-        prev_month = 12 if current_month == 1 else current_month - 1
-        prev_year = curr_time.year if prev_month != 12 else curr_time.year - 1
-        prev_time = curr_time.replace(prev_year, prev_month, 1,
-                                      0, 0, 0, 0, tz_cph)
-        min_timestamp = int(prev_time.timestamp())
+        if curr_time.day > 1 or curr_time.hour > MonthlyIntfar.HOUR_OF_ANNOUNCEMENT:
+            # Get Int-Far stats for current month.
+            start_of_month = curr_time.replace(day=1, hour=0, minute=0, second=0)
+            min_timestamp = int(start_of_month.timestamp())
+        else:
+            # Get Int-Far stats for previous month.
+            prev_month = 12 if current_month == 1 else current_month - 1
+            prev_year = curr_time.year if prev_month != 12 else curr_time.year - 1
+            prev_time = curr_time.replace(prev_year, prev_month, 1,
+                                          0, 0, 0, 0, tz_cph)
+            min_timestamp = int(prev_time.timestamp())
 
         max_timestamp = int(curr_time.timestamp())
+        return f"timestamp > {min_timestamp} AND timestamp < {max_timestamp}"
 
-        query_intfars = """
-        SELECT Count(*) as c, int_far FROM best_stats bs, participants p 
-        WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=disc_id 
-        AND timestamp > ? AND timestamp < ? 
-        GROUP BY int_far ORDER BY c DESC
-        """
-        query_games = """
-        SELECT Count(*) as c, disc_id FROM best_stats bs, participants p 
-        WHERE bs.game_id=p.game_id
-        AND timestamp > ? AND timestamp < ? 
-        GROUP BY disc_id;
-        """
+    def get_intfars_of_the_month(self):
+        delim_str = self.get_monthly_delimiter()
+
+        query_intfars = (
+            "SELECT Count(*) as c, int_far FROM best_stats bs, participants p " +
+            "WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=disc_id " +
+            "AND " + delim_str + " GROUP BY int_far ORDER BY c DESC"
+        )
+        query_games = (
+            "SELECT Count(*) as c, disc_id FROM best_stats bs, participants p " +
+            "WHERE bs.game_id=p.game_id " +
+            "AND " + delim_str + " GROUP BY disc_id"
+        )
         with closing(self.get_connection()) as db:
-            games_per_person = db.cursor().execute(query_games,
-                                                   (min_timestamp, max_timestamp)).fetchall()
-            intfars_per_person = db.cursor().execute(query_intfars, (min_timestamp, max_timestamp)).fetchall()
+            games_per_person = db.cursor().execute(query_games).fetchall()
+            intfars_per_person = db.cursor().execute(query_intfars).fetchall()
             pct_intfars = []
             for intfars, intfar_id in intfars_per_person:
                 total_games = 0
@@ -222,9 +228,13 @@ class Database:
                     return count, prev_intfar
             return len(int_fars), prev_intfar # All the int-fars is the current int-far!
 
-    def get_intfar_stats(self, disc_id):
+    def get_intfar_stats(self, disc_id, monthly=False):
         query_total = "SELECT Count(*) FROM participants WHERE disc_id=?"
         query_intfar = "SELECT intfar_reason FROM best_stats WHERE int_far=?"
+        if monthly:
+            delim_str = self.get_monthly_delimiter()
+            query_total += f" AND {delim_str}"
+            query_intfar += f" AND {delim_str}"
         with closing(self.get_connection()) as db:
             total_games = db.cursor().execute(query_total, (disc_id,)).fetchone()[0]
             intfar_games = db.cursor().execute(query_intfar, (disc_id,)).fetchall()
