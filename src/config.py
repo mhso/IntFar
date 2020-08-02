@@ -21,6 +21,7 @@ class Config:
         self.log_warning = 1
         self.log_error = 2
         self.message_timeout = 1.5
+        self.ifotm_min_games = 5
 
     def log(self, data, severity=0, end="\n"):
         curr_time = datetime.now()

@@ -54,37 +54,7 @@ class TestMock(DiscordClient):
         self.users_in_game = [
             self.database.discord_id_from_summoner(name) for name in summoners
         ]
-        kills = [11, 11, 4]
-        deaths = [11, 11, 6]
-        assists = [4, 14, 16]
-        visions = [20, 20, 20]
-        damages = [30000, 30000, 30000]
-        data = generate_game_data(kills, deaths, assists, visions, damages, summoners)
-        filtered = self.get_filtered_stats(data)
-        intfar_details = self.get_intfar_details(filtered)
-        intfar_counts = {}
-        max_intfar_count = 1
-        max_count_intfar = None
-        intfar_data = {}
-
-        # Look through details for the people qualifying for Int-Far.
-        # The one with most criteria met gets chosen.
-        for (index, (tied_intfars, stat_value)) in enumerate(intfar_details):
-            if tied_intfars is not None:
-                for intfar_disc_id in tied_intfars:
-                    if intfar_disc_id not in intfar_counts:
-                        intfar_counts[intfar_disc_id] = 0
-                        intfar_data[intfar_disc_id] = []
-                    current_intfar_count = intfar_counts[intfar_disc_id] + 1
-                    intfar_counts[intfar_disc_id] = current_intfar_count
-                    if current_intfar_count >= max_intfar_count:
-                        max_intfar_count = current_intfar_count
-                        max_count_intfar = intfar_disc_id
-                    intfar_data[intfar_disc_id].append((index, stat_value))
-
-        final_intfar = self.resolve_intfar_ties(intfar_data, max_intfar_count, filtered)
-        print(intfar_data)
-        print(final_intfar, flush=True)
+        print(self.get_ifotm_lead_msg(115142485579137029))
 
 auth = json.load(open("auth.json"))
 

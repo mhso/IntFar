@@ -145,5 +145,4 @@ if __name__ == "__main__":
     desc += ":clap: :clap: :clap: :clap: :clap: \n"
     desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
     desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
-
-    print(num_winners)
+    print(desc)

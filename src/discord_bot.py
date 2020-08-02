@@ -584,6 +584,43 @@ class DiscordClient(discord.Client):
                     f"{prev_mention} is over " + "{emote_woahpikachu}")
         return None
 
+    def get_ifotm_lead_msg(self, intfar_id):
+        """
+        Return a message describing whether the person being Int-Far is now
+        in the lead for Int-Far Of The Month (IFOTM) after acquring their new Int-Far award.
+        """
+        mention_str = self.get_mention_str(intfar_id)
+        message = f"{mention_str} has now taken the lead for Int-Far of the Month!"
+        intfar_details = self.database.get_intfars_of_the_month()
+        monthly_games, monthly_intfars = self.database.get_intfar_stats(intfar_id, monthly=True)
+        if intfar_details == []: # No one was Int-Far yet this month.
+            if monthly_games == self.config.ifotm_min_games - 1:
+                return message # Current Int-Far is the first qualified person for IFOTM.
+            return None
+
+        highest_intfar = intfar_details[0]
+        if highest_intfar[0] == intfar_id: # Current Int-Far is already in lead for IFOTM.
+            return None
+
+        curr_num_games = 1
+        curr_intfars = 0
+        for (disc_id, games, intfars, _) in intfar_details[1:]:
+            if disc_id == intfar_id:
+                curr_num_games = games + 1
+                curr_intfars = intfars + 1
+                break
+
+        if curr_intfars == 0:
+            curr_num_games = monthly_games + 1
+            if curr_num_games == self.config.ifotm_min_games:
+                curr_intfars = monthly_intfars + 1
+
+        new_pct = int((curr_intfars / curr_num_games) * 100)
+
+        if new_pct > highest_intfar[3]:
+            return message
+        return None
+
     async def send_intfar_message(self, disc_id, reason, intfar_streak, prev_intfar):
         """
         Send Int-Far message to the #int-far-spam Discord channel.
@@ -600,6 +637,9 @@ class DiscordClient(discord.Client):
         streak_msg = self.get_streak_msg(disc_id, intfar_streak, prev_intfar)
         if streak_msg is not None:
             message += "\n" + streak_msg
+        ifotm_lead_msg = self.get_ifotm_lead_msg(disc_id)
+        if ifotm_lead_msg is not None:
+            message += "\n" + ifotm_lead_msg
 
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)

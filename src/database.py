@@ -179,7 +179,8 @@ class Database:
                     if disc_id == intfar_id:
                         total_games = games_played
                         break
-                if total_games < 5: # Disqualify people with less than 5 games played this month.
+                if total_games < self.config.ifotm_min_games:
+                    # Disqualify people with less than 5 games played this month.
                     continue
                 pct_intfars.append((intfar_id, total_games, intfars, int((intfars / total_games) * 100)))
             return sorted(pct_intfars, key=lambda x: (x[3], x[2]), reverse=True)
