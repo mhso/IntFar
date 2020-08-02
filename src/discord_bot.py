@@ -1098,11 +1098,11 @@ class DiscordClient(discord.Client):
                 msg = f"{person_to_check} has been Int-Far **{len(intfar_reason_ids)}** times "
                 msg += "{emote_unlimited_chins}"
             else:
-                msg = f"{person_to_check}: Int-Far {len(intfar_reason_ids)} times "
-                msg += f"({pct_intfar}% of {games_played} games) "
+                msg = f"{person_to_check}: Int-Far **{len(intfar_reason_ids)}** times "
+                msg += f"**({pct_intfar}%** of {games_played} games) "
 
             if expanded and len(intfar_reason_ids) > 0:
-                monthly_games, monthly_intfars = self.database.get_intfar_stats(disc_id, monthly)
+                monthly_games, monthly_intfars = self.database.get_intfar_stats(disc_id, True)
                 pct_monthly = (0 if monthly_games == 0
                                else int(len(monthly_intfars) / monthly_games * 100))
 
@@ -1148,10 +1148,10 @@ class DiscordClient(discord.Client):
                     messages_monthly.append((resp_str_month, intfars_month))
                 messages_all_time.sort(key=lambda x: x[1], reverse=True)
                 messages_monthly.sort(key=lambda x: x[1], reverse=True)
-                response = "--- All time stats ---\n"
+                response = "**--- All time stats ---**\n"
                 for resp_str, _ in messages_all_time:
                     response += "- " + resp_str + "\n"
-                response += f"--- Stats for {current_month} ---\n"
+                response += f"**--- Stats for {current_month} ---**\n"
                 for resp_str, _ in messages_monthly:
                     response += "- " + resp_str + "\n"
             else:

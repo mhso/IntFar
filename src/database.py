@@ -230,7 +230,10 @@ class Database:
 
     def get_intfar_stats(self, disc_id, monthly=False):
         query_total = "SELECT Count(*) FROM participants WHERE disc_id=?"
-        query_intfar = "SELECT intfar_reason FROM best_stats WHERE int_far=?"
+        query_intfar = (
+            "SELECT intfar_reason FROM best_stats bs, participants p " +
+            "WHERE int_far=? AND disc_id=int_far AND bs.game_id=p.game_id"
+        )
         if monthly:
             delim_str = self.get_monthly_delimiter()
             query_total += f" AND {delim_str}"
