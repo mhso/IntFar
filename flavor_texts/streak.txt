@@ -2,4 +2,4 @@
 {nickname} just keeps on being terrible! He is on a {streak} game Int-Far streak {emote_sadbuttrue}
 Can someone help poor {nickname}... He is on a {streak} Int-Far streak {emote_gual_yikes}
 Okay, this is getting ridiculous... {nickname} has been Int-Far {streak} games in a row {emote_PepeHands}
-I didn't think this was possible... {nickname} is defying all odds with {streak} Int-Far awards in a row
+I didn't think this was possible... {nickname} is defying all odds with {streak} Int-Far awards in a row {emote_pepems}
