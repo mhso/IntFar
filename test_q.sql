@@ -1,1 +1,1 @@
-SELECT intfar_reason FROM best_stats bs, participants p WHERE int_far=? AND disc_id=int_far AND bs.game_id=p.game_id
+UPDATE participants SET doinks='100000' VALUES(4742300264, )

@@ -26,7 +26,7 @@ NO_INTFAR_FLAVOR_TEXTS = load_flavor_texts("no_intfar")
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
-    "KDA larger than 10", "More than 30 kills", "More damage than rest of the team combined",
+    "KDA larger than 10", "More than 20 kills", "More damage than rest of the team combined",
     "Getting a pentakill", "Vision score larger than 100",
     "Kill participation larger than 80%", "Securing all epic monsters"
 ]
@@ -383,7 +383,7 @@ class DiscordClient(discord.Client):
         exceptionally well.
         Criteria for being redeemed:
             - Having a KDA of 10+
-            - Getting more than 30 kills
+            - Getting more than 20 kills
             - Doing more damage than the rest of the team combined
             - Getting a penta-kill
             - Having a vision score of 100+
@@ -396,7 +396,7 @@ class DiscordClient(discord.Client):
             kda = game_stats.calc_kda(stats)
             if kda > 10.0:
                 mention_list.append((0, round_digits(kda)))
-            if stats["kills"] > 30:
+            if stats["kills"] > 20:
                 mention_list.append((1, stats["kills"]))
             damage_dealt = stats["totalDamageDealtToChampions"]
             if damage_dealt > stats["damage_by_team"]:
@@ -1127,8 +1127,7 @@ class DiscordClient(discord.Client):
     async def handle_intfar_msg(self, message, target_name):
         current_month = MonthlyIntfar.MONTH_NAMES[datetime.now().month-1]
 
-        def get_intfar_stats(disc_id, expanded=True, monthly=False):
-            person_to_check = self.get_discord_nick(disc_id)
+        def get_intfar_stats(disc_id, monthly=False):
             games_played, intfar_reason_ids = self.database.get_intfar_stats(disc_id, monthly)
             intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
             for reason_id in intfar_reason_ids:
@@ -1139,14 +1138,25 @@ class DiscordClient(discord.Client):
 
             pct_intfar = (0 if games_played == 0
                           else int(len(intfar_reason_ids) / games_played * 100))
-            if expanded:
-                msg = f"{person_to_check} has been Int-Far **{len(intfar_reason_ids)}** times "
-                msg += "{emote_unlimited_chins}"
-            else:
-                msg = f"{person_to_check}: Int-Far **{len(intfar_reason_ids)}** times "
-                msg += f"**({pct_intfar}%** of {games_played} games) "
+            return games_played, intfar_reason_ids, intfar_counts, pct_intfar
 
-            if expanded and len(intfar_reason_ids) > 0:
+        def format_for_all(disc_id, monthly=False):
+            person_to_check = self.get_discord_nick(disc_id)
+            games_played, intfar_reason_ids, _, pct_intfar = get_intfar_stats(disc_id, monthly)
+            msg = f"{person_to_check}: Int-Far **{len(intfar_reason_ids)}** times "
+            msg += f"**({pct_intfar}%** of {games_played} games) "
+            msg = self.insert_emotes(msg)
+            return msg, len(intfar_reason_ids)
+
+        def format_for_single(disc_id):
+            person_to_check = self.get_discord_nick(disc_id)
+            games_played, intfar_reason_ids, intfar_counts, pct_intfar = get_intfar_stats(disc_id)
+            intfars_of_the_month = self.database.get_intfars_of_the_month()
+            user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
+
+            msg = f"{person_to_check} has been Int-Far **{len(intfar_reason_ids)}** times "
+            msg += "{emote_unlimited_chins}"
+            if len(intfar_reason_ids) > 0:
                 monthly_games, monthly_intfars = self.database.get_intfar_stats(disc_id, True)
                 pct_monthly = (0 if monthly_games == 0
                                else int(len(monthly_intfars) / monthly_games * 100))
@@ -1155,6 +1165,7 @@ class DiscordClient(discord.Client):
                 ratio_desc += f"{games_played} games played.\n"
                 ratio_desc += f"In {current_month}, he was Int-Far in **{len(monthly_intfars)}** "
                 ratio_desc += f"of his {monthly_games} games played (**{pct_monthly}%**)\n"
+
                 reason_desc = "Int-Fars awarded so far:\n"
                 for reason_id, reason in enumerate(INTFAR_REASONS):
                     reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
@@ -1175,10 +1186,12 @@ class DiscordClient(discord.Client):
                 relations_desc += "{emote_smol_gual}"
 
                 msg += ratio_desc + reason_desc + streak_desc + no_streak_desc + relations_desc
-
+                if user_is_ifotm:
+                    month_name = MonthlyIntfar.MONTH_NAMES[datetime.now().month-1]
+                    msg += f"\n**{person_to_check} currently stands to be Int-Far of the Month "
+                    msg += f"of {month_name}!**"
             msg = self.insert_emotes(msg)
-
-            return msg, len(intfar_reason_ids)
+            return msg
 
         response = ""
         if target_name is not None: # Check intfar stats for someone else.
@@ -1187,18 +1200,21 @@ class DiscordClient(discord.Client):
                 messages_all_time = []
                 messages_monthly = []
                 for disc_id, _, _ in self.database.summoners:
-                    resp_str_all_time, intfars = get_intfar_stats(disc_id, expanded=False)
-                    resp_str_month, intfars_month = get_intfar_stats(disc_id, expanded=False, monthly=True)
+                    resp_str_all_time, intfars = format_for_all(disc_id)
+                    resp_str_month, intfars_month = format_for_all(disc_id, monthly=True)
+
                     messages_all_time.append((resp_str_all_time, intfars))
                     messages_monthly.append((resp_str_month, intfars_month))
+
                 messages_all_time.sort(key=lambda x: x[1], reverse=True)
                 messages_monthly.sort(key=lambda x: x[1], reverse=True)
+
                 response = "**--- All time stats ---**\n"
                 for resp_str, _ in messages_all_time:
-                    response += "- " + resp_str + "\n"
+                    response += f"- {resp_str}\n"
                 response += f"**--- Stats for {current_month} ---**\n"
                 for resp_str, _ in messages_monthly:
-                    response += "- " + resp_str + "\n"
+                    response += f"- {resp_str}\n"
             else:
                 target_id = self.try_get_user_data(target_name.strip())
                 if target_id is None:
@@ -1206,9 +1222,9 @@ class DiscordClient(discord.Client):
                     msg += f"{self.get_emoji_by_name('PepeHands')}"
                     await message.channel.send(msg)
                     return
-                response = get_intfar_stats(target_id)[0]
+                response = format_for_single(target_id)
         else: # Check intfar stats for the person sending the message.
-            response = get_intfar_stats(message.author.id)[0]
+            response = format_for_single(message.author.id)
 
         await message.channel.send(response)
 
