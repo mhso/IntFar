@@ -13,7 +13,7 @@ class Config:
         self.kda_death_criteria = 2
         self.death_lower_threshold = 9
         self.death_kda_criteria = 2.1
-        self.kp_lower_threshold = 25
+        self.kp_lower_threshold = 20
         self.kp_takedowns_criteria = 10
         self.kp_structures_criteria = 3
         self.vision_score_lower_threshold = 11

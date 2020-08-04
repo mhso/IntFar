@@ -799,6 +799,9 @@ class DiscordClient(discord.Client):
 
         reason_ids = ["0", "0", "0", "0"]
         doinks = {}
+
+        redeemed_text, doinks = self.get_big_doinks(filtered_stats)
+
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
         if max_count_intfar is not None: # Save data for the current game and send int-far message.
             final_intfar = self.resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)
@@ -811,6 +814,8 @@ class DiscordClient(discord.Client):
                 if count > 0:
                     reason_text = " **AND** " + reason_text
                 reason += reason_text
+                if redeemed_text is not None:
+                    reason += "\n" + redeemed_text
 
             await self.send_intfar_message(final_intfar, reason, intfar_streak, prev_intfar)
         else: # No one was bad enough to be Int-Far.
@@ -819,9 +824,9 @@ class DiscordClient(discord.Client):
             honorable_mention_text = self.get_honorable_mentions(filtered_stats)
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
-            redeemed_text, doinks = self.get_big_doinks(filtered_stats)
             if redeemed_text is not None:
                 response += "\n" + redeemed_text
+
             streak_msg = self.get_streak_msg(None, intfar_streak, prev_intfar)
             if streak_msg is not None:
                 response += "\n" + streak_msg
