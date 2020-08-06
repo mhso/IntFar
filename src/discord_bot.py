@@ -590,7 +590,7 @@ class DiscordClient(discord.Client):
         in the lead for Int-Far Of The Month (IFOTM) after acquring their new Int-Far award.
         """
         mention_str = self.get_mention_str(intfar_id)
-        message = f"{mention_str} has now taken the lead for Int-Far of the Month!"
+        message = f"{mention_str} has now taken the lead for Int-Far of the Month " + "{emote_nazi}"
         intfar_details = self.database.get_intfars_of_the_month()
         monthly_games, monthly_intfars = self.database.get_intfar_stats(intfar_id, monthly=True)
         if intfar_details == []: # No one was Int-Far yet this month.
@@ -600,7 +600,7 @@ class DiscordClient(discord.Client):
 
         highest_intfar = intfar_details[0]
         if highest_intfar[0] == intfar_id: # Current Int-Far is already in lead for IFOTM.
-            return None
+            return f"{mention_str} is still in the lead for Int-Far of the month " + "{emote_peberno}"
 
         curr_num_games = 1
         curr_intfars = 0
@@ -610,9 +610,10 @@ class DiscordClient(discord.Client):
                 curr_intfars = intfars + 1
                 break
 
-        if curr_intfars == 0:
+        if curr_intfars == 0: # Current Int-Far was not qualified for IFOTM yet.
             curr_num_games = monthly_games + 1
             if curr_num_games == self.config.ifotm_min_games:
+                # Current Int-Far has played enough games to qualify for IFOTM.
                 curr_intfars = monthly_intfars + 1
 
         new_pct = int((curr_intfars / curr_num_games) * 100)
@@ -838,7 +839,7 @@ class DiscordClient(discord.Client):
                 reasons_str = "".join(reason_ids)
                 if reasons_str == "0000":
                     reasons_str = None
-                self.database.record_stats(max_count_intfar, reasons_str, doinks,
+                self.database.record_stats(final_intfar, reasons_str, doinks,
                                            self.active_game, filtered_stats, self.users_in_game)
             except (DatabaseError, OperationalError) as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
