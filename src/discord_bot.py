@@ -1328,13 +1328,15 @@ class DiscordClient(discord.Client):
                 summ_ids = self.database.summoner_from_discord_id(target_id)[2]
                 game_summary = game_stats.get_game_summary(game_info, summ_ids, self.riot_api)
 
+            emote_to_use = "{emote_pog}" if best else "{emote_peberno}"
+
             if target_name == "all":
                 response = f"The {readable_stat} ever in a game was {min_or_max_value} "
-                response += f"by {recepient} " + self.insert_emotes("{emote_pog}\n")
+                response += f"by {recepient} " + self.insert_emotes(emote_to_use) + "\n"
                 response += f"He got this as {game_summary}"
             else:
                 response = (f"{recepient} has gotten {readable_stat} in a game " +
-                            f"{stat_count} times " + self.insert_emotes("{emote_pog}") + "\n")
+                            f"{stat_count} times " + self.insert_emotes(emote_to_use) + "\n")
                 if min_or_max_value is not None:
                     # The target user has gotten most/fewest of 'stat' in at least one game.
                     response += f"His {readable_stat} ever was "
