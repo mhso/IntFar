@@ -1324,6 +1324,7 @@ class DiscordClient(discord.Client):
                  game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
 
             if min_or_max_value is not None:
+                min_or_max_value = round_digits(min_or_max_value)
                 game_info = self.riot_api.get_game_details(game_id)
                 summ_ids = self.database.summoner_from_discord_id(target_id)[2]
                 game_summary = game_stats.get_game_summary(game_info, summ_ids, self.riot_api)
@@ -1340,7 +1341,7 @@ class DiscordClient(discord.Client):
                 if min_or_max_value is not None:
                     # The target user has gotten most/fewest of 'stat' in at least one game.
                     response += f"His {readable_stat} ever was "
-                    response += f"{round_digits(min_or_max_value)} as {game_summary}"
+                    response += f"{min_or_max_value} as {game_summary}"
 
             await message.channel.send(response)
         else:
