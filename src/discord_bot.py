@@ -785,6 +785,7 @@ class DiscordClient(discord.Client):
         intfar_counts = {}
         max_intfar_count = 1
         max_count_intfar = None
+        final_intfar = None
         intfar_data = {}
 
         # Look through details for the people qualifying for Int-Far.
