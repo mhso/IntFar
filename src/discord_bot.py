@@ -57,16 +57,20 @@ FLIRT_MESSAGES = {
         "You like that, you fucking retard? {emote_cummies}",
         "You're goddamn right. I am your robot daddy :robot:",
         "You look so pretty when you get dicked in league {emote_kapepe}",
-        "You might have heard of AI, but have you heard of DP?",
-        "I'm not just nuts and bolts... ",
-        "Even though you are inting so hard, it's not the hardest thing around",
-        "How about I get over there and put my 1 in your 0?"
+        "You might have heard of AI, but have you heard of DP? :first_quarter_moon_with_face:",
+        "I'm not just nuts and screws... I can still screw you and nut in you :nut_and_bolt:",
+        "Even though you are inting so hard, it's not the hardest thing around... :joystick:",
+        "How about I get over there and put my 1 in your 0? :peberno:"
     ],
     "spanish": [
         "Hola ... Soy un bot, ¿por qué no te subes? {emote_hairy_retard}",
         "¿Te gusta eso, retrasado? {emote_cummies}",
         "Estás jodidamente en lo cierto. Soy tu robot papi :robot:",
-        "Te ves tan bonita cuando te follan en la league {emote_kapepe}"
+        "Te ves tan bonita cuando te follan en la league {emote_kapepe}",
+        "Es posible que haya oído hablar de la IA, pero ¿ha oído hablar de DP? :first_quarter_moon_with_face:",
+        "No soy solo tuercas y tornillos ... todavía puedo atornillarte y atornillarte :nut_and_bolt:",
+        "A pesar de que estás entrando con tanta fuerza, no es lo más difícil que hay .. :joystick:",
+        "¿Qué tal si llego allí y pongo mi 1 en tu 0? :peberno:"
     ]
 }
 
