@@ -1152,7 +1152,7 @@ class DiscordClient(discord.Client):
             msg = f"{person_to_check}: Int-Far **{len(intfar_reason_ids)}** times "
             msg += f"**({pct_intfar}%** of {games_played} games) "
             msg = self.insert_emotes(msg)
-            return msg, len(intfar_reason_ids)
+            return msg, len(intfar_reason_ids), pct_intfar
 
         def format_for_single(disc_id):
             person_to_check = self.get_discord_nick(disc_id)
@@ -1206,14 +1206,14 @@ class DiscordClient(discord.Client):
                 messages_all_time = []
                 messages_monthly = []
                 for disc_id, _, _ in self.database.summoners:
-                    resp_str_all_time, intfars = format_for_all(disc_id)
-                    resp_str_month, intfars_month = format_for_all(disc_id, monthly=True)
+                    resp_str_all_time, intfars, pct_all_time = format_for_all(disc_id)
+                    resp_str_month, intfars_month, pct_month = format_for_all(disc_id, monthly=True)
 
-                    messages_all_time.append((resp_str_all_time, intfars))
-                    messages_monthly.append((resp_str_month, intfars_month))
+                    messages_all_time.append((resp_str_all_time, intfars, pct_all_time))
+                    messages_monthly.append((resp_str_month, intfars_month, pct_month))
 
-                messages_all_time.sort(key=lambda x: x[1], reverse=True)
-                messages_monthly.sort(key=lambda x: x[1], reverse=True)
+                messages_all_time.sort(key=lambda x: (x[1], x[2]), reverse=True)
+                messages_monthly.sort(key=lambda x: (x[1], x[2]), reverse=True)
 
                 response = "**--- All time stats ---**\n"
                 for resp_str, _ in messages_all_time:
