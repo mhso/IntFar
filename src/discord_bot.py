@@ -1216,11 +1216,11 @@ class DiscordClient(discord.Client):
                 messages_monthly.sort(key=lambda x: (x[1], x[2]), reverse=True)
 
                 response = "**--- All time stats ---**\n"
-                for resp_str, _ in messages_all_time:
-                    response += f"- {resp_str}\n"
+                for data in messages_all_time:
+                    response += f"- {data[0]}\n"
                 response += f"**--- Stats for {current_month} ---**\n"
-                for resp_str, _ in messages_monthly:
-                    response += f"- {resp_str}\n"
+                for data in messages_monthly:
+                    response += f"- {data[0]}\n"
             else:
                 target_id = self.try_get_user_data(target_name.strip())
                 if target_id is None:
