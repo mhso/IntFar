@@ -60,7 +60,7 @@ FLIRT_MESSAGES = {
         "You might have heard of AI, but have you heard of DP? :first_quarter_moon_with_face:",
         "I'm not just nuts and screws... I can still screw you and nut in you :nut_and_bolt:",
         "Even though you are inting so hard, it's not the hardest thing around... :joystick:",
-        "How about I get over there and put my 1 in your 0? :peberno:"
+        "How about I get over there and put my 1 in your 0? {emote_peberno}"
     ],
     "spanish": [
         "Hola ... Soy un bot, ¿por qué no te subes? {emote_hairy_retard}",
