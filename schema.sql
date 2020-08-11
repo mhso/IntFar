@@ -58,3 +58,20 @@ CREATE TABLE [worst_stats] (
     [vision_score] INTEGER,
     [vision_score_id] INTEGER
 );
+CREATE TABLE [betting_balance] (
+    [disc_id] INTEGER PRIMARY KEY,
+    [tokens] INTEGER
+);
+CREATE TABLE [betting_events] (
+    [id] INTEGER PRIMARY KEY,
+    [max_return] DECIMAL NOT NULL
+);
+CREATE TABLE [bets] (
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [better_id] INTEGER NOT NULL,
+    [event_id] INTEGER NOT NULL,
+    [amount] INTEGER NOT NULL,
+    [game_duration] INTEGER DEFAULT(0),
+    [target] INTEGER,
+    [result] INTEGER(2)
+);

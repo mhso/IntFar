@@ -1,9 +1,15 @@
 import os
 from datetime import datetime
 import sqlite3
+from sqlite3 import DatabaseError, OperationalError, ProgrammingError
+
 from contextlib import closing
 from montly_intfar import TimeZone, MonthlyIntfar
 import game_stats
+
+class DBException(OperationalError, ProgrammingError):
+    def __init__(self, *args):
+        super().__init__(args)
 
 class Database:
     def __init__(self, config):
@@ -25,6 +31,15 @@ class Database:
     def get_connection(self):
         return sqlite3.connect(self.config.database)
 
+    def execute_query(self, db, query, query_params=None):
+        try:
+            if query_params is None:
+                return db.cursor().execute(query)
+            else:
+                return db.cursor().execute(query, query_params)
+        except (OperationalError, ProgrammingError, DatabaseError) as exc:
+            raise DBException(exc.args)
+
     def create_database(self):
         with closing(self.get_connection()) as db:
             with open("schema.sql", "r") as f:
@@ -33,14 +48,14 @@ class Database:
 
     def get_registered_user(self, summ_name):
         with closing(self.get_connection()) as db:
-            user = db.cursor().execute("SELECT * FROM registered_summoners " +
-                                       "WHERE summ_name=?", (summ_name,)).fetchone()
+            user = self.execute_query(db, ("SELECT * FROM registered_summoners " +
+                                           "WHERE summ_name=?"), (summ_name,)).fetchone()
             return user
 
     def get_all_registered_users(self):
         with closing(self.get_connection()) as db:
-            return db.cursor().execute("SELECT disc_id, summ_name, summ_id " +
-                                       "FROM registered_summoners").fetchall()
+            return self.execute_query(db, ("SELECT disc_id, summ_name, summ_id " +
+                                           "FROM registered_summoners")).fetchall()
 
     def add_user(self, summ_name, summ_id, discord_id):
         if self.summoner_from_discord_id(discord_id) is not None:
@@ -52,8 +67,9 @@ class Database:
         else:
             self.summoners.append((discord_id, [summ_name], [summ_id]))
         with closing(self.get_connection()) as db:
-            db.cursor().execute("INSERT INTO registered_summoners(disc_id, summ_name, summ_id) " +
-                                "VALUES (?, ?, ?)", (discord_id, summ_name, summ_id))
+            self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id) " +
+                                    "VALUES (?, ?, ?)"), (discord_id, summ_name, summ_id))
+            self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 0))
             db.commit()
 
     def discord_id_from_summoner(self, name):
@@ -74,14 +90,14 @@ class Database:
         table = "best_stats" if best else "worst_stats"
         query = f"SELECT {stat}_id, {aggregator}({stat}), game_id FROM {table}"
         with closing(self.get_connection()) as db:
-            return db.cursor().execute(query).fetchone()
+            return self.execute_query(db, query).fetchone()
 
     def get_stat(self, stat, value, best, disc_id, maximize=True):
         aggregator = "MAX" if maximize else "MIN"
         table = "best_stats" if best else "worst_stats"
         query = f"SELECT Count(*), {aggregator}({value}), game_id FROM {table} WHERE {stat}=?"
         with closing(self.get_connection()) as db:
-            return db.cursor().execute(query, (disc_id,)).fetchone()
+            return self.execute_query(db, query, (disc_id,)).fetchone()
 
     def get_meta_stats(self):
         query_games = """
@@ -94,11 +110,11 @@ class Database:
         query_intfar_multis = "SELECT intfar_reason FROM best_stats WHERE intfar_reason != 'None'"
         users = (len(self.summoners),)
         with closing(self.get_connection()) as db:
-            game_data = db.cursor().execute(query_games).fetchone()
-            intfar_data = db.cursor().execute(query_intfars).fetchone()
-            doinks_data = db.cursor().execute(query_doinks).fetchone()
-            persons_counts = db.cursor().execute(query_persons)
-            intfar_multis_data = db.cursor().execute(query_intfar_multis).fetchall()
+            game_data = self.execute_query(db, query_games).fetchone()
+            intfar_data = self.execute_query(db, query_intfars).fetchone()
+            doinks_data = self.execute_query(db, query_doinks).fetchone()
+            persons_counts = self.execute_query(db, query_persons)
+            intfar_multis_data = self.execute_query(db, query_intfar_multis).fetchall()
             persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
             for persons in persons_counts:
                 persons_count[persons[0]] += 1
@@ -170,8 +186,8 @@ class Database:
             "AND " + delim_str + " GROUP BY disc_id"
         )
         with closing(self.get_connection()) as db:
-            games_per_person = db.cursor().execute(query_games).fetchall()
-            intfars_per_person = db.cursor().execute(query_intfars).fetchall()
+            games_per_person = self.execute_query(db, query_games).fetchall()
+            intfars_per_person = self.execute_query(db, query_intfars).fetchall()
             pct_intfars = []
             for intfars, intfar_id in intfars_per_person:
                 total_games = 0
@@ -188,7 +204,7 @@ class Database:
     def get_longest_intfar_streak(self, disc_id):
         query = "SELECT int_far FROM best_stats ORDER BY id"
         with closing(self.get_connection()) as db:
-            int_fars = db.cursor().execute(query).fetchall()
+            int_fars = self.execute_query(db, query).fetchall()
             max_count = 0
             count = 0
             for int_far in int_fars:
@@ -207,7 +223,7 @@ class Database:
         ORDER BY id
         """
         with closing(self.get_connection()) as db:
-            int_fars = db.cursor().execute(query, (disc_id,)).fetchall()
+            int_fars = self.execute_query(db, query, (disc_id,)).fetchall()
             max_count = 0
             count = 0
             for int_far in int_fars:
@@ -222,7 +238,7 @@ class Database:
     def get_current_intfar_streak(self):
         query = "SELECT int_far FROM best_stats ORDER BY id DESC"
         with closing(self.get_connection()) as db:
-            int_fars = db.cursor().execute(query).fetchall()
+            int_fars = self.execute_query(db, query).fetchall()
             prev_intfar = int_fars[0][0]
             for count, int_far in enumerate(int_fars[1:], start=1):
                 if int_far[0] is None or prev_intfar != int_far[0]:
@@ -240,8 +256,8 @@ class Database:
             query_total += f" AND {delim_str}"
             query_intfar += f" AND {delim_str}"
         with closing(self.get_connection()) as db:
-            total_games = db.cursor().execute(query_total, (disc_id,)).fetchone()[0]
-            intfar_games = db.cursor().execute(query_intfar, (disc_id,)).fetchall()
+            total_games = self.execute_query(db, query_total, (disc_id,)).fetchone()[0]
+            intfar_games = self.execute_query(db, query_intfar, (disc_id,)).fetchall()
             return total_games, intfar_games
 
     def get_intfar_relations(self, disc_id):
@@ -258,7 +274,7 @@ class Database:
         with closing(self.get_connection()) as db:
             games_with_person = {}
             intfars_with_person = {}
-            for part_id, intfars in db.cursor().execute(query_intfars, (disc_id,)):
+            for part_id, intfars in self.execute_query(db, query_intfars, (disc_id,)):
                 if disc_id == part_id:
                     continue
                 intfars_with_person[part_id] = intfars
@@ -269,7 +285,7 @@ class Database:
     def get_doinks_stats(self, disc_id):
         query = "SELECT doinks FROM participants WHERE doinks != 'None' AND disc_id=?"
         with closing(self.get_connection()) as db:
-            return db.cursor().execute(query, (disc_id,)).fetchall()
+            return self.execute_query(db, query, (disc_id,)).fetchall()
 
     def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game):
         kills_by_our_team = data[0][1]["kills_by_team"]
@@ -333,20 +349,67 @@ class Database:
         query_worst = query_prefix + " worst_stats " + query_cols
 
         with closing(self.get_connection()) as db:
-            db.cursor().execute(query_best, (game_id, intfar_id, intfar_reason, max_kills,
-                                             max_kills_id, min_deaths, min_deaths_id, max_kda,
-                                             max_kda_id, max_damage, max_damage_id,
-                                             max_cs, max_cs_id, max_gold, max_gold_id,
-                                             max_kp, max_kp_id, max_wards, max_wards_id,
-                                             max_vision, max_vision_id))
-            db.cursor().execute(query_worst, (game_id, intfar_id, intfar_reason, min_kills,
-                                              min_kills_id, max_deaths, max_deaths_id, min_kda,
-                                              min_kda_id, min_damage, min_damage_id,
-                                              min_cs, min_cs_id, min_gold, min_gold_id,
-                                              min_kp, min_kp_id, min_wards, min_wards_id,
-                                              min_vision, min_vision_id))
+            self.execute_query(db, query_best, (game_id, intfar_id, intfar_reason, max_kills,
+                                                max_kills_id, min_deaths, min_deaths_id, max_kda,
+                                                max_kda_id, max_damage, max_damage_id,
+                                                max_cs, max_cs_id, max_gold, max_gold_id,
+                                                max_kp, max_kp_id, max_wards, max_wards_id,
+                                                max_vision, max_vision_id))
+            self.execute_query(db, query_worst, (game_id, intfar_id, intfar_reason, min_kills,
+                                                 min_kills_id, max_deaths, max_deaths_id, min_kda,
+                                                 min_kda_id, min_damage, min_damage_id,
+                                                 min_cs, min_cs_id, min_gold, min_gold_id,
+                                                 min_kp, min_kp_id, min_wards, min_wards_id,
+                                                 min_vision, min_vision_id))
             query = "INSERT INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"
             for disc_id, _, _ in users_in_game:
                 doink = doinks.get(disc_id, None)
-                db.cursor().execute(query, (game_id, disc_id, timestamp, doink))
+                self.execute_query(db, query, (game_id, disc_id, timestamp, doink))
             db.commit()
+
+    def get_active_bets(self, disc_id):
+        with closing(self.get_connection()) as db:
+            query = "SELECT id, amount, event_id, game_duration, target FROM bets "
+            query += "WHERE better_id=? AND result=0"
+            return self.execute_query(db, query, (disc_id,)).fetchall()
+
+    def get_bet_return(self, event_id):
+        with closing(self.get_connection()) as db:
+            query = "SELECT max_return FROM betting_events WHERE id=?"
+            return self.execute_query(db, query, (event_id,)).fetchone()[0]
+
+    def has_enough_tokens(self, disc_id, tokens):
+        with closing(self.get_connection()) as db:
+            query = "SELECT tokens FROM betting_balance WHERE disc_id=?"
+            balance = self.execute_query(db, query, (disc_id,)).fetchone()[0]
+            return balance >= tokens
+
+    def bet_exists(self, disc_id, event_id, target=None):
+        with closing(self.get_connection()) as db:
+            query = "SELECT * FROM bets WHERE better_id=? AND event_id=? AND target=? AND result=0"
+            return self.execute_query(db, query, (disc_id, event_id, target)).fetchone() is None
+
+    def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None):
+        with closing(self.get_connection()) as db:
+            query_bet = "INSERT INTO bets(better_id, event_id, amount, game_duration, target, result) "
+            query_bet += "VALUES (?, ?, ?, ?, ?, ?)"
+            query_balance = "UPDATE betting_balance SET tokens=tokens-? WHERE disc_id=?"
+            self.execute_query(db, query_bet, (disc_id, event_id, amount,
+                                               game_duration, target_person, 0))
+            self.execute_query(db, query_balance, (amount, disc_id))
+
+    def cancel_bet(self, disc_id, event_id, amount, target=None):
+        with closing(self.get_connection()) as db:
+            query_bet = "DELETE FROM bets WHERE better_id=? AND event_id=? AND target=? AND result=0"
+            query_balance = "UPDATE betting_balance SET tokens=tokens+? WHERE disc_id=?"
+            self.execute_query(db, query_bet, (disc_id, event_id, target))
+            self.execute_query(db, query_balance, (amount, disc_id))
+
+    def mark_bet_as_resolved(self, disc_id, bet_id, success, amount_won=0):
+        result_val = 1 if success else -1
+        with closing(self.get_connection()) as db:
+            query_bet = "UPDATE bets SET result=? WHERE id=?"
+            self.execute_query(db, query_bet, (result_val, bet_id))
+            if success:
+                query_tokens = "UPDATE betting_balance SET tokens=tokens+? WHERE disc_id=?"
+                self.execute_query(db, query_tokens, (amount_won, disc_id))

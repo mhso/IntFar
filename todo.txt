@@ -1,4 +1,17 @@
-- Int-Far (og stat?) streak (efter 3 gange i træk maybe)
-- Besked efter streak er blevet brudt?
-- Få fjernet en Int-Far med exceptional plays (penta-kill, over 10 KDA, etc.)
-- Breakdown af hvad man fik Int-Far for, og hvor mange af hver type?
+--- Gambling ---
+- Earn credits by playing games, little for losing, more for winning
+- Bet credits on events
+- Credit leaderboard
+- Bet on yourself/other people
+- Dynamically adjusted payouts?
+
+* Betting events *
+- Game outcome: win/lose
+- Who will get Int-Far in next/current game?
+	- For what will they get Int-Far?
+- Who will get doinks in next/current game?
+	- For what will they be awarded doinks?
+- Specific stat things? (More than 5 deaths, more than 10 kills)
+- All events can be bet on until 10 min in-game. Bets made before game awards more tokens.
+
+* DB Structure *

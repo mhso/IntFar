@@ -28,7 +28,8 @@ class APIClient:
         response = self.make_request(endpoint, summ_id)
         if response.status_code != 200:
             return None
-        return response.json()["gameId"]
+        to_json = response.json()
+        return to_json["gameId"], int(to_json["gameStartTime"] / 1000)
 
     def get_game_details(self, game_id, tries=0):
         endpoint = "/lol/match/v4/matches/{0}"
@@ -36,7 +37,7 @@ class APIClient:
         if response.status_code != 200:
             if tries == 0:
                 return None
-            sleep(0.2)
+            sleep(10)
             return self.get_game_details(game_id, tries - 1) # Try again.
         return response.json()
 

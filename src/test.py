@@ -1,6 +1,6 @@
 import json
 import asyncio
-from database import Database
+from database import Database, DBException
 from config import Config
 from discord_bot import DiscordClient
 
@@ -67,8 +67,12 @@ conf.log("Initializing database...")
 
 database_client = Database(conf)
 
-conf.log("Starting Discord Client...")
+test = []
+for x, y, z in test:
+    print("LOL")
 
-client = TestMock(conf, database_client)
+# conf.log("Starting Discord Client...")
 
-client.run(conf.discord_token)
+# client = TestMock(conf, database_client)
+
+# client.run(conf.discord_token)

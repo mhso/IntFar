@@ -1,12 +1,13 @@
 import random
+import asyncio
 from time import time
 from traceback import print_exc
 from datetime import datetime
-from sqlite3 import DatabaseError, OperationalError
-import asyncio
 import discord
 import riot_api
 import game_stats
+import bets
+from database import DBException
 from montly_intfar import MonthlyIntfar
 
 DISCORD_SERVER_ID = 619073595561213953
@@ -80,30 +81,31 @@ VALID_COMMANDS = {
         "by providing your summoner name (fx. '!register imaqtpie')."
     ),
     "users": "List all users who are currently signed up for the Int-Far™ Tracker™.",
-    "help": "Show this helper text.",
-    "commands": "Show this helper text.",
+    "help": "Show the helper text.",
+    "commands": "Show this list of commands.",
+    "stats": "Show a list of available stat keywords to check",
     "intfar": (
-        "(summoner_name) - Show how many times you (if no summoner name is included), " +
+        "(person) - Show how many times you (if no summoner name is included), " +
         "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users."
     ),
-    "intfar_relations": "(summoner_name) - Show who you (or someone else) int the most games with.",
+    "intfar_relations": "(person) - Show who you (or someone else) int the most games with.",
     "intfar_criteria": (
         "[criteria] - List the things that need to happen for a person to get " +
         "Int-Far because of a specific criteria. Fx. '!intfar_criteria kda'."
     ),
     "doinks": (
-        "(summoner_name) - Show big doinks plays you (or someone else) did! " +
+        "(person) - Show big doinks plays you (or someone else) did! " +
         "'!doinks all' lists all doinks stats for all users."
     ),
     "doinks_criteria": "Show the different criterias needed for acquiring a doink.",
     "best": (
-        "[stat] (summoner_name) - Show how many times you (or someone else) " +
+        "[stat] (person) - Show how many times you (or someone else) " +
         "were the best in the specific stat. " +
         "Fx. '!best kda' shows how many times you had the best KDA in a game." +
         "'!best [stat] all' shows what the best ever was for that stat, and who got it."
     ),
     "worst": (
-        "[stat] (summoner_name) - Show how many times you (or someone else) " +
+        "[stat] (person) - Show how many times you (or someone else) " +
         "were the worst at the specific stat." +
         "'!worst [stat] all' shows what the worst ever was for that stat, and who got it."
     ),
@@ -111,7 +113,20 @@ VALID_COMMANDS = {
     "status": (
         "Show overall stats about how many games have been played, " +
         "how many people were Int-Far, etc."
-    )
+    ),
+    "bet": (
+        "[amount] [event] (person) - Bet a specific amount of credits on an event happening " +
+        "In the current or next game. Fx. '!bet 100 game_win', '!bet 30 intfar', " +
+        "'!bet 100 intfar slurp'."
+    ),
+    "cancel_bet": (
+        "[amount] [event] (person) - Cancel a previously placed bet with the given parameters. " +
+        "The bet can not be cancelled when the game has started."
+    ),
+    "betting": "Show information about betting, as well as list of possible events to bet on.",
+    "active_bets": "(person) - See a list of your (or someone else's) active bets.",
+    "bets": "(person) See a list of all your (or someone else's) lifetime bets.",
+    "bet_return": "[event] - See the return ratio of a specific betting event"
 }
 
 CUTE_COMMANDS = {
@@ -192,10 +207,12 @@ class DiscordClient(discord.Client):
         self.active_users = []
         self.users_in_game = None
         self.active_game = None
+        self.game_start = None
         self.channel_to_write = None
         self.test_channel = None
         self.initialized = False
         self.last_message_time = {}
+        self.betting_handler = bets.BettingHandler(database, config)
         self.time_initialized = datetime.now()
 
     async def poll_for_game_end(self):
@@ -218,8 +235,22 @@ class DiscordClient(discord.Client):
         if game_status == 2: # Game is over.
             try:
                 self.config.log("GAME OVER!!")
-                await self.declare_intfar()
+                self.config.log(f"Active game: {self.active_game}")
+                game_info = self.riot_api.get_game_details(self.active_game, tries=2)
+
+                if game_info is None:
+                    self.config.log("Game info is None! Weird stuff.", self.config.log_error)
+                    raise ValueError("Game info ins None!")
+                
+                filtered_stats = self.get_filtered_stats(game_info)
+
+                betting_data = await self.declare_intfar(filtered_stats)
+                if betting_data is not None:
+                    intfar, intfar_reason, doinks = betting_data
+                    await asyncio.sleep(1)
+                    await self.resolve_bets(filtered_stats, intfar, intfar_reason, doinks)
                 self.active_game = None
+                self.game_start = None
                 self.users_in_game = None # Reset the list of users who are in a game.
                 asyncio.create_task(self.poll_for_game_start())
             except Exception as e:
@@ -276,6 +307,7 @@ class DiscordClient(discord.Client):
 
     def check_game_status(self):
         active_game = None
+        active_game_start = None
         game_ids = set()
         # First check if users are in the same game (or all are in no games).
         user_list = self.active_users if self.users_in_game is None else self.users_in_game
@@ -286,8 +318,10 @@ class DiscordClient(discord.Client):
             active_id = None
             # Check if any of the summ_names/summ_ids for a given player is in a game.
             for summ_name, summ_id in zip(summ_names, summ_ids):
-                game_id = self.riot_api.get_active_game(summ_id)
-                if game_id is not None:
+                game_data = self.riot_api.get_active_game(summ_id)
+                if game_data is not None:
+                    game_id, game_start = game_data
+                    active_game_start = game_start
                     game_for_summoner = game_id
                     active_name = summ_name
                     active_id = summ_id
@@ -302,6 +336,7 @@ class DiscordClient(discord.Client):
 
         if active_game is not None and self.active_game is None:
             self.active_game = active_game
+            self.game_start = active_game_start
             self.users_in_game = users_in_current_game
             self.config.status_interval = 30 # Check status every 30 seconds.
             return 1 # Game is now active.
@@ -380,6 +415,40 @@ class DiscordClient(discord.Client):
             replaced = replaced.replace("{emote_" + emote + "}", emoji)
             emote_index = replaced.find("{emote_")
         return replaced
+
+    async def resolve_bets(self, game_info, intfar, intfar_reason, doinks):
+        response = "\n**--- Results of bets made that game ---**\n"
+        tokens_name = self.config.betting_tokens
+        any_bets = False
+        for disc_id, _, _ in self.users_in_game:
+            bets_made = self.betting_handler.get_active_bets(disc_id)
+            if bets_made != []:
+                mention = self.get_mention_str(disc_id)
+                if any_bets:
+                    response += "-----------------------------\n"
+                response += f"Result of bets {mention} made:\n"
+            for bet_id, amount, event_id, bet_timestamp, target in bets_made:
+                any_bets = True
+                bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_id, amount,
+                                                                       event_id, bet_timestamp,
+                                                                       target,
+                                                                       (intfar,
+                                                                        intfar_reason,
+                                                                        doinks, game_info))
+                person = None
+                if target is not None:
+                    person = self.get_discord_nick(target)
+
+                bet_desc = bets.get_dynamic_bet_desc(event_id, person)
+
+                response += f" - {bet_desc}: "
+                if bet_success:
+                    response += f"Bet was won! It awarded **{payout}** {tokens_name}!\n"
+                else:
+                    response += f"Bet was lost! It cost **{amount}** {tokens_name}!\n"
+
+        if any_bets:
+            await self.channel_to_write.send(response)
 
     def get_big_doinks(self, data):
         """
@@ -692,6 +761,7 @@ class DiscordClient(discord.Client):
                             our_team = participant["teamId"]
                             combined_stats = participant["stats"]
                             combined_stats["timestamp"] = game_info["gameCreation"]
+                            combined_stats["mapId"] = game_info["mapId"]
                             combined_stats.update(participant["timeline"])
                             filtered_stats.append((disc_id, combined_stats))
 
@@ -703,6 +773,7 @@ class DiscordClient(discord.Client):
                     stats["baronKills"] = team["baronKills"]
                     stats["dragonKills"] = team["dragonKills"]
                     stats["heraldKills"] = team["riftHeraldKills"]
+                    stats["gameWon"] = team["win"] == "Win"
                 else:
                     stats["enemyBaronKills"] = team["baronKills"]
                     stats["enemyDragonKills"] = team["dragonKills"]
@@ -759,26 +830,19 @@ class DiscordClient(discord.Client):
         sorted_by_gold = sorted(filtered_data, key=lambda x: x[1]["goldEarned"])
         return sorted_by_gold[0][0]
 
-    async def declare_intfar(self):
+    async def declare_intfar(self, filtered_stats):
         """
         Called when the currently active game is over.
         Determines if an Int-Far should be crowned and for what,
         and sends out a status message about the potential Int-Far (if there was one).
         Also saves worst/best stats for the current game.
         """
-        self.config.log(f"Active game: {self.active_game}")
-        game_info = self.riot_api.get_game_details(self.active_game, tries=2)
-
-        if game_info is None:
-            self.config.log("Game info is None! Weird stuff.", self.config.log_error)
-        if not self.riot_api.is_summoners_rift(game_info["mapId"]):
+        if not self.riot_api.is_summoners_rift(filtered_stats[0][1]["mapId"]):
             response = "That game was not on Summoner's Rift "
             response += "{emote_woahpikachu} no Int-Far will be crowned "
             response += "and no stats will be saved."
             await self.channel_to_write.send(self.insert_emotes(response))
-            return
-
-        filtered_stats = self.get_filtered_stats(game_info)
+            return None
 
         intfar_details = self.get_intfar_details(filtered_stats)
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
@@ -839,19 +903,22 @@ class DiscordClient(discord.Client):
 
             await self.channel_to_write.send(self.insert_emotes(response))
 
+        reasons_str = "".join(reason_ids)
+        if reasons_str == "0000":
+            reasons_str = None
+
         if not self.config.testing:
             try: # Save stats.
-                reasons_str = "".join(reason_ids)
-                if reasons_str == "0000":
-                    reasons_str = None
                 self.database.record_stats(final_intfar, reasons_str, doinks,
                                            self.active_game, filtered_stats, self.users_in_game)
-            except (DatabaseError, OperationalError) as exception:
+            except DBException as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
                 self.config.log(exception)
                 raise exception
 
             self.config.log("Game over! Stats were saved succesfully.")
+
+        return final_intfar, reasons_str, doinks
 
     async def user_joined_voice(self, member, poll_immediately=False):
         self.config.log("User joined voice: " + str(member.id))
@@ -996,22 +1063,44 @@ class DiscordClient(discord.Client):
 
     async def handle_helper_msg(self, message):
         """
-        Write the helper/commands message to Discord.
+        Write the helper message to Discord.
         """
-        valid_stats = ", ".join("'" + cmd + "'" for cmd in STAT_COMMANDS)
         response = "I gotchu fam {emote_nazi}\n"
         response += "The Int-Far™ Tracker™ is a highly sophisticated bot "
         response += "that watches when people in this server plays League, "
         response += "and judges them harshly if they int too hard {emote_simp_but_closeup}\n"
+        response += "- Write !commands to see a list of available commands, and their usages\n"
+        response += "- Write !stats to see a list of available stats to check\n"
+        response += "- Write !betting to see a list of events to bet on and how to do so"
 
-        response += "**--- Valid commands, and their usages, are listed below ---**\n```"
+        await message.channel.send(self.insert_emotes(response))
+
+    async def handle_commands_msg(self, message):
+        response = "**--- Valid commands, and their usages, are listed below ---**\n```"
         for cmd, desc in VALID_COMMANDS.items():
             response += f"!{cmd} - {desc}\n\n"
+        response += "\n```"
 
-        response += "```**--- Valid stats ---**\n```"
+        await message.channel.send(response)
+
+    async def handle_stats_msg(self, message):
+        valid_stats = ", ".join("'" + cmd + "'" for cmd in STAT_COMMANDS)
+        response = "**--- Valid stats ---**\n```"
         response += valid_stats
         response += "\n```"
-        await message.channel.send(self.insert_emotes(response))
+
+        await message.channel.send(response)
+
+    async def handle_betting_msg(self, message):
+        response = "Betting usage: `!bet [amount] [event] (person)`\n"
+        response += "This places a bet on the next (or current) match.\n"
+        response += "**--- List of available events to bet on ---***```\n"
+        for event_name, event_id in bets.BETTING_IDS.items():
+            event_desc = bets.BETTING_DESC[event_id]
+            response += f"{event_name} - Bet on {event_desc}\n"
+        response += "\n```"
+
+        await message.channel.send(response)
 
     def format_duration(self, dt_1, dt_2):
         normed_dt = dt_2.replace(year=dt_1.year, month=dt_1.month)
@@ -1350,6 +1439,36 @@ class DiscordClient(discord.Client):
             response += self.insert_emotes("{emote_carole_fucking_baskin}")
             await message.channel.send(response)
 
+    async def handle_make_bet_msg(self, message, amount_str, betting_event, target_name):
+        target_id = None
+        if target_name is not None: # Bet on a specific person doing a thing.
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+
+        response = self.betting_handler.place_bet(message.author.id, amount_str, self.game_start,
+                                                  betting_event, target_id)
+        await message.channel.send(response)
+
+    async def handle_cancel_bet_msg(self, message, amount_str, betting_event, target_name):
+        target_id = None
+        if target_name is not None: # Bet on a specific person doing a thing.
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+
+        response = self.betting_handler.cancel_bet(message.author.id, amount_str, betting_event,
+                                                   self.game_start, target_id)
+        await message.channel.send(response)
+
     async def handle_flirtation_msg(self, message, language):
         messages = FLIRT_MESSAGES[language]
         flirt_msg = self.insert_emotes(messages[random.randint(0, len(messages)-1)])
@@ -1400,6 +1519,9 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    async def not_implemented_yet(self, message):
+        await message.channel.send("This command is not implemented yet.")
+
     def get_target_name(self, split, start_index):
         if len(split) > start_index:
             return " ".join(split[start_index:])
@@ -1408,7 +1530,7 @@ class DiscordClient(discord.Client):
     async def get_data_and_respond(self, handler, *args):
         try:
             await handler(*args)
-        except (DatabaseError, OperationalError) as exception:
+        except DBException as exception:
             response = "Something went wrong when querying the database! "
             response += self.insert_emotes("{emote_fu}")
             await args[0].channel.send(response)
@@ -1465,8 +1587,14 @@ class DiscordClient(discord.Client):
                 await self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
             elif first_command == "doinks_criteria":
                 await self.handle_doinks_criteria_msg(message)
-            elif first_command in ("help", "commands"):
+            elif first_command == "help":
                 await self.handle_helper_msg(message)
+            elif first_command == "commands":
+                await self.handle_commands_msg(message)
+            elif first_command == "stats":
+                await self.handle_stats_msg(message)
+            elif first_command == "betting":
+                await self.handle_betting_msg(message)
             elif first_command == "status":
                 await self.handle_status_msg(message)
             elif first_command == "uptime":
@@ -1477,6 +1605,18 @@ class DiscordClient(discord.Client):
             elif first_command == "intfar_criteria":
                 criteria = self.get_target_name(split, 1)
                 await self.handle_intfar_criteria_msg(message, criteria)
+            elif first_command == "bet":
+                target_name = self.get_target_name(split, 2)
+                await self.get_data_and_respond(self.handle_make_bet_msg, message, first_command, second_command, target_name)
+            elif first_command == "cancel_bet":
+                target_name = self.get_target_name(split, 2)
+                await self.get_data_and_respond(self.handle_cancel_bet_msg, message, first_command, second_command, target_name)
+            elif first_command == "active_bets":
+                await self.not_implemented_yet(message)
+            elif first_command == "bets":
+                await self.not_implemented_yet(message)
+            elif first_command == "bet_return":
+                await self.not_implemented_yet(message)
             elif first_command == "intdaddy":
                 await self.handle_flirtation_msg(message, "english")
             elif first_command == "intpapi":

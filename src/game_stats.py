@@ -65,6 +65,8 @@ def get_game_summary(data, summ_ids, riot_api):
             break
 
     champ_played = riot_api.get_champ_name(champ_id)
+    if champ_played is None:
+        champ_played = "Unknown Champ (Rito pls)"
     date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
 
     return (f"{champ_played} with a score of {stats['kills']}/" +
