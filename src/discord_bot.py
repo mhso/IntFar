@@ -1128,11 +1128,10 @@ class DiscordClient(discord.Client):
         response += f"You can place a bet during a game, but it has to be done before {max_mins} "
         response += "minutes. Betting during a game returns a lower reward, based on "
         response += "how much time has passed in the game.\n"
-        response += "**--- List of available events to bet on ---**```\n"
+        response += "**--- List of available events to bet on ---**\n"
         for event_name, event_id in bets.BETTING_IDS.items():
             event_desc = bets.BETTING_DESC[event_id]
-            response += f"{event_name} - Bet on {event_desc}\n"
-        response += "\n```"
+            response += f"`{event_name}` - Bet on {event_desc}\n"
 
         await message.channel.send(response)
 
@@ -1502,6 +1501,7 @@ class DiscordClient(discord.Client):
             return
 
         target_id = None
+        discord_name = None
         if target_name is not None: # Bet on a specific person doing a thing.
             target_name = target_name.lower()
             target_id = self.try_get_user_data(target_name.strip())
@@ -1510,9 +1510,10 @@ class DiscordClient(discord.Client):
                 msg += f"{self.get_emoji_by_name('PepeHands')}"
                 await message.channel.send(msg)
                 return
+            discord_name = self.get_discord_nick(target_id)
 
         response = self.betting_handler.cancel_bet(message.author.id, amount_str, betting_event,
-                                                   self.game_start, target_id)
+                                                   self.game_start, target_id, discord_name)
         await message.channel.send(response)
 
     async def handle_bet_return_msg(self, message, betting_event):

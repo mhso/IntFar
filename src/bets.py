@@ -267,7 +267,7 @@ class BettingHandler:
 
         return response + award_equation + balance_resp
 
-    def cancel_bet(self, disc_id, bet_amount, bet_str, game_timestamp, target):
+    def cancel_bet(self, disc_id, bet_amount, bet_str, game_timestamp, target_id, target_name):
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
         if event_id is None:
@@ -280,16 +280,16 @@ class BettingHandler:
             return f"Bet was not placed: Invalid bet amount: '{bet_amount}'."
 
         try:
-            if not self.database.bet_exists(disc_id, event_id, target):
+            if not self.database.bet_exists(disc_id, event_id, target_id):
                 return "Bet was not cancelled: No bet exists with the specified parameters."
 
             if game_timestamp is not None: # Game has already started.
                 return "Bet was not cancelled: Game is underway!"
 
-            self.database.cancel_bet(disc_id, event_id, amount, target)
+            self.database.cancel_bet(disc_id, event_id, amount, target_id)
             new_balance = self.database.get_token_balance(disc_id)
 
-            bet_desc = BETTING_DESC[event_id]
+            bet_desc = get_dynamic_bet_desc(event_id, target_name)
             response = f"Bet on `{bet_desc}` for {amount} {tokens_name} successfully cancelled.\n"
             response += f"Your {tokens_name} balance is now `{new_balance}`."
             return response
