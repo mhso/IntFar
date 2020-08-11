@@ -127,10 +127,27 @@ class BettingHandler:
     def get_active_bets(self, disc_id):
         return self.database.get_active_bets(disc_id)
 
+    def get_bet_return_desc(self, bet_str):
+        event_id = BETTING_IDS.get(bet_str)
+        if event_id is None:
+            return f"Invalid event to bet on: '{bet_str}'."
+
+        event_desc = BETTING_DESC[event_id]
+
+        base_return = self.database.get_bet_return(event_id)
+        response = f"Betting on `{event_desc}` would return {base_return} times your investment.\n"
+        response += "If you bet after the game has started, the return will be lower.\n"
+        if event_id > 1:
+            response += "If you bet on this event happening to a *specific* person "
+            response += "(not just *anyone*), then the return will be further multiplied "
+            response += "by how many people are in the game (2x return if 2 people are in "
+            response += "the game, 3x return if 3 people, etc)."
+        return response
+
     def get_bet_value(self, bet_amount, event_id, bet_timestamp):
-        max_return = self.database.get_bet_return(event_id)
+        base_return = self.database.get_bet_return(event_id)
         if bet_timestamp == 0: # Bet was made before game started, award full value.
-            return int(bet_amount * max_return)
+            return int(bet_amount * base_return)
 
         max_time = 60 * BettingHandler.MAX_BETTING_THRESHOLD
         ratio = bet_timestamp / max_time # Scale value with game time at which bet was made.
@@ -138,7 +155,7 @@ class BettingHandler:
         if value < 1:
             value = 1 # If value rounds down to 0, reward a minimum of 1 payout.
 
-        return value, max_return, ratio
+        return value, base_return, ratio
 
     def resolve_bet(self, disc_id, bet_id, amount, event_id, bet_timestamp, target_id, game_data):
         intfar, intfar_reason, doinks, game_stats = game_data
@@ -193,8 +210,13 @@ class BettingHandler:
                 f"{BettingHandler.MAX_BETTING_THRESHOLD} minutes in game."
             )
 
+        current_balance = 0
+
         try: # Actually save the bet in the database.
-            if self.database.has_enough_tokens(disc_id, amount):
+            if self.database.bet_exists(disc_id, event_id, bet_target):
+                return "Bet was not placed: Such a bet has already been made!"
+            current_balance = self.database.get_token_balance(disc_id)
+            if current_balance >= amount:
                 self.database.make_bet(disc_id, event_id, amount, duration, bet_target)
             else:
                 return f"Bet was not placed: You do not have enough {tokens_name}."
@@ -229,7 +251,10 @@ class BettingHandler:
                 "more players are in the game."
             )
 
-        return response + award_equation
+        new_balance = current_balance - amount
+        balance_resp = f"\nYour {tokens_name} balance is now `{new_balance}`."
+
+        return response + award_equation + balance_resp
 
     def cancel_bet(self, disc_id, bet_amount, bet_str, game_timestamp, target):
         event_id = BETTING_IDS.get(bet_str)
@@ -251,9 +276,12 @@ class BettingHandler:
                 return "Bet was not cancelled: Game is underway!"
 
             self.database.cancel_bet(disc_id, event_id, amount, target)
+            new_balance = self.database.get_token_balance(disc_id)
 
             bet_desc = BETTING_DESC[event_id]
-            return f"Bet on `{bet_desc}` for {amount} {tokens_name} successfully cancelled."
+            response = f"Bet on `{bet_desc}` for {amount} {tokens_name} successfully cancelled.\n"
+            response += f"Your {tokens_name} balance is now `{new_balance}`."
+            return response
         except DBException:
             print_exc()
             return "Bet was not cancelled: Database error occured :("

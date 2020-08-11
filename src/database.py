@@ -378,11 +378,10 @@ class Database:
             query = "SELECT max_return FROM betting_events WHERE id=?"
             return self.execute_query(db, query, (event_id,)).fetchone()[0]
 
-    def has_enough_tokens(self, disc_id, tokens):
+    def get_token_balance(self, disc_id):
         with closing(self.get_connection()) as db:
             query = "SELECT tokens FROM betting_balance WHERE disc_id=?"
-            balance = self.execute_query(db, query, (disc_id,)).fetchone()[0]
-            return balance >= tokens
+            return self.execute_query(db, query, (disc_id,)).fetchone()[0]
 
     def bet_exists(self, disc_id, event_id, target=None):
         with closing(self.get_connection()) as db:

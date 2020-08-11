@@ -114,10 +114,10 @@ VALID_COMMANDS = {
         "Show overall stats about how many games have been played, " +
         "how many people were Int-Far, etc."
     ),
-    "bet": (
+    "make_bet": (
         "[amount] [event] (person) - Bet a specific amount of credits on an event happening " +
-        "In the current or next game. Fx. '!bet 100 game_win', '!bet 30 intfar', " +
-        "'!bet 100 intfar slurp'."
+        "In the current or next game. Fx. '!make_bet 100 game_win', '!make_bet 30 intfar' or " +
+        "'!make_bet all intfar slurp' (bet all on slurp being Int-Far)."
     ),
     "cancel_bet": (
         "[amount] [event] (person) - Cancel a previously placed bet with the given parameters. " +
@@ -125,7 +125,8 @@ VALID_COMMANDS = {
     ),
     "betting": "Show information about betting, as well as list of possible events to bet on.",
     "active_bets": "(person) - See a list of your (or someone else's) active bets.",
-    "bets": "(person) See a list of all your (or someone else's) lifetime bets.",
+    "bets": "(person) - See a list of all your (or someone else's) lifetime bets.",
+    "betting_tokens" : "(person) - See how many betting tokens  you (or someone else) has.",
     "bet_return": "[event] - See the return ratio of a specific betting event"
 }
 
@@ -1092,9 +1093,15 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_betting_msg(self, message):
-        response = "Betting usage: `!bet [amount] [event] (person)`\n"
+        max_mins = bets.BettingHandler.MAX_BETTING_THRESHOLD
+        tokens_name = self.config.betting_tokens
+        response = "Betting usage: `!make_bet [amount] [event] (person)`\n"
         response += "This places a bet on the next (or current) match.\n"
-        response += "**--- List of available events to bet on ---***```\n"
+        response += f"!make_bet all [event] (person) bets **all** your {tokens_name}!\n"
+        response += f"You can place a bet during a game, but it has to be before {max_mins} "
+        response += "minutes. Betting during a game returns a lower reward, based on "
+        response += "how much time has passed.\n"
+        response += "**--- List of available events to bet on ---**```\n"
         for event_name, event_id in bets.BETTING_IDS.items():
             event_desc = bets.BETTING_DESC[event_id]
             response += f"{event_name} - Bet on {event_desc}\n"
@@ -1469,6 +1476,73 @@ class DiscordClient(discord.Client):
                                                    self.game_start, target_id)
         await message.channel.send(response)
 
+    async def handle_bet_return_msg(self, message, betting_event):
+        response = self.betting_handler.get_bet_return_desc(betting_event)
+        await message.channel.send(response)
+
+    async def handle_active_bets_msg(self, message, target_name):
+        target_id = message.author.id
+        recepient = message.author.name
+        if target_name is not None:
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            recepient = self.get_discord_nick(target_id)
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+
+        active_bets = self.betting_handler.get_active_bets(target_id)
+
+        response = ""
+        if active_bets == []:
+            response = f"{recepient} has no active bets."
+        else:
+            tokens_name = self.config.betting_tokens
+            response = f"{recepient} has the following active bets:"
+            for _, amount, event_id, _, target in active_bets:
+                person = None
+                if target is not None:
+                    person = self.get_discord_nick(target)
+
+                bet_desc = bets.get_dynamic_bet_desc(event_id, person)
+
+                response += f"\n - `{bet_desc}` for {amount} {tokens_name}."
+
+        await message.channel.send(response)
+
+    async def handle_token_balance_msg(self, message, target_name):
+        def get_token_balance(disc_id):
+            name = self.get_discord_nick(disc_id)
+            balance = self.database.get_token_balance(disc_id)
+            return balance, name
+
+        tokens_name = self.config.betting_tokens
+        target_id = message.author.id
+        if target_name is not None:
+            target_name = target_name.lower()
+            if target_name == "all":
+                target_id = None
+            else:
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
+
+        response = ""
+        if target_id is None: # Get betting balance for all.
+            for disc_id, _, _ in self.database.summoners:
+                balance, name = get_token_balance(disc_id)
+                response += f"\n{name}: **{balance}** {tokens_name}"
+        else:
+            balance, name = get_token_balance(target_id)
+            response = f"\n{name} has a {tokens_name} balance of **{balance}**"
+
+        await message.channel.send(response)
+
     async def handle_flirtation_msg(self, message, language):
         messages = FLIRT_MESSAGES[language]
         flirt_msg = self.insert_emotes(messages[random.randint(0, len(messages)-1)])
@@ -1605,18 +1679,22 @@ class DiscordClient(discord.Client):
             elif first_command == "intfar_criteria":
                 criteria = self.get_target_name(split, 1)
                 await self.handle_intfar_criteria_msg(message, criteria)
-            elif first_command == "bet":
+            elif first_command == "make_bet" and len(split) > 1:
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_make_bet_msg, message, first_command, second_command, target_name)
-            elif first_command == "cancel_bet":
+            elif first_command == "cancel_bet" and len(split) > 1:
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_cancel_bet_msg, message, first_command, second_command, target_name)
             elif first_command == "active_bets":
-                await self.not_implemented_yet(message)
+                target_name = self.get_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_active_bets_msg, message, target_name)
             elif first_command == "bets":
                 await self.not_implemented_yet(message)
-            elif first_command == "bet_return":
-                await self.not_implemented_yet(message)
+            elif first_command == "bet_return" and len(split) > 1:
+                await self.handle_bet_return_msg(message, second_command)
+            elif first_command == "betting_tokens":
+                target_name = self.get_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_token_balance_msg, message, target_name)
             elif first_command == "intdaddy":
                 await self.handle_flirtation_msg(message, "english")
             elif first_command == "intpapi":
