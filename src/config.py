@@ -9,7 +9,7 @@ class Config:
         self.riot_key = ""
         self.status_interval = 60*10 # 10 minutes wait time between checking for status.
         self.database = "database.db"
-        self.betting_tokens = "cummies"
+        self.betting_tokens = "good-boi points"
         self.kda_lower_threshold = 1.3
         self.kda_death_criteria = 2
         self.death_lower_threshold = 9

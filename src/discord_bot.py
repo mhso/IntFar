@@ -1070,9 +1070,9 @@ class DiscordClient(discord.Client):
         response += "The Int-Far™ Tracker™ is a highly sophisticated bot "
         response += "that watches when people in this server plays League, "
         response += "and judges them harshly if they int too hard {emote_simp_but_closeup}\n"
-        response += "- Write !commands to see a list of available commands, and their usages\n"
-        response += "- Write !stats to see a list of available stats to check\n"
-        response += "- Write !betting to see a list of events to bet on and how to do so"
+        response += "- Write `!commands` to see a list of available commands, and their usages\n"
+        response += "- Write `!stats` to see a list of available stats to check\n"
+        response += "- Write `!betting` to see a list of events to bet on and how to do so"
 
         await message.channel.send(self.insert_emotes(response))
 
@@ -1097,7 +1097,7 @@ class DiscordClient(discord.Client):
         tokens_name = self.config.betting_tokens
         response = "Betting usage: `!make_bet [amount] [event] (person)`\n"
         response += "This places a bet on the next (or current) match.\n"
-        response += f"!make_bet all [event] (person) bets **all** your {tokens_name}!\n"
+        response += f"`!make_bet all [event] (person)` bets **all** your {tokens_name}!\n"
         response += f"You can place a bet during a game, but it has to be before {max_mins} "
         response += "minutes. Betting during a game returns a lower reward, based on "
         response += "how much time has passed.\n"
