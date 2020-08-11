@@ -1521,34 +1521,57 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_active_bets_msg(self, message, target_name):
-        target_id = message.author.id
-        recepient = message.author.name
-        if target_name is not None:
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            recepient = self.get_discord_nick(target_id)
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
+        def get_bet_description(disc_id, single_person=True):
+            active_bets = self.betting_handler.get_active_bets(disc_id)
+            recepient = self.get_discord_nick(disc_id)
 
-        active_bets = self.betting_handler.get_active_bets(target_id)
+            response = ""
+            if active_bets == []:
+                if single_person:
+                    response = f"{recepient} has no active bets."
+                else:
+                    response = None
+            else:
+                tokens_name = self.config.betting_tokens
+                response = f"{recepient} has the following active bets:"
+                for _, amount, event_id, _, target in active_bets:
+                    person = None
+                    if target is not None:
+                        person = self.get_discord_nick(target)
+
+                    bet_desc = bets.get_dynamic_bet_desc(event_id, person)
+
+                    response += f"\n - `{bet_desc}` for {amount} {tokens_name}."
+
+            return response
 
         response = ""
-        if active_bets == []:
-            response = f"{recepient} has no active bets."
+        target_id = message.author.id
+        if target_name is not None:
+            target_name = target_name.lower()
+            if target_name == "all":
+                target_id = None
+            else:
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
+
+        if target_id is None:
+            any_bet = True
+            for disc_id, _, _ in self.database.summoners:
+                bets_for_person = get_bet_description(disc_id, True)
+                if bets_for_person is not None:
+                    if not any_bet:
+                        bets_for_person = "\n" + bets_for_person
+                    response += bets_for_person
+                    any_bet = False
+            if not any_bet:
+                response = "No one has any active bets."
         else:
-            tokens_name = self.config.betting_tokens
-            response = f"{recepient} has the following active bets:"
-            for _, amount, event_id, _, target in active_bets:
-                person = None
-                if target is not None:
-                    person = self.get_discord_nick(target)
-
-                bet_desc = bets.get_dynamic_bet_desc(event_id, person)
-
-                response += f"\n - `{bet_desc}` for {amount} {tokens_name}."
+            response = get_bet_description(target_id)
 
         await message.channel.send(response)
 
