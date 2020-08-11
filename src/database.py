@@ -34,9 +34,11 @@ class Database:
     def execute_query(self, db, query, query_params=None):
         try:
             if query_params is None:
-                return db.cursor().execute(query)
+                cursor = db.cursor().execute(query)
             else:
-                return db.cursor().execute(query, query_params)
+                cursor = db.cursor().execute(query, query_params)
+            db.commit()
+            return cursor
         except (OperationalError, ProgrammingError, DatabaseError) as exc:
             raise DBException(exc.args)
 
@@ -391,7 +393,8 @@ class Database:
 
     def bet_exists(self, disc_id, event_id, target=None):
         with closing(self.get_connection()) as db:
-            query = "SELECT * FROM bets WHERE better_id=? AND event_id=? AND target=? AND result=0"
+            query = "SELECT * FROM bets WHERE better_id=? AND event_id=? "
+            query += "AND (target=? OR target IS NULL) AND result=0"
             return self.execute_query(db, query, (disc_id, event_id, target)).fetchone() is not None
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None):
@@ -404,8 +407,9 @@ class Database:
 
     def cancel_bet(self, disc_id, event_id, amount, target=None):
         with closing(self.get_connection()) as db:
-            query_bet = "DELETE FROM bets WHERE better_id=? AND event_id=? AND target=? AND result=0"
-            self.execute_query(db, query_bet, (disc_id, event_id, target))
+            query = "DELETE FROM bets WHERE better_id=? AND event_id=? "
+            query += "AND (target=? OR target IS NULL) AND result=0"
+            self.execute_query(db, query, (disc_id, event_id, target))
             self.update_token_balance(disc_id, amount, True)
 
     def mark_bet_as_resolved(self, disc_id, bet_id, success, amount_won=0):

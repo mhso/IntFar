@@ -1480,6 +1480,7 @@ class DiscordClient(discord.Client):
             return
 
         target_id = None
+        discord_name = None
         if target_name is not None: # Bet on a specific person doing a thing.
             target_name = target_name.lower()
             target_id = self.try_get_user_data(target_name.strip())
@@ -1488,9 +1489,10 @@ class DiscordClient(discord.Client):
                 msg += f"{self.get_emoji_by_name('PepeHands')}"
                 await message.channel.send(msg)
                 return
+            discord_name = self.get_discord_nick(target_id)
 
         response = self.betting_handler.place_bet(message.author.id, amount_str, self.game_start,
-                                                  betting_event, target_id)
+                                                  betting_event, target_id, discord_name)
         await message.channel.send(response)
 
     async def handle_cancel_bet_msg(self, message, amount_str, betting_event, target_name):

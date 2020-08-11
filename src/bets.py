@@ -192,7 +192,7 @@ class BettingHandler:
 
         return success, bet_value * person_multiplier
 
-    def place_bet(self, disc_id, bet_amount, game_timestamp, bet_str, bet_target):
+    def place_bet(self, disc_id, bet_amount, game_timestamp, bet_str, bet_target, target_name):
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
         if event_id is None:
@@ -228,14 +228,16 @@ class BettingHandler:
             else:
                 return f"Bet was not placed: You do not have enough {tokens_name}."
         except DBException:
+            self.config.log("What happened.", self.config.log_error)
             print_exc()
             return "Bet was not placed: Database error occured :("
 
         bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id, duration)
 
-        bet_desc = BETTING_DESC[event_id]
-        response = f"Bet succesfully placed: `{bet_desc}` for {amount} {tokens_name}.\n"
-        response += f"The return for that event is {base_return}.\n"
+        bet_desc = get_dynamic_bet_desc(event_id, target_name)
+
+        response = f"Bet succesfully placed: `{bet_desc}` for **{amount}** {tokens_name}.\n"
+        response += f"The return multiplier for that event is **{base_return}**.\n"
         if duration == 0:
             response += "You placed your bet before the game started, "
             response += "you will get the full reward. Potential winnings:\n"
@@ -248,8 +250,9 @@ class BettingHandler:
             award_equation += f" x {time_ratio}"
         if bet_target is not None:
             award_equation += " x [players_in_game]"
-        award_equation += f" = {bet_value} {tokens_name}"
-
+        award_equation += f" = **{bet_value}** {tokens_name}"
+        if bet_target is not None:
+            award_equation += " (minimum)"
         if duration > 0:
             award_equation += f"\n{time_ratio} is a penalty for betting during the game."
         if bet_target is not None:
