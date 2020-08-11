@@ -1474,6 +1474,11 @@ class DiscordClient(discord.Client):
             await message.channel.send(response)
 
     async def handle_make_bet_msg(self, message, amount_str, betting_event, target_name):
+        if amount_str is None or betting_event is None:
+            msg = "Usage: `!make_bet [amount] [event] (person)`"
+            await message.channel.send(msg)
+            return
+
         target_id = None
         if target_name is not None: # Bet on a specific person doing a thing.
             target_name = target_name.lower()
@@ -1489,6 +1494,11 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_cancel_bet_msg(self, message, amount_str, betting_event, target_name):
+        if amount_str is None or betting_event is None:
+            msg = "Usage: `!cancel_bet [amount] [event] (person)`"
+            await message.channel.send(msg)
+            return
+
         target_id = None
         if target_name is not None: # Bet on a specific person doing a thing.
             target_name = target_name.lower()
@@ -1657,6 +1667,7 @@ class DiscordClient(discord.Client):
                 return
 
             second_command = None if len(split) < 2 else split[1].lower()
+            third_command = None if len(split) < 3 else split[2].lower()
             if first_command == "register": # Register the user who sent the command.
                 if len(split) > 1:
                     summ_name = " ".join(split[1:])
@@ -1706,12 +1717,12 @@ class DiscordClient(discord.Client):
             elif first_command == "intfar_criteria":
                 criteria = self.get_target_name(split, 1)
                 await self.handle_intfar_criteria_msg(message, criteria)
-            elif first_command == "make_bet" and len(split) > 1:
-                target_name = self.get_target_name(split, 2)
-                await self.get_data_and_respond(self.handle_make_bet_msg, message, first_command, second_command, target_name)
-            elif first_command == "cancel_bet" and len(split) > 1:
-                target_name = self.get_target_name(split, 2)
-                await self.get_data_and_respond(self.handle_cancel_bet_msg, message, first_command, second_command, target_name)
+            elif first_command == "make_bet":
+                target_name = self.get_target_name(split, 3)
+                await self.get_data_and_respond(self.handle_make_bet_msg, message, second_command, third_command, target_name)
+            elif first_command == "cancel_bet":
+                target_name = self.get_target_name(split, 3)
+                await self.get_data_and_respond(self.handle_cancel_bet_msg, message, second_command, third_command, target_name)
             elif first_command == "active_bets":
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_active_bets_msg, message, target_name)

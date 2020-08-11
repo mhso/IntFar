@@ -153,11 +153,12 @@ class BettingHandler:
     def get_bet_value(self, bet_amount, event_id, bet_timestamp):
         base_return = self.database.get_bet_return(event_id)
         if bet_timestamp == 0: # Bet was made before game started, award full value.
-            return int(bet_amount * base_return)
+            ratio = 1.0
+        else:
+            max_time = 60 * BettingHandler.MAX_BETTING_THRESHOLD
+            ratio = bet_timestamp / max_time # Scale value with game time at which bet was made.
 
-        max_time = 60 * BettingHandler.MAX_BETTING_THRESHOLD
-        ratio = bet_timestamp / max_time # Scale value with game time at which bet was made.
-        value = int(bet_amount * ratio)
+        value = int(bet_amount * base_return * ratio)
         if value < 1:
             value = 1 # If value rounds down to 0, reward a minimum of 1 payout.
 
@@ -233,7 +234,8 @@ class BettingHandler:
         bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id, duration)
 
         bet_desc = BETTING_DESC[event_id]
-        response = f"Bet succesfully placed: `{bet_desc}` for {amount}.\n"
+        response = f"Bet succesfully placed: `{bet_desc}` for {amount} {tokens_name}.\n"
+        response += f"The return for that event is {base_return}.\n"
         if duration == 0:
             response += "You placed your bet before the game started, "
             response += "you will get the full reward. Potential winnings:\n"

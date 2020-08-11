@@ -392,7 +392,7 @@ class Database:
     def bet_exists(self, disc_id, event_id, target=None):
         with closing(self.get_connection()) as db:
             query = "SELECT * FROM bets WHERE better_id=? AND event_id=? AND target=? AND result=0"
-            return self.execute_query(db, query, (disc_id, event_id, target)).fetchone() is None
+            return self.execute_query(db, query, (disc_id, event_id, target)).fetchone() is not None
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None):
         with closing(self.get_connection()) as db:
