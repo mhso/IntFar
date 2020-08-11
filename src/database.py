@@ -383,6 +383,12 @@ class Database:
             query = "SELECT tokens FROM betting_balance WHERE disc_id=?"
             return self.execute_query(db, query, (disc_id,)).fetchone()[0]
 
+    def update_token_balance(self, disc_id, amount, increment=True):
+        with closing(self.get_connection()) as db:
+            sign_str = "+" if increment else "-"
+            query = f"UPDATE betting_balance SET tokens=tokens{sign_str}? WHERE disc_id=?"
+            self.execute_query(db, query, (amount, disc_id))
+
     def bet_exists(self, disc_id, event_id, target=None):
         with closing(self.get_connection()) as db:
             query = "SELECT * FROM bets WHERE better_id=? AND event_id=? AND target=? AND result=0"
@@ -392,17 +398,15 @@ class Database:
         with closing(self.get_connection()) as db:
             query_bet = "INSERT INTO bets(better_id, event_id, amount, game_duration, target, result) "
             query_bet += "VALUES (?, ?, ?, ?, ?, ?)"
-            query_balance = "UPDATE betting_balance SET tokens=tokens-? WHERE disc_id=?"
+            self.update_token_balance(disc_id, amount, False)
             self.execute_query(db, query_bet, (disc_id, event_id, amount,
                                                game_duration, target_person, 0))
-            self.execute_query(db, query_balance, (amount, disc_id))
 
     def cancel_bet(self, disc_id, event_id, amount, target=None):
         with closing(self.get_connection()) as db:
             query_bet = "DELETE FROM bets WHERE better_id=? AND event_id=? AND target=? AND result=0"
-            query_balance = "UPDATE betting_balance SET tokens=tokens+? WHERE disc_id=?"
             self.execute_query(db, query_bet, (disc_id, event_id, target))
-            self.execute_query(db, query_balance, (amount, disc_id))
+            self.update_token_balance(disc_id, amount, True)
 
     def mark_bet_as_resolved(self, disc_id, bet_id, success, amount_won=0):
         result_val = 1 if success else -1
@@ -410,5 +414,4 @@ class Database:
             query_bet = "UPDATE bets SET result=? WHERE id=?"
             self.execute_query(db, query_bet, (result_val, bet_id))
             if success:
-                query_tokens = "UPDATE betting_balance SET tokens=tokens+? WHERE disc_id=?"
-                self.execute_query(db, query_tokens, (amount_won, disc_id))
+                self.update_token_balance(disc_id, amount_won, True)

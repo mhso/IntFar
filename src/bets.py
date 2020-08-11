@@ -124,6 +124,12 @@ class BettingHandler:
         self.database = database
         self.config = config
 
+    def award_tokens_for_playing(self, disc_id, game_won):
+        tokens_gained = (self.config.betting_tokens_for_win
+                         if game_won
+                         else self.config.betting_tokens_for_loss)
+        self.database.update_token_balance(disc_id, tokens_gained, True)
+
     def get_active_bets(self, disc_id):
         return self.database.get_active_bets(disc_id)
 

@@ -77,57 +77,66 @@ FLIRT_MESSAGES = {
 
 VALID_COMMANDS = {
     "register": (
-        "[summoner_name] - Sign up for the Int-Far™ Tracker™ " +
-        "by providing your summoner name (fx. '!register imaqtpie')."
+        "[summoner_name]",
+        ("Sign up for the Int-Far™ Tracker™ " +
+         "by providing your summoner name (fx. '!register imaqtpie').")
     ),
-    "users": "List all users who are currently signed up for the Int-Far™ Tracker™.",
-    "help": "Show the helper text.",
-    "commands": "Show this list of commands.",
-    "stats": "Show a list of available stat keywords to check",
+    "users": (None, "List all users who are currently signed up for the Int-Far™ Tracker™."),
+    "help": (None, "Show the helper text."),
+    "commands": (None, "Show this list of commands."),
+    "stats": (None, "Show a list of available stat keywords to check"),
     "intfar": (
-        "(person) - Show how many times you (if no summoner name is included), " +
-        "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users."
+        "(person)",
+        ("Show how many times you (if no summoner name is included), " +
+         "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users.")
     ),
-    "intfar_relations": "(person) - Show who you (or someone else) int the most games with.",
+    "intfar_relations": ("(person)", "Show who you (or someone else) int the most games with."),
     "intfar_criteria": (
-        "[criteria] - List the things that need to happen for a person to get " +
-        "Int-Far because of a specific criteria. Fx. '!intfar_criteria kda'."
+        "[criteria]",
+        ("List the things that need to happen for a person to get " +
+         "Int-Far because of a specific criteria. Fx. '!intfar_criteria kda'.")
     ),
     "doinks": (
-        "(person) - Show big doinks plays you (or someone else) did! " +
-        "'!doinks all' lists all doinks stats for all users."
+        "(person)",
+        ("Show big doinks plays you (or someone else) did! " +
+         "'!doinks all' lists all doinks stats for all users.")
     ),
-    "doinks_criteria": "Show the different criterias needed for acquiring a doink.",
+    "doinks_criteria": (None, "Show the different criterias needed for acquiring a doink."),
     "best": (
-        "[stat] (person) - Show how many times you (or someone else) " +
-        "were the best in the specific stat. " +
-        "Fx. '!best kda' shows how many times you had the best KDA in a game." +
-        "'!best [stat] all' shows what the best ever was for that stat, and who got it."
+        "[stat] (person)",
+        ("Show how many times you (or someone else) " +
+         "were the best in the specific stat. " +
+         "Fx. '!best kda' shows how many times you had the best KDA in a game." +
+         "'!best [stat] all' shows what the best ever was for that stat, and who got it.")
     ),
     "worst": (
-        "[stat] (person) - Show how many times you (or someone else) " +
-        "were the worst at the specific stat." +
-        "'!worst [stat] all' shows what the worst ever was for that stat, and who got it."
+        "[stat] (person)",
+        ("Show how many times you (or someone else) " +
+         "were the worst at the specific stat." +
+         "'!worst [stat] all' shows what the worst ever was for that stat, and who got it.")
     ),
-    "uptime": "Show for how long the bot has been up and running.",
+    "uptime": (None, "Show for how long the bot has been up and running."),
     "status": (
-        "Show overall stats about how many games have been played, " +
-        "how many people were Int-Far, etc."
+        None,
+        ("Show overall stats about how many games have been played, " +
+         "how many people were Int-Far, etc.")
     ),
     "make_bet": (
-        "[amount] [event] (person) - Bet a specific amount of credits on an event happening " +
-        "In the current or next game. Fx. '!make_bet 100 game_win', '!make_bet 30 intfar' or " +
-        "'!make_bet all intfar slurp' (bet all on slurp being Int-Far)."
+        "[amount] [event] (person)",
+        ("Bet a specific amount of credits on an event happening " +
+         "In the current or next game. Fx. '!make_bet 100 game_win', '!make_bet 30 intfar' or " +
+         "'!make_bet all intfar slurp' (bet all on slurp being Int-Far).")
     ),
     "cancel_bet": (
-        "[amount] [event] (person) - Cancel a previously placed bet with the given parameters. " +
-        "The bet can not be cancelled when the game has started."
+        "[amount] [event] (person)",
+        ("Cancel a previously placed bet with the given parameters. " +
+         "The bet can not be cancelled when the game has started.")
     ),
-    "betting": "Show information about betting, as well as list of possible events to bet on.",
-    "active_bets": "(person) - See a list of your (or someone else's) active bets.",
-    "bets": "(person) - See a list of all your (or someone else's) lifetime bets.",
-    "betting_tokens" : "(person) - See how many betting tokens  you (or someone else) has.",
-    "bet_return": "[event] - See the return ratio of a specific betting event"
+    "betting": (None, "Show information about betting, as well as list of possible events to bet on."),
+    "active_bets": ("(person)", "See a list of your (or someone else's) active bets."),
+    "bets": ("(person)", "See a list of all your (or someone else's) lifetime bets."),
+    "betting_tokens" : ("(person)", "See how many betting tokens you (or someone else) has."),
+    "bet_return": ("[event]", "See the return award of a specific betting event")
 }
 
 CUTE_COMMANDS = {
@@ -418,16 +427,25 @@ class DiscordClient(discord.Client):
         return replaced
 
     async def resolve_bets(self, game_info, intfar, intfar_reason, doinks):
-        response = "\n**--- Results of bets made that game ---**\n"
+        game_won = game_info[0][1]["gameWon"]
+        tokens_name = self.config.betting_tokens
+        tokens_gained = (self.config.betting_tokens_for_win
+                         if game_won
+                         else self.config.betting_tokens_for_loss)
+        game_desc = "Game won!" if game_won else "Game lost."
+        response = f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
+        response_bets = "\n**--- Results of bets made that game ---**\n"
         tokens_name = self.config.betting_tokens
         any_bets = False
         for disc_id, _, _ in self.users_in_game:
+            self.betting_handler.award_tokens_for_playing(disc_id, game_info[0][1]["gameWon"])
+
             bets_made = self.betting_handler.get_active_bets(disc_id)
             if bets_made != []:
                 mention = self.get_mention_str(disc_id)
                 if any_bets:
-                    response += "-----------------------------\n"
-                response += f"Result of bets {mention} made:\n"
+                    response_bets += "-----------------------------\n"
+                response_bets += f"Result of bets {mention} made:\n"
             for bet_id, amount, event_id, bet_timestamp, target in bets_made:
                 any_bets = True
                 bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_id, amount,
@@ -442,14 +460,16 @@ class DiscordClient(discord.Client):
 
                 bet_desc = bets.get_dynamic_bet_desc(event_id, person)
 
-                response += f" - {bet_desc}: "
+                response_bets += f" - {bet_desc}: "
                 if bet_success:
-                    response += f"Bet was won! It awarded **{payout}** {tokens_name}!\n"
+                    response_bets += f"Bet was won! It awarded **{payout}** {tokens_name}!\n"
                 else:
-                    response += f"Bet was lost! It cost **{amount}** {tokens_name}!\n"
+                    response_bets += f"Bet was lost! It cost **{amount}** {tokens_name}!\n"
 
         if any_bets:
-            await self.channel_to_write.send(response)
+            response += response_bets
+
+        await self.channel_to_write.send(response)
 
     def get_big_doinks(self, data):
         """
@@ -1077,12 +1097,19 @@ class DiscordClient(discord.Client):
         await message.channel.send(self.insert_emotes(response))
 
     async def handle_commands_msg(self, message):
-        response = "**--- Valid commands, and their usages, are listed below ---**\n```"
-        for cmd, desc in VALID_COMMANDS.items():
-            response += f"!{cmd} - {desc}\n\n"
-        response += "\n```"
+        response = "**--- Valid commands, and their usages, are listed below ---**\n"
+        commands = []
+        for cmd, desc_tupl in VALID_COMMANDS.items():
+            params, desc = desc_tupl
+            params_str = "`-" if params is None else f"{params}` -"
+            commands.append(f"`!{cmd} {params_str} {desc}")
 
-        await message.channel.send(response)
+        message_1 = response + "\n".join(commands[:14]) + "\n"
+        message_2 = "\n".join(commands[14:])
+
+        await message.channel.send(message_1)
+        await asyncio.sleep(0.5)
+        await message.channel.send(message_2)
 
     async def handle_stats_msg(self, message):
         valid_stats = ", ".join("'" + cmd + "'" for cmd in STAT_COMMANDS)
@@ -1097,10 +1124,10 @@ class DiscordClient(discord.Client):
         tokens_name = self.config.betting_tokens
         response = "Betting usage: `!make_bet [amount] [event] (person)`\n"
         response += "This places a bet on the next (or current) match.\n"
-        response += f"`!make_bet all [event] (person)` bets **all** your {tokens_name}!\n"
-        response += f"You can place a bet during a game, but it has to be before {max_mins} "
+        response += f"`!make_bet all [event] (person)` bets **all** your {tokens_name} on an event!\n"
+        response += f"You can place a bet during a game, but it has to be done before {max_mins} "
         response += "minutes. Betting during a game returns a lower reward, based on "
-        response += "how much time has passed.\n"
+        response += "how much time has passed in the game.\n"
         response += "**--- List of available events to bet on ---**```\n"
         for event_name, event_id in bets.BETTING_IDS.items():
             event_desc = bets.BETTING_DESC[event_id]
@@ -1164,19 +1191,19 @@ class DiscordClient(discord.Client):
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         doinks_emote = self.insert_emotes("{emote_Doinks}")
 
-        response += f"--- Since {earliest_time}: ---\n"
+        response += f"--- Since {earliest_time} ---\n"
         response += f"- **{games}** games have been played\n"
         response += f"- **{users}** users have signed up\n"
         response += f"- **{intfars}** Int-Far awards have been given\n"
         response += f"- **{doinks}** {doinks_emote} have been earned\n"
-        response += "--- Of all games played: ---\n"
+        response += "--- Of all games played ---\n"
         response += f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
         response += f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
         response += f"- **{games_ratios[0]}%** were as a duo\n"
         response += f"- **{games_ratios[1]}%** were as a three-man\n"
         response += f"- **{games_ratios[2]}%** were as a four-man\n"
         response += f"- **{games_ratios[3]}%** were as a five-man stack\n"
-        response += "--- When Int-Fars were earned: ---\n"
+        response += "--- When Int-Fars were earned ---\n"
         response += f"- **{intfar_ratios[0]}%** were for dying a ton\n"
         response += f"- **{intfar_ratios[1]}%** were for having an awful KDA\n"
         response += f"- **{intfar_ratios[2]}%** were for having a low KP\n"
@@ -1536,10 +1563,10 @@ class DiscordClient(discord.Client):
         if target_id is None: # Get betting balance for all.
             for disc_id, _, _ in self.database.summoners:
                 balance, name = get_token_balance(disc_id)
-                response += f"\n{name}: **{balance}** {tokens_name}"
+                response += f"\n{name} has **{balance}** {tokens_name}"
         else:
             balance, name = get_token_balance(target_id)
-            response = f"\n{name} has a {tokens_name} balance of **{balance}**"
+            response = f"\n{name} has **{balance}** {tokens_name}"
 
         await message.channel.send(response)
 
