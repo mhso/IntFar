@@ -1562,7 +1562,7 @@ class DiscordClient(discord.Client):
         if target_id is None:
             any_bet = False
             for disc_id, _, _ in self.database.summoners:
-                bets_for_person = get_bet_description(disc_id, True)
+                bets_for_person = get_bet_description(disc_id, False)
                 if bets_for_person is not None:
                     if not any_bet:
                         bets_for_person = "\n" + bets_for_person
