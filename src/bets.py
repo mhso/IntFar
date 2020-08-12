@@ -117,12 +117,12 @@ RESOLVE_DOINKS_BET_FUNCS = [
 ]
 
 class BettingHandler:
-    MAX_BETTING_THRESHOLD = 10 # The latest a bet can be made (in game-time in minutes)
+    MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
     MINIMUM_BETTING_AMOUNT = 5
 
-    def __init__(self, database, config):
-        self.database = database
+    def __init__(self, config, database):
         self.config = config
+        self.database = database
 
     def award_tokens_for_playing(self, disc_id, game_won):
         tokens_gained = (self.config.betting_tokens_for_win
@@ -196,7 +196,7 @@ class BettingHandler:
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
         if event_id is None:
-            return f"Bet was not placed: Invalid event to bet on: '{bet_str}'."
+            return (False, f"Bet was not placed: Invalid event to bet on: '{bet_str}'.")
 
         min_amount = BettingHandler.MINIMUM_BETTING_AMOUNT
         amount = 0
@@ -204,8 +204,10 @@ class BettingHandler:
             amount = int(bet_amount)
             if amount < min_amount: # Bet was for less than the minimum allowed amount.
                 return (
-                    "Bet was not placed: Betting amount is too low. " +
-                    f"Must be minimum {min_amount}."
+                    False, (
+                        "Bet was not placed: Betting amount is too low. " +
+                        f"Must be minimum {min_amount}."
+                    )
                 )
         except ValueError:
             return f"Bet was not placed: Invalid bet amount: '{bet_amount}'."
@@ -213,24 +215,26 @@ class BettingHandler:
         duration = 0 if game_timestamp is None else time() - game_timestamp
         if duration > 60 * BettingHandler.MAX_BETTING_THRESHOLD:
             return (
-                "Bet was not placed: The game is too far progressed. You must place bet before " +
-                f"{BettingHandler.MAX_BETTING_THRESHOLD} minutes in game."
+                False, (
+                    "Bet was not placed: The game is too far progressed. You must place bet before " +
+                    f"{BettingHandler.MAX_BETTING_THRESHOLD} minutes in game."
+                )
             )
 
         current_balance = 0
 
         try: # Actually save the bet in the database.
             if self.database.bet_exists(disc_id, event_id, bet_target):
-                return "Bet was not placed: Such a bet has already been made!"
+                return (False, "Bet was not placed: Such a bet has already been made!")
             current_balance = self.database.get_token_balance(disc_id)
             if current_balance >= amount:
                 self.database.make_bet(disc_id, event_id, amount, duration, bet_target)
             else:
-                return f"Bet was not placed: You do not have enough {tokens_name}."
+                return (False, f"Bet was not placed: You do not have enough {tokens_name}.")
         except DBException:
             self.config.log("What happened.", self.config.log_error)
             print_exc()
-            return "Bet was not placed: Database error occured :("
+            return (False, "Bet was not placed: Database error occured :(")
 
         bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id, duration)
 
@@ -265,26 +269,26 @@ class BettingHandler:
         new_balance = current_balance - amount
         balance_resp = f"\nYour {tokens_name} balance is now `{new_balance}`."
 
-        return response + award_equation + balance_resp
+        return (True, response + award_equation + balance_resp)
 
     def cancel_bet(self, disc_id, bet_amount, bet_str, game_timestamp, target_id, target_name):
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
         if event_id is None:
-            return f"Bet was not cancelled: Not a valid betting event: '{bet_str}'"
+            return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
 
         amount = 0
         try:
             amount = int(bet_amount)
         except ValueError:
-            return f"Bet was not placed: Invalid bet amount: '{bet_amount}'."
+            return (False, f"Bet was not placed: Invalid bet amount: '{bet_amount}'.")
 
         try:
             if not self.database.bet_exists(disc_id, event_id, target_id):
-                return "Bet was not cancelled: No bet exists with the specified parameters."
+                return (False, "Bet was not cancelled: No bet exists with the specified parameters.")
 
             if game_timestamp is not None: # Game has already started.
-                return "Bet was not cancelled: Game is underway!"
+                return (False, "Bet was not cancelled: Game is underway!")
 
             self.database.cancel_bet(disc_id, event_id, amount, target_id)
             new_balance = self.database.get_token_balance(disc_id)
@@ -292,7 +296,7 @@ class BettingHandler:
             bet_desc = get_dynamic_bet_desc(event_id, target_name)
             response = f"Bet on `{bet_desc}` for {amount} {tokens_name} successfully cancelled.\n"
             response += f"Your {tokens_name} balance is now `{new_balance}`."
-            return response
+            return (True, response)
         except DBException:
             print_exc()
-            return "Bet was not cancelled: Database error occured :("
+            return (False, "Bet was not cancelled: Database error occured :(")

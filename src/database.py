@@ -71,7 +71,7 @@ class Database:
         with closing(self.get_connection()) as db:
             self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id) " +
                                     "VALUES (?, ?, ?)"), (discord_id, summ_name, summ_id))
-            self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 0))
+            self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100))
             db.commit()
 
     def discord_id_from_summoner(self, name):

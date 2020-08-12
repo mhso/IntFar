@@ -222,7 +222,7 @@ class DiscordClient(discord.Client):
         self.test_channel = None
         self.initialized = False
         self.last_message_time = {}
-        self.betting_handler = bets.BettingHandler(database, config)
+        self.betting_handler = bets.BettingHandler(config, database)
         self.time_initialized = datetime.now()
 
     async def poll_for_game_end(self):
@@ -1491,7 +1491,7 @@ class DiscordClient(discord.Client):
             discord_name = self.get_discord_nick(target_id)
 
         response = self.betting_handler.place_bet(message.author.id, amount_str, self.game_start,
-                                                  betting_event, target_id, discord_name)
+                                                  betting_event, target_id, discord_name)[1]
         await message.channel.send(response)
 
     async def handle_cancel_bet_msg(self, message, amount_str, betting_event, target_name):
@@ -1513,7 +1513,7 @@ class DiscordClient(discord.Client):
             discord_name = self.get_discord_nick(target_id)
 
         response = self.betting_handler.cancel_bet(message.author.id, amount_str, betting_event,
-                                                   self.game_start, target_id, discord_name)
+                                                   self.game_start, target_id, discord_name)[1]
         await message.channel.send(response)
 
     async def handle_bet_return_msg(self, message, betting_event):
@@ -1560,14 +1560,14 @@ class DiscordClient(discord.Client):
                     return
 
         if target_id is None:
-            any_bet = True
+            any_bet = False
             for disc_id, _, _ in self.database.summoners:
                 bets_for_person = get_bet_description(disc_id, True)
                 if bets_for_person is not None:
                     if not any_bet:
                         bets_for_person = "\n" + bets_for_person
                     response += bets_for_person
-                    any_bet = False
+                    any_bet = True
             if not any_bet:
                 response = "No one has any active bets."
         else:
