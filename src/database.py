@@ -405,12 +405,16 @@ class Database:
             self.execute_query(db, query_bet, (disc_id, event_id, amount,
                                                game_duration, target_person, 0))
 
-    def cancel_bet(self, disc_id, event_id, amount, target=None):
+    def cancel_bet(self, disc_id, event_id, target=None):
         with closing(self.get_connection()) as db:
-            query = "DELETE FROM bets WHERE better_id=? AND event_id=? "
-            query += "AND amount=? AND (target=? OR target IS NULL) AND result=0"
-            self.execute_query(db, query, (disc_id, event_id, amount, target))
+            query_del = "DELETE FROM bets WHERE better_id=? AND event_id=? "
+            query_del += "AND (target=? OR target IS NULL) AND result=0"
+            query_amount = "SELECT amount FROM bets WHERE better_id=? AND event_id=? "
+            query_amount += "AND (target=? OR target IS NULL) AND result=0"
+            amount = self.execute_query(db, query_amount, (disc_id, event_id, target)).fetchone()[0]
+            self.execute_query(db, query_del, (disc_id, event_id, target))
             self.update_token_balance(disc_id, amount, True)
+            return amount
 
     def mark_bet_as_resolved(self, disc_id, bet_id, success, amount_won=0):
         result_val = 1 if success else -1

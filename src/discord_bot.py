@@ -1501,9 +1501,9 @@ class DiscordClient(discord.Client):
                                                   betting_event, target_id, discord_name)[1]
         await message.channel.send(response)
 
-    async def handle_cancel_bet_msg(self, message, amount_str, betting_event, target_name):
-        if amount_str is None or betting_event is None:
-            msg = "Usage: `!cancel_bet [amount] [event] (person)`"
+    async def handle_cancel_bet_msg(self, message, betting_event, target_name):
+        if betting_event is None:
+            msg = "Usage: `!cancel_bet [event] (person)`"
             await message.channel.send(msg)
             return
 
@@ -1519,7 +1519,7 @@ class DiscordClient(discord.Client):
                 return
             discord_name = self.get_discord_nick(target_id)
 
-        response = self.betting_handler.cancel_bet(message.author.id, amount_str, betting_event,
+        response = self.betting_handler.cancel_bet(message.author.id, betting_event,
                                                    self.game_start, target_id, discord_name)[1]
         await message.channel.send(response)
 
@@ -1754,8 +1754,8 @@ class DiscordClient(discord.Client):
                 target_name = self.get_target_name(split, 3)
                 await self.get_data_and_respond(self.handle_make_bet_msg, message, second_command, third_command, target_name)
             elif first_command == "cancel_bet":
-                target_name = self.get_target_name(split, 3)
-                await self.get_data_and_respond(self.handle_cancel_bet_msg, message, second_command, third_command, target_name)
+                target_name = self.get_target_name(split, 2)
+                await self.get_data_and_respond(self.handle_cancel_bet_msg, message, second_command, target_name)
             elif first_command == "active_bets":
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_active_bets_msg, message, target_name)
