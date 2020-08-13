@@ -128,7 +128,7 @@ VALID_COMMANDS = {
          "'!make_bet all intfar slurp' (bet all on slurp being Int-Far).")
     ),
     "cancel_bet": (
-        "[amount] [event] (person)",
+        "[event] (person)",
         ("Cancel a previously placed bet with the given parameters. " +
          "The bet can not be cancelled when the game has started.")
     ),
