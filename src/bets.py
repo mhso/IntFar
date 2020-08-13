@@ -247,8 +247,8 @@ class BettingHandler:
 
         response = f"Bet succesfully placed: `{bet_desc}` for "
         if bet_amount == "all":
-            capitalized = tokens_name.upper()
-            response += f"***ALL YOUR {capitalized}, YOU MAD LAD!!!\n"
+            capitalized = tokens_name[1:-1].upper()
+            response += f"***ALL YOUR {capitalized}, YOU MAD LAD!!!***\n"
         else:
             response += f"**{amount}** {tokens_name}.\n"
 
