@@ -1604,8 +1604,14 @@ class DiscordClient(discord.Client):
 
         response = ""
         if target_id is None: # Get betting balance for all.
+            balances = []
             for disc_id, _, _ in self.database.summoners:
                 balance, name = get_token_balance(disc_id)
+                balances.append((balance, name))
+
+            balances.sort(key=lambda x: x[0], reverse=True)
+
+            for balance, name in balances:
                 response += f"\n{name} has **{balance}** {tokens_name}"
         else:
             balance, name = get_token_balance(target_id)
