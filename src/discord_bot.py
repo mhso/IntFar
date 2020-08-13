@@ -465,11 +465,11 @@ class DiscordClient(discord.Client):
 
                 bet_desc = bets.get_dynamic_bet_desc(event_id, person)
 
-                response_bets += f" - {bet_desc}: "
+                response_bets += f" - `{bet_desc}`: "
                 if bet_success:
-                    response_bets += f"Bet was won! It awarded **{payout}** {tokens_name}!\n"
+                    response_bets += f"Bet was **won**! It awarded **{payout}** {tokens_name}!\n"
                 else:
-                    response_bets += f"Bet was lost! It cost **{amount}** {tokens_name}!\n"
+                    response_bets += f"Bet was **lost**! It cost **{amount}** {tokens_name}!\n"
 
         if any_bets:
             response += response_bets
