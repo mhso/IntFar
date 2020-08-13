@@ -41,7 +41,7 @@ BETTING_DESC = {
 def get_dynamic_bet_desc(event_id, target_person=None):
     bet_desc = BETTING_DESC[event_id]
     if target_person is not None:
-        bet_desc = bet_desc.replace("Someone", target_person)
+        bet_desc = bet_desc.replace("someone", target_person)
     return bet_desc
 
 def resolve_game_outcome(game_data, bet_on_win):
