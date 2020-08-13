@@ -202,9 +202,12 @@ class BettingHandler:
             return (False, f"Bet was not placed: Invalid event to bet on: '{bet_str}'.")
 
         min_amount = BettingHandler.MINIMUM_BETTING_AMOUNT
+        current_balance = 0
         amount = 0
         try:
-            amount = int(bet_amount)
+            current_balance = self.database.get_token_balance(disc_id)
+            amount = current_balance if bet_amount == "all" else int(bet_amount)
+
             if amount < min_amount: # Bet was for less than the minimum allowed amount.
                 return (
                     False, (
@@ -214,6 +217,9 @@ class BettingHandler:
                 )
         except ValueError:
             return f"Bet was not placed: Invalid bet amount: '{bet_amount}'."
+        except DBException:
+            print_exc()
+            return (False, "Bet was not placed: Database error occured :(")
 
         duration = 0 if game_timestamp is None else time() - game_timestamp
         if duration > 60 * BettingHandler.MAX_BETTING_THRESHOLD:
@@ -224,18 +230,14 @@ class BettingHandler:
                 )
             )
 
-        current_balance = 0
-
         try: # Actually save the bet in the database.
             if self.database.bet_exists(disc_id, event_id, bet_target):
                 return (False, "Bet was not placed: Such a bet has already been made!")
-            current_balance = self.database.get_token_balance(disc_id)
             if current_balance >= amount:
                 self.database.make_bet(disc_id, event_id, amount, duration, bet_target)
             else:
                 return (False, f"Bet was not placed: You do not have enough {tokens_name}.")
         except DBException:
-            self.config.log("What happened.", self.config.log_error)
             print_exc()
             return (False, "Bet was not placed: Database error occured :(")
 
@@ -243,7 +245,13 @@ class BettingHandler:
 
         bet_desc = get_dynamic_bet_desc(event_id, target_name)
 
-        response = f"Bet succesfully placed: `{bet_desc}` for **{amount}** {tokens_name}.\n"
+        response = f"Bet succesfully placed: `{bet_desc}` for "
+        if bet_amount == "all":
+            capitalized = tokens_name.upper()
+            response += f"***ALL YOUR {capitalized}, YOU MAD LAD!!!\n"
+        else:
+            response += f"**{amount}** {tokens_name}.\n"
+
         response += f"The return multiplier for that event is **{base_return}**.\n"
         if duration == 0:
             response += "You placed your bet before the game started, "
