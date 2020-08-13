@@ -930,6 +930,7 @@ class DiscordClient(discord.Client):
             if streak_msg is not None:
                 response += "\n" + streak_msg
 
+            response += "\n-----------------------------------------------"
             await self.channel_to_write.send(self.insert_emotes(response))
 
         reasons_str = "".join(reason_ids)
