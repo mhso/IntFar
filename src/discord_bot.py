@@ -912,8 +912,9 @@ class DiscordClient(discord.Client):
                 if count > 0:
                     reason_text = " **AND** " + reason_text
                 reason += reason_text
-                if redeemed_text is not None:
-                    reason += "\n" + redeemed_text
+
+            if redeemed_text is not None:
+                reason += "\n" + redeemed_text
 
             await self.send_intfar_message(final_intfar, reason, intfar_streak, prev_intfar)
         else: # No one was bad enough to be Int-Far.

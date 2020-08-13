@@ -216,7 +216,7 @@ class BettingHandler:
                     )
                 )
         except ValueError:
-            return f"Bet was not placed: Invalid bet amount: '{bet_amount}'."
+            return (False, f"Bet was not placed: Invalid bet amount: '{bet_amount}'.")
         except DBException:
             print_exc()
             return (False, "Bet was not placed: Database error occured :(")
