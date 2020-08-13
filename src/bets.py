@@ -222,6 +222,8 @@ class BettingHandler:
             return (False, "Bet was not placed: Database error occured :(")
 
         duration = 0 if game_timestamp is None else time() - game_timestamp
+        self.config.log(f"Game start: {game_timestamp}")
+        self.config.log(f"Duration in game: {duration}")
         if duration > 60 * BettingHandler.MAX_BETTING_THRESHOLD:
             return (
                 False, (

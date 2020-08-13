@@ -347,6 +347,7 @@ class DiscordClient(discord.Client):
         if active_game is not None and self.active_game is None:
             self.active_game = active_game
             self.game_start = active_game_start
+            self.config.log(f"Game start: {datetime.fromtimestamp(self.game_start)}")
             self.users_in_game = users_in_current_game
             return 1 # Game is now active.
         if active_game is None and self.active_game is not None: # The current game is over.

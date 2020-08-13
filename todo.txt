@@ -15,3 +15,6 @@
 - All events can be bet on until 10 min in-game. Bets made before game awards more tokens.
 
 * DB Structure *
+
+start = 1597355152
+time() = 1597355337.4336839
