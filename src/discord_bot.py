@@ -235,7 +235,7 @@ class DiscordClient(discord.Client):
         time_slept = 0
         sleep_per_loop = 0.5
         try:
-            while time_slept < self.config.status_interval:
+            while time_slept < self.config.status_interval_ingame:
                 await asyncio.sleep(sleep_per_loop)
                 time_slept += sleep_per_loop
         except KeyboardInterrupt:
@@ -278,7 +278,7 @@ class DiscordClient(discord.Client):
         self.config.log("People are active in voice channels! Polling for games...")
         if not immediately:
             try:
-                while time_slept < self.config.status_interval:
+                while time_slept < self.config.status_interval_dormant:
                     if not self.polling_is_active(): # Stop if people leave voice channels.
                         self.config.log("Polling is no longer active.")
                         return
@@ -348,10 +348,8 @@ class DiscordClient(discord.Client):
             self.active_game = active_game
             self.game_start = active_game_start
             self.users_in_game = users_in_current_game
-            self.config.status_interval = 30 # Check status every 30 seconds.
             return 1 # Game is now active.
         if active_game is None and self.active_game is not None: # The current game is over.
-            self.config.status_interval = 60*10
             return 2 # Game is over.
         return 0
 
@@ -437,8 +435,15 @@ class DiscordClient(discord.Client):
         response_bets = "\n**--- Results of bets made that game ---**\n"
         tokens_name = self.config.betting_tokens
         any_bets = False
-        for disc_id, _, _ in self.users_in_game:
-            self.betting_handler.award_tokens_for_playing(disc_id, game_info[0][1]["gameWon"])
+        for disc_id, _, _ in self.database.summoners:
+            user_in_game = False
+            for in_game_id, _, _ in self.users_in_game:
+                if disc_id == in_game_id:
+                    user_in_game = True
+                    break
+
+            if user_in_game:
+                self.betting_handler.award_tokens_for_playing(disc_id, game_info[0][1]["gameWon"])
 
             bets_made = self.betting_handler.get_active_bets(disc_id)
             if bets_made != []:
@@ -735,6 +740,8 @@ class DiscordClient(discord.Client):
         ifotm_lead_msg = self.get_ifotm_lead_msg(disc_id)
         if ifotm_lead_msg is not None:
             message += "\n" + ifotm_lead_msg
+
+        message += "\n-----------------------------------------------"
 
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
@@ -1564,7 +1571,7 @@ class DiscordClient(discord.Client):
             for disc_id, _, _ in self.database.summoners:
                 bets_for_person = get_bet_description(disc_id, False)
                 if bets_for_person is not None:
-                    if not any_bet:
+                    if any_bet:
                         bets_for_person = "\n" + bets_for_person
                     response += bets_for_person
                     any_bet = True

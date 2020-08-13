@@ -39,7 +39,7 @@ BETTING_DESC = {
 }
 
 def get_dynamic_bet_desc(event_id, target_person=None):
-    bet_desc = BETTING_DESC[event_id].capitalize()
+    bet_desc = BETTING_DESC[event_id]
     if target_person is not None:
         bet_desc = bet_desc.replace("Someone", target_person)
     return bet_desc
@@ -154,9 +154,9 @@ class BettingHandler:
         base_return = self.database.get_bet_return(event_id)
         if bet_timestamp == 0: # Bet was made before game started, award full value.
             ratio = 1.0
-        else:
+        else: # Scale value with game time at which bet was made.
             max_time = 60 * BettingHandler.MAX_BETTING_THRESHOLD
-            ratio = bet_timestamp / max_time # Scale value with game time at which bet was made.
+            ratio = 1 - (bet_timestamp / max_time)
 
         value = int(bet_amount * base_return * ratio)
         if value < 1:
@@ -183,6 +183,9 @@ class BettingHandler:
                      if success
                      else 0)
 
+        if target_id is not None:
+            bet_value = bet_value * person_multiplier
+
         try:
             self.database.mark_bet_as_resolved(disc_id, bet_id, success, bet_value)
         except DBException:
@@ -190,7 +193,7 @@ class BettingHandler:
             self.config.log("Database error during bet resolution!", self.config.log_error)
             return
 
-        return success, bet_value * person_multiplier
+        return success, bet_value
 
     def place_bet(self, disc_id, bet_amount, game_timestamp, bet_str, bet_target, target_name):
         event_id = BETTING_IDS.get(bet_str)

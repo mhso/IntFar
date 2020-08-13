@@ -7,7 +7,8 @@ class Config:
         self.testing = False
         self.discord_token = ""
         self.riot_key = ""
-        self.status_interval = 60*10 # 10 minutes wait time between checking for status.
+        self.status_interval_dormant = 60 * 2 # 2 minutes wait time between checking for status.
+        self.status_interval_ingame = 30 # 30 seconds wait time when in-game.
         self.database = "database.db"
         self.betting_tokens = "*good-boi points*"
         self.betting_tokens_for_win = 8

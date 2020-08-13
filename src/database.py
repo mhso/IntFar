@@ -408,8 +408,8 @@ class Database:
     def cancel_bet(self, disc_id, event_id, amount, target=None):
         with closing(self.get_connection()) as db:
             query = "DELETE FROM bets WHERE better_id=? AND event_id=? "
-            query += "AND (target=? OR target IS NULL) AND result=0"
-            self.execute_query(db, query, (disc_id, event_id, target))
+            query += "AND amount=? AND (target=? OR target IS NULL) AND result=0"
+            self.execute_query(db, query, (disc_id, event_id, amount, target))
             self.update_token_balance(disc_id, amount, True)
 
     def mark_bet_as_resolved(self, disc_id, bet_id, success, amount_won=0):
