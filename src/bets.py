@@ -1,6 +1,9 @@
 from time import time
-from database import DBException
+from datetime import datetime
 from traceback import print_exc
+from database import DBException
+from util import format_duration, round_digits
+import game_stats
 
 BETTING_IDS = {
     "game_win": 0,
@@ -17,7 +20,10 @@ BETTING_IDS = {
     "doinks_penta": 11,
     "doinks_vision": 12,
     "doinks_kp": 13,
-    "doinks_monsters": 14
+    "doinks_monsters": 14,
+    "most_kills": 15,
+    "most_damage": 16,
+    "most_kp": 17
 }
 
 BETTING_DESC = {
@@ -35,7 +41,10 @@ BETTING_DESC = {
     11: "someone being awarded doinks for getting a pentakill",
     12: "someone being awarded doinks for high vision score",
     13: "someone being awarded doinks for high KP",
-    14: "someone being awarded doinks for securing all epic monsters"
+    14: "someone being awarded doinks for securing all epic monsters",
+    15: "someone getting the most kills",
+    16: "someone doing the most damamge",
+    17: "someone having the highest kill participation"
 }
 
 def get_dynamic_bet_desc(event_id, target_person=None):
@@ -43,6 +52,9 @@ def get_dynamic_bet_desc(event_id, target_person=None):
     if target_person is not None:
         bet_desc = bet_desc.replace("someone", target_person)
     return bet_desc
+
+def bet_requires_target(event_id):
+    return event_id > 14
 
 def resolve_game_outcome(game_data, bet_on_win):
     stats = game_data[0][1]
@@ -105,6 +117,22 @@ def resolve_doinks_for_kp(doinks, target_id):
 def resolve_doinks_for_monsters(doinks, target_id):
     return resolve_doinks_by_reason(doinks, target_id, 6)
 
+def resolve_most_kills(game_data, target_id):
+    # Ties for most kills are included. If more than one person has most kills, bet is still won.
+    most_kills_ties = game_stats.get_outlier(game_data, "kills", asc=False, include_ties=True)[0]
+    return target_id in most_kills_ties
+
+def resolve_most_damage(game_data, target_id):
+    # Ties for most damage is included. If more than one person has most dmg, bet is still won.
+    most_damage_ties = game_stats.get_outlier(game_data, "totalDamageDealtToChampions",
+                                              asc=False, include_ties=True)[0]
+    return target_id in most_damage_ties
+
+def resolve_highest_kp(game_data, target_id):
+    # Ties for highest kp is included. If more than one person has highest kp, bet is still won.
+    highest_kp_ties = game_stats.get_outlier(game_data, "kp", asc=False, include_ties=True)[0]
+    return target_id in highest_kp_ties
+
 RESOLVE_INTFAR_BET_FUNCS = [
     resolve_is_intfar, resolve_is_intfar_by_kda, resolve_is_intfar_by_deaths,
     resolve_is_intfar_by_kp, resolve_is_intfar_by_vision
@@ -114,6 +142,10 @@ RESOLVE_DOINKS_BET_FUNCS = [
     resolve_got_doinks, resolve_doinks_for_kda, resolve_doinks_for_kills,
     resolve_doinks_for_damage, resolve_doinks_for_penta, resolve_doinks_for_vision,
     resolve_doinks_for_kp, resolve_doinks_for_monsters
+]
+
+RESOLVE_STATS_BET_FUNCS = [
+    resolve_most_kills, resolve_most_damage, resolve_highest_kp
 ]
 
 class BettingHandler:
@@ -175,6 +207,9 @@ class BettingHandler:
         elif event_id < 15:
             resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id-7]
             success = resolve_func(doinks, target_id)
+        elif event_id < 18:
+            resolve_func = RESOLVE_STATS_BET_FUNCS[event_id-15]
+            success = resolve_func(game_stats, target_id)
 
         bet_value = (self.get_bet_value(amount, event_id, bet_timestamp)[0]
                      if success
@@ -198,6 +233,9 @@ class BettingHandler:
         if event_id is None:
             return (False, f"Bet was not placed: Invalid event to bet on: '{bet_str}'.")
 
+        if bet_requires_target(event_id) and bet_target is None:
+            return (False, "Bet was not placed: A person is required as the 'target' of that bet.")
+
         min_amount = BettingHandler.MINIMUM_BETTING_AMOUNT
         current_balance = 0
         amount = 0
@@ -218,7 +256,8 @@ class BettingHandler:
             print_exc()
             return (False, "Bet was not placed: Database error occured :(")
 
-        duration = 0 if game_timestamp is None else time() - game_timestamp
+        time_now = time()
+        duration = 0 if game_timestamp is None else time_now - game_timestamp
         self.config.log(f"Game start: {game_timestamp}")
         self.config.log(f"Duration in game: {duration}")
         if duration > 60 * BettingHandler.MAX_BETTING_THRESHOLD:
@@ -260,15 +299,20 @@ class BettingHandler:
             response += "you will not get the full reward. Potential winnings:\n"
 
         award_equation = f"{amount} x {base_return}"
+        ratio_readable = round_digits(time_ratio)
         if duration > 0:
-            award_equation += f" x {time_ratio}"
+            award_equation += f" x {ratio_readable}"
         if bet_target is not None:
             award_equation += " x [players_in_game]"
         award_equation += f" = **{bet_value}** {tokens_name}"
         if bet_target is not None:
             award_equation += " (minimum)"
         if duration > 0:
-            award_equation += f"\n{time_ratio} is a penalty for betting during the game."
+            dt_start = datetime.fromtimestamp(game_timestamp)
+            dt_now = datetime.fromtimestamp(time_now)
+            duration_fmt = format_duration(dt_start, dt_now)
+            award_equation += f"\n{ratio_readable} is a penalty for betting "
+            award_equation += f"{duration_fmt} after the game started."
         if bet_target is not None:
             award_equation += (
                 "\n[players_in_game] is a multiplier. " +

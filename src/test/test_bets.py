@@ -141,6 +141,32 @@ def test_game_won_fail(bet_handler, db_client, test_runner):
 
     test_runner.assert_equals(len(active_bets), 0, "# Active bets after bet resolved.")
 
+def test_award_tokens_for_game(bet_handler, db_client, test_runner, conf):
+    disc_id = 267401734513491969
+
+    test_runner.set_current_test("Award tokens for game")
+    wipe_db(db_client)
+
+    balance = db_client.get_token_balance(disc_id)
+    test_runner.assert_equals(balance, 100, "Token balance before game won.")
+
+    token_gain = conf.betting_tokens_for_win
+    bet_handler.award_tokens_for_playing(disc_id, token_gain)
+
+    balance = db_client.get_token_balance(disc_id)
+    test_runner.assert_equals(balance, 100 + token_gain, "Token balance after game won.")
+
+    db_client.update_token_balance(disc_id, token_gain, False)
+    balance = db_client.get_token_balance(disc_id)
+
+    test_runner.assert_equals(balance, 100, "Token balance before game lost.")
+
+    token_gain = conf.betting_tokens_for_loss
+    bet_handler.award_tokens_for_playing(disc_id, token_gain)
+
+    balance = db_client.get_token_balance(disc_id)
+    test_runner.assert_equals(balance, 100 + token_gain, "Token balance after game lost.")
+
 def wipe_db(db_client):
     db_client.reset_bets()
 
@@ -153,5 +179,6 @@ def run_tests():
 
     test_game_won_success(bet_handler, database_client, test_runner)
     test_game_won_fail(bet_handler, database_client, test_runner)
+    test_award_tokens_for_game(bet_handler, database_client, test_runner, conf)
 
     test_runner.print_test_summary()
