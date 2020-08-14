@@ -346,6 +346,9 @@ class DiscordClient(discord.Client):
 
         if active_game is not None and self.active_game is None:
             self.active_game = active_game
+            self.config.log(active_game_start)
+            if active_game_start == 0:
+                active_game_start = int(time())
             self.game_start = active_game_start
             self.config.log(f"Game start: {datetime.fromtimestamp(self.game_start)}")
             self.users_in_game = users_in_current_game
@@ -444,7 +447,11 @@ class DiscordClient(discord.Client):
                     break
 
             if user_in_game:
-                self.betting_handler.award_tokens_for_playing(disc_id, game_info[0][1]["gameWon"])
+                gain_for_user = tokens_gained
+                if disc_id in doinks:
+                    gain_for_user += self.config.betting_tokens_for_doinks
+                self.betting_handler.award_tokens_for_playing(disc_id, game_info[0][1]["gameWon"],
+                                                              gain_for_user)
 
             bets_made = self.betting_handler.get_active_bets(disc_id)
             if bets_made != []:
@@ -532,6 +539,11 @@ class DiscordClient(discord.Client):
                 mentions_by_reason[disc_id][stat_index] = "1"
                 user_str += prefix + get_redeeming_flavor_text(stat_index, stat_value)
             mentions_str += user_str
+
+            points = self.config.betting_tokens_for_doinks
+            tokens_name = self.config.betting_tokens
+            mentions_str += f"\nHe is also given {points} bonus {tokens_name} "
+            mentions_str += "for being great {emote_swell}"
 
         formatted_mentions = {d_id: "".join(mentions_by_reason[d_id])
                               for d_id in mentions_by_reason}
@@ -742,7 +754,7 @@ class DiscordClient(discord.Client):
         if ifotm_lead_msg is not None:
             message += "\n" + ifotm_lead_msg
 
-        message += "\n-----------------------------------------------"
+        message += "\n==============================================="
 
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
@@ -931,7 +943,7 @@ class DiscordClient(discord.Client):
             if streak_msg is not None:
                 response += "\n" + streak_msg
 
-            response += "\n-----------------------------------------------"
+            response += "\n==============================================="
             await self.channel_to_write.send(self.insert_emotes(response))
 
         reasons_str = "".join(reason_ids)

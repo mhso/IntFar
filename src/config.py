@@ -13,6 +13,7 @@ class Config:
         self.betting_tokens = "*good-boi points*"
         self.betting_tokens_for_win = 8
         self.betting_tokens_for_loss = 3
+        self.betting_tokens_for_doinks = 15
         self.kda_lower_threshold = 1.3
         self.kda_death_criteria = 2
         self.death_lower_threshold = 9
