@@ -450,8 +450,7 @@ class DiscordClient(discord.Client):
                 gain_for_user = tokens_gained
                 if disc_id in doinks:
                     gain_for_user += self.config.betting_tokens_for_doinks
-                self.betting_handler.award_tokens_for_playing(disc_id, game_info[0][1]["gameWon"],
-                                                              gain_for_user)
+                self.betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
             bets_made = self.betting_handler.get_active_bets(disc_id)
             if bets_made != []:

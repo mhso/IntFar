@@ -124,7 +124,7 @@ class BettingHandler:
         self.config = config
         self.database = database
 
-    def award_tokens_for_playing(self, disc_id, game_won, tokens_gained):
+    def award_tokens_for_playing(self, disc_id, tokens_gained):
         self.database.update_token_balance(disc_id, tokens_gained, True)
 
     def get_active_bets(self, disc_id):
