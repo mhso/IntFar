@@ -169,12 +169,12 @@ def test_award_tokens_for_game(bet_handler, db_client, test_runner):
     test_runner.assert_equals(balance, 100 + token_gain, "Token balance after game lost.")
 
 def test_dynamic_bet_return(bet_handler, db_client, test_runner):
-    disc_id = 267401734513491969
+    disc_id = 115142485579137029
     expected_results = [
         2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0,
         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-        1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
     ]
 
     test_runner.set_current_test("Dynamic bet return")
@@ -185,8 +185,11 @@ def test_dynamic_bet_return(bet_handler, db_client, test_runner):
         for index, event_name in enumerate(bets.BETTING_IDS):
             split = event_name.split("_")
             test_name = " ".join(word.capitalize() for word in split)
+            if target is not None:
+                test_name += " w/ Target"
             event_id = bets.BETTING_IDS[event_name]
             index += (runs * len(bets.BETTING_IDS))
+            print((event_id, target))
             bet_return = bet_handler.get_dynamic_bet_return(event_id, target)
 
             test_runner.assert_equals(bet_return, expected_results[index], test_name)

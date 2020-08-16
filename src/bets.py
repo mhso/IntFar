@@ -8,43 +8,45 @@ import game_stats
 BETTING_IDS = {
     "game_win": 0,
     "game_loss": 1,
-    "intfar": 2,
-    "intfar_kda": 3,
-    "intfar_deaths": 4,
-    "intfar_kp": 5,
-    "intfar_vision": 6,
-    "doinks": 7,
-    "doinks_kda": 8,
-    "doinks_kills": 9,
-    "doinks_damage": 10,
-    "doinks_penta": 11,
-    "doinks_vision": 12,
-    "doinks_kp": 13,
-    "doinks_monsters": 14,
-    "most_kills": 15,
-    "most_damage": 16,
-    "most_kp": 17
+    "no_intfar": 2,
+    "intfar": 3,
+    "intfar_kda": 4,
+    "intfar_deaths": 5,
+    "intfar_kp": 6,
+    "intfar_vision": 7,
+    "doinks": 8,
+    "doinks_kda": 9,
+    "doinks_kills": 10,
+    "doinks_damage": 11,
+    "doinks_penta": 12,
+    "doinks_vision": 13,
+    "doinks_kp": 14,
+    "doinks_monsters": 15,
+    "most_kills": 16,
+    "most_damage": 17,
+    "most_kp": 18
 }
 
 BETTING_DESC = {
     0: "winning the game",
     1: "losing the game",
-    2: "someone being Int-Far",
-    3: "someone being Int-Far by low KDA",
-    4: "someone being Int-Far by many deaths",
-    5: "someone being Int-Far by low KP",
-    6: "someone being Int-Far by low vision score",
-    7: "someone being awarded doinks",
-    8: "someone being awarded doinks for high KDA",
-    9: "someone being awarded doinks for many kills",
-    10: "someone being awarded doinks for high damage",
-    11: "someone being awarded doinks for getting a pentakill",
-    12: "someone being awarded doinks for high vision score",
-    13: "someone being awarded doinks for high KP",
-    14: "someone being awarded doinks for securing all epic monsters",
-    15: "someone getting the most kills",
-    16: "someone doing the most damamge",
-    17: "someone having the highest kill participation"
+    2: "no one being Int-Far",
+    3: "someone being Int-Far",
+    4: "someone being Int-Far by low KDA",
+    5: "someone being Int-Far by many deaths",
+    6: "someone being Int-Far by low KP",
+    7: "someone being Int-Far by low vision score",
+    8: "someone being awarded doinks",
+    9: "someone being awarded doinks for high KDA",
+    10: "someone being awarded doinks for many kills",
+    11: "someone being awarded doinks for high damage",
+    12: "someone being awarded doinks for getting a pentakill",
+    13: "someone being awarded doinks for high vision score",
+    14: "someone being awarded doinks for high KP",
+    15: "someone being awarded doinks for securing all epic monsters",
+    16: "someone getting the most kills",
+    17: "someone doing the most damamge",
+    18: "someone having the highest kill participation"
 }
 
 def get_dynamic_bet_desc(event_id, target_person=None):
@@ -54,7 +56,7 @@ def get_dynamic_bet_desc(event_id, target_person=None):
     return bet_desc
 
 def bet_requires_target(event_id):
-    return event_id > 14
+    return event_id > 15
 
 def resolve_game_outcome(game_data, bet_on_win):
     stats = game_data[0][1]
@@ -64,6 +66,9 @@ def resolve_is_intfar(intfar, intfar_reason, target_id):
     if target_id is None: # Bet was about whether anyone was Int-Far.
         return intfar is not None
     return intfar == target_id # Bet was about a specific person being Int-Far.
+
+def resolve_not_intfar(intfar, intfar_reason, target_id):
+    return not resolve_is_intfar(intfar, intfar_reason, None)
 
 def intfar_by_reason(intfar, reason_str, target_id, reason):
     reason_matches = reason_str[reason] == "1"
@@ -176,7 +181,7 @@ class BettingHandler:
 
         response = f"Betting on `{event_desc}` would return {readable_return} times your investment.\n"
         response += "If you bet after the game has started, the return will be lower.\n"
-        if event_id > 1:
+        if event_id > 2:
             start = "If" if target_id is None else "Since"
             response += f"{start} you bet on this event happening to a *specific* person "
             response += "(not just *anyone*), then the return will be further multiplied "
@@ -185,18 +190,20 @@ class BettingHandler:
         return response
 
     def get_doinks_reason_return(self, target, reason):
-        doinks_total = self.database.get_doinks_count()[0]
         reason_count = 0
+        num_games = 0
         if target is None:
             doinks_reason_ids = self.database.get_doinks_reason_counts()
+            num_games = self.database.get_games_count()[0]
             reason_count = doinks_reason_ids[reason]
         else:
+            num_games = self.database.get_intfar_stats(target)[0]
             doinks_reason_ids = self.database.get_doinks_stats(target)
             for reason_id in doinks_reason_ids:
                 if reason_id[0][reason] == "1":
                     reason_count += 1
 
-        return reason_count / doinks_total
+        return reason_count / num_games
 
     def get_doinks_return(self, target):
         if target is None:
@@ -204,30 +211,35 @@ class BettingHandler:
             doinks_total = self.database.get_doinks_count()[0]
             return doinks_total / games_total
 
-        games_played, _ = self.database.get_intfar_stats(target)
+        games_played = self.database.get_intfar_stats(target)[0]
         doinks_reason_ids = self.database.get_doinks_stats(target)
 
         return len(doinks_reason_ids) / games_played
 
     def get_intfar_reason_return(self, target, reason):
-        intfars_total = self.database.get_intfar_count()[0]
         reason_count = 0
+        num_games = 0
         if target is None:
             intfar_reason_ids = self.database.get_intfar_reason_counts()[0]
+            num_games = self.database.get_games_count()[0]
             reason_count = intfar_reason_ids[reason]
         else:
-            intfar_reason_ids = self.database.get_intfar_stats(target)[1]
+            num_games, intfar_reason_ids = self.database.get_intfar_stats(target)
             for reason_id in intfar_reason_ids:
                 if reason_id[0][reason] == "1":
                     reason_count += 1
 
-        return reason_count / intfars_total
+        return reason_count / num_games
 
-    def get_intfar_return(self, target):
-        if target is None:
+    def get_intfar_return(self, target, is_intfar):
+        if target is None or not is_intfar:
+            print("Yap")
             games_total = self.database.get_games_count()[0]
             intfars_total = self.database.get_intfar_count()[0]
-            return intfars_total / games_total
+            ratio = intfars_total / games_total
+            if not is_intfar:
+                ratio = 1 - ratio
+            return ratio
 
         games_played, intfar_reason_ids = self.database.get_intfar_stats(target)
         return len(intfar_reason_ids) / games_played
@@ -235,14 +247,14 @@ class BettingHandler:
     def get_dynamic_bet_return(self, event_id, target):
         if event_id > 1:
             ratio = 0
-            if event_id == 2:
-                ratio = self.get_intfar_return(target)
-            elif event_id < 7:
-                ratio = self.get_intfar_reason_return(target, event_id - 3)
-            elif event_id == 7:
+            if event_id < 4:
+                ratio = self.get_intfar_return(target, event_id == 3)
+            elif event_id < 8:
+                ratio = self.get_intfar_reason_return(target, event_id - 4)
+            elif event_id == 8:
                 ratio = self.get_doinks_return(target)
-            elif event_id < 15:
-                ratio = self.get_doinks_reason_return(target, event_id - 10)
+            elif event_id < 16:
+                ratio = self.get_doinks_reason_return(target, event_id - 9)
 
             if ratio == 0.0: # If event has never happened, return the "base" ratio.
                 return self.database.get_base_bet_return(event_id)
@@ -273,14 +285,14 @@ class BettingHandler:
         success = False
         if event_id in (0, 1): # The bet concerns winning or losing the game.
             success = resolve_game_outcome(game_stats, event_id == 0)
-        elif event_id < 7: # The bet concerns someone being Int-Far for something.
+        elif event_id < 8: # The bet concerns someone being Int-Far for something.
             resolve_func = RESOLVE_INTFAR_BET_FUNCS[event_id-2]
             success = resolve_func(intfar, intfar_reason, target_id)
-        elif event_id < 15:
-            resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id-7]
+        elif event_id < 16:
+            resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id-8]
             success = resolve_func(doinks, target_id)
-        elif event_id < 18:
-            resolve_func = RESOLVE_STATS_BET_FUNCS[event_id-15]
+        elif event_id < 19:
+            resolve_func = RESOLVE_STATS_BET_FUNCS[event_id-16]
             success = resolve_func(game_stats, target_id)
 
         bet_value = (self.get_bet_value(amount, event_id, bet_timestamp, target_id)[0]

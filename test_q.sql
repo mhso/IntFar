@@ -1,1 +1,15 @@
-UPDATE participants SET doinks='100000' VALUES(4742300264, )
+UPDATE betting_events SET id=18 WHERE id=17;
+UPDATE betting_events SET id=17 WHERE id=16;
+UPDATE betting_events SET id=16 WHERE id=15;
+UPDATE betting_events SET id=15 WHERE id=14;
+UPDATE betting_events SET id=14 WHERE id=13;
+UPDATE betting_events SET id=13 WHERE id=12;
+UPDATE betting_events SET id=12 WHERE id=11;
+UPDATE betting_events SET id=11 WHERE id=10;
+UPDATE betting_events SET id=10 WHERE id=9;
+UPDATE betting_events SET id=9 WHERE id=8;
+UPDATE betting_events SET id=8 WHERE id=7;
+UPDATE betting_events SET id=7 WHERE id=6;
+UPDATE betting_events SET id=6 WHERE id=5;
+UPDATE betting_events SET id=5 WHERE id=4;
+UPDATE betting_events SET id=4 WHERE id=3;
