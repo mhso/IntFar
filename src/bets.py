@@ -233,7 +233,6 @@ class BettingHandler:
 
     def get_intfar_return(self, target, is_intfar):
         if target is None or not is_intfar:
-            print("Yap")
             games_total = self.database.get_games_count()[0]
             intfars_total = self.database.get_intfar_count()[0]
             ratio = intfars_total / games_total
@@ -366,6 +365,8 @@ class BettingHandler:
         bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id,
                                                                 duration, bet_target)
 
+        return_readable = round_digits(base_return)
+
         bet_desc = get_dynamic_bet_desc(event_id, target_name)
 
         response = f"Bet succesfully placed: `{bet_desc}` for "
@@ -375,7 +376,7 @@ class BettingHandler:
         else:
             response += f"**{amount}** {tokens_name}.\n"
 
-        response += f"The return multiplier for that event is **{base_return}**.\n"
+        response += f"The return multiplier for that event is **{return_readable}**.\n"
         if duration == 0:
             response += "You placed your bet before the game started, "
             response += "you will get the full reward. Potential winnings:\n"
@@ -383,7 +384,7 @@ class BettingHandler:
             response += "You placed your bet during the game, therefore "
             response += "you will not get the full reward. Potential winnings:\n"
 
-        award_equation = f"{amount} x {base_return}"
+        award_equation = f"{amount} x {return_readable}"
         ratio_readable = round_digits(time_ratio)
         if duration > 0:
             award_equation += f" x {ratio_readable}"
