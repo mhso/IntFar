@@ -11,7 +11,7 @@ conn = sqlite3.connect(database + ".db")
 if len(argv) > 2:
     filename = argv[2]
     with open(filename + ".sql", "r") as fp:
-        result = conn.cursor().executes(fp.read())
+        result = conn.cursor().executescript(fp.read())
         for row in result:
             print(row)
         conn.commit()

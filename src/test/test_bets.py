@@ -1,3 +1,4 @@
+from sys import argv
 from test.assertion import Assertion
 import bets
 from database import Database
@@ -45,7 +46,7 @@ def test_game_won_success(bet_handler, db_client, test_runner):
     success, bet_value = bet_handler.resolve_bet(disc_id, bet_id, amount, event_id,
                                                  bet_timestamp, target, game_data)
 
-    base_return = db_client.get_bet_return(event_id)
+    base_return = db_client.get_base_bet_return(event_id)
 
     test_runner.assert_equals(bet_value, int(bet_amount) * base_return, "Bet value.")
     test_runner.assert_true(success, "Bet was won.")
@@ -141,7 +142,7 @@ def test_game_won_fail(bet_handler, db_client, test_runner):
 
     test_runner.assert_equals(len(active_bets), 0, "# Active bets after bet resolved.")
 
-def test_award_tokens_for_game(bet_handler, db_client, test_runner, conf):
+def test_award_tokens_for_game(bet_handler, db_client, test_runner):
     disc_id = 267401734513491969
 
     test_runner.set_current_test("Award tokens for game")
@@ -150,7 +151,7 @@ def test_award_tokens_for_game(bet_handler, db_client, test_runner, conf):
     balance = db_client.get_token_balance(disc_id)
     test_runner.assert_equals(balance, 100, "Token balance before game won.")
 
-    token_gain = conf.betting_tokens_for_win
+    token_gain = bet_handler.betting_tokens_for_win
     bet_handler.award_tokens_for_playing(disc_id, token_gain)
 
     balance = db_client.get_token_balance(disc_id)
@@ -161,11 +162,34 @@ def test_award_tokens_for_game(bet_handler, db_client, test_runner, conf):
 
     test_runner.assert_equals(balance, 100, "Token balance before game lost.")
 
-    token_gain = conf.betting_tokens_for_loss
+    token_gain = bet_handler.betting_tokens_for_loss
     bet_handler.award_tokens_for_playing(disc_id, token_gain)
 
     balance = db_client.get_token_balance(disc_id)
     test_runner.assert_equals(balance, 100 + token_gain, "Token balance after game lost.")
+
+def test_dynamic_bet_return(bet_handler, db_client, test_runner):
+    disc_id = 267401734513491969
+    expected_results = [
+        2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+    ]
+
+    test_runner.set_current_test("Dynamic bet return")
+    wipe_db(db_client)
+
+    for runs in range(2):
+        target = disc_id if runs == 1 else None
+        for index, event_name in enumerate(bets.BETTING_IDS):
+            split = event_name.split("_")
+            test_name = " ".join(word.capitalize() for word in split)
+            event_id = bets.BETTING_IDS[event_name]
+            index += (runs * len(bets.BETTING_IDS))
+            bet_return = bet_handler.get_dynamic_bet_return(event_id, target)
+
+            test_runner.assert_equals(bet_return, expected_results[index], test_name)
 
 def wipe_db(db_client):
     db_client.reset_bets()
@@ -177,8 +201,18 @@ def run_tests():
     test_runner = Assertion()
     bet_handler = bets.BettingHandler(conf, database_client)
 
-    test_game_won_success(bet_handler, database_client, test_runner)
-    test_game_won_fail(bet_handler, database_client, test_runner)
-    test_award_tokens_for_game(bet_handler, database_client, test_runner, conf)
+    test_to_run = -1
+    if len(argv) > 1:
+        test_to_run = int(argv[1])
+
+    tests = [
+        test_game_won_success, test_game_won_fail,
+        test_award_tokens_for_game, test_dynamic_bet_return
+    ]
+
+    tests_to_run = tests if test_to_run == -1 else [tests[test_to_run]]
+
+    for test in tests_to_run:
+        test(bet_handler, database_client, test_runner)
 
     test_runner.print_test_summary()

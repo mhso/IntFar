@@ -13,9 +13,9 @@
 -- INSERT INTO betting_events(id, max_return) VALUES(12, 75.0);
 -- INSERT INTO betting_events(id, max_return) VALUES(13, 50.0);
 -- INSERT INTO betting_events(id, max_return) VALUES(14, 150.0);
-INSERT INTO betting_events(id, max_return) VALUES(15, 1.0)
-INSERT INTO betting_events(id, max_return) VALUES(16, 1.0)
-INSERT INTO betting_events(id, max_return) VALUES(17, 1.0)
+-- INSERT INTO betting_events(id, max_return) VALUES(15, 1.0);
+-- INSERT INTO betting_events(id, max_return) VALUES(16, 1.0);
+-- INSERT INTO betting_events(id, max_return) VALUES(17, 1.0);
 
 -- INSERT INTO betting_balance(disc_id, tokens) VALUES (115142485579137029, 100);
 -- INSERT INTO betting_balance(disc_id, tokens) VALUES (172757468814770176, 100);

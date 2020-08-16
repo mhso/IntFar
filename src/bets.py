@@ -155,6 +155,8 @@ class BettingHandler:
     def __init__(self, config, database):
         self.config = config
         self.database = database
+        self.betting_tokens_for_win = config.betting_tokens_for_win
+        self.betting_tokens_for_loss = config.betting_tokens_for_loss
 
     def award_tokens_for_playing(self, disc_id, tokens_gained):
         self.database.update_token_balance(disc_id, tokens_gained, True)
@@ -162,25 +164,95 @@ class BettingHandler:
     def get_active_bets(self, disc_id):
         return self.database.get_active_bets(disc_id)
 
-    def get_bet_return_desc(self, bet_str):
+    def get_bet_return_desc(self, bet_str, target_id, target_name):
         event_id = BETTING_IDS.get(bet_str)
         if event_id is None:
             return f"Invalid event to bet on: '{bet_str}'."
 
-        event_desc = BETTING_DESC[event_id]
+        event_desc = get_dynamic_bet_desc(event_id, target_name)
 
-        base_return = self.database.get_bet_return(event_id)
-        response = f"Betting on `{event_desc}` would return {base_return} times your investment.\n"
+        base_return = self.get_dynamic_bet_return(event_id, target_id)
+        readable_return = round_digits(base_return)
+
+        response = f"Betting on `{event_desc}` would return {readable_return} times your investment.\n"
         response += "If you bet after the game has started, the return will be lower.\n"
         if event_id > 1:
-            response += "If you bet on this event happening to a *specific* person "
+            start = "If" if target_id is None else "Since"
+            response += f"{start} you bet on this event happening to a *specific* person "
             response += "(not just *anyone*), then the return will be further multiplied "
             response += "by how many people are in the game (2x return if 2 people are in "
             response += "the game, 3x return if 3 people, etc)."
         return response
 
-    def get_bet_value(self, bet_amount, event_id, bet_timestamp):
-        base_return = self.database.get_bet_return(event_id)
+    def get_doinks_reason_return(self, target, reason):
+        doinks_total = self.database.get_doinks_count()[0]
+        reason_count = 0
+        if target is None:
+            doinks_reason_ids = self.database.get_doinks_reason_counts()
+            reason_count = doinks_reason_ids[reason]
+        else:
+            doinks_reason_ids = self.database.get_doinks_stats(target)
+            for reason_id in doinks_reason_ids:
+                if reason_id[0][reason] == "1":
+                    reason_count += 1
+
+        return reason_count / doinks_total
+
+    def get_doinks_return(self, target):
+        if target is None:
+            games_total = self.database.get_games_count()[0]
+            doinks_total = self.database.get_doinks_count()[0]
+            return doinks_total / games_total
+
+        games_played, _ = self.database.get_intfar_stats(target)
+        doinks_reason_ids = self.database.get_doinks_stats(target)
+
+        return len(doinks_reason_ids) / games_played
+
+    def get_intfar_reason_return(self, target, reason):
+        intfars_total = self.database.get_intfar_count()[0]
+        reason_count = 0
+        if target is None:
+            intfar_reason_ids = self.database.get_intfar_reason_counts()[0]
+            reason_count = intfar_reason_ids[reason]
+        else:
+            intfar_reason_ids = self.database.get_intfar_stats(target)[1]
+            for reason_id in intfar_reason_ids:
+                if reason_id[0][reason] == "1":
+                    reason_count += 1
+
+        return reason_count / intfars_total
+
+    def get_intfar_return(self, target):
+        if target is None:
+            games_total = self.database.get_games_count()[0]
+            intfars_total = self.database.get_intfar_count()[0]
+            return intfars_total / games_total
+
+        games_played, intfar_reason_ids = self.database.get_intfar_stats(target)
+        return len(intfar_reason_ids) / games_played
+
+    def get_dynamic_bet_return(self, event_id, target):
+        if event_id > 1:
+            ratio = 0
+            if event_id == 2:
+                ratio = self.get_intfar_return(target)
+            elif event_id < 7:
+                ratio = self.get_intfar_reason_return(target, event_id - 3)
+            elif event_id == 7:
+                ratio = self.get_doinks_return(target)
+            elif event_id < 15:
+                ratio = self.get_doinks_reason_return(target, event_id - 10)
+
+            if ratio == 0.0: # If event has never happened, return the "base" ratio.
+                return self.database.get_base_bet_return(event_id)
+
+            return 1 / ratio
+
+        return self.database.get_base_bet_return(event_id)
+
+    def get_bet_value(self, bet_amount, event_id, bet_timestamp, target):
+        base_return = self.get_dynamic_bet_return(event_id, target)
         if bet_timestamp == 0: # Bet was made before game started, award full value.
             ratio = 1.0
         else: # Scale value with game time at which bet was made.
@@ -211,7 +283,7 @@ class BettingHandler:
             resolve_func = RESOLVE_STATS_BET_FUNCS[event_id-15]
             success = resolve_func(game_stats, target_id)
 
-        bet_value = (self.get_bet_value(amount, event_id, bet_timestamp)[0]
+        bet_value = (self.get_bet_value(amount, event_id, bet_timestamp, target_id)[0]
                      if success
                      else 0)
 
@@ -279,7 +351,8 @@ class BettingHandler:
             print_exc()
             return (False, "Bet was not placed: Database error occured :(")
 
-        bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id, duration)
+        bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id,
+                                                                duration, bet_target)
 
         bet_desc = get_dynamic_bet_desc(event_id, target_name)
 

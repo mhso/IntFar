@@ -137,7 +137,10 @@ VALID_COMMANDS = {
     "active_bets": ("(person)", "See a list of your (or someone else's) active bets."),
     "bets": ("(person)", "See a list of all your (or someone else's) lifetime bets."),
     "betting_tokens" : ("(person)", "See how many betting tokens you (or someone else) has."),
-    "bet_return": ("[event]", "See the return award of a specific betting event")
+    "bet_return": (
+        "[event] (person)",
+        "See the return award of a specific betting event (targetting 'person', if given)."
+    )
 }
 
 CUTE_COMMANDS = {
@@ -1496,8 +1499,19 @@ class DiscordClient(discord.Client):
                                                    self.game_start, target_id, discord_name)[1]
         await message.channel.send(response)
 
-    async def handle_bet_return_msg(self, message, betting_event):
-        response = self.betting_handler.get_bet_return_desc(betting_event)
+    async def handle_bet_return_msg(self, message, betting_event, target_name):
+        target_id = None
+        if target_name is not None:
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+            target_name = self.get_discord_nick(target_id)
+
+        response = self.betting_handler.get_bet_return_desc(betting_event, target_id, target_name)
         await message.channel.send(response)
 
     async def handle_active_bets_msg(self, message, target_name):
@@ -1741,7 +1755,8 @@ class DiscordClient(discord.Client):
             elif first_command == "bets":
                 await self.not_implemented_yet(message)
             elif first_command == "bet_return" and len(split) > 1:
-                await self.handle_bet_return_msg(message, second_command)
+                target_name = self.get_target_name(split, 2)
+                await self.handle_bet_return_msg(message, second_command, target_name)
             elif first_command == "betting_tokens":
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_token_balance_msg, message, target_name)

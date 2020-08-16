@@ -101,30 +101,43 @@ class Database:
         with closing(self.get_connection()) as db:
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
-    def get_meta_stats(self):
+    def get_doinks_count(self, context=None):
+        query_doinks = "SELECT Count(*) FROM participants WHERE doinks != 'None'"
+        with (closing(self.get_connection()) if context is None else context) as db:
+            return self.execute_query(db, query_doinks).fetchone()
+
+    def get_doinks_reason_counts(self, context=None):
+        query_doinks_multis = "SELECT doinks FROM participants WHERE doinks != 'None'"
+
+        with (closing(self.get_connection()) if context is None else context) as db:
+            doinks_reasons_data = self.execute_query(db, query_doinks_multis).fetchall()
+
+            doinks_counts = [0, 0, 0, 0, 0, 0, 0]
+            for reason in doinks_reasons_data:
+                for index, c in enumerate(reason[0]):
+                    if c == "1":
+                        doinks_counts[index] += 1
+
+            return doinks_counts
+
+    def get_games_count(self, context=None):
         query_games = """
         SELECT Count(DISTINCT bs.game_id), timestamp FROM best_stats bs, participants p
         WHERE bs.game_id = p.game_id ORDER BY id
         """
+        with (closing(self.get_connection()) if context is None else context) as db:
+            return self.execute_query(db, query_games).fetchone()
+
+    def get_intfar_count(self, context=None):
         query_intfars = "SELECT Count(int_far) FROM best_stats WHERE int_far != 'None'"
-        query_persons = "SELECT Count(*) FROM participants GROUP BY game_id"
-        query_doinks = "SELECT Count(*) FROM participants WHERE doinks != 'None'"
+        with (closing(self.get_connection()) if context is None else context) as db:
+            return self.execute_query(db, query_intfars).fetchone()
+
+    def get_intfar_reason_counts(self, context=None):
         query_intfar_multis = "SELECT intfar_reason FROM best_stats WHERE intfar_reason != 'None'"
-        users = (len(self.summoners),)
-        with closing(self.get_connection()) as db:
-            game_data = self.execute_query(db, query_games).fetchone()
-            intfar_data = self.execute_query(db, query_intfars).fetchone()
-            doinks_data = self.execute_query(db, query_doinks).fetchone()
-            persons_counts = self.execute_query(db, query_persons)
+
+        with (closing(self.get_connection()) if context is None else context) as db:
             intfar_multis_data = self.execute_query(db, query_intfar_multis).fetchall()
-            persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
-            for persons in persons_counts:
-                persons_count[persons[0]] += 1
-            twos_ratio = int((persons_count[2] / game_data[0]) * 100)
-            threes_ratio = int((persons_count[3] / game_data[0]) * 100)
-            fours_ratio = int((persons_count[4] / game_data[0]) * 100)
-            fives_ratio = int((persons_count[5] / game_data[0]) * 100)
-            games_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
 
             intfar_counts = [0, 0, 0, 0]
             intfar_multi_counts = {
@@ -138,21 +151,34 @@ class Database:
                         amount += 1
                 if amount > 0:
                     intfar_multi_counts[amount] += 1
-            total_intfars = len(intfar_multis_data)
-            twos_ratio = int((intfar_counts[0] / total_intfars) * 100)
-            threes_ratio = int((intfar_counts[1] / total_intfars) * 100)
-            fours_ratio = int((intfar_counts[2] / total_intfars) * 100)
-            fives_ratio = int((intfar_counts[3] / total_intfars) * 100)
-            intfars_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
 
-            twos_ratio = int((intfar_multi_counts[1] / total_intfars) * 100)
-            threes_ratio = int((intfar_multi_counts[2] / total_intfars) * 100)
-            fours_ratio = int((intfar_multi_counts[3] / total_intfars) * 100)
-            fives_ratio = int((intfar_multi_counts[4] / total_intfars) * 100)
-            intfar_multis_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
+            intfar_multis = [intfar_multi_counts[x] for x in intfar_multi_counts]
+
+            return intfar_counts, intfar_multis
+
+    def get_meta_stats(self):
+        query_persons = "SELECT Count(*) FROM participants GROUP BY game_id"
+        users = (len(self.summoners),)
+        with closing(self.get_connection()) as db:
+            game_data = self.get_games_count(db)
+            intfar_data = self.get_intfar_count(db)
+            doinks_data = self.get_doinks_count(db)
+            persons_counts = self.execute_query(db, query_persons)
+            persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
+            for persons in persons_counts:
+                persons_count[persons[0]] += 1
+            twos_ratio = int((persons_count[2] / game_data[0]) * 100)
+            threes_ratio = int((persons_count[3] / game_data[0]) * 100)
+            fours_ratio = int((persons_count[4] / game_data[0]) * 100)
+            fives_ratio = int((persons_count[5] / game_data[0]) * 100)
+            games_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
+
+            intfar_counts, intfar_multis_counts = self.get_intfar_reason_counts(db)
+            intfar_ratios = [int((count / intfar_data[0]) * 100) for count in intfar_counts]
+            intfar_multis_ratios = [int((count / intfar_data[0]) * 100) for count in intfar_multis_counts]
 
             return (game_data + users + intfar_data + doinks_data +
-                    (games_ratios, intfars_ratios, intfar_multis_ratios))
+                    (games_ratios, intfar_ratios, intfar_multis_ratios))
 
     def get_monthly_delimiter(self):
         tz_cph = TimeZone()
@@ -375,7 +401,7 @@ class Database:
             query += "WHERE better_id=? AND result=0"
             return self.execute_query(db, query, (disc_id,)).fetchall()
 
-    def get_bet_return(self, event_id):
+    def get_base_bet_return(self, event_id):
         with closing(self.get_connection()) as db:
             query = "SELECT max_return FROM betting_events WHERE id=?"
             return self.execute_query(db, query, (event_id,)).fetchone()[0]
