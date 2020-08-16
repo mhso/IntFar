@@ -58,6 +58,9 @@ def get_dynamic_bet_desc(event_id, target_person=None):
 def bet_requires_target(event_id):
     return event_id > 15
 
+def bet_requires_no_target(event_id):
+    return event_id < 3
+
 def resolve_game_outcome(game_data, bet_on_win):
     stats = game_data[0][1]
     return not (stats["gameWon"] ^ bet_on_win)
@@ -318,6 +321,9 @@ class BettingHandler:
 
         if bet_requires_target(event_id) and bet_target is None:
             return (False, "Bet was not placed: A person is required as the 'target' of that bet.")
+
+        if bet_requires_no_target(event_id):
+            bet_target = None
 
         min_amount = BettingHandler.MINIMUM_BETTING_AMOUNT
         current_balance = 0

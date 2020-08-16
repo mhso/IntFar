@@ -216,6 +216,7 @@ class DiscordClient(discord.Client):
         self.test_channel = None
         self.initialized = False
         self.last_message_time = {}
+        self.timeout_length = {}
         self.betting_handler = bets.BettingHandler(config, database)
         self.time_initialized = datetime.now()
 
@@ -1464,13 +1465,16 @@ class DiscordClient(discord.Client):
         target_id = None
         discord_name = None
         if target_name is not None: # Bet on a specific person doing a thing.
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
+            if target_name == "me":
+                target_id = message.author.id
+            else:
+                target_name = target_name.lower()
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
             discord_name = self.get_discord_nick(target_id)
 
         response = self.betting_handler.place_bet(message.author.id, amount_str, self.game_start,
@@ -1486,13 +1490,16 @@ class DiscordClient(discord.Client):
         target_id = None
         discord_name = None
         if target_name is not None: # Bet on a specific person doing a thing.
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
+            if target_name == "me":
+                target_id = message.author.id
+            else:
+                target_name = target_name.lower()
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
             discord_name = self.get_discord_nick(target_id)
 
         response = self.betting_handler.cancel_bet(message.author.id, betting_event,
@@ -1502,13 +1509,16 @@ class DiscordClient(discord.Client):
     async def handle_bet_return_msg(self, message, betting_event, target_name):
         target_id = None
         if target_name is not None:
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
+            if target_name == "me":
+                target_id = message.author.id
+            else:
+                target_name = target_name.lower()
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
             target_name = self.get_discord_nick(target_id)
 
         response = self.betting_handler.get_bet_return_desc(betting_event, target_id, target_name)
