@@ -1622,9 +1622,9 @@ class DiscordClient(discord.Client):
         event_desc = bets.BETTING_DESC[most_often_event]
 
         response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
-        response += f"- Bets won: **{bets_won} ({pct_won}%)**.\n"
-        response += f"- Average amount of {tokens_name} wagered: **{average_amount}**.\n"
-        response += f"- Bet made the most often: `{event_desc}` (made **{max_event_count}** times).\n"
+        response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
+        response += f"- Average amount of {tokens_name} wagered: **{average_amount}**\n"
+        response += f"- Bet made the most often: `{event_desc}` (made **{max_event_count}** times)\n"
         response += f"- Bets that targeted a person: **{had_target} ({pct_target}%)**\n"
         response += f"- Bets made during a game: **{during_game} ({pct_during}%)**"
 
