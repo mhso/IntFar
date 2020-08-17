@@ -1592,7 +1592,7 @@ class DiscordClient(discord.Client):
         else:
             target_name = message.author.name
 
-        bets = self.database.get_all_bets(target_id)
+        all_bets = self.database.get_all_bets(target_id)
         tokens_name = self.config.betting_tokens
         bets_won = 0
         had_target = 0
@@ -1602,7 +1602,7 @@ class DiscordClient(discord.Client):
         max_event_count = 0
         event_counts = {x: 0 for x in bets.BETTING_DESC}
 
-        for _, amount, event_id, game_time, target, result in bets:
+        for _, amount, event_id, game_time, target, result in all_bets:
             average_amount += amount
             event_counts[event_id] += 1
             if event_counts[event_id] > max_event_count:
@@ -1615,18 +1615,18 @@ class DiscordClient(discord.Client):
             if game_time > 0:
                 during_game += 1
 
-        average_amount = average_amount / len(bets)
-        pct_won = int((bets_won / len(bets)) * 100)
-        pct_target = int((had_target / len(bets)) * 100)
-        pct_during = int((during_game / len(bets)) * 100)
+        average_amount = int(average_amount / len(all_bets))
+        pct_won = int((bets_won / len(all_bets)) * 100)
+        pct_target = int((had_target / len(all_bets)) * 100)
+        pct_during = int((during_game / len(all_bets)) * 100)
         event_desc = bets.BETTING_DESC[most_often_event]
 
-        response = f"{target_name} has made a total of {len(bets)} bets.\n"
-        response += f"Bets won: **{bets_won} ({pct_won}%)**.\n"
-        response += f"Average amount of {tokens_name} wagered: **{average_amount}**."
-        response += f"Bet made the most often: `{event_desc}` (made **{max_event_count}** times)."
-        response += f"Bets that had a person as target: **{had_target} ({pct_target}%)**"
-        response += f"Bets that were made during a game: **{during_game} ({pct_during}%)**"
+        response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
+        response += f"- Bets won: **{bets_won} ({pct_won}%)**.\n"
+        response += f"- Average amount of {tokens_name} wagered: **{average_amount}**.\n"
+        response += f"- Bet made the most often: `{event_desc}` (made **{max_event_count}** times).\n"
+        response += f"- Bets that targeted a person: **{had_target} ({pct_target}%)**\n"
+        response += f"- Bets made during a game: **{during_game} ({pct_during}%)**"
 
         await message.channel.send(response)
 
