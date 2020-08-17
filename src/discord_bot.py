@@ -1697,10 +1697,24 @@ class DiscordClient(discord.Client):
                     and first_command != "test"):
                 return
 
-            if time() - self.last_message_time.get(message.author.id, 0) < self.config.message_timeout:
+            # The following lines are spam protection.
+            time_from_last_msg = time() - self.last_message_time.get(message.author.id, 0)
+            self.last_message_time[message.author.id] = time()
+            curr_timeout = self.timeout_length.get(message.author.id, 0)
+            if time_from_last_msg < curr_timeout: # User has already received a penalty for spam.
+                if curr_timeout < 10:
+                    curr_timeout *= 2 # Increase penalty...
+                    if curr_timeout > 10: # ... Up to 10 secs. max.
+                        curr_timeout = 10
+                    self.timeout_length[message.author.id] = curr_timeout
+                return
+            if time_from_last_msg < self.config.message_timeout:
                 # Some guy is sending messages too fast!
+                self.timeout_length[message.author.id] = self.config.message_timeout
                 await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
                 return
+
+            self.timeout_length[message.author.id] = 0 # Reset timeout length.
 
             second_command = None if len(split) < 2 else split[1].lower()
             third_command = None if len(split) < 3 else split[2].lower()
@@ -1774,8 +1788,6 @@ class DiscordClient(discord.Client):
                 await self.handle_flirtation_msg(message, "english")
             elif first_command == "intpapi":
                 await self.handle_flirtation_msg(message, "spanish")
-
-            self.last_message_time[message.author.id] = time()
 
     async def on_voice_state_update(self, member, before, after):
         if before.channel is None and after.channel is not None: # User joined.
