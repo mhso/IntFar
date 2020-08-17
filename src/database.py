@@ -395,6 +395,12 @@ class Database:
                 self.execute_query(db, query, (game_id, disc_id, timestamp, doink))
             db.commit()
 
+    def get_all_bets(self, disc_id):
+        with closing(self.get_connection()) as db:
+            query = "SELECT id, amount, event_id, game_duration, target, result FROM bets"
+            query += "WHERE better_id=? AND result != 0"
+            return self.execute_query(db, query, (disc_id,)).fetchall()
+
     def get_active_bets(self, disc_id):
         with closing(self.get_connection()) as db:
             query = "SELECT id, amount, event_id, game_duration, target FROM bets "

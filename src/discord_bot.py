@@ -1579,6 +1579,57 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    async def handle_all_bets_msg(self, message, target_name):
+        target_id = message.author.id
+        if target_name is not None:
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+            target_name = self.get_discord_nick(target_id)
+        else:
+            target_name = message.author.name
+
+        bets = self.database.get_all_bets(target_id)
+        tokens_name = self.config.betting_tokens
+        bets_won = 0
+        had_target = 0
+        during_game = 0
+        average_amount = 0
+        most_often_event = 0
+        max_event_count = 0
+        event_counts = {x: 0 for x in bets.BETTING_DESC}
+
+        for _, amount, event_id, game_time, target, result in bets:
+            average_amount += amount
+            event_counts[event_id] += 1
+            if event_counts[event_id] > max_event_count:
+                max_event_count = event_counts[event_id]
+                most_often_event = event_id
+            if result == 1:
+                bets_won += 1
+            if target is not None:
+                had_target += 1
+            if game_time > 0:
+                during_game += 1
+
+        average_amount = average_amount / len(bets)
+        pct_won = int((bets_won / len(bets)) * 100)
+        pct_target = int((had_target / len(bets)) * 100)
+        pct_during = int((during_game / len(bets)) * 100)
+        event_desc = bets.BETTING_DESC[most_often_event]
+
+        response = f"{target_name} has made a total of {len(bets)} bets.\n"
+        response += f"Bets won: **{bets_won} ({pct_won}%)**.\n"
+        response += f"Average amount of {tokens_name} wagered: **{average_amount}**."
+        response += f"Bet made the most often: `{event_desc}` (made **{max_event_count}** times)."
+        response += f"Bets that had a person as target: **{had_target} ({pct_target}%)**"
+        response += f"Bets that were made during a game: **{during_game} ({pct_during}%)**"
+
+        await message.channel.send(response)
+
     async def handle_token_balance_msg(self, message, target_name):
         def get_token_balance(disc_id):
             name = self.get_discord_nick(disc_id)
@@ -1777,7 +1828,8 @@ class DiscordClient(discord.Client):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_active_bets_msg, message, target_name)
             elif first_command == "bets":
-                await self.not_implemented_yet(message)
+                target_name = self.get_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_all_bets_msg, message, target_name)
             elif first_command == "bet_return" and len(split) > 1:
                 target_name = self.get_target_name(split, 2)
                 await self.handle_bet_return_msg(message, second_command, target_name)
