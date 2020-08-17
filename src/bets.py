@@ -142,8 +142,8 @@ def resolve_highest_kp(game_data, target_id):
     return target_id in highest_kp_ties
 
 RESOLVE_INTFAR_BET_FUNCS = [
-    resolve_is_intfar, resolve_is_intfar_by_kda, resolve_is_intfar_by_deaths,
-    resolve_is_intfar_by_kp, resolve_is_intfar_by_vision
+    resolve_not_intfar, resolve_is_intfar, resolve_is_intfar_by_kda,
+    resolve_is_intfar_by_deaths, resolve_is_intfar_by_kp, resolve_is_intfar_by_vision
 ]
 
 RESOLVE_DOINKS_BET_FUNCS = [

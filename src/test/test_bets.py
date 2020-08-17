@@ -142,6 +142,49 @@ def test_game_won_fail(bet_handler, db_client, test_runner):
 
     test_runner.assert_equals(len(active_bets), 0, "# Active bets after bet resolved.")
 
+def test_no_intfar(bet_handler, db_client, test_runner):
+    disc_id = 267401734513491969
+    bet_amount = "30"
+    game_timestamp = None
+    bet_str = "no_intfar"
+    bet_target = None
+    target_name = None
+    game_data = (None, None, None, [(0, {"gameWon": True})])
+
+    test_runner.set_current_test("Bet on no Int-Far")
+    wipe_db(db_client)
+
+    success, response = bet_handler.place_bet(disc_id, bet_amount, game_timestamp,
+                                              bet_str, bet_target, target_name)
+
+    if LOUD:
+        print(response)
+
+    test_runner.assert_true(success, "Bet placed.")
+
+    active_bets = bet_handler.get_active_bets(disc_id)
+
+    test_runner.assert_equals(len(active_bets), 1, "# Active bets after bet placed.")
+
+    bet_id, amount, event_id, bet_timestamp, target = active_bets[0]
+
+    success, _ = bet_handler.resolve_bet(disc_id, bet_id, amount, event_id,
+                                         bet_timestamp, target, game_data)
+
+    test_runner.assert_true(success, "Bet was won.")
+
+    game_data = (267401734513491969, None, None, [(0, {"gameWon": True})])
+
+    bet_handler.place_bet(disc_id, bet_amount, game_timestamp,
+                          bet_str, bet_target, target_name)
+
+    active_bets = bet_handler.get_active_bets(disc_id)
+
+    success, _ = bet_handler.resolve_bet(disc_id, bet_id, amount, event_id,
+                                         bet_timestamp, target, game_data)
+
+    test_runner.assert_false(success, "Bet was lost.")
+
 def test_award_tokens_for_game(bet_handler, db_client, test_runner):
     disc_id = 267401734513491969
 
@@ -210,7 +253,8 @@ def run_tests():
 
     tests = [
         test_game_won_success, test_game_won_fail,
-        test_award_tokens_for_game, test_dynamic_bet_return
+        test_award_tokens_for_game, test_no_intfar,
+        test_dynamic_bet_return
     ]
 
     tests_to_run = tests if test_to_run == -1 else [tests[test_to_run]]
