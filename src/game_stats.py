@@ -1,4 +1,6 @@
 from datetime import datetime
+from time import time
+from util import format_duration
 
 def calc_kda(stats):
     if stats["deaths"] == 0:
@@ -68,6 +70,10 @@ def get_game_summary(data, summ_ids, riot_api):
     if champ_played is None:
         champ_played = "Unknown Champ (Rito pls)"
     date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
+    duration = data["gameDuration"]
+    dt_1 = datetime.fromtimestamp(time())
+    dt_2 = datetime.fromtimestamp(time() + duration)
+    fmt_duration = format_duration(dt_1, dt_2)
 
     return (f"{champ_played} with a score of {stats['kills']}/" +
-            f"{stats['deaths']}/{stats['assists']} on {date}")
+            f"{stats['deaths']}/{stats['assists']} on {date} in a {fmt_duration} long game")
