@@ -246,7 +246,7 @@ class DiscordClient(discord.Client):
                 if game_info is None:
                     self.config.log("Game info is None! Weird stuff.", self.config.log_error)
                     raise ValueError("Game info ins None!")
-                
+
                 filtered_stats = self.get_filtered_stats(game_info)
 
                 betting_data = await self.declare_intfar(filtered_stats)
@@ -254,6 +254,7 @@ class DiscordClient(discord.Client):
                     intfar, intfar_reason, doinks = betting_data
                     await asyncio.sleep(1)
                     await self.resolve_bets(filtered_stats, intfar, intfar_reason, doinks)
+                    await self.save_stats(intfar, intfar_reason, doinks, filtered_stats)
                 self.active_game = None
                 self.game_start = None
                 self.users_in_game = None # Reset the list of users who are in a game.
@@ -944,9 +945,12 @@ class DiscordClient(discord.Client):
         if reasons_str == "0000":
             reasons_str = None
 
+        return final_intfar, reasons_str, doinks
+
+    async def save_stats(self, intfar_id, intfar_reason, doinks, filtered_stats):
         if not self.config.testing:
             try: # Save stats.
-                self.database.record_stats(final_intfar, reasons_str, doinks,
+                self.database.record_stats(intfar_id, intfar_reason, doinks,
                                            self.active_game, filtered_stats, self.users_in_game)
             except DBException as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
@@ -954,8 +958,6 @@ class DiscordClient(discord.Client):
                 raise exception
 
             self.config.log("Game over! Stats were saved succesfully.")
-
-        return final_intfar, reasons_str, doinks
 
     async def user_joined_voice(self, member, poll_immediately=False):
         self.config.log("User joined voice: " + str(member.id))
