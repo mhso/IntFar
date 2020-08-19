@@ -208,7 +208,6 @@ class DiscordClient(discord.Client):
         self.riot_api = riot_api.APIClient(config)
         self.config = config
         self.database = database
-        self.active_users = []
         self.users_in_game = None
         self.active_game = None
         self.game_start = None
@@ -245,7 +244,7 @@ class DiscordClient(discord.Client):
 
                 if game_info is None:
                     self.config.log("Game info is None! Weird stuff.", self.config.log_error)
-                    raise ValueError("Game info ins None!")
+                    raise ValueError("Game info is None!")
 
                 filtered_stats = self.get_filtered_stats(game_info)
 
@@ -254,7 +253,7 @@ class DiscordClient(discord.Client):
                     intfar, intfar_reason, doinks = betting_data
                     await asyncio.sleep(1)
                     await self.resolve_bets(filtered_stats, intfar, intfar_reason, doinks)
-                    await self.save_stats(intfar, intfar_reason, doinks, filtered_stats)
+                    await self.save_stats(filtered_stats, intfar, intfar_reason, doinks)
                 self.active_game = None
                 self.game_start = None
                 self.users_in_game = None # Reset the list of users who are in a game.
@@ -309,14 +308,14 @@ class DiscordClient(discord.Client):
         return f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
 
     def polling_is_active(self): # We only check game statuses if there are two or more active users.
-        return len(self.active_users) > 1
+        return len(self.get_users_in_voice()) > 1
 
     def check_game_status(self):
         active_game = None
         active_game_start = None
         game_ids = set()
         # First check if users are in the same game (or all are in no games).
-        user_list = self.active_users if self.users_in_game is None else self.users_in_game
+        user_list = self.get_users_in_voice() if self.users_in_game is None else self.users_in_game
         users_in_current_game = []
         for disc_id, summ_names, summ_ids in user_list:
             game_for_summoner = None
@@ -403,6 +402,18 @@ class DiscordClient(discord.Client):
                     if emoji.name == emoji_name:
                         return str(emoji)
         return None
+
+    def get_users_in_voice(self):
+        users_in_voice = []
+        for guild in self.guilds:
+            if guild.id == DISCORD_SERVER_ID:
+                for channel in guild.voice_channels:
+                    members_in_voice = channel.members
+                    for member in members_in_voice:
+                        user_info = self.database.summoner_from_discord_id(member.id)
+                        if user_info is not None:
+                            users_in_voice.append(user_info)
+        return users_in_voice
 
     def insert_emotes(self, text):
         """
@@ -904,7 +915,6 @@ class DiscordClient(discord.Client):
                     intfar_data[intfar_disc_id].append((index, stat_value))
 
         reason_ids = ["0", "0", "0", "0"]
-        doinks = {}
 
         redeemed_text, doinks = self.get_big_doinks(filtered_stats)
 
@@ -912,7 +922,7 @@ class DiscordClient(discord.Client):
         if max_count_intfar is not None: # Save data for the current game and send int-far message.
             final_intfar = self.resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)
             reason = ""
-            # Go through the criteria the chosen int-far met and list them in a readable format.
+            # Go through the criteria the chosen Int-Far met and list them in a readable format.
             for (count, (reason_index, stat_value)) in enumerate(intfar_data[final_intfar]):
                 key = reason_keys[reason_index]
                 reason_text = get_reason_flavor_text(round_digits(stat_value), key)
@@ -947,7 +957,7 @@ class DiscordClient(discord.Client):
 
         return final_intfar, reasons_str, doinks
 
-    async def save_stats(self, intfar_id, intfar_reason, doinks, filtered_stats):
+    async def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks):
         if not self.config.testing:
             try: # Save stats.
                 self.database.record_stats(intfar_id, intfar_reason, doinks,
@@ -963,20 +973,15 @@ class DiscordClient(discord.Client):
         self.config.log("User joined voice: " + str(member.id))
         summoner_info = self.database.summoner_from_discord_id(member.id)
         if summoner_info is not None:
+            users_in_voice = self.get_users_in_voice()
             self.config.log("Summoner joined voice: " + summoner_info[1][0])
-            if len(self.active_users) != 0 and not self.polling_is_active():
+            if len(users_in_voice) != 0 and not self.polling_is_active():
                 self.config.log("Polling is now active!")
                 asyncio.create_task(self.poll_for_game_start(poll_immediately))
-            self.active_users.append(summoner_info)
-            self.config.log(f"Active users: {len(self.active_users)}")
+            self.config.log(f"Active users: {len(users_in_voice)}")
 
     async def user_left_voice(self, member):
         self.config.log("User left voice: " + str(member.id))
-        summoner_info = self.database.summoner_from_discord_id(member.id)
-        if summoner_info is not None and summoner_info in self.active_users:
-            self.active_users.remove(summoner_info)
-            self.config.log("Summoner left voice: " + summoner_info[1][0])
-            self.config.log(f"Active users: {len(self.active_users)}")
 
     async def remove_intfar_role(self, intfar_id, role_id):
         nibs_guild = None
