@@ -1001,6 +1001,7 @@ class DiscordClient(discord.Client):
             self.config.log("Summoner joined voice: " + summoner_info[1][0])
             if len(users_in_voice) != 0 and not self.polling_active:
                 self.config.log("Polling is now active!")
+                self.polling_active = True
                 asyncio.create_task(self.poll_for_game_start(poll_immediately))
             self.config.log(f"Active users: {len(users_in_voice)}")
 

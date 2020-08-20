@@ -517,7 +517,7 @@ class BettingHandler:
                 bet_desc = get_dynamic_bet_desc(event_id, target_name)
                 response = f"Bet on `{bet_desc}` for {amount_refunded} {tokens_name} successfully cancelled.\n"
             else:
-                response = f"Multi-bet with ticked ID {ticket} successfully cancelled.\n"
+                response = f"Multi-bet with ticket ID {ticket} successfully cancelled.\n"
             response += f"Your {tokens_name} balance is now `{new_balance}`."
             return (True, response)
         except DBException:
