@@ -1492,7 +1492,7 @@ class DiscordClient(discord.Client):
             msg = "Usage: `!make_bet [amount] [event] (person)`"
             await message.channel.send(msg)
             return
-        
+
         target_ids = []
         target_names = []
         for target_name in targets:
@@ -1770,6 +1770,12 @@ class DiscordClient(discord.Client):
     async def not_implemented_yet(self, message):
         await message.channel.send("This command is not implemented yet.")
 
+    def get_target_name(self, split, start_index, end_index=None):
+        end_index = len(split) if end_index is None else end_index
+        if len(split) > start_index:
+            return " ".join(split[start_index:end_index])
+        return None
+
     def get_multi_bet_params(self, split):
         amounts = []
         events = []
@@ -1785,8 +1791,6 @@ class DiscordClient(discord.Client):
                 try:
                     end_index = split.index("&", index)
                 except ValueError:
-                    if index + 4 != len(split):
-                        raise ValueError("Multi-bet input is formatted incorrectly!")
                     end_index = len(split)
                 target = self.get_target_name(split, index+2, end_index)
                 index = end_index + 1
@@ -1796,12 +1800,6 @@ class DiscordClient(discord.Client):
             events.append(event)
             targets.append(target)
         return amounts, events, targets
-
-    def get_target_name(self, split, start_index, end_index=None):
-        end_index = len(split) if end_index is None else end_index
-        if len(split) > start_index:
-            return " ".join(split[start_index:end_index])
-        return None
 
     async def get_data_and_respond(self, handler, *args):
         try:
