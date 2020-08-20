@@ -513,8 +513,8 @@ class BettingHandler:
 
             new_balance = self.database.get_token_balance(disc_id)
 
-            bet_desc = get_dynamic_bet_desc(event_id, target_name)
             if ticket is None:
+                bet_desc = get_dynamic_bet_desc(event_id, target_name)
                 response = f"Bet on `{bet_desc}` for {amount_refunded} {tokens_name} successfully cancelled.\n"
             else:
                 response = f"Multi-bet with ticked ID {ticket} successfully cancelled.\n"

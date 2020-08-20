@@ -477,7 +477,7 @@ class DiscordClient(discord.Client):
                 if any_bets:
                     response_bets += "-----------------------------\n"
                 response_bets += f"Result of bets {mention} made:\n"
-            for bet_ids, amounts, events, targets, bet_timestamp in bets_made:
+            for bet_ids, amounts, events, targets, bet_timestamp, _ in bets_made:
                 any_bets = True
                 bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_ids, amounts,
                                                                        events, bet_timestamp,
@@ -1576,11 +1576,11 @@ class DiscordClient(discord.Client):
             else:
                 tokens_name = self.config.betting_tokens
                 response = f"{recepient} has the following active bets:"
-                for _, amounts, events, targets, _ in active_bets:
+                for _, amounts, events, targets, _, ticket in active_bets:
                     bets_str = "\n - "
                     total_cost = 0
                     if len(amounts) > 1:
-                        bets_str += "Multi-bet: "
+                        bets_str += f"Multi-bet (ticket = {ticket}): "
                     for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
                         person = None
                         if target is not None:

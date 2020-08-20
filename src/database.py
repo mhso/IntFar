@@ -426,7 +426,7 @@ class Database:
                 events.append(event_id)
                 targets.append(target)
                 if ticket is None or ticket != next_ticket:
-                    grouped_data.append((bet_ids, amounts, events, targets, game_duration))
+                    grouped_data.append((bet_ids, amounts, events, targets, game_duration, ticket))
                     bet_ids = []
                     amounts = []
                     events = []
@@ -452,13 +452,16 @@ class Database:
 
     def bet_exists(self, disc_id, event_id, target=None, ticket=None):
         with closing(self.get_connection()) as db:
-            query = "SELECT * FROM bets WHERE better_id=? AND event_id=? "
-            query += "AND (target=? OR target IS NULL) AND (ticket=? OR ticket IS NULL) "
-            query += "AND result=0"
-            return self.execute_query(
-                db, query,
-                (disc_id, event_id, target, ticket)
-            ).fetchone() is not None
+            query = ""
+            if ticket is None:
+                query = "SELECT * FROM bets WHERE better_id=? AND event_id=? "
+                query += "AND (target=? OR target IS NULL) "
+                query += "AND result=0"
+                args = (disc_id, event_id, target)
+            else:
+                query = "SELECT * FROM bets WHERE better_id=? AND ticket=? AND result=0"
+                args = (disc_id, ticket)
+            return self.execute_query(db, query, args).fetchone() is not None
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):
         with closing(self.get_connection()) as db:
@@ -485,7 +488,7 @@ class Database:
             query_del = "DELETE FROM bets WHERE better_id=? AND ticket=?"
             query_amount = "SELECT amount FROM bets WHERE better_id=? AND ticket=?"
             amounts = self.execute_query(db, query_amount, (disc_id, ticket)).fetchall()
-            amount_total = sum(amounts)
+            amount_total = sum(x[0] for x in amounts)
             self.execute_query(db, query_del, (disc_id, ticket))
             self.update_token_balance(disc_id, amount_total, True)
             return amount_total
