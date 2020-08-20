@@ -827,7 +827,7 @@ class DiscordClient(discord.Client):
                     damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
                     # We loop through the static 'self.users_in_game' list and not the dynamic
                     # 'self.active_players' for safety.
-                    for disc_id, _, summ_ids in self.users_in_game:
+                    for disc_id, _, summ_ids in self.database.summoners:
                         if part_info["player"]["summonerId"] in summ_ids:
                             our_team = participant["teamId"]
                             combined_stats = participant["stats"]
@@ -835,6 +835,17 @@ class DiscordClient(discord.Client):
                             combined_stats["mapId"] = game_info["mapId"]
                             combined_stats.update(participant["timeline"])
                             filtered_stats.append((disc_id, combined_stats))
+
+                            if self.users_in_game is not None:
+                                user_in_list = False
+                                for user_disc_id, _, _ in self.users_in_game:
+                                    if user_disc_id == disc_id:
+                                        user_in_list = True
+                                        break
+                                if not user_in_list:
+                                    summ_data = (disc_id, part_info["player"]["summonerName"],
+                                                part_info["player"]["summonerId"])
+                                    self.users_in_game.append(summ_data)
 
         for _, stats in filtered_stats:
             stats["kills_by_team"] = kills_per_team[our_team]

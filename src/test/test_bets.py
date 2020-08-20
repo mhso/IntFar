@@ -331,15 +331,6 @@ def test_multi_bet_success(bet_handler, db_client, test_runner):
     if LOUD:
         print(response)
 
-    active_bets = bet_handler.get_active_bets(disc_id)
-
-    bet_ids, amounts, event_ids, targets, bet_timestamp, ticket = active_bets[0]
-
-    success, value = bet_handler.resolve_bet(disc_id, bet_ids, amounts, event_ids,
-                                             bet_timestamp, targets, game_data)
-
-    test_runner.assert_true(success, "Bet was lost.")
-
     balance_before = db_client.get_token_balance(disc_id)
 
     success, response = bet_handler.place_bet(disc_id, bet_amount, game_timestamp,
