@@ -73,5 +73,6 @@ CREATE TABLE [bets] (
     [amount] INTEGER NOT NULL,
     [game_duration] INTEGER DEFAULT(0),
     [target] INTEGER,
+    [ticket] INTEGER,
     [result] INTEGER(2)
 );

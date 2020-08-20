@@ -279,162 +279,242 @@ class BettingHandler:
 
         return value, base_return, ratio
 
-    def resolve_bet(self, disc_id, bet_id, amount, event_id, bet_timestamp, target_id, game_data):
-        intfar, intfar_reason, doinks, game_stats = game_data
+    def resolve_bet(self, disc_id, bet_ids, amounts, events, bet_timestamp, targets, game_data):
+        intfar, intfar_reason, doinks, stats = game_data
         # Multiplier for betting on a specific person to do something. If more people are
         # in the game, the multiplier is higher.
-        person_multiplier = len(game_stats)
-        success = False
-        if event_id in (0, 1): # The bet concerns winning or losing the game.
-            success = resolve_game_outcome(game_stats, event_id == 0)
-        elif event_id < 8: # The bet concerns someone being Int-Far for something.
-            resolve_func = RESOLVE_INTFAR_BET_FUNCS[event_id-2]
-            success = resolve_func(intfar, intfar_reason, target_id)
-        elif event_id < 16:
-            resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id-8]
-            success = resolve_func(doinks, target_id)
-        elif event_id < 19:
-            resolve_func = RESOLVE_STATS_BET_FUNCS[event_id-16]
-            success = resolve_func(game_stats, target_id)
+        person_multiplier = len(stats)
+        total_value = 0
+        all_success = True
+        for amount, event_id, target_id in zip(amounts, events, targets):
+            success = False
+            if event_id in (0, 1): # The bet concerns winning or losing the game.
+                success = resolve_game_outcome(stats, event_id == 0)
+            elif event_id < 8: # The bet concerns someone being Int-Far for something.
+                resolve_func = RESOLVE_INTFAR_BET_FUNCS[event_id-2]
+                success = resolve_func(intfar, intfar_reason, target_id)
+            elif event_id < 16:
+                resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id-8]
+                success = resolve_func(doinks, target_id)
+            elif event_id < 19:
+                resolve_func = RESOLVE_STATS_BET_FUNCS[event_id-16]
+                success = resolve_func(stats, target_id)
 
-        bet_value = (self.get_bet_value(amount, event_id, bet_timestamp, target_id)[0]
-                     if success
-                     else 0)
+            all_success = all_success and success
 
-        if target_id is not None:
-            bet_value = bet_value * person_multiplier
+            bet_value = (self.get_bet_value(amount, event_id, bet_timestamp, target_id)[0]
+                         if success
+                         else 0)
 
-        try:
-            self.database.mark_bet_as_resolved(disc_id, bet_id, success, bet_value)
-        except DBException:
-            print_exc()
-            self.config.log("Database error during bet resolution!", self.config.log_error)
-            return
+            if target_id is not None:
+                bet_value = bet_value * person_multiplier
 
-        return success, bet_value
+            total_value += bet_value
 
-    def place_bet(self, disc_id, bet_amount, game_timestamp, bet_str, bet_target, target_name):
+        total_value *= len(amounts)
+
+        for bet_id in bet_ids:
+            try:
+                self.database.mark_bet_as_resolved(disc_id, bet_id, all_success, total_value)
+            except DBException:
+                print_exc()
+                self.config.log("Database error during bet resolution!", self.config.log_error)
+                return
+
+        return all_success, total_value
+
+    def get_bet_placed_text(self, data, all_in, duration, ticket=None):
+        tokens_name = self.config.betting_tokens
+
+        response = ""
+        if len(data) > 1:
+            response = "Multi-bet successfully placed! "
+            response += "You bet on **all** the following happening:"
+
+            for amount, _, _, base_return, bet_desc in data:
+                response += f"\n - `{bet_desc}` for **{amount}** {tokens_name} "
+                response += f"(**{base_return}x** return)."
+            response += f"\nThis bet uses the following ticket ID: {ticket}. "
+            response += "You will need this ticket to cancel the bet."
+        else:
+            amount, _, _, base_return, bet_desc = data[0]
+            response = f"Bet succesfully placed: `{bet_desc}` for "
+            if all_in:
+                capitalized = tokens_name[1:-1].upper()
+                response += f"***ALL YOUR {capitalized}, YOU MAD LAD!!!***\n"
+            else:
+                response += f"**{amount}** {tokens_name}.\n"
+            response += f"The return multiplier for that event is **{base_return}**.\n"
+
+        if duration == 0:
+            response += "\nYou placed your bet before the game started, "
+            response += "you will get the full reward.\n"
+        else:
+            response += "\nYou placed your bet during the game, therefore "
+            response += "you will not get the full reward.\n"
+
+        return response
+
+    def get_bet_error_msg(self, bet_desc, error):
+        return f"Bet was not placed: {bet_desc} - {error}"
+
+    def check_bet_validity(self, disc_id, bet_amount, game_timestamp, bet_str, balance, bet_target, target_name, ticket):
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
         if event_id is None:
             return (False, f"Bet was not placed: Invalid event to bet on: '{bet_str}'.")
 
-        if bet_requires_target(event_id) and bet_target is None:
-            return (False, "Bet was not placed: A person is required as the 'target' of that bet.")
-
         if bet_requires_no_target(event_id):
             bet_target = None
-
-        min_amount = BettingHandler.MINIMUM_BETTING_AMOUNT
-        current_balance = 0
-        amount = 0
-        try:
-            current_balance = self.database.get_token_balance(disc_id)
-            amount = current_balance if bet_amount == "all" else int(bet_amount)
-
-            if amount < min_amount: # Bet was for less than the minimum allowed amount.
-                return (
-                    False, (
-                        "Bet was not placed: Betting amount is too low. " +
-                        f"Must be minimum {min_amount}."
-                    )
-                )
-        except ValueError:
-            return (False, f"Bet was not placed: Invalid bet amount: '{bet_amount}'.")
-        except DBException:
-            print_exc()
-            return (False, "Bet was not placed: Database error occured :(")
-
-        time_now = time()
-        duration = 0 if game_timestamp is None else time_now - game_timestamp
-        self.config.log(f"Game start: {game_timestamp}")
-        self.config.log(f"Duration in game: {duration}")
-        if duration > 60 * BettingHandler.MAX_BETTING_THRESHOLD:
-            return (
-                False, (
-                    "Bet was not placed: The game is too far progressed. You must place bet before " +
-                    f"{BettingHandler.MAX_BETTING_THRESHOLD} minutes in game."
-                )
-            )
-
-        try: # Actually save the bet in the database.
-            if self.database.bet_exists(disc_id, event_id, bet_target):
-                return (False, "Bet was not placed: Such a bet has already been made!")
-            if current_balance >= amount:
-                self.database.make_bet(disc_id, event_id, amount, duration, bet_target)
-            else:
-                return (False, f"Bet was not placed: You do not have enough {tokens_name}.")
-        except DBException:
-            print_exc()
-            return (False, "Bet was not placed: Database error occured :(")
-
-        bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id,
-                                                                duration, bet_target)
-
-        return_readable = round_digits(base_return)
+            target_name = None
 
         bet_desc = get_dynamic_bet_desc(event_id, target_name)
 
-        response = f"Bet succesfully placed: `{bet_desc}` for "
-        if bet_amount == "all":
-            capitalized = tokens_name[1:-1].upper()
-            response += f"***ALL YOUR {capitalized}, YOU MAD LAD!!!***\n"
-        else:
-            response += f"**{amount}** {tokens_name}.\n"
+        if bet_requires_target(event_id) and bet_target is None:
+            err_msg = self.get_bet_error_msg(bet_desc, "A person is required as the 'target' of that bet.")
+            return (False, err_msg)
 
-        response += f"The return multiplier for that event is **{return_readable}**.\n"
-        if duration == 0:
-            response += "You placed your bet before the game started, "
-            response += "you will get the full reward. Potential winnings:\n"
-        else:
-            response += "You placed your bet during the game, therefore "
-            response += "you will not get the full reward. Potential winnings:\n"
+        min_amount = BettingHandler.MINIMUM_BETTING_AMOUNT
+        amount = 0
+        try:
+            amount = balance if bet_amount == "all" else int(bet_amount)
 
-        award_equation = f"{amount} x {return_readable}"
+            if amount < min_amount: # Bet was for less than the minimum allowed amount.
+                err_msg = self.get_bet_error_msg(
+                    bet_desc, f"Betting amount is too low. Must be minimum {min_amount}."
+                )
+                return (False, err_msg)
+        except ValueError:
+            err_msg = self.get_bet_error_msg(bet_desc, f"Invalid bet amount: '{bet_amount}'.")
+            return (False, err_msg)
+        time_now = time()
+        duration = 0 if game_timestamp is None else time_now - game_timestamp
+        if duration > 60 * BettingHandler.MAX_BETTING_THRESHOLD:
+            err_msg = self.get_bet_error_msg(
+                bet_desc,
+                "The game is too far progressed. You must place bet before " +
+                f"{BettingHandler.MAX_BETTING_THRESHOLD} minutes in game."
+            )
+            return (False, err_msg)
+
+        if self.database.bet_exists(disc_id, event_id, bet_target, ticket):
+            err_msg = self.get_bet_error_msg(bet_desc, "Such a bet has already been made!")
+            return (False, err_msg)
+        if balance < amount:
+            err_msg = self.get_bet_error_msg(bet_desc, f"You do not have enough {tokens_name}.")
+            return (False, err_msg)
+        return (True, (amount, event_id, duration, bet_desc))
+
+    def place_bet(self, disc_id, amounts, game_timestamp, events, targets, target_names):
+        tokens_name = self.config.betting_tokens
+        ticket = None if len(amounts) == 1 else self.database.generate_ticket_id(disc_id)
+        bet_data = []
+        reward_equation = "Potential winnings:\n"
+        game_duration = 0
+        time_ratio = 0
+        final_value = 0
+        first = True
+        any_target = False
+        try:
+            balance = self.database.get_token_balance(disc_id)
+            for bet_amount, event, target, target_name in zip(amounts, events, targets, target_names):
+                valid, data = self.check_bet_validity(disc_id, bet_amount, game_timestamp, event,
+                                                      balance, target, target_name, ticket)
+
+                if not valid:
+                    return (False, data)
+
+                amount, event_id, game_duration, bet_desc = data
+                balance -= amount
+
+                bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id,
+                                                                        game_duration, target)
+
+                final_value += bet_value
+                return_readable = round_digits(base_return)
+
+                bet_data.append((amount, event_id, target, return_readable, bet_desc))
+
+            for amount, event_id, bet_target, base_return, bet_desc in bet_data:
+                self.database.make_bet(disc_id, event_id, amount, game_duration, bet_target, ticket)
+
+                if not first:
+                    reward_equation += " + "
+                reward_equation += f"{amount} x {base_return}"
+
+                if bet_target is not None:
+                    reward_equation += " x [players_in_game]"
+                    any_target = True
+
+                first = False
+        except DBException:
+            print_exc()
+            return (False, "Bet was not placed: Database error occured :(")
+
+        final_value *= len(amounts)
+        if len(amounts) > 1:
+            reward_equation += f" x {len(amounts)}"
+
         ratio_readable = round_digits(time_ratio)
-        if duration > 0:
-            award_equation += f" x {ratio_readable}"
-        if bet_target is not None:
-            award_equation += " x [players_in_game]"
-        award_equation += f" = **{bet_value}** {tokens_name}"
-        if bet_target is not None:
-            award_equation += " (minimum)"
-        if duration > 0:
+        if game_duration > 0:
+            reward_equation += f" x {ratio_readable}"
+
+        reward_equation += f" = **{final_value}** {tokens_name}"
+
+        if any_target:
+            reward_equation += " (minimum)\n"
+
+        if game_duration > 0:
             dt_start = datetime.fromtimestamp(game_timestamp)
-            dt_now = datetime.fromtimestamp(time_now)
+            dt_now = datetime.fromtimestamp(time())
             duration_fmt = format_duration(dt_start, dt_now)
-            award_equation += f"\n{ratio_readable} is a penalty for betting "
-            award_equation += f"{duration_fmt} after the game started."
-        if bet_target is not None:
-            award_equation += (
-                "\n[players_in_game] is a multiplier. " +
+            reward_equation += f"\n{ratio_readable} is a penalty for betting "
+            reward_equation += f"{duration_fmt} after the game started."
+
+        if any_target:
+            reward_equation += (
+                "[players_in_game] is a multiplier. " +
                 f"Because you bet on a specific person, you will get more {tokens_name} if " +
                 "more players are in the game."
             )
 
-        new_balance = current_balance - amount
-        balance_resp = f"\nYour {tokens_name} balance is now `{new_balance}`."
+        bet_all = len(amounts) == 1 and amounts[0] == "all"
 
-        return (True, response + award_equation + balance_resp)
+        response = self.get_bet_placed_text(bet_data, game_duration, bet_all, ticket)
+
+        balance_resp = f"\nYour {tokens_name} balance is now `{balance}`."
+
+        return (True, response + reward_equation + balance_resp)
 
     def cancel_bet(self, disc_id, bet_str, game_timestamp, target_id, target_name):
+        ticket = None
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
         if event_id is None:
-            return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
+            try:
+                ticket = int(bet_str)
+            except ValueError:
+                return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
 
         try:
-            if not self.database.bet_exists(disc_id, event_id, target_id):
+            if not self.database.bet_exists(disc_id, event_id, target_id, ticket):
                 return (False, "Bet was not cancelled: No bet exists with the specified parameters.")
 
             if game_timestamp is not None: # Game has already started.
                 return (False, "Bet was not cancelled: Game is underway!")
 
-            amount_refunded = self.database.cancel_bet(disc_id, event_id, target_id)
+            if ticket is None:
+                amount_refunded = self.database.cancel_bet(disc_id, event_id, target_id)
+            else:
+                amount_refunded = self.database.cancel_multi_bet(disc_id, ticket)
+
             new_balance = self.database.get_token_balance(disc_id)
 
             bet_desc = get_dynamic_bet_desc(event_id, target_name)
-            response = f"Bet on `{bet_desc}` for {amount_refunded} {tokens_name} successfully cancelled.\n"
+            if ticket is None:
+                response = f"Bet on `{bet_desc}` for {amount_refunded} {tokens_name} successfully cancelled.\n"
+            else:
+                response = f"Multi-bet with ticked ID {ticket} successfully cancelled.\n"
             response += f"Your {tokens_name} balance is now `{new_balance}`."
             return (True, response)
         except DBException:

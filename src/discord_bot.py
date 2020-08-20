@@ -128,10 +128,17 @@ VALID_COMMANDS = {
          "In the current or next game. Fx. '!make_bet 100 game_win', '!make_bet 30 intfar' or " +
          "'!make_bet all intfar slurp' (bet all on slurp being Int-Far).")
     ),
+    "make_multi_bet": (
+        "[amount] [event] (person) (&) (more bets...)",
+        ("Bet on *multiple* events happening. The bet will only be won if *all* "+
+         "the things happen. You will receive a bonus if all bets are won." +
+         "Fx. '!make_multi_bet 20 game_win & 30 no_intfar'.")
+    ),
     "cancel_bet": (
-        "[event] (person)",
+        "[event/ticket] (person)",
         ("Cancel a previously placed bet with the given parameters. " +
-         "The bet can not be cancelled when the game has started.")
+         "To cancel a multibet, provide the ticket generated for that bet. " +
+         "A bet can not be cancelled when the game has started.")
     ),
     "betting": (None, "Show information about betting, as well as list of possible events to bet on."),
     "active_bets": ("(person)", "See a list of your (or someone else's) active bets."),
@@ -214,6 +221,7 @@ class DiscordClient(discord.Client):
         self.channel_to_write = None
         self.test_channel = None
         self.initialized = False
+        self.polling_active = False
         self.last_message_time = {}
         self.timeout_length = {}
         self.betting_handler = bets.BettingHandler(config, database)
@@ -268,6 +276,7 @@ class DiscordClient(discord.Client):
             await self.poll_for_game_end()
 
     async def poll_for_game_start(self, immediately=False):
+        self.polling_active = True
         time_slept = 0
         sleep_per_loop = 0.5
         self.config.log("People are active in voice channels! Polling for games...")
@@ -275,16 +284,19 @@ class DiscordClient(discord.Client):
             try:
                 while time_slept < self.config.status_interval_dormant:
                     if not self.polling_is_active(): # Stop if people leave voice channels.
+                        self.polling_active = False
                         self.config.log("Polling is no longer active.")
                         return
                     await asyncio.sleep(sleep_per_loop)
                     time_slept += sleep_per_loop
             except KeyboardInterrupt:
+                self.polling_active = False
                 return
 
         game_status = self.check_game_status()
 
         if game_status == 1: # Game has started.
+            self.polling_active = False
             await self.poll_for_game_end()
         elif game_status == 0: # Sleep for 10 minutes and check game status again.
             await self.poll_for_game_start()
@@ -465,25 +477,37 @@ class DiscordClient(discord.Client):
                 if any_bets:
                     response_bets += "-----------------------------\n"
                 response_bets += f"Result of bets {mention} made:\n"
-            for bet_id, amount, event_id, bet_timestamp, target in bets_made:
+            for bet_ids, amounts, events, targets, bet_timestamp in bets_made:
                 any_bets = True
-                bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_id, amount,
-                                                                       event_id, bet_timestamp,
-                                                                       target,
+                bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_ids, amounts,
+                                                                       events, bet_timestamp,
+                                                                       targets,
                                                                        (intfar,
                                                                         intfar_reason,
                                                                         doinks, game_info))
-                person = None
-                if target is not None:
-                    person = self.get_discord_nick(target)
 
-                bet_desc = bets.get_dynamic_bet_desc(event_id, person)
+                response_bets += " - "
+                total_cost = 0
+                for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
+                    person = None
+                    if target is not None:
+                        person = self.get_discord_nick(target)
 
-                response_bets += f" - `{bet_desc}`: "
+                    bet_desc = bets.get_dynamic_bet_desc(event, person)
+
+                    response_bets += f"`{bet_desc}`"
+                    if index != len(amounts) - 1:
+                        response_bets += " **and** "
+
+                    total_cost += amount
+
+                if len(amounts) > 1:
+                    response_bets += " (multi-bet)"
+
                 if bet_success:
-                    response_bets += f"Bet was **won**! It awarded **{payout}** {tokens_name}!\n"
+                    response_bets += f": Bet was **won**! It awarded **{payout}** {tokens_name}!\n"
                 else:
-                    response_bets += f"Bet was **lost**! It cost **{amount}** {tokens_name}!\n"
+                    response_bets += f": Bet was **lost**! It cost **{total_cost}** {tokens_name}!\n"
 
         if any_bets:
             response += response_bets
@@ -975,7 +999,7 @@ class DiscordClient(discord.Client):
         if summoner_info is not None:
             users_in_voice = self.get_users_in_voice()
             self.config.log("Summoner joined voice: " + summoner_info[1][0])
-            if len(users_in_voice) != 0 and not self.polling_is_active():
+            if len(users_in_voice) != 0 and not self.polling_active:
                 self.config.log("Polling is now active!")
                 asyncio.create_task(self.poll_for_game_start(poll_immediately))
             self.config.log(f"Active users: {len(users_in_voice)}")
@@ -1463,29 +1487,36 @@ class DiscordClient(discord.Client):
             response += self.insert_emotes("{emote_carole_fucking_baskin}")
             await message.channel.send(response)
 
-    async def handle_make_bet_msg(self, message, amount_str, betting_event, target_name):
-        if amount_str is None or betting_event is None:
+    async def handle_make_bet_msg(self, message, amounts, events, targets):
+        if None in amounts or None in events:
             msg = "Usage: `!make_bet [amount] [event] (person)`"
             await message.channel.send(msg)
             return
 
-        target_id = None
-        discord_name = None
-        if target_name is not None: # Bet on a specific person doing a thing.
-            if target_name == "me":
-                target_id = message.author.id
-            else:
-                target_name = target_name.lower()
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
-            discord_name = self.get_discord_nick(target_id)
+        target_ids = []
+        target_names = []
+        for target_name in targets:
+            target_id = None
+            discord_name = None
+            if target_name is not None: # Bet on a specific person doing a thing.
+                if target_name == "me":
+                    target_id = message.author.id
+                else:
+                    target_name = target_name.lower()
+                    target_id = self.try_get_user_data(target_name.strip())
+                    if target_id is None:
+                        msg = "Error: Invalid summoner or Discord name "
+                        msg += f"{self.get_emoji_by_name('PepeHands')}"
+                        await message.channel.send(msg)
+                        return
+                discord_name = self.get_discord_nick(target_id)
+            target_ids.append(target_id)
+            target_names.append(discord_name)
 
-        response = self.betting_handler.place_bet(message.author.id, amount_str, self.game_start,
-                                                  betting_event, target_id, discord_name)[1]
+        response = self.betting_handler.place_bet(message.author.id, amounts,
+                                                  self.game_start, events,
+                                                  target_ids, target_names)[1]
+
         await message.channel.send(response)
 
     async def handle_cancel_bet_msg(self, message, betting_event, target_name):
@@ -1545,14 +1576,26 @@ class DiscordClient(discord.Client):
             else:
                 tokens_name = self.config.betting_tokens
                 response = f"{recepient} has the following active bets:"
-                for _, amount, event_id, _, target in active_bets:
-                    person = None
-                    if target is not None:
-                        person = self.get_discord_nick(target)
+                for _, amounts, events, targets, _ in active_bets:
+                    bets_str = "\n - "
+                    total_cost = 0
+                    if len(amounts) > 1:
+                        bets_str += "Multi-bet: "
+                    for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
+                        person = None
+                        if target is not None:
+                            person = self.get_discord_nick(target)
 
-                    bet_desc = bets.get_dynamic_bet_desc(event_id, person)
+                        bet_desc = bets.get_dynamic_bet_desc(event, person)
+                        bets_str += f"`{bet_desc}`"
+                        if index != len(amounts) - 1:
+                            bets_str += " & "
 
-                    response += f"\n - `{bet_desc}` for {amount} {tokens_name}."
+                        total_cost += amount
+
+                    bets_str += f" for {total_cost} {tokens_name}"
+
+                    response += bets_str
 
             return response
 
@@ -1727,9 +1770,37 @@ class DiscordClient(discord.Client):
     async def not_implemented_yet(self, message):
         await message.channel.send("This command is not implemented yet.")
 
-    def get_target_name(self, split, start_index):
+    def get_multi_bet_params(self, split):
+        amounts = []
+        events = []
+        targets = []
+        index = 1
+        while index < len(split):
+            amount = split[index]
+            event = split[index+1]
+            if "&" in (event, amount):
+                raise ValueError("Multi-bet input is formatted incorrectly!")
+            target = None
+            if index + 2 < len(split) and split[index+2] != "&":
+                try:
+                    end_index = split.index("&", index)
+                except ValueError:
+                    if index + 4 != len(split):
+                        raise ValueError("Multi-bet input is formatted incorrectly!")
+                    end_index = len(split)
+                target = self.get_target_name(split, index+2, end_index)
+                index = end_index + 1
+            else:
+                index += 3
+            amounts.append(amount)
+            events.append(event)
+            targets.append(target)
+        return amounts, events, targets
+
+    def get_target_name(self, split, start_index, end_index=None):
+        end_index = len(split) if end_index is None else end_index
         if len(split) > start_index:
-            return " ".join(split[start_index:])
+            return " ".join(split[start_index:end_index])
         return None
 
     async def get_data_and_respond(self, handler, *args):
@@ -1827,7 +1898,13 @@ class DiscordClient(discord.Client):
                 await self.handle_intfar_criteria_msg(message, criteria)
             elif first_command == "make_bet":
                 target_name = self.get_target_name(split, 3)
-                await self.get_data_and_respond(self.handle_make_bet_msg, message, second_command, third_command, target_name)
+                await self.get_data_and_respond(self.handle_make_bet_msg, message, [second_command], [third_command], [target_name])
+            elif first_command == "make_multi_bet":
+                try:
+                    amounts, events, targets = self.get_multi_bet_params(split)
+                    await self.get_data_and_respond(self.handle_make_bet_msg, message, amounts, events, targets)
+                except ValueError as exc:
+                    await message.channel.send(str(exc))
             elif first_command == "cancel_bet":
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_cancel_bet_msg, message, second_command, target_name)

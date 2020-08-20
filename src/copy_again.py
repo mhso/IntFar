@@ -19,6 +19,9 @@ with closing(database_client_1.get_connection()) as db_1:
     data_worst = db_1.cursor().execute("SELECT * FROM worst_stats").fetchall()
     participants = db_1.cursor().execute("SELECT * FROM participants").fetchall()
     summoners = db_1.cursor().execute("SELECT * FROM registered_summoners").fetchall()
+    balances = db_1.cursor().execute("SELECT * FROM betting_balance").fetchall()
+    events = db_1.cursor().execute("SELECT * FROM betting_events").fetchall()
+    bets = db_1.cursor().execute("SELECT * FROM bets").fetchall()
 
     query_prefix = "INSERT INTO "
     query_cols = (
@@ -43,4 +46,14 @@ with closing(database_client_1.get_connection()) as db_1:
         query = "INSERT INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"
         for data in participants:
             db_2.cursor().execute(query, data)
+        query = "INSERT INTO betting_balance(disc_id, tokens) VALUES (?, ?)"
+        for data in balances:
+            db_2.cursor().execute(query, data)
+        query = "INSERT INTO betting_events(id, max_return) VALUES (?, ?)"
+        for data in events:
+            db_2.cursor().execute(query, data)
+        query = "INSERT INTO bets(id, better_id, event_id, amount, game_duration, target, ticket, result) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        for data in bets:
+            data_reshaped = data[:-1] + (None,) + (data[-1],)
+            db_2.cursor().execute(query, data_reshaped)
         db_2.commit()

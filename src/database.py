@@ -395,6 +395,14 @@ class Database:
                 self.execute_query(db, query, (game_id, disc_id, timestamp, doink))
             db.commit()
 
+    def generate_ticket_id(self, disc_id):
+        with closing(self.get_connection()) as db:
+            query = "SELECT MAX(ticket) FROM bets WHERE better_id=?"
+            curr_id = self.execute_query(db, query, (disc_id,)).fetchone()
+            if curr_id is None or curr_id[0] is None:
+                return 0
+            return curr_id[0] + 1
+
     def get_all_bets(self, disc_id):
         with closing(self.get_connection()) as db:
             query = "SELECT id, amount, event_id, game_duration, target, result FROM bets "
@@ -403,9 +411,28 @@ class Database:
 
     def get_active_bets(self, disc_id):
         with closing(self.get_connection()) as db:
-            query = "SELECT id, amount, event_id, game_duration, target FROM bets "
-            query += "WHERE better_id=? AND result=0"
-            return self.execute_query(db, query, (disc_id,)).fetchall()
+            query = "SELECT id, amount, event_id, game_duration, target, ticket FROM bets "
+            query += "WHERE better_id=? AND result=0 ORDER BY ticket"
+            grouped_data = []
+            data = self.execute_query(db, query, (disc_id,)).fetchall()
+            bet_ids = []
+            amounts = []
+            events = []
+            targets = []
+            for index, (bet_id, amount, event_id, game_duration, target, ticket) in enumerate(data):
+                next_ticket = None if index == len(data) - 1 else data[index+1][-1]
+                bet_ids.append(bet_id)
+                amounts.append(amount)
+                events.append(event_id)
+                targets.append(target)
+                if ticket is None or ticket != next_ticket:
+                    grouped_data.append((bet_ids, amounts, events, targets, game_duration))
+                    bet_ids = []
+                    amounts = []
+                    events = []
+                    targets = []
+
+            return grouped_data
 
     def get_base_bet_return(self, event_id):
         with closing(self.get_connection()) as db:
@@ -423,19 +450,24 @@ class Database:
             query = f"UPDATE betting_balance SET tokens=tokens{sign_str}? WHERE disc_id=?"
             self.execute_query(db, query, (amount, disc_id))
 
-    def bet_exists(self, disc_id, event_id, target=None):
+    def bet_exists(self, disc_id, event_id, target=None, ticket=None):
         with closing(self.get_connection()) as db:
             query = "SELECT * FROM bets WHERE better_id=? AND event_id=? "
-            query += "AND (target=? OR target IS NULL) AND result=0"
-            return self.execute_query(db, query, (disc_id, event_id, target)).fetchone() is not None
+            query += "AND (target=? OR target IS NULL) AND (ticket=? OR ticket IS NULL) "
+            query += "AND result=0"
+            return self.execute_query(
+                db, query,
+                (disc_id, event_id, target, ticket)
+            ).fetchone() is not None
 
-    def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None):
+    def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):
         with closing(self.get_connection()) as db:
-            query_bet = "INSERT INTO bets(better_id, event_id, amount, game_duration, target, result) "
-            query_bet += "VALUES (?, ?, ?, ?, ?, ?)"
+            query_bet = "INSERT INTO bets(better_id, event_id, amount, "
+            query_bet += "game_duration, target,  ticket, result) "
+            query_bet += "VALUES (?, ?, ?, ?, ?, ?, ?)"
             self.update_token_balance(disc_id, amount, False)
-            self.execute_query(db, query_bet, (disc_id, event_id, amount,
-                                               game_duration, target_person, 0))
+            self.execute_query(db, query_bet, (disc_id, event_id, amount, game_duration,
+                                               target_person, ticket, 0))
 
     def cancel_bet(self, disc_id, event_id, target=None):
         with closing(self.get_connection()) as db:
@@ -447,6 +479,16 @@ class Database:
             self.execute_query(db, query_del, (disc_id, event_id, target))
             self.update_token_balance(disc_id, amount, True)
             return amount
+
+    def cancel_multi_bet(self, disc_id, ticket):
+        with closing(self.get_connection()) as db:
+            query_del = "DELETE FROM bets WHERE better_id=? AND ticket=?"
+            query_amount = "SELECT amount FROM bets WHERE better_id=? AND ticket=?"
+            amounts = self.execute_query(db, query_amount, (disc_id, ticket)).fetchall()
+            amount_total = sum(amounts)
+            self.execute_query(db, query_del, (disc_id, ticket))
+            self.update_token_balance(disc_id, amount_total, True)
+            return amount_total
 
     def mark_bet_as_resolved(self, disc_id, bet_id, success, amount_won=0):
         result_val = 1 if success else -1
