@@ -131,7 +131,7 @@ VALID_COMMANDS = {
     "make_multi_bet": (
         "[amount] [event] (person) (&) (more bets...)",
         ("Bet on *multiple* events happening. The bet will only be won if *all* "+
-         "the things happen. You will receive a bonus if all bets are won." +
+         "the things happen. You will receive a bonus if all bets are won. " +
          "Fx. '!make_multi_bet 20 game_win & 30 no_intfar'.")
     ),
     "cancel_bet": (
@@ -1492,7 +1492,7 @@ class DiscordClient(discord.Client):
             msg = "Usage: `!make_bet [amount] [event] (person)`"
             await message.channel.send(msg)
             return
-
+        
         target_ids = []
         target_names = []
         for target_name in targets:

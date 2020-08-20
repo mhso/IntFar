@@ -353,6 +353,8 @@ class BettingHandler:
             response += "\nYou placed your bet during the game, therefore "
             response += "you will not get the full reward.\n"
 
+        response += "Potential winnings:\n"
+
         return response
 
     def get_bet_error_msg(self, bet_desc, error):
@@ -409,7 +411,7 @@ class BettingHandler:
         tokens_name = self.config.betting_tokens
         ticket = None if len(amounts) == 1 else self.database.generate_ticket_id(disc_id)
         bet_data = []
-        reward_equation = "Potential winnings:\n"
+        reward_equation = ""
         game_duration = 0
         time_ratio = 0
         final_value = 0
@@ -453,7 +455,8 @@ class BettingHandler:
 
         final_value *= len(amounts)
         if len(amounts) > 1:
-            reward_equation += f" x {len(amounts)}"
+            reward_equation = "(" + reward_equation
+            reward_equation += f") x {len(amounts)}"
 
         ratio_readable = round_digits(time_ratio)
         if game_duration > 0:
