@@ -523,3 +523,42 @@ class BettingHandler:
         except DBException:
             print_exc()
             return (False, "Bet was not cancelled: Database error occured :(")
+
+    def get_gift_err_msg(self, err_msg):
+        return f"Transfer failed: {err_msg}"
+
+    def give_tokens(self, disc_id, amount_str, receiver_id, receiver_name):
+        amount = 0
+        balance = 0
+        tokens_name = self.config.betting_tokens
+        try:
+            balance = self.database.get_token_balance(disc_id)
+        except DBException:
+            print_exc()
+            err_msg = self.get_gift_err_msg("Database error occured :(")
+            return (False, err_msg)
+
+        try:
+            amount = balance if amount_str == "all" else int(amount_str)
+        except ValueError:
+            err_msg = self.get_gift_err_msg("Invalid token amount: '{amount_str}'.")
+            return (False, err_msg)
+
+        if balance < amount:
+            err_msg = self.get_gift_err_msg(f"You do not have enough {tokens_name}.")
+            return (False, err_msg)
+
+        try:
+            self.database.give_tokens(disc_id, amount, receiver_id)
+        except DBException:
+            print_exc()
+            err_msg = self.get_gift_err_msg("Database error occured :(")
+            return (False, err_msg)
+
+        receiver_balance = self.database.get_token_balance(receiver_id)
+
+        response = f"Transfer of **{amount}** {tokens_name} to {receiver_name} succesfully made.\n"
+        response += f"You now have **{balance - amount}** {tokens_name}.\n"
+        response += f"{receiver_name} now has **{receiver_balance}** {tokens_name}."
+
+        return (True, response)

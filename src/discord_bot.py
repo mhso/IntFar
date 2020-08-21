@@ -122,23 +122,27 @@ VALID_COMMANDS = {
         ("Show overall stats about how many games have been played, " +
          "how many people were Int-Far, etc.")
     ),
-    "make_bet": (
+    "bet": (
         "[amount] [event] (person)",
         ("Bet a specific amount of credits on an event happening " +
-         "In the current or next game. Fx. '!make_bet 100 game_win', '!make_bet 30 intfar' or " +
-         "'!make_bet all intfar slurp' (bet all on slurp being Int-Far).")
+         "In the current or next game. Fx. '!bet 100 game_win', '!bet 30 intfar' or " +
+         "'!bet all intfar slurp' (bet all on slurp being Int-Far).")
     ),
-    "make_multi_bet": (
+    "multi_bet": (
         "[amount] [event] (person) (&) (more bets...)",
         ("Bet on *multiple* events happening. The bet will only be won if *all* "+
          "the things happen. You will receive a bonus if all bets are won. " +
-         "Fx. '!make_multi_bet 20 game_win & 30 no_intfar'.")
+         "Fx. '!multi_bet 20 game_win & 30 no_intfar'.")
     ),
     "cancel_bet": (
         "[event/ticket] (person)",
         ("Cancel a previously placed bet with the given parameters. " +
          "To cancel a multibet, provide the ticket generated for that bet. " +
          "A bet can not be cancelled when the game has started.")
+    ),
+    "give_tokens": (
+        "[amount] [person]",
+        "Give good-boi points to someone."
     ),
     "betting": (None, "Show information about betting, as well as list of possible events to bet on."),
     "active_bets": ("(person)", "See a list of your (or someone else's) active bets."),
@@ -1181,9 +1185,9 @@ class DiscordClient(discord.Client):
     async def handle_betting_msg(self, message):
         max_mins = bets.BettingHandler.MAX_BETTING_THRESHOLD
         tokens_name = self.config.betting_tokens
-        response = "Betting usage: `!make_bet [amount] [event] (person)`\n"
+        response = "Betting usage: `!bet [amount] [event] (person)`\n"
         response += "This places a bet on the next (or current) match.\n"
-        response += f"`!make_bet all [event] (person)` bets **all** your {tokens_name} on an event!\n"
+        response += f"`!bet all [event] (person)` bets **all** your {tokens_name} on an event!\n"
         response += f"You can place a bet during a game, but it has to be done before {max_mins} "
         response += "minutes. Betting during a game returns a lower reward, based on "
         response += "how much time has passed in the game.\n"
@@ -1501,7 +1505,7 @@ class DiscordClient(discord.Client):
 
     async def handle_make_bet_msg(self, message, amounts, events, targets):
         if None in amounts or None in events:
-            msg = "Usage: `!make_bet [amount] [event] (person)`"
+            msg = "Usage: `!bet [amount] [event] (person)`"
             await message.channel.send(msg)
             return
 
@@ -1572,6 +1576,26 @@ class DiscordClient(discord.Client):
             target_name = self.get_discord_nick(target_id)
 
         response = self.betting_handler.get_bet_return_desc(betting_event, target_id, target_name)
+        await message.channel.send(response)
+
+    async def handle_give_tokens_msg(self, message, amount, target_name):
+        if target_name is None or amount is None:
+            msg = "Usage: `!give_tokens [amount] [person]`"
+            await message.channel.send(msg)
+            return
+
+        target_name = target_name.lower()
+        target_id = self.try_get_user_data(target_name.strip())
+        if target_id is None:
+            msg = "Error: Invalid summoner or Discord name "
+            msg += f"{self.get_emoji_by_name('PepeHands')}"
+            await message.channel.send(msg)
+            return
+
+        target_name = self.get_discord_nick(target_id)
+
+        response = self.betting_handler.give_tokens(message.author.id, amount,
+                                                    target_id, target_name)[1]
         await message.channel.send(response)
 
     async def handle_active_bets_msg(self, message, target_name):
@@ -1906,10 +1930,10 @@ class DiscordClient(discord.Client):
             elif first_command == "intfar_criteria":
                 criteria = self.get_target_name(split, 1)
                 await self.handle_intfar_criteria_msg(message, criteria)
-            elif first_command == "make_bet":
+            elif first_command == "bet":
                 target_name = self.get_target_name(split, 3)
                 await self.get_data_and_respond(self.handle_make_bet_msg, message, [second_command], [third_command], [target_name])
-            elif first_command == "make_multi_bet":
+            elif first_command == "multi_bet":
                 try:
                     amounts, events, targets = self.get_multi_bet_params(split)
                     await self.get_data_and_respond(self.handle_make_bet_msg, message, amounts, events, targets)
@@ -1918,6 +1942,9 @@ class DiscordClient(discord.Client):
             elif first_command == "cancel_bet":
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_cancel_bet_msg, message, second_command, target_name)
+            elif first_command == "give_tokens":
+                target_name = self.get_target_name(split, 2)
+                await self.get_data_and_respond(self.handle_give_tokens_msg, message, second_command, target_name)
             elif first_command == "active_bets":
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_active_bets_msg, message, target_name)

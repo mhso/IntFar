@@ -507,3 +507,7 @@ class Database:
             query_balance = "UPDATE betting_balance SET tokens=100"
             self.execute_query(db, query_bets)
             self.execute_query(db, query_balance)
+
+    def give_tokens(self, sender, amount, receiver):
+        self.update_token_balance(sender, amount, increment=False)
+        self.update_token_balance(receiver, amount, increment=True)
