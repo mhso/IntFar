@@ -60,19 +60,23 @@ class Database:
                                            "FROM registered_summoners")).fetchall()
 
     def add_user(self, summ_name, summ_id, discord_id):
-        if self.summoner_from_discord_id(discord_id) is not None:
-            for disc_id, summ_names, summ_ids in self.summoners:
-                if disc_id == discord_id:
-                    summ_names.append(summ_name)
-                    summ_ids.append(summ_id)
-                    break
-        else:
-            self.summoners.append((discord_id, [summ_name], [summ_id]))
-        with closing(self.get_connection()) as db:
-            self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id) " +
-                                    "VALUES (?, ?, ?)"), (discord_id, summ_name, summ_id))
-            self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100))
-            db.commit()
+        
+        try:
+            with closing(self.get_connection()) as db:
+                self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id) " +
+                                        "VALUES (?, ?, ?)"), (discord_id, summ_name, summ_id))
+                self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100))
+                db.commit()
+            if self.summoner_from_discord_id(discord_id) is not None:
+                for disc_id, summ_names, summ_ids in self.summoners:
+                    if disc_id == discord_id:
+                        summ_names.append(summ_name)
+                        summ_ids.append(summ_id)
+                        break
+                    else:
+                        self.summoners.append((discord_id, [summ_name], [summ_id]))
+        except sqlite3.IntegrityError:
+            pass
 
     def discord_id_from_summoner(self, name):
         for disc_id, summ_names, summ_ids in self.summoners:
