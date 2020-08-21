@@ -456,7 +456,6 @@ class DiscordClient(discord.Client):
         game_desc = "Game won!" if game_won else "Game lost."
         response = f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
         response_bets = "\n**--- Results of bets made that game ---**\n"
-        tokens_name = self.config.betting_tokens
         any_bets = False
         for disc_id, _, _ in self.database.summoners:
             user_in_game = False
@@ -465,6 +464,7 @@ class DiscordClient(discord.Client):
                     user_in_game = True
                     break
 
+            gain_for_user = 0
             if user_in_game:
                 gain_for_user = tokens_gained
                 if disc_id in doinks:
@@ -472,11 +472,17 @@ class DiscordClient(discord.Client):
                 self.betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
             bets_made = self.betting_handler.get_active_bets(disc_id)
+            balance_before = self.database.get_token_balance(disc_id)
+            tokens_earned = gain_for_user
+            tokens_lost = 0
+            disc_name = self.get_discord_nick(disc_id)
+
             if bets_made != []:
                 mention = self.get_mention_str(disc_id)
                 if any_bets:
                     response_bets += "-----------------------------\n"
                 response_bets += f"Result of bets {mention} made:\n"
+
             for bet_ids, amounts, events, targets, bet_timestamp, _ in bets_made:
                 any_bets = True
                 bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_ids, amounts,
@@ -506,8 +512,22 @@ class DiscordClient(discord.Client):
 
                 if bet_success:
                     response_bets += f": Bet was **won**! It awarded **{payout}** {tokens_name}!\n"
+                    tokens_earned += payout
                 else:
                     response_bets += f": Bet was **lost**! It cost **{total_cost}** {tokens_name}!\n"
+                    tokens_lost += total_cost
+
+            if tokens_earned >= balance_before: # Bettnng tokens was more than doubled.
+                quant_desc = "" if tokens_earned == balance_before else "more than"
+                response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
+            elif tokens_lost >= balance_before / 2:
+                quant_desc = "half"
+                if tokens_lost == balance_before:
+                    quant_desc = "all"
+                elif tokens_lost > balance_before / 2:
+                    quant_desc = "more than half"
+
+                response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
 
         if any_bets:
             response += response_bets
@@ -1216,12 +1236,26 @@ class DiscordClient(discord.Client):
         pct_doinks = int((doinks / games) * 100)
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         doinks_emote = self.insert_emotes("{emote_Doinks}")
+        all_bets = self.database.get_all_bets()
+        tokens_name = self.config.betting_tokens
+        bets_won = 0
+        total_amount = 0
+        for bet_data in all_bets:
+            amount = bet_data[1]
+            result = bet_data[5]
+
+            total_amount += amount
+            if result == 1:
+                bets_won += 1
+        pct_won = int((bets_won / len(all_bets)) * 100)
 
         response += f"--- Since {earliest_time} ---\n"
         response += f"- **{games}** games have been played\n"
         response += f"- **{users}** users have signed up\n"
         response += f"- **{intfars}** Int-Far awards have been given\n"
         response += f"- **{doinks}** {doinks_emote} have been earned\n"
+        response += f"- **{len(all_bets)}** bets have been made (**{pct_won}%** was won)\n"
+        response += f"- A total of **{total_amount}** {tokens_name} has been spent on bets"
         response += "--- Of all games played ---\n"
         response += f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
         response += f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
