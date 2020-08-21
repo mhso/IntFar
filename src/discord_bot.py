@@ -1257,7 +1257,7 @@ class DiscordClient(discord.Client):
         response += f"- **{intfars}** Int-Far awards have been given\n"
         response += f"- **{doinks}** {doinks_emote} have been earned\n"
         response += f"- **{len(all_bets)}** bets have been made (**{pct_won}%** was won)\n"
-        response += f"- A total of **{total_amount}** {tokens_name} has been spent on bets"
+        response += f"- A total of **{total_amount}** {tokens_name} has been spent on bets\n"
         response += "--- Of all games played ---\n"
         response += f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
         response += f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
