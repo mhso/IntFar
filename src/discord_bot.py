@@ -306,22 +306,18 @@ class DiscordClient(discord.Client):
             await self.poll_for_game_start()
 
     def user_is_registered(self, summ_name):
-        for _, name, _ in self.database.summoners:
-            if name == summ_name:
+        for _, names, _ in self.database.summoners:
+            if summ_name in names:
                 return True
         return False
 
     def add_user(self, summ_name, discord_id):
         if self.user_is_registered(summ_name):
-            return "User is already registered."
+            return "User with that summoner name is already registered."
         summ_id = self.riot_api.get_summoner_id(summ_name.replace(" ", "%20"))
         if summ_id is None:
             return f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
-        is_smurf = self.database.summoner_from_discord_id(discord_id) is not None
-        self.database.add_user(summ_name, summ_id, discord_id)
-        if is_smurf:
-            return f"Added smurf '{summ_name}' with  summoner ID '{summ_id}'."
-        return f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
+        return self.database.add_user(summ_name, summ_id, discord_id)[1]
 
     def polling_is_active(self): # We only check game statuses if there are two or more active users.
         return len(self.get_users_in_voice()) > 1
