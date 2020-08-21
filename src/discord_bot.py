@@ -1236,7 +1236,9 @@ class DiscordClient(discord.Client):
         pct_doinks = int((doinks / games) * 100)
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         doinks_emote = self.insert_emotes("{emote_Doinks}")
-        all_bets = self.database.get_all_bets()
+        all_bets = []
+        for disc_id, _, _ in self.database.summoners:
+            all_bets.extend(self.database.get_all_bets(disc_id))
         tokens_name = self.config.betting_tokens
         bets_won = 0
         total_amount = 0
