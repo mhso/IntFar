@@ -504,8 +504,6 @@ class Database:
         with closing(self.get_connection()) as db:
             query_bet = "UPDATE bets SET result=? WHERE id=?"
             self.execute_query(db, query_bet, (result_val, bet_id))
-            if success:
-                self.update_token_balance(disc_id, amount_won, True)
 
     def reset_bets(self):
         with closing(self.get_connection()) as db:

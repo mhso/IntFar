@@ -284,6 +284,10 @@ class BettingHandler:
         # Multiplier for betting on a specific person to do something. If more people are
         # in the game, the multiplier is higher.
         person_multiplier = len(stats)
+        amount_multiplier = len(amounts)
+        self.config.log(f"Disc ID: {disc_id}")
+        self.config.log(f"Person multiplier: {person_multiplier}")
+        self.config.log(f"Amount of bets: {amount_multiplier}")
         total_value = 0
         all_success = True
         for amount, event_id, target_id in zip(amounts, events, targets):
@@ -311,7 +315,7 @@ class BettingHandler:
 
             total_value += bet_value
 
-        total_value *= len(amounts)
+        total_value = total_value * amount_multiplier
 
         for bet_id in bet_ids:
             try:
@@ -320,6 +324,9 @@ class BettingHandler:
                 print_exc()
                 self.config.log("Database error during bet resolution!", self.config.log_error)
                 return
+
+        if all_success:
+            self.database.update_token_balance(disc_id, total_value, True)
 
         return all_success, total_value
 
