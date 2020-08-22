@@ -258,9 +258,9 @@ class DiscordClient(discord.Client):
                     self.config.log("Game info is None! Weird stuff.", self.config.log_error)
                     raise ValueError("Game info is None!")
 
-                self.config.log("Users in game before: {self.users_in_game}")
+                self.config.log(f"Users in game before: {self.users_in_game}")
                 filtered_stats = self.get_filtered_stats(game_info)
-                self.config.log("Users in game after: {self.users_in_game}")
+                self.config.log(f"Users in game after: {self.users_in_game}")
 
                 betting_data = await self.declare_intfar(filtered_stats)
                 if betting_data is not None:
@@ -268,6 +268,7 @@ class DiscordClient(discord.Client):
                     await asyncio.sleep(1)
                     await self.resolve_bets(filtered_stats, intfar, intfar_reason, doinks)
                     await self.save_stats(filtered_stats, intfar, intfar_reason, doinks)
+
                 self.active_game = None
                 self.game_start = None
                 self.users_in_game = None # Reset the list of users who are in a game.
@@ -302,7 +303,6 @@ class DiscordClient(discord.Client):
         game_status = self.check_game_status()
 
         if game_status == 1: # Game has started.
-            self.polling_active = False
             await self.poll_for_game_end()
         elif game_status == 0: # Sleep for 10 minutes and check game status again.
             await self.poll_for_game_start()
@@ -1040,6 +1040,8 @@ class DiscordClient(discord.Client):
 
     async def user_left_voice(self, member):
         self.config.log("User left voice: " + str(member.id))
+        if len(users_in_voice) < 2 and self.polling_active:
+            self.polling_active = False
 
     async def remove_intfar_role(self, intfar_id, role_id):
         nibs_guild = None
