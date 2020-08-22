@@ -258,7 +258,9 @@ class DiscordClient(discord.Client):
                     self.config.log("Game info is None! Weird stuff.", self.config.log_error)
                     raise ValueError("Game info is None!")
 
+                self.config.log("Users in game before: {self.users_in_game}")
                 filtered_stats = self.get_filtered_stats(game_info)
+                self.config.log("Users in game after: {self.users_in_game}")
 
                 betting_data = await self.declare_intfar(filtered_stats)
                 if betting_data is not None:
@@ -864,7 +866,7 @@ class DiscordClient(discord.Client):
                                         break
                                 if not user_in_list:
                                     summ_data = (disc_id, part_info["player"]["summonerName"],
-                                                part_info["player"]["summonerId"])
+                                                 part_info["player"]["summonerId"])
                                     self.users_in_game.append(summ_data)
 
         for _, stats in filtered_stats:
