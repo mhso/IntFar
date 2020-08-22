@@ -490,7 +490,7 @@ class BettingHandler:
 
         bet_all = len(amounts) == 1 and amounts[0] == "all"
 
-        response = self.get_bet_placed_text(bet_data, game_duration, bet_all, ticket)
+        response = self.get_bet_placed_text(bet_data, bet_all, game_duration, ticket)
 
         balance_resp = f"\nYour {tokens_name} balance is now `{balance}`."
 
