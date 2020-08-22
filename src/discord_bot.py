@@ -178,6 +178,16 @@ QUANTITY_DESC = [
 def cmd_equals(text, cmd):
     return text == cmd or (cmd in ALIASES and text in ALIASES[cmd])
 
+def valid_command(cmd):
+    is_main_cmd = cmd in VALID_COMMANDS or cmd in CUTE_COMMANDS
+    if is_main_cmd:
+        return True
+
+    for alias in ALIASES:
+        if cmd in ALIASES[alias]:
+            return True
+    return False
+
 def get_intfar_flavor_text(nickname, reason):
     flavor_text = INTFAR_FLAVOR_TEXTS[random.randint(0, len(INTFAR_FLAVOR_TEXTS)-1)]
     return flavor_text.replace("{nickname}", nickname).replace("{reason}", reason)
@@ -1194,7 +1204,7 @@ class DiscordClient(discord.Client):
         for cmd, desc_tupl in VALID_COMMANDS.items():
             cmd_str = cmd
             for alias in ALIASES.get(cmd, []):
-                cmd_str += f"/{alias}"
+                cmd_str += f"/!{alias}"
             params, desc = desc_tupl
             params_str = "`-" if params is None else f"{params}` -"
             commands.append(f"`!{cmd_str} {params_str} {desc}")
@@ -1903,9 +1913,7 @@ class DiscordClient(discord.Client):
             split = msg.split(" ")
             first_command = split[0][1:].lower()
 
-            if (first_command not in VALID_COMMANDS
-                    and first_command not in ALIASES
-                    and first_command not in CUTE_COMMANDS):
+            if not valid_command(first_command):
                 return
 
             # The following lines are spam protection.
