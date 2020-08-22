@@ -499,7 +499,7 @@ class Database:
             self.update_token_balance(disc_id, amount_total, True)
             return amount_total
 
-    def mark_bet_as_resolved(self, disc_id, bet_id, success, amount_won=0):
+    def mark_bet_as_resolved(self, bet_id, success):
         result_val = 1 if success else -1
         with closing(self.get_connection()) as db:
             query_bet = "UPDATE bets SET result=? WHERE id=?"

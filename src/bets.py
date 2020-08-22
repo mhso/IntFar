@@ -319,7 +319,7 @@ class BettingHandler:
 
         for bet_id in bet_ids:
             try:
-                self.database.mark_bet_as_resolved(disc_id, bet_id, all_success, total_value)
+                self.database.mark_bet_as_resolved(bet_id, all_success)
             except DBException:
                 print_exc()
                 self.config.log("Database error during bet resolution!", self.config.log_error)
