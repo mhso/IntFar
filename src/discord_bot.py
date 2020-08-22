@@ -154,6 +154,11 @@ VALID_COMMANDS = {
     )
 }
 
+ALIASES = {
+    "give_tokens": ["give"],
+    "betting_tokens": ["gbp"]
+}
+
 CUTE_COMMANDS = {
     "intdaddy": "Flirt with the Int-Far.",
     "intpapi": "Flirt with the Int-Far in spanish."
@@ -169,6 +174,9 @@ QUANTITY_DESC = [
     ("most", "least"), ("most", "least"), ("highest", "lowest"), ("most", "fewest"),
     ("highest", "lowest")
 ]
+
+def cmd_equals(text, cmd):
+    return text == cmd or (cmd in ALIASES and text in ALIASES[cmd])
 
 def get_intfar_flavor_text(nickname, reason):
     flavor_text = INTFAR_FLAVOR_TEXTS[random.randint(0, len(INTFAR_FLAVOR_TEXTS)-1)]
@@ -1184,9 +1192,12 @@ class DiscordClient(discord.Client):
         response = "**--- Valid commands, and their usages, are listed below ---**\n"
         commands = []
         for cmd, desc_tupl in VALID_COMMANDS.items():
+            cmd_str = cmd
+            for alias in ALIASES.get(cmd, []):
+                cmd_str += f"/{alias}"
             params, desc = desc_tupl
             params_str = "`-" if params is None else f"{params}` -"
-            commands.append(f"`!{cmd} {params_str} {desc}")
+            commands.append(f"`!{cmd_str} {params_str} {desc}")
 
         message_1 = response + "\n".join(commands[:14]) + "\n"
         message_2 = "\n".join(commands[14:])
@@ -1893,8 +1904,8 @@ class DiscordClient(discord.Client):
             first_command = split[0][1:].lower()
 
             if (first_command not in VALID_COMMANDS
-                    and first_command not in CUTE_COMMANDS
-                    and first_command != "test"):
+                    and first_command not in ALIASES
+                    and first_command not in CUTE_COMMANDS):
                 return
 
             # The following lines are spam protection.
@@ -1918,7 +1929,7 @@ class DiscordClient(discord.Client):
 
             second_command = None if len(split) < 2 else split[1].lower()
             third_command = None if len(split) < 3 else split[2].lower()
-            if first_command == "register": # Register the user who sent the command.
+            if cmd_equals(first_command, "register"): # Register the user who sent the command.
                 if len(split) > 1:
                     summ_name = " ".join(split[1:])
                     status = self.add_user(summ_name, message.author.id)
@@ -1926,7 +1937,7 @@ class DiscordClient(discord.Client):
                 else:
                     response = "You must supply a summoner name {emote_angry_gual}"
                     await message.channel.send(self.insert_emotes(response))
-            elif first_command == "users": # List all registered users.
+            elif cmd_equals(first_command, "users"): # List all registered users.
                 response = ""
                 for disc_id, summ_name, _ in self.database.summoners:
                     summ_names = self.database.summoner_from_discord_id(disc_id)[1]
@@ -1938,65 +1949,66 @@ class DiscordClient(discord.Client):
                 else:
                     response = "**--- Registered bois ---**\n" + response
                 await message.channel.send(self.insert_emotes(response))
-            elif first_command == "intfar": # Lookup how many intfar 'awards' the given user has.
+            elif cmd_equals(first_command, "intfar"): # Lookup how many intfar 'awards' the given user has.
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_intfar_msg, message, target_name)
-            elif first_command == "intfar_relations":
+            elif cmd_equals(first_command, "intfar_relations"):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_intfar_relations_msg, message, target_name)
-            elif first_command == "doinks":
+            elif cmd_equals(first_command, "doinks"):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
-            elif first_command == "doinks_criteria":
+            elif cmd_equals(first_command, "doinks_criteria"):
                 await self.handle_doinks_criteria_msg(message)
-            elif first_command == "help":
+            elif cmd_equals(first_command, "help"):
                 await self.handle_helper_msg(message)
-            elif first_command == "commands":
+            elif cmd_equals(first_command, "commands"):
                 await self.handle_commands_msg(message)
-            elif first_command == "stats":
+            elif cmd_equals(first_command, "stats"):
                 await self.handle_stats_msg(message)
-            elif first_command == "betting":
+            elif cmd_equals(first_command, "betting"):
                 await self.handle_betting_msg(message)
-            elif first_command == "status":
+            elif cmd_equals(first_command, "status"):
                 await self.handle_status_msg(message)
-            elif first_command == "uptime":
+            elif cmd_equals(first_command, "uptime"):
                 await self.handle_uptime_msg(message)
-            elif first_command in ["worst", "best"] and len(split) > 1: # Get game stats.
+            elif (cmd_equals(first_command, "worst") or cmd_equals(first_command, "best")
+                    and len(split) > 1): # Get game stats.
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
-            elif first_command == "intfar_criteria":
+            elif cmd_equals(first_command, "intfar_criteria"):
                 criteria = self.get_target_name(split, 1)
                 await self.handle_intfar_criteria_msg(message, criteria)
-            elif first_command == "bet":
+            elif cmd_equals(first_command, "bet"):
                 target_name = self.get_target_name(split, 3)
                 await self.get_data_and_respond(self.handle_make_bet_msg, message, [second_command], [third_command], [target_name])
-            elif first_command == "multi_bet":
+            elif cmd_equals(first_command, "multi_bet"):
                 try:
                     amounts, events, targets = self.get_multi_bet_params(split)
                     await self.get_data_and_respond(self.handle_make_bet_msg, message, amounts, events, targets)
                 except ValueError as exc:
                     await message.channel.send(str(exc))
-            elif first_command == "cancel_bet":
+            elif cmd_equals(first_command, "cancel_bet"):
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_cancel_bet_msg, message, second_command, target_name)
-            elif first_command == "give_tokens":
+            elif cmd_equals(first_command, "give_tokens"):
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_give_tokens_msg, message, second_command, target_name)
-            elif first_command == "active_bets":
+            elif cmd_equals(first_command, "active_bets"):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_active_bets_msg, message, target_name)
-            elif first_command == "bets":
+            elif cmd_equals(first_command, "bets"):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_all_bets_msg, message, target_name)
-            elif first_command == "bet_return" and len(split) > 1:
+            elif cmd_equals(first_command, "bet_return") and len(split) > 1:
                 target_name = self.get_target_name(split, 2)
                 await self.handle_bet_return_msg(message, second_command, target_name)
-            elif first_command == "betting_tokens":
+            elif cmd_equals(first_command, "betting_tokens"):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_token_balance_msg, message, target_name)
-            elif first_command == "intdaddy":
+            elif cmd_equals(first_command, "intdaddy"):
                 await self.handle_flirtation_msg(message, "english")
-            elif first_command == "intpapi":
+            elif cmd_equals(first_command, "intpapi"):
                 await self.handle_flirtation_msg(message, "spanish")
 
     async def on_voice_state_update(self, member, before, after):
