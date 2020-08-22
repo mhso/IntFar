@@ -1040,6 +1040,7 @@ class DiscordClient(discord.Client):
 
     async def user_left_voice(self, member):
         self.config.log("User left voice: " + str(member.id))
+        users_in_voice = self.get_users_in_voice()
         if len(users_in_voice) < 2 and self.polling_active:
             self.polling_active = False
 
