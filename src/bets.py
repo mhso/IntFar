@@ -342,7 +342,7 @@ class BettingHandler:
                 response += f"\n - `{bet_desc}` for **{amount}** {tokens_name} "
                 response += f"(**{base_return}x** return)."
             response += f"\nThis bet uses the following ticket ID: {ticket}. "
-            response += "You will need this ticket to cancel the bet."
+            response += "You will need this ticket to cancel the bet.\n"
         else:
             amount, _, _, base_return, bet_desc = data[0]
             response = f"Bet succesfully placed: `{bet_desc}` for "
@@ -354,10 +354,10 @@ class BettingHandler:
             response += f"The return multiplier for that event is **{base_return}**.\n"
 
         if duration == 0:
-            response += "\nYou placed your bet before the game started, "
+            response += "You placed your bet before the game started, "
             response += "you will get the full reward.\n"
         else:
-            response += "\nYou placed your bet during the game, therefore "
+            response += "You placed your bet during the game, therefore "
             response += "you will not get the full reward.\n"
 
         response += "Potential winnings:\n"

@@ -36,24 +36,23 @@ with closing(database_client_1.get_connection()) as db_1:
     with closing(database_client_2.get_connection()) as db_2:
         for summ in summoners:
             disc_id = int(summ[0])
-            db_2.cursor().execute("INSERT INTO registered_summoners VALUES (?, ?, ?)", (disc_id, summ[1], summ[2]))
+            db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?)", (disc_id, summ[1], summ[2]))
         query = query_prefix + "best_stats" + query_cols
         for data in data_best:
             db_2.cursor().execute(query, data)
         query = query_prefix + "worst_stats" + query_cols
         for data in data_worst:
             db_2.cursor().execute(query, data)
-        query = "INSERT INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"
+        query = "INSERT OR IGNORE INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"
         for data in participants:
             db_2.cursor().execute(query, data)
-        query = "INSERT INTO betting_balance(disc_id, tokens) VALUES (?, ?)"
+        query = "INSERT OR IGNORE INTO betting_balance(disc_id, tokens) VALUES (?, ?)"
         for data in balances:
             db_2.cursor().execute(query, data)
-        query = "INSERT INTO betting_events(id, max_return) VALUES (?, ?)"
+        query = "INSERT OR IGNORE INTO betting_events(id, max_return) VALUES (?, ?)"
         for data in events:
             db_2.cursor().execute(query, data)
-        query = "INSERT INTO bets(id, better_id, event_id, amount, game_duration, target, ticket, result) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        query = "INSERT OR IGNORE INTO bets(id, better_id, event_id, amount, game_duration, target, ticket, result) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         for data in bets:
-            data_reshaped = data[:-1] + (None,) + (data[-1],)
-            db_2.cursor().execute(query, data_reshaped)
+            db_2.cursor().execute(query, data)
         db_2.commit()

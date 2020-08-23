@@ -643,7 +643,7 @@ class DiscordClient(discord.Client):
                 cs_per_min = (cs_per_min + stats["creepsPerMinDeltas"]["10-20"]) / 2
             if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
                 mentions[disc_id].append((2, round_digits(cs_per_min)))
-            epic_monsters_secured = stats["baronKills"] + stats["dragonKills"]
+            epic_monsters_secured = stats["baronKills"] + stats["dragonKills"] + stats["riftHeraldKills"]
             if stats["lane"] == "JUNGLE" and epic_monsters_secured == 0:
                 mentions[disc_id].append((3, epic_monsters_secured))
 
