@@ -1580,14 +1580,14 @@ class DiscordClient(discord.Client):
         game_data = None
         active_summoner = None
         for summ_id in summoner_ids:
-            game_data = self.riot_api.get_active_game(summoner_ids)
+            game_data = self.riot_api.get_active_game(summ_id)
             if game_data is not None:
                 active_summoner = summ_id
                 break
             await asyncio.sleep(1)
 
         if game_data is not None:
-            response = "{target_name} is "
+            response = f"{target_name} is "
             response += game_stats.get_active_game_summary(game_data, active_summoner,
                                                            self.database.summoners, self.riot_api)
         else:
@@ -1951,7 +1951,7 @@ class DiscordClient(discord.Client):
                 return True
             elif param[0] == "[" and param[-1] == "]":
                 if len(args) <= index:
-                    await message.channel.send(f"Usage: !{cmd} {params_def}")
+                    await message.channel.send(f"Usage: `!{cmd} {params_def}`")
                     return False
 
         return True

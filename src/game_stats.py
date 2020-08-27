@@ -81,21 +81,22 @@ def get_finished_game_summary(data, summ_ids, riot_api):
 def get_active_game_summary(data, summ_id, summoners, riot_api):
     champions = {}
     for participant in data["participants"]:
-        for _, _, summoner_id in summoners:
-            if participant["summonerId"] == summoner_id:
+        for _, _, summoner_ids in summoners:
+            if participant["summonerId"] in summoner_ids:
                 champ_id = participant["championId"]
                 champ_played = riot_api.get_champ_name(champ_id)
                 if champ_played is None:
                     champ_played = "Unknown Champ (Rito pls)"
-                champions[summoner_id] = (participant["summonerName"], champ_played)
+                champions[participant["summonerId"]] = (participant["summonerName"], champ_played)
 
-    duration = data["gameDuration"]
-    dt_1 = datetime.fromtimestamp(time())
-    dt_2 = datetime.fromtimestamp(time() + duration)
+    game_start = data["gameStartTime"] / 1000
+    duration = data["gameLength"]
+    dt_1 = datetime.fromtimestamp(game_start)
+    dt_2 = datetime.fromtimestamp(game_start + duration)
     fmt_duration = format_duration(dt_1, dt_2)
     game_mode = data["gameMode"]
 
-    response = f"{fmt_duration} in a {game_mode} game, playing {champions[summ_id]}.\n"
+    response = f"{fmt_duration} in a {game_mode} game, playing {champions[summ_id][1]}.\n"
     if len(champions) > 1:
         response += "He is playing with:"
         for other_id in champions:
