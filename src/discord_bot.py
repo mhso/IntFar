@@ -72,7 +72,7 @@ FLIRT_MESSAGES = {
         "Es posible que haya oído hablar de la IA, pero ¿ha oído hablar de DP? :first_quarter_moon_with_face:",
         "No soy solo tuercas y tornillos ... todavía puedo atornillarte y atornillarte :nut_and_bolt:",
         "A pesar de que estás entrando con tanta fuerza, no es lo más difícil que hay .. :joystick:",
-        "¿Qué tal si llego allí y pongo mi 1 en tu 0? :peberno:"
+        "¿Qué tal si llego allí y pongo mi 1 en tu 0? {emote_peberno}"
     ]
 }
 
@@ -121,6 +121,9 @@ VALID_COMMANDS = {
         None,
         ("Show overall stats about how many games have been played, " +
          "how many people were Int-Far, etc.")
+    ),
+    "game": (
+        "[person]", "See details about the league match the given person is in, if any."
     ),
     "bet": (
         "[amount] [event] (person)",
@@ -177,16 +180,6 @@ QUANTITY_DESC = [
 
 def cmd_equals(text, cmd):
     return text == cmd or (cmd in ALIASES and text in ALIASES[cmd])
-
-def valid_command(cmd):
-    is_main_cmd = cmd in VALID_COMMANDS or cmd in CUTE_COMMANDS
-    if is_main_cmd:
-        return True
-
-    for alias in ALIASES:
-        if cmd in ALIASES[alias]:
-            return True
-    return False
 
 def get_intfar_flavor_text(nickname, reason):
     flavor_text = INTFAR_FLAVOR_TEXTS[random.randint(0, len(INTFAR_FLAVOR_TEXTS)-1)]
@@ -357,7 +350,8 @@ class DiscordClient(discord.Client):
             for summ_name, summ_id in zip(summ_names, summ_ids):
                 game_data = self.riot_api.get_active_game(summ_id)
                 if game_data is not None:
-                    game_id, game_start = game_data
+                    game_id = game_data["gameId"]
+                    game_start = int(game_data["gameStartTime"] / 1000)
                     active_game_start = game_start
                     game_for_summoner = game_id
                     active_name = summ_name
@@ -1539,7 +1533,7 @@ class DiscordClient(discord.Client):
                 min_or_max_value = round_digits(min_or_max_value)
                 game_info = self.riot_api.get_game_details(game_id)
                 summ_ids = self.database.summoner_from_discord_id(target_id)[2]
-                game_summary = game_stats.get_game_summary(game_info, summ_ids, self.riot_api)
+                game_summary = game_stats.get_finished_game_summary(game_info, summ_ids, self.riot_api)
 
             emote_to_use = "{emote_pog}" if best else "{emote_peberno}"
 
@@ -1560,6 +1554,47 @@ class DiscordClient(discord.Client):
             response = f"Not a valid stat: '{second_cmd}' "
             response += self.insert_emotes("{emote_carole_fucking_baskin}")
             await message.channel.send(response)
+
+    async def handle_game_msg(self, message, target_name):
+        summoner_ids = None
+        target_id = None
+        if target_name == "me":
+            target_id = message.author.id
+            target_name = message.author.name
+        else:
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+            target_name = self.get_discord_nick(target_id)
+
+        for disc_id, _, summ_ids in self.database.summoners:
+            if disc_id == target_id:
+                summoner_ids = summ_ids
+                break
+
+        response = ""
+        game_data = None
+        active_summoner = None
+        for summ_id in summoner_ids:
+            game_data = self.riot_api.get_active_game(summoner_ids)
+            if game_data is not None:
+                active_summoner = summ_id
+                break
+            await asyncio.sleep(1)
+
+        if game_data is not None:
+            response = "{target_name} is "
+            response += game_stats.get_active_game_summary(game_data, active_summoner,
+                                                           self.database.summoners, self.riot_api)
+        else:
+            response = f"{target_name} is not in a game at the moment "
+            response += self.insert_emotes("{emote_simp_but_closeup}")
+
+        await message.channel.send(response)
 
     async def handle_make_bet_msg(self, message, amounts, events, targets):
         if None in amounts or None in events:
@@ -1594,11 +1629,6 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_cancel_bet_msg(self, message, betting_event, target_name):
-        if betting_event is None:
-            msg = "Usage: `!cancel_bet [event] (person)`"
-            await message.channel.send(msg)
-            return
-
         target_id = None
         discord_name = None
         if target_name is not None: # Bet on a specific person doing a thing.
@@ -1637,11 +1667,6 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_give_tokens_msg(self, message, amount, target_name):
-        if target_name is None or amount is None:
-            msg = "Usage: `!give_tokens [amount] [person]`"
-            await message.channel.send(msg)
-            return
-
         target_name = target_name.lower()
         target_id = self.try_get_user_data(target_name.strip())
         if target_id is None:
@@ -1862,7 +1887,8 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def not_implemented_yet(self, message):
-        await message.channel.send("This command is not implemented yet.")
+        msg = self.insert_emotes("This command is not implemented yet {emote_peberno}")
+        await message.channel.send()
 
     def get_target_name(self, split, start_index, end_index=None):
         end_index = len(split) if end_index is None else end_index
@@ -1904,6 +1930,32 @@ class DiscordClient(discord.Client):
             await args[0].channel.send(response)
             self.config.log(exception, self.config.log_error)
 
+    async def valid_command(self, message, cmd, args):
+        is_main_cmd = cmd in VALID_COMMANDS or cmd in CUTE_COMMANDS
+        valid_cmd = None
+        if is_main_cmd:
+            valid_cmd = cmd
+
+        for alias in ALIASES:
+            if cmd in ALIASES[alias]:
+                valid_cmd = alias
+                break
+
+        if valid_cmd is None:
+            return False
+
+        params_def = VALID_COMMANDS[valid_cmd][0]
+        params_split = params_def.split(" ")
+        for index, param in enumerate(params_split):
+            if param is None or (param[0] == "(" and param[-1] == ")"):
+                return True
+            elif param[0] == "[" and param[-1] == "]":
+                if len(args) <= index:
+                    await message.channel.send(f"Usage: !{cmd} {params_def}")
+                    return False
+
+        return True
+
     async def on_message(self, message):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
@@ -1913,7 +1965,7 @@ class DiscordClient(discord.Client):
             split = msg.split(" ")
             first_command = split[0][1:].lower()
 
-            if not valid_command(first_command):
+            if not self.valid_command(message, first_command, split[1:]):
                 return
 
             # The following lines are spam protection.
@@ -1981,12 +2033,15 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "uptime"):
                 await self.handle_uptime_msg(message)
             elif (cmd_equals(first_command, "worst") or cmd_equals(first_command, "best")
-                    and len(split) > 1): # Get game stats.
+                  and len(split) > 1): # Get game stats.
                 target_name = self.get_target_name(split, 2)
                 await self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
             elif cmd_equals(first_command, "intfar_criteria"):
                 criteria = self.get_target_name(split, 1)
                 await self.handle_intfar_criteria_msg(message, criteria)
+            elif cmd_equals(first_command, "game"):
+                target_name = self.get_target_name(split, 1)
+                await self.handle_game_msg(message, target_name)
             elif cmd_equals(first_command, "bet"):
                 target_name = self.get_target_name(split, 3)
                 await self.get_data_and_respond(self.handle_make_bet_msg, message, [second_command], [third_command], [target_name])

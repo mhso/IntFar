@@ -54,7 +54,7 @@ def get_outlier_stat(stat, data):
     least = stats[stat]
     return most_id, most, least_id, least
 
-def get_game_summary(data, summ_ids, riot_api):
+def get_finished_game_summary(data, summ_ids, riot_api):
     stats = None
     champ_id = 0
     for part_info in data["participantIdentities"]:
@@ -77,3 +77,30 @@ def get_game_summary(data, summ_ids, riot_api):
 
     return (f"{champ_played} with a score of {stats['kills']}/" +
             f"{stats['deaths']}/{stats['assists']} on {date} in a {fmt_duration} long game")
+
+def get_active_game_summary(data, summ_id, summoners, riot_api):
+    champions = {}
+    for participant in data["participants"]:
+        for _, _, summoner_id in summoners:
+            if participant["summonerId"] == summoner_id:
+                champ_id = participant["championId"]
+                champ_played = riot_api.get_champ_name(champ_id)
+                if champ_played is None:
+                    champ_played = "Unknown Champ (Rito pls)"
+                champions[summoner_id] = (participant["summonerName"], champ_played)
+
+    duration = data["gameDuration"]
+    dt_1 = datetime.fromtimestamp(time())
+    dt_2 = datetime.fromtimestamp(time() + duration)
+    fmt_duration = format_duration(dt_1, dt_2)
+    game_mode = data["gameMode"]
+
+    response = f"{fmt_duration} in a {game_mode} game, playing {champions[summ_id]}.\n"
+    if len(champions) > 1:
+        response += "He is playing with:"
+        for other_id in champions:
+            if other_id != summ_id:
+                name, champ = champions[other_id]
+                response += f"\n - {name} ({champ})"
+
+    return response
