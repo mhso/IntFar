@@ -1965,7 +1965,7 @@ class DiscordClient(discord.Client):
             split = msg.split(" ")
             first_command = split[0][1:].lower()
 
-            if not self.valid_command(message, first_command, split[1:]):
+            if not await self.valid_command(message, first_command, split[1:]):
                 return
 
             # The following lines are spam protection.
