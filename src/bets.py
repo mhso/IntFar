@@ -267,11 +267,11 @@ class BettingHandler:
 
     def get_bet_value(self, bet_amount, event_id, bet_timestamp, target):
         base_return = self.get_dynamic_bet_return(event_id, target)
-        if bet_timestamp == 0: # Bet was made before game started, award full value.
+        if bet_timestamp <= 2: # Bet was made before game started, award full value.
             ratio = 1.0
         else: # Scale value with game time at which bet was made.
             max_time = 60 * BettingHandler.MAX_BETTING_THRESHOLD
-            ratio = 1 - (bet_timestamp / max_time)
+            ratio = 1 - ((bet_timestamp - 2) / max_time)
 
         value = int(bet_amount * base_return * ratio)
         if value < 1:
