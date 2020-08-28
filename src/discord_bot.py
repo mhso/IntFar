@@ -1945,6 +1945,9 @@ class DiscordClient(discord.Client):
             return False
 
         params_def = VALID_COMMANDS[valid_cmd][0]
+        if params_def is None:
+            return True
+
         params_split = params_def.split(" ")
         for index, param in enumerate(params_split):
             if param is None or (param[0] == "(" and param[-1] == ")"):
