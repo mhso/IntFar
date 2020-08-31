@@ -450,6 +450,11 @@ class Database:
             query = "SELECT tokens FROM betting_balance WHERE disc_id=?"
             return self.execute_query(db, query, (disc_id,)).fetchone()[0]
 
+    def get_max_tokens_details(self):
+        with closing(self.get_connection()) as db:
+            query = "SELECT MAX(tokens), disc_id FROM betting_balance"
+            return self.execute_query(db, query).fetchone()
+
     def update_token_balance(self, disc_id, amount, increment=True):
         with closing(self.get_connection()) as db:
             sign_str = "+" if increment else "-"

@@ -461,6 +461,22 @@ class DiscordClient(discord.Client):
             emote_index = replaced.find("{emote_")
         return replaced
 
+    async def assign_top_tokens_role(self, old_holder, new_holder):
+        role_id = 750111830529146980
+        nibs_guild = None
+        for guild in self.guilds:
+            if guild.id == DISCORD_SERVER_ID:
+                nibs_guild = guild
+                break
+
+        role = nibs_guild.get_role(role_id)
+
+        old_head_honcho = nibs_guild.get_member(old_holder)
+        await old_head_honcho.remove_roles(role)
+
+        new_head_honcho = nibs_guild.get_member(new_holder)
+        await new_head_honcho.add_roles(role)
+
     async def resolve_bets(self, game_info, intfar, intfar_reason, doinks):
         game_won = game_info[0][1]["gameWon"]
         tokens_name = self.config.betting_tokens
@@ -470,6 +486,8 @@ class DiscordClient(discord.Client):
         game_desc = "Game won!" if game_won else "Game lost."
         response = f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
         response_bets = "\n**--- Results of bets made that game ---**\n"
+        max_tokens_before, max_tokens_holder = self.database.get_max_tokens_details()
+
         any_bets = False
         for disc_id, _, _ in self.database.summoners:
             user_in_game = False
@@ -542,6 +560,14 @@ class DiscordClient(discord.Client):
                     quant_desc = "more than half"
 
                 response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
+
+            tokens_now = balance_before + tokens_earned
+
+            if tokens_now > max_tokens_before and disc_id != max_tokens_holder:
+                # This person now has the most tokens!
+                response_bets += "{disc_name} now has the most {tokens_name} of everyone! "
+                response_bets += "**HAIL TO THE KING!!!***\n"
+                await self.assign_top_tokens_role(max_tokens_holder, disc_id)
 
         if any_bets:
             response += response_bets

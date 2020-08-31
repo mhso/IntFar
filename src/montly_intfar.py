@@ -131,7 +131,7 @@ if __name__ == "__main__":
     #     (2, 20, 6, 30),
     #     (3, 20, 6, 20),
     # ]
-    intfar_details = [("Guy" + str(disc_id), games, intfars, ratio)
+    intfar_details = [("Disc ID: " + str(disc_id), games, intfars, ratio)
                       for (disc_id, games, intfars, ratio) in details]
 
     month = monthly_monitor.time_at_announcement.month
@@ -145,4 +145,4 @@ if __name__ == "__main__":
     desc += ":clap: :clap: :clap: :clap: :clap: \n"
     desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
     desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
-    print(desc)
+    print(intro_desc + desc)
