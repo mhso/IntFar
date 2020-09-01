@@ -74,10 +74,8 @@ def resolve_not_intfar(intfar, intfar_reason, target_id):
     return not resolve_is_intfar(intfar, intfar_reason, None)
 
 def intfar_by_reason(intfar, reason_str, target_id, reason):
-    reason_matches = reason_str[reason] == "1"
-    if target_id is None:
-        return reason_matches
-    return intfar == target_id and reason_matches
+    return (resolve_is_intfar(intfar, reason_str, target_id)
+            and reason_str[reason] == "1")
 
 def resolve_is_intfar_by_kda(intfar, intfar_reason, target_id):
     return intfar_by_reason(intfar, intfar_reason, target_id, 0)
