@@ -488,28 +488,29 @@ class DiscordClient(discord.Client):
         response_bets = "\n**--- Results of bets made that game ---**\n"
         max_tokens_before, max_tokens_holder = self.database.get_max_tokens_details()
 
-        any_bets = False
+        any_bets = False # Bool to indicate whether any bets were made.
         for disc_id, _, _ in self.database.summoners:
-            user_in_game = False
+            user_in_game = False # See if the user corresponding to 'disc_id' was in-game.
             for in_game_id, _, _ in self.users_in_game:
                 if disc_id == in_game_id:
                     user_in_game = True
                     break
 
             gain_for_user = 0
-            if user_in_game:
+            if user_in_game: # If current user was in-game, he gains tokens for playing.
                 gain_for_user = tokens_gained
-                if disc_id in doinks:
+                if disc_id in doinks: # If user was awarded doinks, he gets more tokens.
                     gain_for_user += self.config.betting_tokens_for_doinks
                 self.betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
+            # Get list of active bets for the current user.
             bets_made = self.betting_handler.get_active_bets(disc_id)
             balance_before = self.database.get_token_balance(disc_id)
-            tokens_earned = gain_for_user
-            tokens_lost = 0
+            tokens_earned = gain_for_user # Variable for tracking tokens gained for the user.
+            tokens_lost = 0 # Variable for tracking tokens lost for the user.
             disc_name = self.get_discord_nick(disc_id)
 
-            if bets_made != []:
+            if bets_made != []: # No active bets for the current user.
                 mention = self.get_mention_str(disc_id)
                 if any_bets:
                     response_bets += "-----------------------------\n"
@@ -517,6 +518,7 @@ class DiscordClient(discord.Client):
 
             for bet_ids, amounts, events, targets, bet_timestamp, _ in bets_made:
                 any_bets = True
+                # Resolve current bet which the user made, marks it as won/lost in DB.
                 bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_ids, amounts,
                                                                        events, bet_timestamp,
                                                                        targets,
@@ -525,7 +527,7 @@ class DiscordClient(discord.Client):
                                                                         doinks, game_info))
 
                 response_bets += " - "
-                total_cost = 0
+                total_cost = 0 # Track total cost of the current bet.
                 for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
                     person = None
                     if target is not None:
@@ -534,37 +536,37 @@ class DiscordClient(discord.Client):
                     bet_desc = bets.get_dynamic_bet_desc(event, person)
 
                     response_bets += f"`{bet_desc}`"
-                    if index != len(amounts) - 1:
+                    if index != len(amounts) - 1: # Bet was a multi-bet.
                         response_bets += " **and** "
 
                     total_cost += amount
 
-                if len(amounts) > 1:
+                if len(amounts) > 1: # Again, bet was a multi-bet.
                     response_bets += " (multi-bet)"
 
-                if bet_success:
+                if bet_success: # Bet was won. Track how many tokens it awarded.
                     response_bets += f": Bet was **won**! It awarded **{payout}** {tokens_name}!\n"
                     tokens_earned += payout
-                else:
+                else: # Bet was lost. Track how many tokens it cost.
                     response_bets += f": Bet was **lost**! It cost **{total_cost}** {tokens_name}!\n"
                     tokens_lost += total_cost
 
-            if tokens_earned >= balance_before: # Bettnng tokens was more than doubled.
+            if tokens_earned >= balance_before: # Betting tokens balanced was (at least) doubled.
                 quant_desc = "" if tokens_earned == balance_before else "more than"
                 response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
-            elif tokens_lost >= balance_before / 2:
+            elif tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved.
                 quant_desc = "half"
-                if tokens_lost == balance_before:
+                if tokens_lost == balance_before: # Current bet cost ALL the user's tokens.
                     quant_desc = "all"
                 elif tokens_lost > balance_before / 2:
                     quant_desc = "more than half"
 
                 response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
 
-            tokens_now = balance_before + tokens_earned
+            tokens_now = balance_before + tokens_earned # Record how many tokens the user has now.
 
             if tokens_now > max_tokens_before and disc_id != max_tokens_holder:
-                # This person now has the most tokens!
+                # This person now has the most tokens of all users!
                 response_bets += "{disc_name} now has the most {tokens_name} of everyone! "
                 response_bets += "**HAIL TO THE KING!!!***\n"
                 await self.assign_top_tokens_role(max_tokens_holder, disc_id)
@@ -1057,6 +1059,7 @@ class DiscordClient(discord.Client):
             try: # Save stats.
                 self.database.record_stats(intfar_id, intfar_reason, doinks,
                                            self.active_game, filtered_stats, self.users_in_game)
+                self.database.create_backup()
             except DBException as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
                 self.config.log(exception)

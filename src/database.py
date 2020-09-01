@@ -1,8 +1,8 @@
 import os
+from shutil import copyfile
 from datetime import datetime
 import sqlite3
 from sqlite3 import DatabaseError, OperationalError, ProgrammingError
-
 from contextlib import closing
 from montly_intfar import TimeZone, MonthlyIntfar
 import game_stats
@@ -400,6 +400,14 @@ class Database:
                 doink = doinks.get(disc_id, None)
                 self.execute_query(db, query, (game_id, disc_id, timestamp, doink))
             db.commit()
+
+    def create_backup(self):
+        backup_name = "database_backup.db"
+        try:
+            os.remove(backup_name)
+            copyfile(self.config.database, backup_name)
+        except (OSError, IOError) as exc:
+            raise DBException(exc.args)
 
     def generate_ticket_id(self, disc_id):
         with closing(self.get_connection()) as db:
