@@ -1205,7 +1205,7 @@ class DiscordClient(discord.Client):
                     for member in members_in_voice:
                         # Start polling for an active game
                         # if more than one user is active in voice.
-                        await self.user_joined_voice(member, True)
+                        await self.user_joined_voice(member.id, True)
                 for text_channel in guild.text_channels:
                     if text_channel.id == CHANNEL_ID: # Find the 'int-far-spam' channel.
                         self.channel_to_write = text_channel
