@@ -330,7 +330,14 @@ class DiscordClient(discord.Client):
         summ_id = self.riot_api.get_summoner_id(summ_name.replace(" ", "%20"))
         if summ_id is None:
             return f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
-        return self.database.add_user(summ_name, summ_id, discord_id)[1]
+        success, status = self.database.add_user(summ_name, summ_id, discord_id)
+        if success:
+            users_in_voice = self.get_users_in_voice()
+            for disc_id, _, _ in users_in_voice:
+                if discord_id == disc_id: # User is already in voice channel.
+                    self.user_joined_voice(disc_id)
+                    break
+        return status
 
     def polling_is_active(self): # We only check game statuses if there are two or more active users.
         return len(self.get_users_in_voice()) > 1
@@ -1067,9 +1074,9 @@ class DiscordClient(discord.Client):
 
             self.config.log("Game over! Stats were saved succesfully.")
 
-    async def user_joined_voice(self, member, poll_immediately=False):
-        self.config.log("User joined voice: " + str(member.id))
-        summoner_info = self.database.summoner_from_discord_id(member.id)
+    async def user_joined_voice(self, disc_id, poll_immediately=False):
+        self.config.log("User joined voice: " + str(disc_id))
+        summoner_info = self.database.summoner_from_discord_id(disc_id)
         if summoner_info is not None:
             users_in_voice = self.get_users_in_voice()
             self.config.log("Summoner joined voice: " + summoner_info[1][0])
@@ -1079,8 +1086,8 @@ class DiscordClient(discord.Client):
                 asyncio.create_task(self.poll_for_game_start(poll_immediately))
             self.config.log(f"Active users: {len(users_in_voice)}")
 
-    async def user_left_voice(self, member):
-        self.config.log("User left voice: " + str(member.id))
+    async def user_left_voice(self, disc_id):
+        self.config.log("User left voice: " + str(disc_id))
         users_in_voice = self.get_users_in_voice()
         if len(users_in_voice) < 2 and self.polling_active:
             self.polling_active = False
@@ -2108,6 +2115,6 @@ class DiscordClient(discord.Client):
 
     async def on_voice_state_update(self, member, before, after):
         if before.channel is None and after.channel is not None: # User joined.
-            await self.user_joined_voice(member)
+            await self.user_joined_voice(member.id)
         elif before.channel is not None and after.channel is None: # User left.
-            await self.user_left_voice(member)
+            await self.user_left_voice(member.id)
