@@ -825,7 +825,7 @@ class DiscordClient(discord.Client):
             curr_num_games = monthly_games + 1
             if curr_num_games == self.config.ifotm_min_games:
                 # Current Int-Far has played enough games to qualify for IFOTM.
-                curr_intfars = monthly_intfars + 1
+                curr_intfars = len(monthly_intfars) + 1
 
         new_pct = int((curr_intfars / curr_num_games) * 100)
 
