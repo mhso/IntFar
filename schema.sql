@@ -13,7 +13,7 @@ CREATE TABLE [participants] (
 );
 CREATE TABLE [best_stats] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
-    [game_id] INTEGER NOT NULL,
+    [game_id] INTEGER UNIQUE NOT NULL,
     [int_far] INTEGER,
     [intfar_reason] NVARCHAR(4),
     [kills] INTEGER,
@@ -37,7 +37,7 @@ CREATE TABLE [best_stats] (
 );
 CREATE TABLE [worst_stats] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
-    [game_id] INTEGER NOT NULL,
+    [game_id] INTEGER UNIQUE NOT NULL,
     [int_far] INTEGER,
     [intfar_reason] NVARCHAR(4),
     [kills] INTEGER,

@@ -5,3 +5,4 @@ queries.sql
 __pycache__
 *.db
 champions.json
+debug.log

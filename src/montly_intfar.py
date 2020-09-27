@@ -93,7 +93,7 @@ class MonthlyIntfar:
             if pct_2nd == pct_3rd and intfars_2nd == intfars_3rd: # Int-Far #2 and Int-Far #3 values are equal.
                 runner_up_str += f"both {nickname_2nd} and {nickname_3rd} "
                 runner_up_str += f"for a tied {pct_desc_2nd} of games where they were Int-Far!\n"
-                runner_up_str += "You both get one of these: :second_place: \n"
+                runner_up_str += "You both get one of these: :second_place: :second_place: \n"
             else: # All three Int-Far values are distinct.
                 runner_up_str += f"{nickname_2nd} for being almost as bad with "
                 runner_up_str += f"{pct_desc_2nd} of games being Int-Far!\n"
@@ -105,7 +105,7 @@ class MonthlyIntfar:
             winner_str += f"--- {nickname_1st} **AND** {nickname_2nd}!!! ---\n"
             desc_str = f"They are both equally terrible with a tied {pct_desc_1st} "
             desc_str += "of games were they were Int-Far this month!!!\n"
-            desc_str += "You both deserve this: :first_place: \n"
+            desc_str += "You both deserve this: :first_place: :first_place: \n"
             desc_str += "You will also both receive a badge of shame on Discord {emote_main}\n\n"
             desc_str += f"Second place goes to {nickname_3rd} for inting in {pct_desc_3rd} "
             desc_str += "of his games! Take this, my boi: :second_place: \n"
@@ -114,7 +114,7 @@ class MonthlyIntfar:
             winner_str += f"--- {nickname_1st}, {nickname_2nd} **AND** {nickname_3rd}!!! ---\n"
             desc_str = f"They are ALL equally terrible with a tied {pct_desc_1st} "
             desc_str += "of games in which they were Int-Far this month!!!\n"
-            desc_str += "You all deserve this: :first_place: \n"
+            desc_str += "You all deserve this: :first_place: :first_place: :first_place: \n"
             desc_str += "You will also all receive a badge of shame on Discord {emote_main}\n"
             winners = 3
 
