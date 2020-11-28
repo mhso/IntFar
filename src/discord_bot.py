@@ -172,6 +172,10 @@ STAT_COMMANDS = [
     "cs", "gold", "kp", "vision_wards", "vision_score"
 ]
 
+ADMIN_COMMANDS = [
+    "restart"
+]
+
 QUANTITY_DESC = [
     ("most", "fewest"), ("fewest", "most"), ("highest", "lowest"), ("most", "least"),
     ("most", "least"), ("most", "least"), ("highest", "lowest"), ("most", "fewest"),
@@ -225,11 +229,18 @@ def get_streak_flavor_text(nickname, streak):
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 class DiscordClient(discord.Client):
-    def __init__(self, config, database):
-        super().__init__()
+    def __init__(self, config, database, pipe_conn):
+        super().__init__(
+            intents=discord.Intents(members=True,
+                                    voice_states=True,
+                                    guilds=True,
+                                    emojis=True,
+                                    guild_messages=True)
+        )
         self.riot_api = riot_api.APIClient(config)
         self.config = config
         self.database = database
+        self.pipe_conn = pipe_conn
         self.users_in_game = None
         self.active_game = None
         self.game_start = None
@@ -558,15 +569,15 @@ class DiscordClient(discord.Client):
                     response_bets += f": Bet was **lost**! It cost **{total_cost}** {tokens_name}!\n"
                     tokens_lost += total_cost
 
-            if tokens_earned >= balance_before: # Betting tokens balanced was (at least) doubled.
-                quant_desc = "" if tokens_earned == balance_before else "more than"
-                response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
-            elif tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved.
+            if tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved.
                 quant_desc = "half"
                 if tokens_lost == balance_before: # Current bet cost ALL the user's tokens.
                     quant_desc = "all"
                 elif tokens_lost > balance_before / 2:
                     quant_desc = "more than half"
+            elif tokens_earned >= balance_before: # Betting tokens balanced was (at least) doubled.
+                quant_desc = "" if tokens_earned == balance_before else "more than"
+                response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
 
                 response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
 
@@ -1200,6 +1211,7 @@ class DiscordClient(discord.Client):
         self.initialized = True
         for guild in self.guilds: # Add all users currently in voice channels as active users.
             if guild.id == DISCORD_SERVER_ID:
+                await guild.chunk()
                 for voice_channel in guild.voice_channels:
                     members_in_voice = voice_channel.members
                     for member in members_in_voice:
@@ -1924,7 +1936,7 @@ class DiscordClient(discord.Client):
 
     async def not_implemented_yet(self, message):
         msg = self.insert_emotes("This command is not implemented yet {emote_peberno}")
-        await message.channel.send()
+        await message.channel.send(msg)
 
     def get_target_name(self, split, start_index, end_index=None):
         end_index = len(split) if end_index is None else end_index
@@ -1967,6 +1979,9 @@ class DiscordClient(discord.Client):
             self.config.log(exception, self.config.log_error)
 
     async def valid_command(self, message, cmd, args):
+        if cmd in ADMIN_COMMANDS:
+            return message.author.id == MY_DISC_ID
+
         is_main_cmd = cmd in VALID_COMMANDS or cmd in CUTE_COMMANDS
         valid_cmd = None
         if is_main_cmd:
@@ -2112,6 +2127,11 @@ class DiscordClient(discord.Client):
                 await self.handle_flirtation_msg(message, "english")
             elif cmd_equals(first_command, "intpapi"):
                 await self.handle_flirtation_msg(message, "spanish")
+            elif cmd_equals(first_command, "restart"):
+                response = self.insert_emotes("I will kill myself and come back stronger! {emote_nazi}")
+                await message.channel.send(response)
+                self.pipe_conn.send("We restarting!")
+                exit(0)
 
     async def on_voice_state_update(self, member, before, after):
         if before.channel is None and after.channel is not None: # User joined.
