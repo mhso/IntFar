@@ -525,7 +525,7 @@ class DiscordClient(discord.Client):
             bets_made = self.betting_handler.get_active_bets(disc_id)
             balance_before = self.database.get_token_balance(disc_id)
             tokens_earned = gain_for_user # Variable for tracking tokens gained for the user.
-            tokens_lost = 0 # Variable for tracking tokens lost for the user.
+            tokens_lost = -1 # Variable for tracking tokens lost for the user.
             disc_name = self.get_discord_nick(disc_id)
 
             if bets_made != []: # No active bets for the current user.
@@ -585,7 +585,7 @@ class DiscordClient(discord.Client):
 
             if tokens_now > max_tokens_before and disc_id != max_tokens_holder:
                 # This person now has the most tokens of all users!
-                response_bets += "{disc_name} now has the most {tokens_name} of everyone! "
+                response_bets += f"{disc_name} now has the most {tokens_name} of everyone! "
                 response_bets += "**HAIL TO THE KING!!!***\n"
                 await self.assign_top_tokens_role(max_tokens_holder, disc_id)
 
@@ -673,7 +673,7 @@ class DiscordClient(discord.Client):
         mentions = {} # List of mentioned users for the different criteria.
         for disc_id, stats in data:
             mentions[disc_id] = []
-            if stats["visionWardsBoughtInGame"] == 0:
+            if stats["mapId"] != 21 and stats["visionWardsBoughtInGame"] == 0:
                 mentions[disc_id].append((0, stats["visionWardsBoughtInGame"]))
             damage_dealt = stats["totalDamageDealtToChampions"]
             if stats["role"] != "DUO_SUPPORT" and damage_dealt < 8000:
@@ -869,7 +869,7 @@ class DiscordClient(discord.Client):
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
 
-    def get_intfar_details(self, stats):
+    def get_intfar_details(self, stats, map_id):
         intfar_kda_id, kda = self.intfar_by_kda(stats)
         if intfar_kda_id is not None:
             self.config.log("Int-Far because of KDA.")
@@ -882,9 +882,11 @@ class DiscordClient(discord.Client):
         if intfar_kp_id is not None:
             self.config.log("Int-Far because of kill participation.")
 
-        intfar_vision_id, vision_score = self.intfar_by_vision_score(stats)
-        if intfar_vision_id is not None:
-            self.config.log("Int-Far because of vision score.")
+        intfar_vision_id, vision_score = None, None
+        if map_id != 21:
+            intfar_vision_id, vision_score = self.intfar_by_vision_score(stats)
+            if intfar_vision_id is not None:
+                self.config.log("Int-Far because of vision score.")
 
         return [
             (intfar_kda_id, kda), (intfar_deaths_id, deaths),
@@ -999,14 +1001,14 @@ class DiscordClient(discord.Client):
         and sends out a status message about the potential Int-Far (if there was one).
         Also saves worst/best stats for the current game.
         """
-        if not self.riot_api.is_summoners_rift(filtered_stats[0][1]["mapId"]):
+        if not self.riot_api.is_good_map(filtered_stats[0][1]["mapId"]):
             response = "That game was not on Summoner's Rift "
             response += "{emote_woahpikachu} no Int-Far will be crowned "
             response += "and no stats will be saved."
             await self.channel_to_write.send(self.insert_emotes(response))
             return None
 
-        intfar_details = self.get_intfar_details(filtered_stats)
+        intfar_details = self.get_intfar_details(filtered_stats, filtered_stats[0][1]["mapId"])
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
         intfar_counts = {}
         max_intfar_count = 1
@@ -1725,8 +1727,19 @@ class DiscordClient(discord.Client):
 
         target_name = self.get_discord_nick(target_id)
 
+        max_tokens_before, max_tokens_holder = self.database.get_max_tokens_details()
+
         response = self.betting_handler.give_tokens(message.author.id, amount,
                                                     target_id, target_name)[1]
+
+        balance_after = self.database.get_token_balance(target_id)
+
+        if balance_after > max_tokens_before and target_id != max_tokens_holder:
+            # This person now has the most tokens of all users!
+            tokens_name = self.config.betting_tokens
+            response += f"\n{target_name} now has the most {tokens_name} of everyone! "
+            await self.assign_top_tokens_role(max_tokens_holder, target_id)
+
         await message.channel.send(response)
 
     async def handle_active_bets_msg(self, message, target_name):
