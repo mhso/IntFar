@@ -575,11 +575,10 @@ class DiscordClient(discord.Client):
                     quant_desc = "all"
                 elif tokens_lost > balance_before / 2:
                     quant_desc = "more than half"
+                response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
             elif tokens_earned >= balance_before: # Betting tokens balanced was (at least) doubled.
                 quant_desc = "" if tokens_earned == balance_before else "more than"
                 response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
-
-                response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
 
             tokens_now = balance_before + tokens_earned # Record how many tokens the user has now.
 
