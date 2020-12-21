@@ -126,21 +126,15 @@ VALID_COMMANDS = {
         "[person]", "See details about the league match the given person is in, if any."
     ),
     "bet": (
-        "[amount] [event] (person)",
+        "[event] [amount] (person)",
         ("Bet a specific amount of credits on one or more events happening " +
-         "in the current or next game. Fx. '!bet 100 game_win', '!bet all intfar slurp' " +
-         "or '!bet 20 game_win & 30 no_intfar' (bet on game win *AND* no Int-Far).")
-    ),
-    "multi_bet": (
-        "[amount] [event] (person) (&) (more bets...)",
-        ("Bet on *multiple* events happening. The bet will only be won if *all* "+
-         "the things happen. You will receive a bonus if all bets are won. " +
-         "Fx. '!multi_bet 20 game_win & 30 no_intfar'.")
+         "in the current or next game. Fx. '!bet game_win 100', '!bet intfar all slurp' " +
+         "or '!bet game_win 20 & no_intfar 30' (bet on game win *AND* no Int-Far).")
     ),
     "cancel_bet": (
         "[event/ticket] (person)",
         ("Cancel a previously placed bet with the given parameters. " +
-         "To cancel a multibet, provide the ticket generated for that bet. " +
+         "To cancel a multi-bet, provide the ticket generated for that bet. " +
          "A bet can not be cancelled when the game has started.")
     ),
     "give_tokens": (
@@ -1645,9 +1639,9 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_make_bet_msg(self, message, amounts, events, targets):
+    async def handle_make_bet_msg(self, message, events, amounts, targets):
         if None in amounts or None in events:
-            msg = "Usage: `!bet [amount] [event] (person)`"
+            msg = "Usage: `!bet [event] [amount] (person)`"
             await message.channel.send(msg)
             return
 
@@ -1962,8 +1956,8 @@ class DiscordClient(discord.Client):
         targets = []
         index = 1
         while index < len(split):
-            amount = split[index]
-            event = split[index+1]
+            event = split[index]
+            amount = split[index+1]
             if "&" in (event, amount):
                 raise ValueError("Multi-bet input is formatted incorrectly!")
             target = None
@@ -2111,7 +2105,7 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "bet"):
                 try:
                     amounts, events, targets = self.get_bet_params(split)
-                    await self.get_data_and_respond(self.handle_make_bet_msg, message, amounts, events, targets)
+                    await self.get_data_and_respond(self.handle_make_bet_msg, message, events, amounts, targets)
                 except ValueError as exc:
                     await message.channel.send(str(exc))
             elif cmd_equals(first_command, "cancel_bet"):
