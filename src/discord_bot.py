@@ -127,9 +127,9 @@ VALID_COMMANDS = {
     ),
     "bet": (
         "[amount] [event] (person)",
-        ("Bet a specific amount of credits on an event happening " +
-         "In the current or next game. Fx. '!bet 100 game_win', '!bet 30 intfar' or " +
-         "'!bet all intfar slurp' (bet all on slurp being Int-Far).")
+        ("Bet a specific amount of credits on one or more events happening " +
+         "in the current or next game. Fx. '!bet 100 game_win', '!bet all intfar slurp' " +
+         "or '!bet 20 game_win & 30 no_intfar' (bet on game win *AND* no Int-Far).")
     ),
     "multi_bet": (
         "[amount] [event] (person) (&) (more bets...)",
@@ -585,7 +585,7 @@ class DiscordClient(discord.Client):
             if tokens_now > max_tokens_before and disc_id != max_tokens_holder:
                 # This person now has the most tokens of all users!
                 response_bets += f"{disc_name} now has the most {tokens_name} of everyone! "
-                response_bets += "**HAIL TO THE KING!!!***\n"
+                response_bets += "***HAIL TO THE KING!!!***\n"
                 await self.assign_top_tokens_role(max_tokens_holder, disc_id)
 
         if any_bets:
@@ -1956,7 +1956,7 @@ class DiscordClient(discord.Client):
             return " ".join(split[start_index:end_index])
         return None
 
-    def get_multi_bet_params(self, split):
+    def get_bet_params(self, split):
         amounts = []
         events = []
         targets = []
@@ -2109,11 +2109,8 @@ class DiscordClient(discord.Client):
                 target_name = self.get_target_name(split, 1)
                 await self.handle_game_msg(message, target_name)
             elif cmd_equals(first_command, "bet"):
-                target_name = self.get_target_name(split, 3)
-                await self.get_data_and_respond(self.handle_make_bet_msg, message, [second_command], [third_command], [target_name])
-            elif cmd_equals(first_command, "multi_bet"):
                 try:
-                    amounts, events, targets = self.get_multi_bet_params(split)
+                    amounts, events, targets = self.get_bet_params(split)
                     await self.get_data_and_respond(self.handle_make_bet_msg, message, amounts, events, targets)
                 except ValueError as exc:
                     await message.channel.send(str(exc))

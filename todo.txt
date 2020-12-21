@@ -1,17 +1,4 @@
 --- Gambling ---
-- Earn credits by playing games, little for losing, more for winning
-- Bet credits on events
-- Credit leaderboard
-- Bet on yourself/other people
-- Dynamically adjusted payouts?
-
-* Betting events *
-- Game outcome: win/lose
-- Who will get Int-Far in next/current game?
-	- For what will they get Int-Far?
-- Who will get doinks in next/current game?
-	- For what will they be awarded doinks?
-- Specific stat things? (More than 5 deaths, more than 10 kills)
-- All events can be bet on until 10 min in-game. Bets made before game awards more tokens.
-
-* DB Structure *
+- Make !bet the only command (if & is included it is a multi-bet)
+- Swap order of amount/bet event maybe?
+- Christmas fun with good boi points?
