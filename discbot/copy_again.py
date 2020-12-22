@@ -1,7 +1,7 @@
 import json
 from contextlib import closing
-from database import Database
-from config import Config
+from api.database import Database
+from api.config import Config
 
 auth = json.load(open("auth.json"))
 

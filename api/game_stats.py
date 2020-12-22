@@ -1,6 +1,6 @@
 from datetime import datetime
 from time import time
-from util import format_duration
+from api.util import format_duration
 
 def calc_kda(stats):
     if stats["deaths"] == 0:

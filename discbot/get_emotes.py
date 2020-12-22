@@ -1,10 +1,10 @@
 import json
-from database import Database
-from config import Config
-from discord_bot import DiscordClient
+from api.database import Database
+from api.config import Config
+from discbot.discord_bot import DiscordClient
 import threading
 
-auth = json.load(open("auth.json"))
+auth = json.load(open("discbot/auth.json"))
 
 conf = Config()
 

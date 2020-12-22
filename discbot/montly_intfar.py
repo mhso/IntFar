@@ -1,37 +1,17 @@
-from datetime import datetime, tzinfo, timedelta
-import config
-import database
-
-class TimeZone(tzinfo):
-    """
-    Class for representing the time zone of Copenhagen (UTC+1).
-    """
-    def tzname(self, dt):
-        return "Europe/Copenhagen"
-
-    def utcoffset(self, dt):
-        return self.dst(dt) + timedelta(0, 0, 0, 0, 0, 1, 0)
-
-    def dst(self, dt):
-        if dt.month < 10 or dt.month > 3:
-            return timedelta(0, 0, 0, 0, 0, 1, 0)
-        if dt.month == 10 and dt.day < 25:
-            return timedelta(0, 0, 0, 0, 0, 1, 0)
-        if dt.month == 3 and dt.day > 28:
-            return timedelta(0, 0, 0, 0, 0, 1, 0)
-        return timedelta(0, 0, 0, 0, 0, 1, 0)
+from datetime import datetime
+from api import config, database
+from api.util import TimeZone
 
 class MonthlyIntfar:
     """
     Class for handling the tracking of when to announce Int-Far of the month.
     """
-    HOUR_OF_ANNOUNCEMENT = 12 # Hour of the day on which to announce IFOTM.
     MONTH_NAMES = [
         "January", "February", "March", "April", "May", "June", "July",
         "August", "September", "October", "November", "December"
     ]
 
-    def __init__(self):
+    def __init__(self, hour_of_announce):
         self.cph_timezone = TimeZone()
         current_time = datetime.now(self.cph_timezone)
         current_month = current_time.month
@@ -41,11 +21,11 @@ class MonthlyIntfar:
         # we should announce the Int-Far at the current month (and year).
         # Otherwise, we should announce it at the first day of the next month.
         month_to_announce = (current_month
-                             if current_time.day == 1 and current_time.hour < self.HOUR_OF_ANNOUNCEMENT
+                             if current_time.day == 1 and current_time.hour < hour_of_announce
                              else next_month)
         year_to_announce = current_time.year if month_to_announce == current_month else next_year
         self.time_at_announcement = current_time.replace(year_to_announce, month_to_announce, 1,
-                                                         self.HOUR_OF_ANNOUNCEMENT, 0, 0, 0,
+                                                         hour_of_announce, 0, 0, 0,
                                                          self.cph_timezone)
 
     def should_announce(self):
@@ -122,8 +102,8 @@ class MonthlyIntfar:
         return winner_str + desc_str, winners
 
 if __name__ == "__main__":
-    monthly_monitor = MonthlyIntfar()
     conf = config.Config()
+    monthly_monitor = MonthlyIntfar(conf.hour_of_ifotm_announce)
     db_client = database.Database(conf)
     details = db_client.get_intfars_of_the_month()
     # details = [

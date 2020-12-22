@@ -1,8 +1,8 @@
 from sys import argv
-from test.assertion import Assertion
-import bets
-from database import Database
-from config import Config
+from discbot.test.assertion import Assertion
+from api import bets
+from api.database import Database
+from api.config import Config
 
 LOUD = False
 

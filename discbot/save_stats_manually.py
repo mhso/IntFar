@@ -1,13 +1,13 @@
 import json
-from database import Database
-from config import Config
-from discord_bot import DiscordClient
-import game_stats
-import riot_api
+from api.database import Database
+from discbot.discord_bot import DiscordClient
+from api.config import Config
+from api import game_stats
+from api import riot_api
 
 GAME_ID = 4774682598
 
-auth = json.load(open("auth.json"))
+auth = json.load(open("discbot/auth.json"))
 
 conf = Config()
 

@@ -1,8 +1,7 @@
 import json
-import asyncio
-from database import Database, DBException
-from config import Config
-from discord_bot import DiscordClient
+from api.database import Database
+from api.config import Config
+from discbot.discord_bot import DiscordClient
 
 def generate_game_data(kills, deaths, assists, vision, damages, summ_names):
     partIds = []

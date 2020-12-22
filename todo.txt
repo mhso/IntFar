@@ -1,4 +1,5 @@
 --- Gambling ---
-- Make !bet the only command (if & is included it is a multi-bet)
-- Swap order of amount/bet event maybe?
 - Christmas fun with good boi points?
+
+--- Misc ---
+- Make a page on mhooge for interacting with the bot and watching stats?

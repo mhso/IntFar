@@ -1,3 +1,24 @@
+from datetime import tzinfo, timedelta
+
+class TimeZone(tzinfo):
+    """
+    Class for representing the time zone of Copenhagen (UTC+1).
+    """
+    def tzname(self, dt):
+        return "Europe/Copenhagen"
+
+    def utcoffset(self, dt):
+        return self.dst(dt) + timedelta(0, 0, 0, 0, 0, 1, 0)
+
+    def dst(self, dt):
+        if dt.month < 10 or dt.month > 3:
+            return timedelta(0, 0, 0, 0, 0, 1, 0)
+        if dt.month == 10 and dt.day < 25:
+            return timedelta(0, 0, 0, 0, 0, 1, 0)
+        if dt.month == 3 and dt.day > 28:
+            return timedelta(0, 0, 0, 0, 0, 1, 0)
+        return timedelta(0, 0, 0, 0, 0, 1, 0)
+
 def zero_pad(number):
     if number < 10:
         return "0" + str(number)

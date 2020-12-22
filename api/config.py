@@ -27,6 +27,7 @@ class Config:
         self.log_error = 2
         self.message_timeout = 1.5
         self.ifotm_min_games = 5
+        self.hour_of_ifotm_announce = 12 # Hour of the day on which to announce IFOTM.
 
     def log(self, data, severity=0, end="\n"):
         curr_time = datetime.now()
