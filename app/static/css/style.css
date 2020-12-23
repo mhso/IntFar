@@ -1,3 +1,17 @@
-h1 {
+body {
+    background-color: #353535;
+}
+
+#intfar-list-wrapper {
+    display: flex;
+}
+
+.intfar-list {
     text-align: center;
+    color: inherit;
+}
+
+h1, h2 {
+    text-align: center;
+    color: rgb(228, 228, 228);
 }

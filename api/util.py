@@ -19,6 +19,11 @@ class TimeZone(tzinfo):
             return timedelta(0, 0, 0, 0, 0, 1, 0)
         return timedelta(0, 0, 0, 0, 0, 1, 0)
 
+MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December"
+]
+
 def zero_pad(number):
     if number < 10:
         return "0" + str(number)

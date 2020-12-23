@@ -1,13 +1,32 @@
 <html>
 <head>
-    <title>Battleship</title>
-    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
-    <link rel="icon" type="image/png" href="/favicon-48.png" sizes="48x48">
+    <title>IntFar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-32.png') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-48.png') }}" sizes="48x48">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}"/>
+	<script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
 	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="wrapper">
-        <h1>IntFar!</h1>
+    <div class="wrapper container-flex">
+        <h1>Inting Bois</h1>
+
+        <div id="intfar-list-wrapper" class="row">
+            <div id="intfar-all" class="col-xs-6">
+                <h2>All Time</h2>
+                <div class="intfar-list">
+                    {% for games, intfars, intfar_pct in intfar_all %}
+                        {{ intfar_all[0][0] }}
+                    {% endfor %}
+                </div>
+            </div>
+            <div id="intfar-month" class="col-xs-6">
+                <h2>For {{ curr_month }}</h2>
+            </div>
+        </div>
     </div>
 </body>
+<script scr="{{ url_for('static', filename='js/main.js') }}"></script>
 </html>

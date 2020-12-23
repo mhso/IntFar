@@ -1,15 +1,11 @@
 from datetime import datetime
 from api import config, database
-from api.util import TimeZone
+from api.util import TimeZone, MONTH_NAMES
 
 class MonthlyIntfar:
     """
     Class for handling the tracking of when to announce Int-Far of the month.
     """
-    MONTH_NAMES = [
-        "January", "February", "March", "April", "May", "June", "July",
-        "August", "September", "October", "November", "December"
-    ]
 
     def __init__(self, hour_of_announce):
         self.cph_timezone = TimeZone()

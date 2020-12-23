@@ -7,7 +7,7 @@ from datetime import datetime
 from discbot.montly_intfar import MonthlyIntfar
 from api import riot_api, game_stats, bets
 from api.database import DBException
-from api.util import format_duration, round_digits
+from api.util import format_duration, round_digits, MONTH_NAMES
 
 DISCORD_SERVER_ID = 619073595561213953
 MY_SERVER_ID = 512363920044982272
@@ -221,7 +221,7 @@ def get_streak_flavor_text(nickname, streak):
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 class DiscordClient(discord.Client):
-    def __init__(self, config, database, pipe_conn):
+    def __init__(self, config, database, pipe_conn, flask_conn=None):
         super().__init__(
             intents=discord.Intents(members=True,
                                     voice_states=True,
@@ -233,6 +233,7 @@ class DiscordClient(discord.Client):
         self.config = config
         self.database = database
         self.pipe_conn = pipe_conn
+        self.flask_conn = flask_conn
         self.users_in_game = None
         self.active_game = None
         self.game_start = None
@@ -408,6 +409,14 @@ class DiscordClient(discord.Client):
                 for member in guild.members:
                     if member.id == disc_id:
                         return member.display_name
+        return None
+
+    async def get_discord_avatar(self, disc_id):
+        for guild in self.guilds:
+            if guild.id == DISCORD_SERVER_ID:
+                for member in guild.members:
+                    if member.id == disc_id:
+                        return await member.avatar_url_as(format="png", size=64).read()
         return None
 
     def get_discord_id(self, nickname):
@@ -1126,7 +1135,7 @@ class DiscordClient(discord.Client):
                 nibs_guild = guild
                 break
 
-        month_name = MonthlyIntfar.MONTH_NAMES[prev_month-1]
+        month_name = MONTH_NAMES[prev_month-1]
         color = discord.Color.from_rgb(*colors[prev_month-1])
         role_name = f"Int-Far of the Month - {month_name}"
 
@@ -1159,7 +1168,7 @@ class DiscordClient(discord.Client):
 
         month = monitor.time_at_announcement.month
         prev_month = month - 1 if month != 1 else 12
-        month_name = MonthlyIntfar.MONTH_NAMES[prev_month-1]
+        month_name = MONTH_NAMES[prev_month-1]
 
         intfar_data = self.database.get_intfars_of_the_month()
         intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
@@ -1218,6 +1227,9 @@ class DiscordClient(discord.Client):
                         break
             elif guild.id == MY_SERVER_ID:
                 self.test_channel = guild.text_channels[0]
+
+        if self.flask_conn is not None: # Listen for external commands from web page.
+            asyncio.create_task(self.listen_for_external_command())
 
     async def handle_helper_msg(self, message):
         """
@@ -1377,7 +1389,7 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_intfar_msg(self, message, target_name):
-        current_month = MonthlyIntfar.MONTH_NAMES[datetime.now().month-1]
+        current_month = MONTH_NAMES[datetime.now().month-1]
 
         def get_intfar_stats(disc_id, monthly=False):
             games_played, intfar_reason_ids = self.database.get_intfar_stats(disc_id, monthly)
@@ -1439,7 +1451,7 @@ class DiscordClient(discord.Client):
 
                 msg += ratio_desc + reason_desc + streak_desc + no_streak_desc + relations_desc
                 if user_is_ifotm:
-                    month_name = MonthlyIntfar.MONTH_NAMES[datetime.now().month-1]
+                    month_name = MONTH_NAMES[datetime.now().month-1]
                     msg += f"\n**{person_to_check} currently stands to be Int-Far of the Month "
                     msg += f"of {month_name}!**"
             msg = self.insert_emotes(msg)
@@ -2139,3 +2151,19 @@ class DiscordClient(discord.Client):
             await self.user_joined_voice(member.id)
         elif before.channel is not None and after.channel is None: # User left.
             await self.user_left_voice(member.id)
+
+    async def listen_for_external_command(self):
+        while True:
+            if self.flask_conn.poll():
+                command_type, command, params = self.flask_conn.recv()
+                result = None
+                if command_type == "func":
+                    result = self.__getattribute__(command)(*params)
+                elif command_type == "bot_command":
+                    pass # Do bot command.
+                self.flask_conn.send(result)
+            asyncio.sleep(0.5)
+
+def run_client(config, database, pipe):
+    client = DiscordClient(config, database, pipe)
+    client.run(config.discord_token)

@@ -289,6 +289,7 @@ class Database:
             delim_str = self.get_monthly_delimiter()
             query_total += f" AND {delim_str}"
             query_intfar += f" AND {delim_str}"
+
         with closing(self.get_connection()) as db:
             total_games = self.execute_query(db, query_total, (disc_id,)).fetchone()[0]
             intfar_games = self.execute_query(db, query_intfar, (disc_id,)).fetchall()
