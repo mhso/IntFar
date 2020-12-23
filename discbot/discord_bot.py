@@ -234,6 +234,7 @@ class DiscordClient(discord.Client):
         self.database = database
         self.pipe_conn = pipe_conn
         self.flask_conn = flask_conn
+        self.cached_avatars = {}
         self.users_in_game = None
         self.active_game = None
         self.game_start = None
@@ -416,7 +417,14 @@ class DiscordClient(discord.Client):
             if guild.id == DISCORD_SERVER_ID:
                 for member in guild.members:
                     if member.id == disc_id:
-                        return await member.avatar_url_as(format="png", size=64).read()
+                        caching_time = self.cached_avatars.get(disc_id, 0)
+                        time_now = time()
+                        # We cache avatars for an hour.
+                        path = f"app/static/img/avatars/{disc_id}.png"
+                        if time_now - caching_time > 3600:
+                            await member.avatar_url_as(format="png", size=64).write(path)
+                            self.cached_avatars[disc_id] = time_now
+                        return path
         return None
 
     def get_discord_id(self, nickname):

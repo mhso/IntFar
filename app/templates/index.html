@@ -17,8 +17,10 @@
             <div id="intfar-all" class="col-xs-6">
                 <h2>All Time</h2>
                 <div class="intfar-list">
-                    {% for games, intfars, intfar_pct in intfar_all %}
-                        {{ intfar_all[0][0] }}
+                    {% for games, intfars, intfar_pct, avatar in intfar_all %}
+                        <div>
+                            {{ intfar_all[0][0] }}
+                        </div>
                     {% endfor %}
                 </div>
             </div>

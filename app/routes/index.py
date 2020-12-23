@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, render_template, current_app, url_for
 from datetime import datetime
 from api.util import MONTH_NAMES
 
@@ -23,10 +23,12 @@ def index():
 
         bot_conn.send(("func", "get_discord_avatar", disc_id))
         avatar = bot_conn.recv()
+        if avatar is not None:
+            avatar = avatar.replace("app/static/", "")
 
-        intfar_all_data.append((games_played, len(intfar_reason_ids), pct_intfar))
+        intfar_all_data.append((games_played, len(intfar_reason_ids), pct_intfar, avatar))
         intfar_month_data.append(
-            (games_played_monthly, len(intfar_reason_ids_monthly), pct_intfar_monthly)
+            (games_played_monthly, len(intfar_reason_ids_monthly), pct_intfar_monthly, avatar)
         )
 
     return render_template(
