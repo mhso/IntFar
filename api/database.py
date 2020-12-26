@@ -6,6 +6,7 @@ from sqlite3 import DatabaseError, OperationalError, ProgrammingError
 from contextlib import closing
 from api import game_stats
 from api.util import TimeZone
+from app.user import generate_secret
 
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
@@ -21,7 +22,7 @@ class Database:
         # Populate summoner names and ids lists with currently registered summoners.
         users = self.get_all_registered_users()
         user_entries = {x[0]: ([], []) for x in users}
-        for disc_id, summ_name, summ_id in users:
+        for disc_id, summ_name, summ_id, _ in users:
             user_entries[disc_id][0].append(summ_name)
             user_entries[disc_id][1].append(summ_id)
 
@@ -48,20 +49,44 @@ class Database:
                 db.cursor().executescript(f.read())
             db.commit()
 
+    def user_exists(self, discord_id):
+        for disc_id, _, _ in self.summoners:
+            if discord_id == disc_id:
+                return True
+        return False
+
     def get_registered_user(self, summ_name):
         with closing(self.get_connection()) as db:
-            user = self.execute_query(db, ("SELECT * FROM registered_summoners " +
-                                           "WHERE summ_name=?"), (summ_name,)).fetchone()
-            return user
+            return self.execute_query(
+                db, (
+                    "SELECT disc_id, summ_name, summ_id FROM registered_summoners " +
+                    "WHERE summ_name=?"
+                ), (summ_name,)
+            ).fetchone()
 
     def get_all_registered_users(self):
         with closing(self.get_connection()) as db:
-            return self.execute_query(db, ("SELECT disc_id, summ_name, summ_id " +
+            return self.execute_query(db, ("SELECT disc_id, summ_name, summ_id, secret " +
                                            "FROM registered_summoners")).fetchall()
+
+    def get_client_secret(self, disc_id):
+        with closing(self.get_connection()) as db:
+            return self.execute_query(
+                db, ("SELECT secret FROM registered_summoners WHERE disc_id=?"),
+                (disc_id,)
+            ).fetchone()[0]
+
+    def get_user_from_secret(self, secret):
+        with closing(self.get_connection()) as db:
+            return self.execute_query(
+                db, ("SELECT disc_id FROM registered_summoners WHERE secret=?"),
+                (secret,)
+            ).fetchone()[0]
 
     def add_user(self, summ_name, summ_id, discord_id):
         status = ""
         summ_info = self.summoner_from_discord_id(discord_id)
+        secret = generate_secret()
         if summ_info is not None:
             disc_id, summ_names, summ_ids = summ_info
             summ_names.append(summ_name)
@@ -72,8 +97,8 @@ class Database:
             status = f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
         try:
             with closing(self.get_connection()) as db:
-                self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id) " +
-                                        "VALUES (?, ?, ?)"), (discord_id, summ_name, summ_id))
+                self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id, secret) " +
+                                        "VALUES (?, ?, ?, ?)"), (discord_id, summ_name, summ_id, secret))
                 self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100))
                 db.commit()
         except sqlite3.IntegrityError:

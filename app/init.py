@@ -21,8 +21,13 @@ def create_app(database, bot_pipe):
     web_app = Flask(__name__)
     CORS(web_app)
     root = "/intfar/"
-    from app.routes import index
+    from app.routes import index, users, verify, betting, doinks, stats
     web_app.register_blueprint(index.start_page, url_prefix=root)
+    web_app.register_blueprint(users.user_page, url_prefix=root + "user/")
+    web_app.register_blueprint(verify.verify_page, url_prefix=root + "verify/")
+    web_app.register_blueprint(betting.betting_page, url_prefix=root + "betting/")
+    web_app.register_blueprint(doinks.doinks_page, url_prefix=root + "doinks/")
+    web_app.register_blueprint(stats.stats_page, url_prefix=root + "stats/")
     web_app.config['TESTING'] = True
     web_app.config["DATABASE"] = database
     web_app.config["BOT_CONN"] = bot_pipe

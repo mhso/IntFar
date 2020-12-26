@@ -26,10 +26,10 @@ if __name__ == "__main__":
 
         our_end, bot_end_us = Pipe()
 
-        #bot_process = Process(
-        # target=run_client, args=(conf, database_client, bot_end_us, bot_end_flask)
-        #)
-        #bot_process.start()
+        bot_process = Process(
+            target=run_client, args=(conf, database_client, bot_end_us, bot_end_flask)
+        )
+        bot_process.start()
 
         try:
             our_end.recv() # Wait for bot to say it has died.

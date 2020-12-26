@@ -2,8 +2,9 @@ import json
 from contextlib import closing
 from api.database import Database
 from api.config import Config
+from app.user import generate_secret
 
-auth = json.load(open("auth.json"))
+auth = json.load(open("discbot/auth.json"))
 
 conf_1 = Config()
 
@@ -36,7 +37,8 @@ with closing(database_client_1.get_connection()) as db_1:
     with closing(database_client_2.get_connection()) as db_2:
         for summ in summoners:
             disc_id = int(summ[0])
-            db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?)", (disc_id, summ[1], summ[2]))
+            secret = generate_secret()
+            db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret))
         query = query_prefix + "best_stats" + query_cols
         for data in data_best:
             db_2.cursor().execute(query, data)

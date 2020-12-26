@@ -1,6 +1,8 @@
 import random
 import asyncio
+from typing import Coroutine
 import discord
+from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
 from time import time
 from traceback import print_exc
 from datetime import datetime
@@ -146,6 +148,12 @@ VALID_COMMANDS = {
     "bet_return": (
         "[event] (person)",
         "See the return award of a specific betting event (targetting 'person', if given)."
+    ),
+    "website": (None, "See information about the Int-Far website."),
+    "website_verify": (
+        None,
+        "Running this command will cause the bot to send you a secret link. " +
+        "Opening this link verifies you on the Int-Far homepage and logs you in permanently."
     )
 }
 
@@ -401,31 +409,48 @@ class DiscordClient(discord.Client):
                         return member.mention
         return None
 
-    def get_discord_nick(self, disc_id):
+    def get_discord_nick(self, discord_id):
         """
         Return Discord nickname matching the given Discord ID.
+        If 'discord_id' is None, returns all nicknames.
         """
-        for guild in self.guilds:
-            if guild.id == DISCORD_SERVER_ID:
-                for member in guild.members:
-                    if member.id == disc_id:
-                        return member.display_name
-        return None
+        server = self.get_guild(DISCORD_SERVER_ID)
+        if discord_id is not None:
+            member = server.get_member(discord_id)
+            return None if member is None else member.display_name
 
-    async def get_discord_avatar(self, disc_id):
-        for guild in self.guilds:
-            if guild.id == DISCORD_SERVER_ID:
-                for member in guild.members:
-                    if member.id == disc_id:
-                        caching_time = self.cached_avatars.get(disc_id, 0)
-                        time_now = time()
-                        # We cache avatars for an hour.
-                        path = f"app/static/img/avatars/{disc_id}.png"
-                        if time_now - caching_time > 3600:
-                            await member.avatar_url_as(format="png", size=64).write(path)
-                            self.cached_avatars[disc_id] = time_now
-                        return path
-        return None
+        nicknames = []
+        for disc_id, _, _ in self.database.summoners:
+            member = server.get_member(disc_id)
+            name = "Unnamed" if member is None else member.display_name
+            nicknames.append(name)
+        return nicknames
+
+    async def get_discord_avatar(self, discord_id):
+        users_to_search = ([x[0] for x in self.database.summoners]
+                           if discord_id is None
+                           else [discord_id])
+        avatar_paths = []
+        server = self.get_guild(DISCORD_SERVER_ID)
+        for disc_id in users_to_search:
+            member = server.get_member(disc_id)
+            if member is None:
+                return None
+
+            caching_time = self.cached_avatars.get(member.id, 0)
+            time_now = time()
+            # We cache avatars for an hour.
+            path = f"app/static/img/avatars/{member.id}.png"
+            if time_now - caching_time > 3600:
+                try:
+                    await member.avatar_url_as(format="png", size=64).save(path)
+                    self.cached_avatars[member.id] = time_now
+                except (DiscordException, HTTPException, NotFound) as exc:
+                    print(exc)
+                    return None
+
+            avatar_paths.append(path)
+        return avatar_paths if discord_id is None else avatar_paths[0]
 
     def get_discord_id(self, nickname):
         for guild in self.guilds:
@@ -1908,6 +1933,16 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    async def handle_verify_msg(self, message):
+        client_secret = self.database.get_client_secret(message.author.id)
+        url = f"https://mhooge.com/intfar/verify/{client_secret}"
+        response = "Go to this link to verify yourself (totally not a virus):\n"
+        response += url + "\n"
+        response += "This will enable you to interact with the Int-Far bot from "
+        response += "the website, fx. to see stats or place bets.\n"
+        response += "Don't show this link to anyone, or they will be able to log in as you!"
+        return response
+
     async def handle_flirtation_msg(self, message, language):
         messages = FLIRT_MESSAGES[language]
         flirt_msg = self.insert_emotes(messages[random.randint(0, len(messages)-1)])
@@ -1957,6 +1992,14 @@ class DiscordClient(discord.Client):
                         f" - Having less than {crit_2} KDA")
 
         await message.channel.send(response)
+
+    async def send_dm(self, text, disc_id):
+        user = self.get_user(disc_id)
+        try:
+            await user.send(content=text)
+            return True
+        except (HTTPException, Forbidden):
+            return False
 
     async def not_implemented_yet(self, message):
         msg = self.insert_emotes("This command is not implemented yet {emote_peberno}")
@@ -2144,6 +2187,11 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "betting_tokens"):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_token_balance_msg, message, target_name)
+            elif cmd_equals(first_command, "website_verify"):
+                response = await self.handle_verify_msg(message)
+                dm_sent = await self.send_dm(response, message.author.id)
+                if not dm_sent:
+                    await message.channel.send("Error: DM Message could not be sent for some reason ;(")
             elif cmd_equals(first_command, "intdaddy"):
                 await self.handle_flirtation_msg(message, "english")
             elif cmd_equals(first_command, "intpapi"):
@@ -2167,11 +2215,13 @@ class DiscordClient(discord.Client):
                 result = None
                 if command_type == "func":
                     result = self.__getattribute__(command)(*params)
+                    if isinstance(result, Coroutine):
+                        result = await result
                 elif command_type == "bot_command":
                     pass # Do bot command.
                 self.flask_conn.send(result)
-            asyncio.sleep(0.5)
+            await asyncio.sleep(0.05)
 
-def run_client(config, database, pipe):
-    client = DiscordClient(config, database, pipe)
+def run_client(config, database, main_pipe, flask_pipe):
+    client = DiscordClient(config, database, main_pipe, flask_pipe)
     client.run(config.discord_token)

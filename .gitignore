@@ -6,6 +6,6 @@ __pycache__
 *.db
 champions.json
 debug.log
-app/static/secret.txt
+app/static/*
 vendor
 composer.lock

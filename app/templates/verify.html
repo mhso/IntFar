@@ -1,0 +1,19 @@
+<html>
+<head>
+    <title>IntFar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-32.png') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-48.png') }}" sizes="48x48">
+	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div id="verify-wrapper">
+        <h1>You are now verified!<br><u>BIG NICE!</u></h1>
+        <a href="{{ url_for('index.index') }}">
+            <button id="verify-home-btn">Home</button>
+        </a><a href="{{ url_for('users.user', disc_id=disc_id) }}">
+            <button id="verify-profile-btn">Profile</button>
+        </a>
+    </div>
+</body>
+</html>

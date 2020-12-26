@@ -1,0 +1,9 @@
+{% macro entry(name, games, intfars, intfar_pct, avatar) -%}
+<tr class="intfar-list-entry">
+    <td><img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar"></td>
+    <td>{{ name }}</td>
+    <td>{{ intfars }}</td>
+    <td>{{ games }}</td>
+    <td>{{ intfar_pct }}%</td>
+</tr>
+{%- endmacro %}
