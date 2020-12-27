@@ -2,7 +2,7 @@ from datetime import datetime
 import flask
 from api.util import MONTH_NAMES
 from app.util import get_discord_data
-from app.user import get_logged_in_user
+from app.user import get_user_details
 
 start_page = flask.Blueprint("index", __name__, template_folder="templates")
 
@@ -50,14 +50,7 @@ def index():
     intfar_all_data.sort(key=lambda x: (x[2], x[3]), reverse=True)
     intfar_month_data.sort(key=lambda x: (x[2], x[3]), reverse=True)
 
-    logged_in_user = get_logged_in_user(database, flask.request.cookies.get("user_id"))
-    logged_in_name = "Unknown"
-    logged_in_avatar = None
-    if logged_in_user is not None:
-        logged_in_name = get_discord_data(bot_conn, "func", "get_discord_nick", logged_in_user)
-        avatar = get_discord_data(bot_conn, "func", "get_discord_avatar", logged_in_user)
-        if avatar is not None:
-            logged_in_avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
+    logged_in_user, logged_in_name, logged_in_avatar = get_user_details()
 
     return flask.render_template(
         "index.html", curr_month=curr_month,

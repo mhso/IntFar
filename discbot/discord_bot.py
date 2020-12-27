@@ -2212,6 +2212,7 @@ class DiscordClient(discord.Client):
         while True:
             if self.flask_conn.poll():
                 command_type, command, params = self.flask_conn.recv()
+                self.config.log((command_type, command, params))
                 result = None
                 if command_type == "func":
                     result = self.__getattribute__(command)(*params)

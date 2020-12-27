@@ -1,14 +1,5 @@
 <html>
-<head>
-    <title>IntFar</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-32.png') }}" sizes="32x32">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-48.png') }}" sizes="48x48">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}"/>
-	<script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
-	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
+{% include 'head.html' %}
 {% import "intfar_list_entry.html" as list_entry %}
 {% import "navbar.html" as navbar %}
 <body>
