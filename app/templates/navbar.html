@@ -1,4 +1,4 @@
-{% macro navbar(disc_id, name, avatar) -%}
+{% macro navbar(discord_id, name, avatar) -%}
 <div class="intfar-navbar row">
     <!--
         <input class="open-hamburger" type="checkbox">
@@ -9,12 +9,12 @@
         <a href="{{ url_for('doinks.home') }}">Doinks</a> | <a href="{{ url_for('stats.home') }}">Stats</a>
     </div>
     <div class="navbar-user">
-        <a class="navbar-username hidden-xs" href="{% if disc_id %} {{ url_for('users.user', disc_id=disc_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
+        <a class="navbar-username hidden-xs" href="{% if discord_id %} {{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
             <span>{{ name }}</span>
         </a>
-        <a href="{% if disc_id %} {{ url_for('users.user', disc_id=disc_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
+        <a href="{% if discord_id %}{{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
             <img 
-                class="discord-avatar{% if not disc_id %} discord-avatar-unknown{% endif %}" 
+                class="discord-avatar{% if not discord_id %} discord-avatar-unknown{% endif %}" 
                 src="{% if avatar %}{{ avatar }}{% else %}{{ url_for('static', filename='img/questionmark.png') }}{% endif %}"
             >
         </a>

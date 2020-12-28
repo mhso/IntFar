@@ -409,19 +409,28 @@ class DiscordClient(discord.Client):
                         return member.mention
         return None
 
+    def get_member_safe(self, disc_id):
+        if isinstance(disc_id, str):
+            disc_id = int(disc_id)
+
+        server = self.get_guild(DISCORD_SERVER_ID)
+        for member in server.members:
+            if member.id == disc_id:
+                return member
+        return None
+
     def get_discord_nick(self, discord_id):
         """
         Return Discord nickname matching the given Discord ID.
         If 'discord_id' is None, returns all nicknames.
         """
-        server = self.get_guild(DISCORD_SERVER_ID)
         if discord_id is not None:
-            member = server.get_member(discord_id)
+            member = self.get_member_safe(discord_id)
             return None if member is None else member.display_name
 
         nicknames = []
         for disc_id, _, _ in self.database.summoners:
-            member = server.get_member(disc_id)
+            member = self.get_member_safe(disc_id)
             name = "Unnamed" if member is None else member.display_name
             nicknames.append(name)
         return nicknames
@@ -431,9 +440,8 @@ class DiscordClient(discord.Client):
                            if discord_id is None
                            else [discord_id])
         avatar_paths = []
-        server = self.get_guild(DISCORD_SERVER_ID)
         for disc_id in users_to_search:
-            member = server.get_member(disc_id)
+            member = self.get_member_safe(disc_id)
             if member is None:
                 return None
 
@@ -2211,16 +2219,19 @@ class DiscordClient(discord.Client):
     async def listen_for_external_command(self):
         while True:
             if self.flask_conn.poll():
-                command_type, command, params = self.flask_conn.recv()
-                self.config.log((command_type, command, params))
-                result = None
-                if command_type == "func":
-                    result = self.__getattribute__(command)(*params)
-                    if isinstance(result, Coroutine):
-                        result = await result
-                elif command_type == "bot_command":
-                    pass # Do bot command.
-                self.flask_conn.send(result)
+                command_types, commands, paramses = self.flask_conn.recv()
+                results = []
+                for command_type, command, params in zip(command_types, commands, paramses):
+                    result = None
+                    if command_type == "func":
+                        result = self.__getattribute__(command)(*tuple(params))
+                        if isinstance(result, Coroutine):
+                            result = await result
+                    elif command_type == "bot_command":
+                        pass # Do bot command.
+                    results.append(result)
+
+                self.flask_conn.send(results)
             await asyncio.sleep(0.05)
 
 def run_client(config, database, main_pipe, flask_pipe):

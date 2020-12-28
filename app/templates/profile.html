@@ -3,10 +3,28 @@
 {% import "navbar.html" as navbar %}
 <body>
     {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar) }}
-    <div id="profile-wrapper">
-        <img src="{{ avatar }}"><br>
-        <h1>{{ name }}</h1>
-        
+    <div id="profile-wrapper" class="container-flex">
+        <img class="discord-avatar" src="{{ avatar }}"><br>
+        <h1>{{ nickname }}</h1>
+        <div class="row">
+            <div class="col-lg-3">
+                <h2>Stats</h2>
+            </div>
+            <div class="col-lg-3">
+                <h2>Intfars</h2>
+                Games<br>
+                Intfars<br>
+                % Intfar<br>
+                Table of Int-Far relations
+            </div>
+            <div class="col-lg-3">
+                <h2>Doinks</h2>
+            </div>
+            <div class="col-lg-3">
+                <h2>Bets</h2>
+
+            </div>
+        </div>
     </div>
 </body>
 </html>
