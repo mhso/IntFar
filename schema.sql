@@ -3,6 +3,7 @@ CREATE TABLE [registered_summoners] (
     [summ_name] NVARCHAR(64) NOT NULL,
     [summ_id] NVARCHAR(64) NOT NULL,
     [secret] NVARCHAR(32) NOT NULL,
+    [reports] INTEGER,
     PRIMARY KEY (disc_id, summ_name)
 );
 CREATE TABLE [participants] (

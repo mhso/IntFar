@@ -97,8 +97,8 @@ class Database:
             status = f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
         try:
             with closing(self.get_connection()) as db:
-                self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id, secret) " +
-                                        "VALUES (?, ?, ?, ?)"), (discord_id, summ_name, summ_id, secret))
+                self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id, secret, reports) " +
+                                        "VALUES (?, ?, ?, ?, ?)"), (discord_id, summ_name, summ_id, secret, 0))
                 self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100))
                 db.commit()
         except sqlite3.IntegrityError:
@@ -443,36 +443,74 @@ class Database:
                 return 0
             return curr_id[0] + 1
 
-    def get_all_bets(self, disc_id):
+    def get_all_bets(self, disc_id=None):
         with closing(self.get_connection()) as db:
-            query = "SELECT id, amount, event_id, game_duration, target, result FROM bets "
-            query += "WHERE better_id=? AND result != 0"
-            return self.execute_query(db, query, (disc_id,)).fetchall()
-
-    def get_active_bets(self, disc_id):
-        with closing(self.get_connection()) as db:
-            query = "SELECT id, amount, event_id, game_duration, target, ticket FROM bets "
-            query += "WHERE better_id=? AND result=0 ORDER BY ticket"
-            grouped_data = []
-            data = self.execute_query(db, query, (disc_id,)).fetchall()
+            query = "SELECT better_id, id, amount, event_id, game_duration, target, ticket, result FROM bets "
+            query += "WHERE result != 0"
+            params = None
+            if disc_id is not None:
+                query += " AND better_id=?"
+                params = (disc_id,)
+            query += " ORDER BY ticket"
+            data_for_person = {}
+            data = self.execute_query(db, query, params).fetchall()
             bet_ids = []
             amounts = []
             events = []
             targets = []
-            for index, (bet_id, amount, event_id, game_duration, target, ticket) in enumerate(data):
+
+            for index, (discord_id, bet_id, amount, event_id, game_duration, target, ticket, result) in enumerate(data):
+                if discord_id not in data_for_person:
+                    data_for_person[discord_id] = []
+
+                next_ticket = None if index == len(data) - 1 else data[index+1][-2]
+                bet_ids.append(bet_id)
+                amounts.append(amount)
+                events.append(event_id)
+                targets.append(target)
+
+                if ticket is None or ticket != next_ticket:
+                    data_for_person[discord_id].append((bet_ids, amounts, events, targets, game_duration, result))
+                    bet_ids = []
+                    amounts = []
+                    events = []
+                    targets = []
+
+            return data_for_person if disc_id is None else data_for_person[disc_id]
+
+    def get_active_bets(self, disc_id=None):
+        with closing(self.get_connection()) as db:
+            query = "SELECT better_id, id, amount, event_id, game_duration, target, ticket FROM bets "
+            query += "WHERE result=0 "
+            params = None
+            if disc_id is not None:
+                query += "AND better_id=? "
+                params = (disc_id,)
+            query += "ORDER BY ticket"
+            data = self.execute_query(db, query, params).fetchall()
+            data_for_person = {}
+            bet_ids = []
+            amounts = []
+            events = []
+            targets = []
+
+            for index, (discord_id, bet_id, amount, event_id, game_duration, target, ticket) in enumerate(data):
+                if discord_id not in data_for_person:
+                    data_for_person[discord_id] = []
+
                 next_ticket = None if index == len(data) - 1 else data[index+1][-1]
                 bet_ids.append(bet_id)
                 amounts.append(amount)
                 events.append(event_id)
                 targets.append(target)
                 if ticket is None or ticket != next_ticket:
-                    grouped_data.append((bet_ids, amounts, events, targets, game_duration, ticket))
+                    data_for_person[discord_id].append((bet_ids, amounts, events, targets, game_duration, ticket))
                     bet_ids = []
                     amounts = []
                     events = []
                     targets = []
 
-            return grouped_data
+            return data_for_person if disc_id is None else data_for_person[disc_id]
 
     def get_base_bet_return(self, event_id):
         with closing(self.get_connection()) as db:
@@ -554,3 +592,18 @@ class Database:
     def give_tokens(self, sender, amount, receiver):
         self.update_token_balance(sender, amount, increment=False)
         self.update_token_balance(receiver, amount, increment=True)
+
+    def get_reports(self, disc_id=None, context=None):
+        with (closing(self.get_connection()) if context is None else context) as db:
+            query_select = "SELECT disc_id, reports FROM registered_summoners"
+            params = None
+            if disc_id is not None:
+                query_select += " WHERE disc_id=?"
+                params = (disc_id,)
+            return self.execute_query(db, query_select, params).fetchall()
+
+    def report_user(self, disc_id):
+        with closing(self.get_connection()) as db:
+            query_update = "UPDATE registered_summoners SET reports=reports+1 WHERE disc_id=?"
+            self.execute_query(db, query_update, (disc_id,))
+            return self.get_reports(disc_id, db)[0][1]

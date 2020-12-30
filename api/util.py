@@ -1,4 +1,4 @@
-from datetime import tzinfo, timedelta
+from datetime import tzinfo, timedelta, datetime
 
 class TimeZone(tzinfo):
     """
@@ -23,6 +23,9 @@ MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June", "July",
     "August", "September", "October", "November", "December"
 ]
+
+def current_month():
+    return MONTH_NAMES[datetime.now().month-1]
 
 def zero_pad(number):
     if number < 10:

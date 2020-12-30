@@ -1,0 +1,11 @@
+{% macro entry(name, events, result, avatar) -%}
+{% for event, amount in events %}
+<tr class="bets-list-entry list-entry{% if loop.first %} bet-main{% endif %}">
+    <td>{% if loop.first %}<img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">{% endif %}</td>
+    <td>{% if loop.first %}{{ name }}{% endif%}</td>
+    <td>{{ event }}</td>
+    <td>{{ amount }}</td>
+    <td class="{% if result == 'Won' %}bet-won{% else %}bet-lost{% endif %}">{% if loop.first %}{{ result }}{% endif %}</td>
+</tr>
+{% endfor %}
+{%- endmacro %}

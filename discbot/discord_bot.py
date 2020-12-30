@@ -154,7 +154,9 @@ VALID_COMMANDS = {
         None,
         "Running this command will cause the bot to send you a secret link. " +
         "Opening this link verifies you on the Int-Far homepage and logs you in permanently."
-    )
+    ),
+    "report": ("[person]", "Report someone, f.x. if they are being a poon."),
+    "reports": ("(person)", "See how many times someone (or yourself) has been reported.")
 }
 
 ALIASES = {
@@ -229,7 +231,7 @@ def get_streak_flavor_text(nickname, streak):
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 class DiscordClient(discord.Client):
-    def __init__(self, config, database, pipe_conn, flask_conn=None):
+    def __init__(self, config, database, betting_handler, pipe_conn, flask_conn=None):
         super().__init__(
             intents=discord.Intents(members=True,
                                     voice_states=True,
@@ -252,7 +254,7 @@ class DiscordClient(discord.Client):
         self.polling_active = False
         self.last_message_time = {}
         self.timeout_length = {}
-        self.betting_handler = bets.BettingHandler(config, database)
+        self.betting_handler = betting_handler
         self.time_initialized = datetime.now()
 
     async def poll_for_game_end(self):
@@ -1876,16 +1878,17 @@ class DiscordClient(discord.Client):
         max_event_count = 0
         event_counts = {x: 0 for x in bets.BETTING_DESC}
 
-        for _, amount, event_id, game_time, target, result in all_bets:
-            average_amount += amount
-            event_counts[event_id] += 1
-            if event_counts[event_id] > max_event_count:
-                max_event_count = event_counts[event_id]
-                most_often_event = event_id
+        for _, amounts, events, targets, game_time, result in all_bets:
+            for amount, event_id, target in zip(amounts, events, targets):
+                average_amount += amount
+                event_counts[event_id] += 1
+                if event_counts[event_id] > max_event_count:
+                    max_event_count = event_counts[event_id]
+                    most_often_event = event_id
+                if target is not None:
+                    had_target += 1
             if result == 1:
                 bets_won += 1
-            if target is not None:
-                had_target += 1
             if game_time > 0:
                 during_game += 1
 
@@ -1950,6 +1953,50 @@ class DiscordClient(discord.Client):
         response += "the website, fx. to see stats or place bets.\n"
         response += "Don't show this link to anyone, or they will be able to log in as you!"
         return response
+
+    async def handle_report_msg(self, message, target_name):
+        target_name = target_name.lower()
+        target_id = self.try_get_user_data(target_name.strip())
+        if target_id is None:
+            msg = "Error: Invalid summoner or Discord name "
+            msg += f"{self.get_emoji_by_name('PepeHands')}"
+            await message.channel.send(msg)
+            return
+
+        target_name = self.get_discord_nick(target_id)
+        mention = self.get_mention_str(target_id)
+
+        reports = self.database.report_user(target_id)
+
+        response = f"{message.author.name} reported {mention} " + "{emote_woahpikachu}\n"
+        response += f"{target_name} has been reported {reports} time"
+        if reports > 1:
+            response += "s"
+        response += "."
+
+        await message.channel.send(self.insert_emotes(response))
+
+    async def handle_see_reports_msg(self, message, target_name):
+        target_id = message.author.id
+        if target_name is not None:
+            target_name = target_name.lower()
+            if target_name == "all":
+                target_id = None
+            else:
+                target_id = self.try_get_user_data(target_name.strip())
+                if target_id is None:
+                    msg = "Error: Invalid summoner or Discord name "
+                    msg += f"{self.get_emoji_by_name('PepeHands')}"
+                    await message.channel.send(msg)
+                    return
+
+        report_data = self.database.get_reports(target_id)
+        response = ""
+        for disc_id, reports in report_data:
+            name = self.get_discord_nick(disc_id)
+            response += f"{name} has been reported {reports} times.\n"
+
+        await message.channel.send(response)
 
     async def handle_flirtation_msg(self, message, language):
         messages = FLIRT_MESSAGES[language]
@@ -2200,6 +2247,12 @@ class DiscordClient(discord.Client):
                 dm_sent = await self.send_dm(response, message.author.id)
                 if not dm_sent:
                     await message.channel.send("Error: DM Message could not be sent for some reason ;(")
+            elif cmd_equals(first_command, "report"):
+                target_name = self.get_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_report_msg, message, target_name)
+            elif cmd_equals(first_command, "reports"):
+                target_name = self.get_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_see_reports_msg, message, target_name)
             elif cmd_equals(first_command, "intdaddy"):
                 await self.handle_flirtation_msg(message, "english")
             elif cmd_equals(first_command, "intpapi"):
@@ -2221,10 +2274,10 @@ class DiscordClient(discord.Client):
             if self.flask_conn.poll():
                 command_types, commands, paramses = self.flask_conn.recv()
                 results = []
-                for command_type, command, params in zip(command_types, commands, paramses):
+                for (command_type, command, *params) in zip(command_types, commands, paramses):
                     result = None
                     if command_type == "func":
-                        result = self.__getattribute__(command)(*tuple(params))
+                        result = self.__getattribute__(command)(*params)
                         if isinstance(result, Coroutine):
                             result = await result
                     elif command_type == "bot_command":
@@ -2234,6 +2287,6 @@ class DiscordClient(discord.Client):
                 self.flask_conn.send(results)
             await asyncio.sleep(0.05)
 
-def run_client(config, database, main_pipe, flask_pipe):
-    client = DiscordClient(config, database, main_pipe, flask_pipe)
+def run_client(config, database, betting_handler, main_pipe, flask_pipe):
+    client = DiscordClient(config, database, betting_handler, main_pipe, flask_pipe)
     client.run(config.discord_token)

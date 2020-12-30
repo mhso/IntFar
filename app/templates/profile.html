@@ -1,5 +1,6 @@
 <html>
 {% include 'head.html' %}
+{% import "intfar_list_entry.html" as list_entry %}
 {% import "navbar.html" as navbar %}
 <body>
     {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar) }}
@@ -12,10 +13,37 @@
             </div>
             <div class="col-lg-3">
                 <h2>Intfars</h2>
-                Games<br>
-                Intfars<br>
-                % Intfar<br>
-                Table of Int-Far relations
+                <div class="row">
+                    <div class="col-lg-1"></div>
+                    <div class="col-lg-5">
+                        <h3>All Time</h3>
+                        <span class="left">Games:</span> <span class="right">{{ intfar_data_all[0] }}</span><br>
+                        <span class="left">Intfars:</span> <span class="right">{{ intfar_data_all[1] }}</span><br>
+                        <span class="left">Pct.:</span> <span class="right">{{ intfar_data_all[2] }}%</span><br>
+                    </div>
+                    <div class="col-lg-5">
+                        <h3>{{ curr_month }}</h3>
+                        <span class="left">Games:</span> <span class="right">{{ intfar_data_month[0] }}</span><br>
+                        <span class="left">Intfars:</span> <span class="right">{{ intfar_data_month[1] }}</span><br>
+                        <span class="left">Pct.:</span> <span class="right">{{ intfar_data_month[2] }}%</span><br>
+                    </div>
+                    <div class="col-lg-1"></div>
+                </div>
+                <div class="row">
+                    <h3>Intfar Relations</h3>
+                    <table class="intfar-list">
+                        <tr id="intfar-list-first" class="intfar-list-entry">
+                            <th></th>
+                            <th>Games with</th>
+                            <th>Int</th>
+                            <th>Games</th>
+                            <th>%</th>
+                        </tr>
+                        {% for name, disc_id, games, intfars, pct, avatar in relations %}
+                            {{ list_entry.entry(name, games, intfars, pct, avatar) }}
+                        {% endfor %}
+                    </table>
+                </div>
             </div>
             <div class="col-lg-3">
                 <h2>Doinks</h2>

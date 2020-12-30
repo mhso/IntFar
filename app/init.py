@@ -2,7 +2,7 @@ from flask import Flask
 from flask_cors import CORS
 from logging.config import dictConfig
 
-def create_app(database, bot_pipe):
+def create_app(database, bet_handler, bot_pipe):
     dictConfig({
         'version': 1,
         'formatters': {'default': {
@@ -30,6 +30,7 @@ def create_app(database, bot_pipe):
     web_app.register_blueprint(stats.stats_page, url_prefix=root + "stats/")
     web_app.config['TESTING'] = True
     web_app.config["DATABASE"] = database
+    web_app.config["BET_HANDLER"] = bet_handler
     web_app.config["BOT_CONN"] = bot_pipe
     web_app.secret_key = open("app/static/secret.txt").readline()
 

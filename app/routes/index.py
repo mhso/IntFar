@@ -1,6 +1,5 @@
-from datetime import datetime
 import flask
-from api.util import MONTH_NAMES
+from api.util import current_month
 from app.util import get_discord_data
 from app.user import get_user_details
 
@@ -11,7 +10,7 @@ start_page = flask.Blueprint("index", __name__, template_folder="templates")
 def index():
     database = flask.current_app.config["DATABASE"]
     bot_conn = flask.current_app.config["BOT_CONN"]
-    curr_month = MONTH_NAMES[datetime.now().month-1]
+    curr_month = current_month()
 
     intfar_all_data = []
     intfar_month_data = []
