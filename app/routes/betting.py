@@ -18,18 +18,17 @@ def get_bets(bot_conn, database, only_active):
     presentable_data = []
     for disc_id in all_bets:
         bets = all_bets[disc_id]
-        for _, amounts, events, targets, _, result_or_ticket in bets:
+        reformatted = [x + (None,) for x in bets] if only_active else bets
+        for bet_id, amounts, events, targets, _, result_or_ticket, payout in reformatted:
             event_descs = [(get_dynamic_bet_desc(e, names_dict.get(t)), a) for (e, t, a) in zip(events, targets, amounts)]
-            if not only_active:
-                result_or_ticket = "Won" if result_or_ticket == 1 else "Lost"
             presentable_data.append(
-                (names_dict[disc_id], event_descs, result_or_ticket, avatar_dict[disc_id])
+                (bet_id, names_dict[disc_id], event_descs, result_or_ticket, payout, avatar_dict[disc_id])
             )
+    presentable_data.sort(key=lambda x: x[0], reverse=True)
     return presentable_data
 
 @betting_page.route('/')
 def home():
-    betting_handler = flask.current_app.config["BET_HANDLER"]
     database = flask.current_app.config["DATABASE"]
     bot_conn = flask.current_app.config["BOT_CONN"]
     resolved_bets = get_bets(bot_conn, database, False)

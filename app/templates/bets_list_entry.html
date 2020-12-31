@@ -1,11 +1,27 @@
-{% macro entry(name, events, result, avatar) -%}
+{% macro entry(name, events, result, payout, avatar) -%}
 {% for event, amount in events %}
-<tr class="bets-list-entry list-entry{% if loop.first %} bet-main{% endif %}">
+<tr class="bets-list-entry list-entry{% if loop.first and loop.last %} bet-single{% elif loop.first %} bet-main{% else %} bet-follow{% endif %}">
     <td>{% if loop.first %}<img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">{% endif %}</td>
     <td>{% if loop.first %}{{ name }}{% endif%}</td>
-    <td>{{ event }}</td>
+    <td>{% if not loop.first %}<span class="emph">and</span> {% endif %}{{ event }}</td>
     <td>{{ amount }}</td>
-    <td class="{% if result == 'Won' %}bet-won{% else %}bet-lost{% endif %}">{% if loop.first %}{{ result }}{% endif %}</td>
+    <td class="{% if result == 1 %}bet-won{% elif result == -1 %}bet-lost{% endif %}">
+        {% if result == 1 or result == -1 %}
+            {% if loop.first %}
+                {% if result == 1 %}
+                    {% if payout %}
+                        +{{ payout }}
+                    {% else %}
+                        Won
+                    {% endif %}
+                {% else %}
+                    Lost
+                {% endif %}
+            {% endif %}
+        {% else %}
+            {{ result }}
+        {% endif %}
+    </td>
 </tr>
 {% endfor %}
 {%- endmacro %}

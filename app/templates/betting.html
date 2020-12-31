@@ -18,25 +18,29 @@
                         <th>GBP</th>
                         <th>Result</th>
                     </tr>
-                    {% for name, events, result, avatar in resolved_bets %}
-                        {{ list_entry.entry(name, events, result, avatar) }}
+                    {% for bet_id, name, events, result, payout, avatar in resolved_bets %}
+                        {{ list_entry.entry(name, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
             </div>
             <div id="bets-active" class="col-xs-12 col-lg-5">
                 <h2>Active Bets</h2>
+                {% if active_bets == [] %}
+                <p id="no-active-bets">There are currently no active bets.</p>
+                {% else %}
                 <table class="intfar-list">
                     <tr class="list-entry">
                         <th></th>
                         <th>By</th>
                         <th>Event</th>
                         <th>GBP</th>
-                        <th>Result</th>
+                        <th>Ticket</th>
                     </tr>
-                    {% for name, events, result, avatar in active_bets %}
-                        {{ list_entry.entry(name, events, result, avatar) }}
+                    {% for bet_id, name, events, result, payout, avatar in active_bets %}
+                        {{ list_entry.entry(name, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
+                {% endif %}
             </div>
             <div class="hidden-xs col-lg-1"></div>
         </div>

@@ -572,65 +572,65 @@ class DiscordClient(discord.Client):
             tokens_lost = -1 # Variable for tracking tokens lost for the user.
             disc_name = self.get_discord_nick(disc_id)
 
-            if bets_made != []: # No active bets for the current user.
+            if bets_made is not None: # No active bets for the current user.
                 mention = self.get_mention_str(disc_id)
                 if any_bets:
                     response_bets += "-----------------------------\n"
                 response_bets += f"Result of bets {mention} made:\n"
 
-            for bet_ids, amounts, events, targets, bet_timestamp, _ in bets_made:
-                any_bets = True
-                # Resolve current bet which the user made, marks it as won/lost in DB.
-                bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_ids, amounts,
-                                                                       events, bet_timestamp,
-                                                                       targets,
-                                                                       (intfar,
-                                                                        intfar_reason,
-                                                                        doinks, game_info))
+                for bet_ids, amounts, events, targets, bet_timestamp, _ in bets_made:
+                    any_bets = True
+                    # Resolve current bet which the user made, marks it as won/lost in DB.
+                    bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_ids, amounts,
+                                                                        events, bet_timestamp,
+                                                                        targets,
+                                                                        (intfar,
+                                                                            intfar_reason,
+                                                                            doinks, game_info))
 
-                response_bets += " - "
-                total_cost = 0 # Track total cost of the current bet.
-                for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
-                    person = None
-                    if target is not None:
-                        person = self.get_discord_nick(target)
+                    response_bets += " - "
+                    total_cost = 0 # Track total cost of the current bet.
+                    for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
+                        person = None
+                        if target is not None:
+                            person = self.get_discord_nick(target)
 
-                    bet_desc = bets.get_dynamic_bet_desc(event, person)
+                        bet_desc = bets.get_dynamic_bet_desc(event, person)
 
-                    response_bets += f"`{bet_desc}`"
-                    if index != len(amounts) - 1: # Bet was a multi-bet.
-                        response_bets += " **and** "
+                        response_bets += f"`{bet_desc}`"
+                        if index != len(amounts) - 1: # Bet was a multi-bet.
+                            response_bets += " **and** "
 
-                    total_cost += amount
+                        total_cost += amount
 
-                if len(amounts) > 1: # Again, bet was a multi-bet.
-                    response_bets += " (multi-bet)"
+                    if len(amounts) > 1: # Again, bet was a multi-bet.
+                        response_bets += " (multi-bet)"
 
-                if bet_success: # Bet was won. Track how many tokens it awarded.
-                    response_bets += f": Bet was **won**! It awarded **{payout}** {tokens_name}!\n"
-                    tokens_earned += payout
-                else: # Bet was lost. Track how many tokens it cost.
-                    response_bets += f": Bet was **lost**! It cost **{total_cost}** {tokens_name}!\n"
-                    tokens_lost += total_cost
+                    if bet_success: # Bet was won. Track how many tokens it awarded.
+                        response_bets += f": Bet was **won**! It awarded **{payout}** {tokens_name}!\n"
+                        tokens_earned += payout
+                    else: # Bet was lost. Track how many tokens it cost.
+                        response_bets += f": Bet was **lost**! It cost **{total_cost}** {tokens_name}!\n"
+                        tokens_lost += total_cost
 
-            if tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved.
-                quant_desc = "half"
-                if tokens_lost == balance_before: # Current bet cost ALL the user's tokens.
-                    quant_desc = "all"
-                elif tokens_lost > balance_before / 2:
-                    quant_desc = "more than half"
-                response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
-            elif tokens_earned >= balance_before: # Betting tokens balanced was (at least) doubled.
-                quant_desc = "" if tokens_earned == balance_before else "more than"
-                response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
+                if tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved.
+                    quant_desc = "half"
+                    if tokens_lost == balance_before: # Current bet cost ALL the user's tokens.
+                        quant_desc = "all"
+                    elif tokens_lost > balance_before / 2:
+                        quant_desc = "more than half"
+                    response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
+                elif tokens_earned >= balance_before: # Betting tokens balanced was (at least) doubled.
+                    quant_desc = "" if tokens_earned == balance_before else "more than"
+                    response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
 
-            tokens_now = balance_before + tokens_earned # Record how many tokens the user has now.
+                tokens_now = balance_before + tokens_earned # Record how many tokens the user has now.
 
-            if tokens_now > max_tokens_before and disc_id != max_tokens_holder:
-                # This person now has the most tokens of all users!
-                response_bets += f"{disc_name} now has the most {tokens_name} of everyone! "
-                response_bets += "***HAIL TO THE KING!!!***\n"
-                await self.assign_top_tokens_role(max_tokens_holder, disc_id)
+                if tokens_now > max_tokens_before and disc_id != max_tokens_holder:
+                    # This person now has the most tokens of all users!
+                    response_bets += f"{disc_name} now has the most {tokens_name} of everyone! "
+                    response_bets += "***HAIL TO THE KING!!!***\n"
+                    await self.assign_top_tokens_role(max_tokens_holder, disc_id)
 
         if any_bets:
             response += response_bets
@@ -1352,20 +1352,33 @@ class DiscordClient(discord.Client):
         pct_doinks = int((doinks / games) * 100)
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         doinks_emote = self.insert_emotes("{emote_Doinks}")
-        all_bets = []
-        for disc_id, _, _ in self.database.summoners:
-            all_bets.extend(self.database.get_all_bets(disc_id))
+        all_bets = self.database.get_all_bets()
+
         tokens_name = self.config.betting_tokens
         bets_won = 0
         total_amount = 0
-        for bet_data in all_bets:
-            amount = bet_data[1]
-            result = bet_data[5]
+        total_payout = 0
+        highest_payout = 0
+        highest_payout_user = None
 
-            total_amount += amount
-            if result == 1:
-                bets_won += 1
+        for disc_id in all_bets:
+            bet_data = all_bets[disc_id]
+            for _, amounts, events, targets, _, result, payout in bet_data:
+                for amount, _, _ in zip(amounts, events, targets):
+                    total_amount += amount
+
+                if payout is not None:
+                    if payout > highest_payout:
+                        highest_payout = payout
+                        highest_payout_user = disc_id
+
+                    total_payout += payout
+
+                if result == 1:
+                    bets_won += 1
+
         pct_won = int((bets_won / len(all_bets)) * 100)
+        highest_payout_name = self.get_discord_nick(highest_payout_user)
 
         response += f"--- Since {earliest_time} ---\n"
         response += f"- **{games}** games have been played\n"
@@ -1373,7 +1386,9 @@ class DiscordClient(discord.Client):
         response += f"- **{intfars}** Int-Far awards have been given\n"
         response += f"- **{doinks}** {doinks_emote} have been earned\n"
         response += f"- **{len(all_bets)}** bets have been made (**{pct_won}%** was won)\n"
-        response += f"- **{total_amount}** {tokens_name} has been spent on bets\n"
+        response += f"- **{total_amount}** {tokens_name} have been spent on bets\n"
+        response += f"- **{total_payout}** {tokens_name} have been won from bets\n"
+        response += f"- **{highest_payout}** {tokens_name} was the biggest single win, by {highest_payout_name}\n"
         response += "--- Of all games played ---\n"
         response += f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
         response += f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
@@ -1394,6 +1409,8 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     def try_get_user_data(self, name):
+        if name.startswith("<@!"):
+            return int(name[3:-1])
         user_data = self.database.discord_id_from_summoner(name)
         if user_data is None: # Summoner name gave no result, try Discord name.
             return self.get_discord_id(name)
@@ -1794,7 +1811,7 @@ class DiscordClient(discord.Client):
             recepient = self.get_discord_nick(disc_id)
 
             response = ""
-            if active_bets == []:
+            if active_bets is None:
                 if single_person:
                     response = f"{recepient} has no active bets."
                 else:
@@ -1873,14 +1890,15 @@ class DiscordClient(discord.Client):
         bets_won = 0
         had_target = 0
         during_game = 0
-        average_amount = 0
+        spent = 0
         most_often_event = 0
         max_event_count = 0
+        winnings = 0
         event_counts = {x: 0 for x in bets.BETTING_DESC}
 
-        for _, amounts, events, targets, game_time, result in all_bets:
+        for _, amounts, events, targets, game_time, result, payout in all_bets:
             for amount, event_id, target in zip(amounts, events, targets):
-                average_amount += amount
+                spent += amount
                 event_counts[event_id] += 1
                 if event_counts[event_id] > max_event_count:
                     max_event_count = event_counts[event_id]
@@ -1889,10 +1907,11 @@ class DiscordClient(discord.Client):
                     had_target += 1
             if result == 1:
                 bets_won += 1
+                winnings += payout if payout is not None else 0
             if game_time > 0:
                 during_game += 1
 
-        average_amount = int(average_amount / len(all_bets))
+        average_amount = int(spent / len(all_bets))
         pct_won = int((bets_won / len(all_bets)) * 100)
         pct_target = int((had_target / len(all_bets)) * 100)
         pct_during = int((during_game / len(all_bets)) * 100)
@@ -1901,6 +1920,8 @@ class DiscordClient(discord.Client):
         response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
         response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
         response += f"- Average amount of {tokens_name} wagered: **{average_amount}**\n"
+        response += f"- Total {tokens_name} wagered: **{spent}**\n"
+        response += f"- Total {tokens_name} won: **{winnings}**\n"
         response += f"- Bet made the most often: `{event_desc}` (made **{max_event_count}** times)\n"
         response += f"- Bets that targeted a person: **{had_target} ({pct_target}%)**\n"
         response += f"- Bets made during a game: **{during_game} ({pct_during}%)**"
@@ -1947,12 +1968,31 @@ class DiscordClient(discord.Client):
     async def handle_verify_msg(self, message):
         client_secret = self.database.get_client_secret(message.author.id)
         url = f"https://mhooge.com/intfar/verify/{client_secret}"
-        response = "Go to this link to verify yourself (totally not a virus):\n"
-        response += url + "\n"
-        response += "This will enable you to interact with the Int-Far bot from "
-        response += "the website, fx. to see stats or place bets.\n"
-        response += "Don't show this link to anyone, or they will be able to log in as you!"
-        return response
+        response_dm = "Go to this link to verify yourself (totally not a virus):\n"
+        response_dm += url + "\n"
+        response_dm += "This will enable you to interact with the Int-Far bot from "
+        response_dm += "the website, fx. to see stats or place bets.\n"
+        response_dm += "Don't show this link to anyone, or they will be able to log in as you!"
+
+        mention = self.get_mention_str(message.author.id)
+        response_server = (
+            f"Psst, {mention}, I sent you a DM with a secret link, "
+            "where you can sign up for the website {emote_peberno}"
+        )
+
+        await message.channel.send(self.insert_emotes(response_server))
+
+        return response_dm
+
+    async def handle_website_msg(self, message):
+        response = (
+            "Check out the amazing Int-Far website:\n" +
+            "https://mhooge.com/intfar\n" +
+            "Write `!website_verify` to see how to sign in to the website, " +
+            "where you can create bets and see stats."
+        )
+
+        await message.channel.send(response)
 
     async def handle_report_msg(self, message, target_name):
         target_name = target_name.lower()
@@ -2242,6 +2282,8 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "betting_tokens"):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_token_balance_msg, message, target_name)
+            elif cmd_equals(first_command, "website"):
+                await self.get_data_and_respond(self.handle_website_msg, message)
             elif cmd_equals(first_command, "website_verify"):
                 response = await self.handle_verify_msg(message)
                 dm_sent = await self.send_dm(response, message.author.id)
