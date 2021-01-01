@@ -47,14 +47,14 @@ def home():
 
 @betting_page.route("/payout", methods=["GET"])
 def get_payout():
-    data = flask.request.args
-    event = data["event"]
-    amount = data["amount"]
-    target = None if data["target"] == "invalid" else data["target"]
-    print((event, amount, target), flush=True)
+    data = flask.request.json
+    events = data["events"]
+    amounts = data["amounts"]
+    targets = [None if t in ("invalid", "any") else t for t in data["targets"]]
     response = 1000
     return flask.make_response((str(response), 200))
 
 @betting_page.route("/create", methods=["POST"])
 def create_bet():
     data = flask.request.form
+    events = data["events"]

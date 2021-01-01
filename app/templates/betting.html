@@ -11,15 +11,15 @@
             <div class="hidden-xs col-lg-4"></div>
             <div id="make-bet-wrapper" class="col-xs-12 col-lg-2">
                 <h2>Make Bet</h2>
-                <select id="bet-event" onchange="betParameterChanged();">
+                <select id="bet-event">
                     {% for event_id, event_name in bet_events %}
                         <option {% if loop.first %}selected{% endif %} value="{{ event_id }}">{{ event_name }}</option>
                     {% endfor %}
                 </select>
                 <br>
-                <input id="bet-amount" type="number" placeholder="Betting Amount" onchange="betParameterChanged();">
+                <input id="bet-amount" type="number" placeholder="Betting Amount">
                 <br>
-                <select disabled id="bet-target" onchange="betParameterChanged();">
+                <select disabled id="bet-target">
                     <option selected value="any">Any Target</option>
                         {% for target in targets %}
                         <option>{{ target }}</option>
@@ -30,13 +30,19 @@
                     <span id="bet-payout-value">0 GBP</span>
                 </p>
                 <p id="bet-error"></p>
-                <button id="bet-add-event">Add Event</button>
+                <button id="bet-add-event" onclick="addEvent();">Add Event</button>
                 <br>
-                <button id="bet-submit">Finalize Bet</button>
+                <button id="bet-submit" onclick="makeBet();">Finalize Bet</button>
             </div>
             <div id="bet-events-wrapper" class="col-xs-12 col-lg-3">
                 <h2>Bet Events</h2>
-                <div id="bet-events-list"></div>
+                <table id="bet-events-list">
+                    <tr class="event-row header">
+                        <th>Event</th>
+                        <th>Amount</th>
+                        <th>Target</th>
+                    </tr>
+                </table>
             </div>
             <div class="hidden-xs col-lg-3"></div>
         </div>
