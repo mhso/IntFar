@@ -451,7 +451,7 @@ class Database:
             if disc_id is not None:
                 query += " AND better_id=?"
                 params = (disc_id,)
-            query += " ORDER BY better_id, ticket"
+            query += " ORDER BY id"
             data_for_person = {}
             data = self.execute_query(db, query, params).fetchall()
             bet_ids = []
@@ -464,12 +464,13 @@ class Database:
                     data_for_person[discord_id] = []
 
                 next_ticket = None if index == len(data) - 1 else data[index+1][-3]
+                next_better = None if index == len(data) - 1 else data[index+1][0]
                 bet_ids.append(bet_id)
                 amounts.append(amount)
                 events.append(event_id)
                 targets.append(target)
 
-                if ticket is None or ticket != next_ticket:
+                if ticket is None or ticket != next_ticket or discord_id != next_better:
                     data_for_person[discord_id].append((bet_ids, amounts, events, targets, game_duration, result, payout))
                     bet_ids = []
                     amounts = []
@@ -486,7 +487,7 @@ class Database:
             if disc_id is not None:
                 query += "AND better_id=? "
                 params = (disc_id,)
-            query += "ORDER BY ticket"
+            query += "ORDER BY id"
             data = self.execute_query(db, query, params).fetchall()
             data_for_person = {}
             bet_ids = []
@@ -499,11 +500,12 @@ class Database:
                     data_for_person[discord_id] = []
 
                 next_ticket = None if index == len(data) - 1 else data[index+1][-1]
+                next_better = None if index == len(data) - 1 else data[index+1][0]
                 bet_ids.append(bet_id)
                 amounts.append(amount)
                 events.append(event_id)
                 targets.append(target)
-                if ticket is None or ticket != next_ticket:
+                if ticket is None or ticket != next_ticket or discord_id != next_better:
                     data_for_person[discord_id].append((bet_ids, amounts, events, targets, game_duration, ticket))
                     bet_ids = []
                     amounts = []
@@ -609,3 +611,8 @@ class Database:
             query_update = "UPDATE registered_summoners SET reports=reports+1 WHERE disc_id=?"
             self.execute_query(db, query_update, (disc_id,))
             return self.get_reports(disc_id, db)[0][1]
+
+    def update_payout(self, bet_id, payout):
+        with closing(self.get_connection()) as db:
+            query_update = "UPDATE bets SET payout=? WHERE id=?"
+            self.execute_query(db, query_update, (payout, bet_id))

@@ -9,3 +9,5 @@ debug.log
 app/static/*
 vendor
 composer.lock
+bet_messages.txt
+fix_payouts.py

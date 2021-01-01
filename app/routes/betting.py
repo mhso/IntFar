@@ -1,6 +1,6 @@
 import flask
 from app.util import get_discord_data
-from api.bets import get_dynamic_bet_desc
+from api.bets import get_dynamic_bet_desc, BETTING_IDS
 from app.user import get_user_details
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
@@ -35,8 +35,26 @@ def home():
     active_bets = get_bets(bot_conn, database, True)
     logged_in_user, logged_in_name, logged_in_avatar = get_user_details()
 
+    all_events = [(bet_id, bet_id.replace("_", " ").capitalize()) for bet_id in BETTING_IDS]
+    all_names = get_discord_data(bot_conn, "func", "get_discord_nick", None)
+
     return flask.render_template(
         "betting.html", resolved_bets=resolved_bets,
-        active_bets=active_bets, logged_in_user=logged_in_user,
-        logged_in_name=logged_in_name, logged_in_avatar=logged_in_avatar
+        active_bets=active_bets, bet_events=all_events, targets=all_names,
+        logged_in_user=logged_in_user, logged_in_name=logged_in_name,
+        logged_in_avatar=logged_in_avatar
     )
+
+@betting_page.route("/payout", methods=["GET"])
+def get_payout():
+    data = flask.request.args
+    event = data["event"]
+    amount = data["amount"]
+    target = None if data["target"] == "invalid" else data["target"]
+    print((event, amount, target), flush=True)
+    response = 1000
+    return flask.make_response((str(response), 200))
+
+@betting_page.route("/create", methods=["POST"])
+def create_bet():
+    data = flask.request.form
