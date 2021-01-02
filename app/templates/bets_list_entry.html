@@ -1,11 +1,12 @@
-{% macro entry(name, events, result, payout, avatar) -%}
-{% for event, amount in events %}
-<tr class="bets-list-entry list-entry{% if loop.first and loop.last %} bet-single{% elif loop.first %} bet-main{% else %} bet-follow{% endif %}">
+{% macro entry(name, better_id, logged_in_user, events, result, payout, avatar) -%}
+{% for bet_id, event, amount in events %}
+<tr class="bets-list-entry list-entry{% if loop.first and loop.last %} bet-single{% elif loop.first %} bet-main{% else %} bet-follow{% endif %}"
+    data-betid="{{ bet_id }}"{% if result and result != -1 and result != 1 %}data-ticket="{{ result }}"{% endif %}>
     <td>{% if loop.first %}<img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">{% endif %}</td>
     <td>{% if loop.first %}{{ name }}{% endif%}</td>
     <td>{% if not loop.first %}<span class="emph">and</span> {% endif %}{{ event }}</td>
     <td>{{ amount }}</td>
-    <td class="{% if result == 1 %}bet-won{% elif result == -1 %}bet-lost{% endif %}">
+    <td {% if result == 1 %}class="bet-won"{% elif result == -1 %}class="bet-lost"{% endif %}>
         {% if result == 1 or result == -1 %}
             {% if loop.first %}
                 {% if result == 1 %}
@@ -19,7 +20,12 @@
                 {% endif %}
             {% endif %}
         {% else %}
-            {{ result }}
+            {% if result %}{{ result }}{% endif %}
+            {% if better_id == logged_in_user and loop.first %}
+            <button class="delete-btn" {% if loop.first and loop.last %}onclick="deleteBet({{ bet_id }});"{% else %}onclick="deleteMultiBet({{ result }});"{% endif %}>
+                &times;
+            </button>
+            {% endif %}
         {% endif %}
     </td>
 </tr>

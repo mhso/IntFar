@@ -8,41 +8,52 @@
         <h1>Betting</h1>
         
         <div class="row">
-            <div class="hidden-xs col-lg-4"></div>
-            <div id="make-bet-wrapper" class="col-xs-12 col-lg-2">
+            <div class="hidden-xs col-lg-3"></div>
+            <div id="make-bet-wrapper" class="col-xs-12 col-lg-3">
                 <h2>Make Bet</h2>
-                <select id="bet-event">
+                <select id="bet-event" onchange="betEventChanged();">
                     {% for event_id, event_name in bet_events %}
                         <option {% if loop.first %}selected{% endif %} value="{{ event_id }}">{{ event_name }}</option>
                     {% endfor %}
                 </select>
                 <br>
-                <input id="bet-amount" type="number" placeholder="Betting Amount">
+                <input id="bet-amount" type="number" required min="5" placeholder="Betting Amount">
                 <br>
                 <select disabled id="bet-target">
-                    <option selected value="any">Any Target</option>
-                        {% for target in targets %}
-                        <option>{{ target }}</option>
+                    <option selected value="any">No Target</option>
+                        {% for target_id, target_name in targets %}
+                        <option value="{{ target_id }}">{{ target_name }}</option>
                     {% endfor %}
                 </select>
-                <p id="bet-payout">
-                    Minimum Payout:<br>
-                    <span id="bet-payout-value">0 GBP</span>
+                <br>
+                <input id="bet-players" type="number" min="2" max="5" placeholder="Number of Players">
+                <p id="bet-balance">
+                    Token Balance: <span id="bet-balance-value">{{ token_balance }} GBP</span>
                 </p>
-                <p id="bet-error"></p>
+                <p id="bet-cost">
+                    Total Bet Cost: <span id="bet-cost-value">0 GBP</span>
+                </p>
+                <p id="bet-payout">
+                    Minimum Payout: <span id="bet-payout-value">0 GBP</span>
+                </p>
+                <p id="bet-status"></p>
                 <button id="bet-add-event" onclick="addEvent();">Add Event</button>
                 <br>
-                <button id="bet-submit" onclick="makeBet();">Finalize Bet</button>
+                <button id="bet-submit" disabled onclick="makeBet();">Finalize Bet</button>
+                <br>
             </div>
-            <div id="bet-events-wrapper" class="col-xs-12 col-lg-3">
-                <h2>Bet Events</h2>
-                <table id="bet-events-list">
-                    <tr class="event-row header">
-                        <th>Event</th>
-                        <th>Amount</th>
-                        <th>Target</th>
-                    </tr>
-                </table>
+            <div class="col-xs-12 col-lg-4">
+                <h2>Current Bet</h2>
+                <div id="bet-events-wrapper">
+                    <table id="bet-events-list">
+                        <tr class="event-row header">
+                            <th>Event</th>
+                            <th>Amount</th>
+                            <th>Target</th>
+                            <th></th>
+                        </tr>
+                    </table>
+                </div>
             </div>
             <div class="hidden-xs col-lg-3"></div>
         </div>
@@ -51,7 +62,7 @@
             <div class="hidden-xs col-lg-1"></div>
             <div id="bets-all" class="col-xs-12 col-lg-5">
                 <h2>All Bets</h2>
-                <table class="intfar-list">
+                <table class="nice-table">
                     <tr class="list-first list-entry">
                         <th></th>
                         <th>By</th>
@@ -59,8 +70,8 @@
                         <th>GBP</th>
                         <th>Result</th>
                     </tr>
-                    {% for bet_id, name, events, result, payout, avatar in resolved_bets %}
-                        {{ list_entry.entry(name, events, result, payout, avatar) }}
+                    {% for better_id, name, events, result, payout, avatar in resolved_bets %}
+                        {{ list_entry.entry(name, better_id, logged_in_user, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
             </div>
@@ -68,20 +79,19 @@
                 <h2>Active Bets</h2>
                 {% if active_bets == [] %}
                 <p id="no-active-bets">There are currently no active bets.</p>
-                {% else %}
-                <table class="intfar-list">
-                    <tr class="list-entry">
+                {% endif %}
+                <table class="nice-table{% if active_bets == [] %} empty-list{% endif %}">
+                    <tr class="list-first list-entry">
                         <th></th>
                         <th>By</th>
                         <th>Event</th>
                         <th>GBP</th>
                         <th>Ticket</th>
                     </tr>
-                    {% for bet_id, name, events, result, payout, avatar in active_bets %}
-                        {{ list_entry.entry(name, events, result, payout, avatar) }}
+                    {% for better_id, name, events, result, payout, avatar in active_bets %}
+                        {{ list_entry.entry(name, better_id, logged_in_user, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
-                {% endif %}
             </div>
             <div class="hidden-xs col-lg-1"></div>
         </div>
@@ -89,5 +99,8 @@
 </body>
 
 <script src="{{ url_for('static', filename='js/betting.js') }}"></script>
+<script>
+{%if logged_in_user %}setLoggedInUser("{{ logged_in_user }}");{% endif %}
+</script>
 
 </html>

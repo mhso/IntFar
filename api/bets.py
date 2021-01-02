@@ -5,6 +5,9 @@ from api.database import DBException
 from api.util import format_duration, round_digits
 from api import game_stats
 
+MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
+MINIMUM_BETTING_AMOUNT = 5
+
 BETTING_IDS = {
     "game_win": 0,
     "game_loss": 1,
@@ -155,9 +158,6 @@ RESOLVE_STATS_BET_FUNCS = [
 ]
 
 class BettingHandler:
-    MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
-    MINIMUM_BETTING_AMOUNT = 5
-
     def __init__(self, config, database):
         self.config = config
         self.database = database
@@ -268,7 +268,7 @@ class BettingHandler:
         if bet_timestamp <= 2: # Bet was made before game started, award full value.
             ratio = 1.0
         else: # Scale value with game time at which bet was made.
-            max_time = 60 * BettingHandler.MAX_BETTING_THRESHOLD
+            max_time = 60 * MAX_BETTING_THRESHOLD
             ratio = 1 - ((bet_timestamp - 2) / max_time)
 
         value = int(bet_amount * base_return * ratio)
@@ -381,7 +381,7 @@ class BettingHandler:
             err_msg = self.get_bet_error_msg(bet_desc, "A person is required as the 'target' of that bet.")
             return (False, err_msg)
 
-        min_amount = BettingHandler.MINIMUM_BETTING_AMOUNT
+        min_amount = MINIMUM_BETTING_AMOUNT
         amount = 0
         try:
             amount = balance if bet_amount == "all" else int(bet_amount)
@@ -396,15 +396,15 @@ class BettingHandler:
             return (False, err_msg)
         time_now = time()
         duration = 0 if game_timestamp is None else time_now - game_timestamp
-        if duration > 60 * BettingHandler.MAX_BETTING_THRESHOLD:
+        if duration > 60 * MAX_BETTING_THRESHOLD:
             err_msg = self.get_bet_error_msg(
                 bet_desc,
                 "The game is too far progressed. You must place bet before " +
-                f"{BettingHandler.MAX_BETTING_THRESHOLD} minutes in game."
+                f"{MAX_BETTING_THRESHOLD} minutes in game."
             )
             return (False, err_msg)
 
-        if self.database.bet_exists(disc_id, event_id, bet_target, ticket):
+        if self.database.get_bet_id(disc_id, event_id, bet_target, ticket) is not None:
             err_msg = self.get_bet_error_msg(bet_desc, "Such a bet has already been made!")
             return (False, err_msg)
         if balance < amount:
@@ -422,6 +422,7 @@ class BettingHandler:
         final_value = 0
         first = True
         any_target = False
+        bet_id = None
         try:
             balance = self.database.get_token_balance(disc_id)
             for bet_amount, event, target, target_name in zip(amounts, events, targets, target_names):
@@ -429,7 +430,7 @@ class BettingHandler:
                                                       balance, target, target_name, ticket)
 
                 if not valid:
-                    return (False, data)
+                    return (False, data, None)
 
                 amount, event_id, game_duration, bet_desc = data
                 balance -= amount
@@ -443,7 +444,7 @@ class BettingHandler:
                 bet_data.append((amount, event_id, target, return_readable, bet_desc))
 
             for amount, event_id, bet_target, base_return, bet_desc in bet_data:
-                self.database.make_bet(disc_id, event_id, amount, game_duration, bet_target, ticket)
+                bet_id = self.database.make_bet(disc_id, event_id, amount, game_duration, bet_target, ticket)
 
                 if not first:
                     reward_equation += " + "
@@ -456,7 +457,7 @@ class BettingHandler:
                 first = False
         except DBException:
             print_exc()
-            return (False, "Bet was not placed: Database error occured :(")
+            return (False, "Bet was not placed: Database error occured :(", None)
 
         final_value *= len(amounts)
         if len(amounts) > 1:
@@ -492,7 +493,25 @@ class BettingHandler:
 
         balance_resp = f"\nYour {tokens_name} balance is now `{balance}`."
 
-        return (True, response + reward_equation + balance_resp)
+        bet_id = None if len(amounts) > 1 else bet_id
+
+        return (True, response + reward_equation + balance_resp, (bet_id, ticket))
+
+    def delete_bet(self, disc_id, bet_id, ticket, game_timestamp):
+        if game_timestamp is not None: # Game has already started.
+            return (False, "Bet was not cancelled: Game is underway!")
+
+        if self.database.get_better_id(bet_id, ticket) != disc_id:
+            return (False, "Bet was not cancelled: You don't own this bet!")
+
+        if ticket is None:
+            amount_refunded = self.database.cancel_bet(bet_id, disc_id)
+        else:
+            amount_refunded = self.database.cancel_multi_bet(ticket, disc_id)
+
+        new_balance = self.database.get_token_balance(disc_id)
+
+        return (True, (new_balance, amount_refunded))
 
     def cancel_bet(self, disc_id, bet_str, game_timestamp, target_id, target_name):
         ticket = None
@@ -505,19 +524,15 @@ class BettingHandler:
                 return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
 
         try:
-            if not self.database.bet_exists(disc_id, event_id, target_id, ticket):
+            bet_id = self.database.get_bet_id(disc_id, event_id, target_id, ticket)
+            if bet_id is None:
                 return (False, "Bet was not cancelled: No bet exists with the specified parameters.")
 
-            if game_timestamp is not None: # Game has already started.
-                return (False, "Bet was not cancelled: Game is underway!")
+            success, data = self.delete_bet(disc_id, bet_id, ticket, game_timestamp)
+            if not success:
+                return (False, data)
 
-            if ticket is None:
-                amount_refunded = self.database.cancel_bet(disc_id, event_id, target_id)
-            else:
-                amount_refunded = self.database.cancel_multi_bet(disc_id, ticket)
-
-            new_balance = self.database.get_token_balance(disc_id)
-
+            new_balance, amount_refunded = data
             if ticket is None:
                 bet_desc = get_dynamic_bet_desc(event_id, target_name)
                 response = f"Bet on `{bet_desc}` for {amount_refunded} {tokens_name} successfully cancelled.\n"

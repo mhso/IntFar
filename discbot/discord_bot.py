@@ -400,6 +400,9 @@ class DiscordClient(discord.Client):
             return 2 # Game is over.
         return 0
 
+    def get_game_start(self):
+        return self.game_start
+
     def get_mention_str(self, disc_id):
         """
         Return a string that allows for @mention of the given user.
@@ -421,7 +424,7 @@ class DiscordClient(discord.Client):
                 return member
         return None
 
-    def get_discord_nick(self, discord_id):
+    def get_discord_nick(self, discord_id=None):
         """
         Return Discord nickname matching the given Discord ID.
         If 'discord_id' is None, returns all nicknames.
@@ -437,7 +440,7 @@ class DiscordClient(discord.Client):
             nicknames.append(name)
         return nicknames
 
-    async def get_discord_avatar(self, discord_id):
+    async def get_discord_avatar(self, discord_id=None):
         users_to_search = ([x[0] for x in self.database.summoners]
                            if discord_id is None
                            else [discord_id])
@@ -2319,7 +2322,11 @@ class DiscordClient(discord.Client):
                 for (command_type, command, *params) in zip(command_types, commands, paramses):
                     result = None
                     if command_type == "func":
-                        result = self.__getattribute__(command)(*params)
+                        if params[0] is None and len(params) == 1:
+                            result = self.__getattribute__(command)()
+                        else:
+                            result = self.__getattribute__(command)(*params)
+
                         if isinstance(result, Coroutine):
                             result = await result
                     elif command_type == "bot_command":

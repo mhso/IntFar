@@ -535,18 +535,25 @@ class Database:
             query = f"UPDATE betting_balance SET tokens=tokens{sign_str}? WHERE disc_id=?"
             self.execute_query(db, query, (amount, disc_id))
 
-    def bet_exists(self, disc_id, event_id, target=None, ticket=None):
+    def get_bet_id(self, disc_id, event_id, target=None, ticket=None):
         with closing(self.get_connection()) as db:
             query = ""
             if ticket is None:
-                query = "SELECT * FROM bets WHERE better_id=? AND event_id=? "
+                query = "SELECT id FROM bets WHERE better_id=? AND event_id=? "
                 query += "AND (target=? OR target IS NULL) "
                 query += "AND result=0"
                 args = (disc_id, event_id, target)
             else:
-                query = "SELECT * FROM bets WHERE better_id=? AND ticket=? AND result=0"
+                query = "SELECT id FROM bets WHERE better_id=? AND ticket=? AND result=0"
                 args = (disc_id, ticket)
-            return self.execute_query(db, query, args).fetchone() is not None
+            result = self.execute_query(db, query, args).fetchone()
+            return None if result is None else result[0]
+
+    def get_better_id(self, bet_id, ticket):
+        with closing(self.get_connection()) as db:
+            query = "SELECT better_id FROM bets WHERE id=? OR ticket=?"
+            result = self.execute_query(db, query, (bet_id, ticket)).fetchone()
+            return None if result is None else result[0]
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):
         with closing(self.get_connection()) as db:
@@ -556,19 +563,18 @@ class Database:
             self.update_token_balance(disc_id, amount, False)
             self.execute_query(db, query_bet, (disc_id, event_id, amount, game_duration,
                                                target_person, ticket, 0))
+            return self.execute_query(db, "SELECT last_insert_rowid()").fetchone()[0]
 
-    def cancel_bet(self, disc_id, event_id, target=None):
+    def cancel_bet(self, bet_id, disc_id):
         with closing(self.get_connection()) as db:
-            query_del = "DELETE FROM bets WHERE better_id=? AND event_id=? "
-            query_del += "AND (target=? OR target IS NULL) AND result=0"
-            query_amount = "SELECT amount FROM bets WHERE better_id=? AND event_id=? "
-            query_amount += "AND (target=? OR target IS NULL) AND result=0"
-            amount = self.execute_query(db, query_amount, (disc_id, event_id, target)).fetchone()[0]
-            self.execute_query(db, query_del, (disc_id, event_id, target))
+            query_del = "DELETE FROM bets WHERE id=? AND better_id=? AND result=0"
+            query_amount = "SELECT amount FROM bets WHERE id=? AND better_id=? AND result=0"
+            amount = self.execute_query(db, query_amount, (bet_id, disc_id)).fetchone()[0]
+            self.execute_query(db, query_del, (bet_id, disc_id))
             self.update_token_balance(disc_id, amount, True)
             return amount
 
-    def cancel_multi_bet(self, disc_id, ticket):
+    def cancel_multi_bet(self, ticket, disc_id):
         with closing(self.get_connection()) as db:
             query_del = "DELETE FROM bets WHERE better_id=? AND ticket=?"
             query_amount = "SELECT amount FROM bets WHERE better_id=? AND ticket=?"
