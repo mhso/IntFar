@@ -1,4 +1,5 @@
 from time import sleep
+from os.path import exists
 import json
 import requests
 
@@ -7,6 +8,33 @@ API_ROUTE = "https://euw1.api.riotgames.com"
 class APIClient:
     def __init__(self, config):
         self.config = config
+        self.latest_patch = self.get_latest_patch()
+        if not exists(self.get_champions_file()):
+            self.get_latest_champions_file()
+
+    def get_champions_file(self):
+        return f"api/champions-{self.latest_patch}.json"
+
+    def get_latest_patch(self):
+        url = "https://ddragon.leagueoflegends.com/api/versions.json"
+        try:
+            response_json = requests.get(url).json()
+            return response_json[0]
+        except requests.exceptions.RequestException as exc:
+            self.config.log("Exception when getting newest champions.json file!")
+            self.config.log(exc)
+            return None
+
+    def get_latest_champions_file(self):
+        url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/champion.json"
+        self.config.log(f"Downloading latest champions file: '{self.get_champions_file()}'")
+        try:
+            response_json = requests.get(url).json()
+            f_out = open(self.get_champions_file(), "w", encoding="utf-8")
+            json.dump(response_json, f_out)
+        except requests.exceptions.RequestException as exc:
+            self.config.log("Exception when getting newest champions.json file!")
+            self.config.log(exc)
 
     def make_request(self, endpoint, *params):
         req_string = endpoint
@@ -41,7 +69,11 @@ class APIClient:
         return response.json()
 
     def get_champ_name(self, champ_id):
-        with open("champions.json", encoding="UTF-8") as fp:
+        champions_file = self.get_champions_file()
+        if champions_file is None:
+            return None
+
+        with open(champions_file, encoding="UTF-8") as fp:
             champion_data = json.load(fp)
             for champ_name in champion_data["data"]:
                 if int(champion_data["data"][champ_name]["key"]) == champ_id:
@@ -49,7 +81,7 @@ class APIClient:
         return None
 
     def is_good_map(self, map_id):
-        with open("maps.json", encoding="UTF-8") as fp:
+        with open("api/maps.json", encoding="UTF-8") as fp:
             map_data = json.load(fp)
             for map_info in map_data:
                 if map_info["mapId"] == map_id:
