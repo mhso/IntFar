@@ -1,6 +1,6 @@
 import flask
 from api.util import current_month
-from app.util import get_discord_data
+from app.util import discord_request
 from app.user import get_user_details
 
 user_page = flask.Blueprint("users", __name__, template_folder="templates")
@@ -19,12 +19,12 @@ def get_relations_data(disc_id, bot_conn, database):
 
     relations_data.sort(key=lambda x: x[2], reverse=True)
 
-    avatars = get_discord_data(bot_conn, "func", "get_discord_avatar", [x[0] for x in relations_data])
+    avatars = discord_request(bot_conn, "func", "get_discord_avatar", [x[0] for x in relations_data])
     avatars = [
         flask.url_for("static", filename=avatar.replace("app/static/", ""))
         for avatar in avatars
     ]
-    nicknames = get_discord_data(bot_conn, "func", "get_discord_nick", [x[0] for x in relations_data])
+    nicknames = discord_request(bot_conn, "func", "get_discord_nick", [x[0] for x in relations_data])
 
     return [
         (x,) + y + (z,)
@@ -44,7 +44,7 @@ def user(disc_id):
     database = flask.current_app.config["DATABASE"]
     bot_conn = flask.current_app.config["BOT_CONN"]
 
-    discord_data = get_discord_data(bot_conn, "func", ["get_discord_nick", "get_discord_avatar"], disc_id)
+    discord_data = discord_request(bot_conn, "func", ["get_discord_nick", "get_discord_avatar"], disc_id)
     nickname = discord_data[0]
     avatar = discord_data[1]
     if avatar is not None:

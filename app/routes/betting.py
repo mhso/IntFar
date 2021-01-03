@@ -1,7 +1,7 @@
 from time import time
 import json
 import flask
-from app.util import get_discord_data
+from app.util import discord_request
 from api.bets import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
 from app.user import get_user_details
 
@@ -9,8 +9,8 @@ betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
 def get_bets(bot_conn, database, only_active):
     all_bets = database.get_active_bets() if only_active else database.get_all_bets()
-    names = get_discord_data(bot_conn, "func", "get_discord_nick", None)
-    avatars = get_discord_data(bot_conn, "func", "get_discord_avatar", None)
+    names = discord_request(bot_conn, "func", "get_discord_nick", None)
+    avatars = discord_request(bot_conn, "func", "get_discord_avatar", None)
     avatars = [
         flask.url_for("static", filename=avatar.replace("app/static/", ""))
         for avatar in avatars
@@ -39,7 +39,7 @@ def home():
 
     all_events = [(bet_id, bet_id.replace("_", " ").capitalize()) for bet_id in BETTING_IDS]
     all_ids = [x[0] for x in database.summoners]
-    all_names = get_discord_data(bot_conn, "func", "get_discord_nick", None)
+    all_names = discord_request(bot_conn, "func", "get_discord_nick", None)
 
     token_balance = "?"
     if logged_in_user is not None:
@@ -77,7 +77,7 @@ def get_payout():
     except ValueError:
         pass
 
-    game_start = get_discord_data(bot_conn, "func", "get_game_start", None)
+    game_start = discord_request(bot_conn, "func", "get_game_start", None)
     duration = 0 if game_start is None else time() - game_start
     if duration > 60 * MAX_BETTING_THRESHOLD:
         return get_response("Error: Game is too far progressed to create bet bet amount value.", 400)
@@ -124,7 +124,7 @@ def create_bet():
     if disc_id is None:
         return get_response("Error: You need to be logged in to place a bet.", 403)
 
-    game_start = get_discord_data(bot_conn, "func", "get_game_start", None)
+    game_start = discord_request(bot_conn, "func", "get_game_start", None)
 
     success, response, placed_bet_data = betting_handler.place_bet(
         int(disc_id), amounts, game_start, event_strs, targets, target_names
@@ -148,6 +148,15 @@ def create_bet():
         "avatar": logged_in_avatar, "betting_balance": new_balance
     }
 
+    disc_msg = f"Gnarly, {logged_in_name}, you created a bet using the **I N T E R W E B Z**!!!\n"
+    if bet_data["bet_type"] == "single":
+        response = response.replace("Bet succesfully placed:", "You bet on")
+    else:
+        response = response.replace("Multi-bet successfully placed! ", "")
+    disc_msg += response
+
+    discord_request(bot_conn, "func", "send_message_unprompted", disc_msg)
+
     return get_response("Bet successfully placed!", 200, data=bet_data)
 
 @betting_page.route("/delete", methods=["POST"])
@@ -164,17 +173,30 @@ def delete_bet():
     ticket = None if data["betType"] == "single" else int(data["betId"])
     bet_id = None if data["betType"] == "multi" else int(data["betId"])
 
-    game_start = get_discord_data(bot_conn, "func", "get_game_start", None)
+    game_start = discord_request(bot_conn, "func", "get_game_start", None)
 
-    success, data = betting_handler.delete_bet(int(disc_id), bet_id, ticket, game_start)
+    success, cancel_data = betting_handler.delete_bet(int(disc_id), bet_id, ticket, game_start)
 
     if not success:
         return get_response(data, 400)
 
-    new_balance = data[0]
+    new_balance, amount_refunded = cancel_data
 
     return_data = {
         "betting_balance": new_balance
     }
+
+    tokens_name = betting_handler.config.betting_tokens
+
+    logged_in_name = get_user_details()[1]
+
+    disc_msg = f"Stealthy! {logged_in_name} just cancelled a bet using the website!\n"
+    if data["betType"] == "single":
+        disc_msg += f"Bet with ID {bet_id} for {amount_refunded} {tokens_name} successfully cancelled.\n"
+    else:
+        disc_msg += f"Multi-bet with ticket ID {ticket} for {amount_refunded} {tokens_name} successfully cancelled.\n"
+    disc_msg += f"Your {tokens_name} balance is now `{new_balance}`."
+
+    discord_request(bot_conn, "func", "send_message_unprompted", disc_msg)
 
     return get_response("Bet sucessfully cancelled.", 200, data=return_data)

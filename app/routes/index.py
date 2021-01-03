@@ -1,6 +1,6 @@
 import flask
 from api.util import current_month
-from app.util import get_discord_data
+from app.util import discord_request
 from app.user import get_user_details
 
 start_page = flask.Blueprint("index", __name__, template_folder="templates")
@@ -29,13 +29,13 @@ def index():
             (games_played_monthly, len(intfar_reason_ids_monthly), pct_intfar_monthly)
         )
 
-    avatars = get_discord_data(bot_conn, "func", "get_discord_avatar", None)
+    avatars = discord_request(bot_conn, "func", "get_discord_avatar", None)
     if avatars is not None:
         avatars = [
             flask.url_for("static", filename=avatar.replace("app/static/", ""))
             for avatar in avatars
         ]
-    nicknames = get_discord_data(bot_conn, "func", "get_discord_nick", None)
+    nicknames = discord_request(bot_conn, "func", "get_discord_nick", None)
 
     intfar_all_data = [
         (x,) + y + (z,)

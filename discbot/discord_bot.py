@@ -1738,9 +1738,11 @@ class DiscordClient(discord.Client):
             target_ids.append(target_id)
             target_names.append(discord_name)
 
+        self.database.start_persistent_connection()
         response = self.betting_handler.place_bet(message.author.id, amounts,
                                                   self.game_start, events,
                                                   target_ids, target_names)[1]
+        self.database.close_persistent_connection()
 
         await message.channel.send(response)
 
@@ -2307,6 +2309,9 @@ class DiscordClient(discord.Client):
                 await message.channel.send(response)
                 self.pipe_conn.send("We restarting!")
                 exit(0)
+
+    async def send_message_unprompted(self, message):
+        await self.channel_to_write.send(message)
 
     async def on_voice_state_update(self, member, before, after):
         if before.channel is None and after.channel is not None: # User joined.

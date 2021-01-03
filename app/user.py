@@ -1,7 +1,7 @@
 from flask import request, current_app, url_for
 import secrets
 from hashlib import sha256
-from app.util import get_discord_data
+from app.util import discord_request
 
 def generate_secret():
     return secrets.token_hex(nbytes=32)
@@ -30,8 +30,8 @@ def get_user_details():
     logged_in_name = "Unknown"
     logged_in_avatar = None
     if logged_in_user is not None:
-        logged_in_name = get_discord_data(bot_conn, "func", "get_discord_nick", logged_in_user)
-        avatar = get_discord_data(bot_conn, "func", "get_discord_avatar", logged_in_user)
+        logged_in_name = discord_request(bot_conn, "func", "get_discord_nick", logged_in_user)
+        avatar = discord_request(bot_conn, "func", "get_discord_avatar", logged_in_user)
         if avatar is not None:
             logged_in_avatar = url_for("static", filename=avatar.replace("app/static/", ""))
 

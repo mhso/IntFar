@@ -16,6 +16,7 @@ class Database:
     def __init__(self, config):
         self.config = config
         self.summoners = []
+        self.persistent_connection = None
         if not os.path.exists(self.config.database):
             self.create_database()
 
@@ -29,15 +30,15 @@ class Database:
         for k, v in user_entries.items():
             self.summoners.append((k, v[0], v[1]))
 
-        self.persistent_connection = None
-
     def get_connection(self):
+        if self.persistent_connection is not None:
+            return self.persistent_connection
         return closing(sqlite3.connect(self.config.database))
 
     def start_persistent_connection(self):
-        self.persistent_connection = None
+        self.persistent_connection = sqlite3.connect(self.config.database)
 
-    def stop_persistent_connection(self):
+    def close_persistent_connection(self):
         self.persistent_connection.close()
         self.persistent_connection = None
 
@@ -53,7 +54,7 @@ class Database:
             raise DBException(exc.args)
 
     def create_database(self):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             with open("schema.sql", "r") as f:
                 db.cursor().executescript(f.read())
             db.commit()
@@ -65,7 +66,7 @@ class Database:
         return False
 
     def get_registered_user(self, summ_name):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             return self.execute_query(
                 db, (
                     "SELECT disc_id, summ_name, summ_id FROM registered_summoners " +
@@ -74,19 +75,19 @@ class Database:
             ).fetchone()
 
     def get_all_registered_users(self):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             return self.execute_query(db, ("SELECT disc_id, summ_name, summ_id, secret " +
                                            "FROM registered_summoners")).fetchall()
 
     def get_client_secret(self, disc_id):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             return self.execute_query(
                 db, ("SELECT secret FROM registered_summoners WHERE disc_id=?"),
                 (disc_id,)
             ).fetchone()[0]
 
     def get_user_from_secret(self, secret):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             return self.execute_query(
                 db, ("SELECT disc_id FROM registered_summoners WHERE secret=?"),
                 (secret,)
@@ -105,7 +106,7 @@ class Database:
             self.summoners.append((discord_id, [summ_name], [summ_id]))
             status = f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
         try:
-            with closing(self.get_connection()) as db:
+            with self.get_connection() as db:
                 self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id, secret, reports) " +
                                         "VALUES (?, ?, ?, ?, ?)"), (discord_id, summ_name, summ_id, secret, 0))
                 self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100))
@@ -131,25 +132,25 @@ class Database:
         aggregator = "MAX" if maximize else "MIN"
         table = "best_stats" if best else "worst_stats"
         query = f"SELECT {stat}_id, {aggregator}({stat}), game_id FROM {table}"
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             return self.execute_query(db, query).fetchone()
 
     def get_stat(self, stat, value, best, disc_id, maximize=True):
         aggregator = "MAX" if maximize else "MIN"
         table = "best_stats" if best else "worst_stats"
         query = f"SELECT Count(*), {aggregator}({value}), game_id FROM {table} WHERE {stat}=?"
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
     def get_doinks_count(self, context=None):
         query_doinks = "SELECT Count(*) FROM participants WHERE doinks != 'None'"
-        with (closing(self.get_connection()) if context is None else context) as db:
+        with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_doinks).fetchone()
 
     def get_doinks_reason_counts(self, context=None):
         query_doinks_multis = "SELECT doinks FROM participants WHERE doinks != 'None'"
 
-        with (closing(self.get_connection()) if context is None else context) as db:
+        with (self.get_connection() if context is None else context) as db:
             doinks_reasons_data = self.execute_query(db, query_doinks_multis).fetchall()
 
             doinks_counts = [0, 0, 0, 0, 0, 0, 0]
@@ -165,18 +166,18 @@ class Database:
         SELECT Count(DISTINCT bs.game_id), timestamp FROM best_stats bs, participants p
         WHERE bs.game_id = p.game_id ORDER BY id
         """
-        with (closing(self.get_connection()) if context is None else context) as db:
+        with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_games).fetchone()
 
     def get_intfar_count(self, context=None):
         query_intfars = "SELECT Count(int_far) FROM best_stats WHERE int_far != 'None'"
-        with (closing(self.get_connection()) if context is None else context) as db:
+        with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_intfars).fetchone()
 
     def get_intfar_reason_counts(self, context=None):
         query_intfar_multis = "SELECT intfar_reason FROM best_stats WHERE intfar_reason != 'None'"
 
-        with (closing(self.get_connection()) if context is None else context) as db:
+        with (self.get_connection() if context is None else context) as db:
             intfar_multis_data = self.execute_query(db, query_intfar_multis).fetchall()
 
             intfar_counts = [0, 0, 0, 0]
@@ -199,7 +200,7 @@ class Database:
     def get_meta_stats(self):
         query_persons = "SELECT Count(*) FROM participants GROUP BY game_id"
         users = (len(self.summoners),)
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             game_data = self.get_games_count(db)
             intfar_data = self.get_intfar_count(db)
             doinks_data = self.get_doinks_count(db)
@@ -253,7 +254,7 @@ class Database:
             "WHERE bs.game_id=p.game_id " +
             "AND " + delim_str + " GROUP BY disc_id"
         )
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             games_per_person = self.execute_query(db, query_games).fetchall()
             intfars_per_person = self.execute_query(db, query_intfars).fetchall()
             pct_intfars = []
@@ -271,7 +272,7 @@ class Database:
 
     def get_longest_intfar_streak(self, disc_id):
         query = "SELECT int_far FROM best_stats ORDER BY id"
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             int_fars = self.execute_query(db, query).fetchall()
             max_count = 0
             count = 0
@@ -290,7 +291,7 @@ class Database:
         WHERE bs.game_id = p.game_id and disc_id=?
         ORDER BY id
         """
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             int_fars = self.execute_query(db, query, (disc_id,)).fetchall()
             max_count = 0
             count = 0
@@ -305,7 +306,7 @@ class Database:
 
     def get_current_intfar_streak(self):
         query = "SELECT int_far FROM best_stats ORDER BY id DESC"
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             int_fars = self.execute_query(db, query).fetchall()
             prev_intfar = int_fars[0][0]
             for count, int_far in enumerate(int_fars[1:], start=1):
@@ -324,7 +325,7 @@ class Database:
             query_total += f" AND {delim_str}"
             query_intfar += f" AND {delim_str}"
 
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             total_games = self.execute_query(db, query_total, (disc_id,)).fetchone()[0]
             intfar_games = self.execute_query(db, query_intfar, (disc_id,)).fetchall()
             return total_games, intfar_games
@@ -340,7 +341,7 @@ class Database:
         WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=?
         GROUP BY disc_id ORDER BY c DESC
         """
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             games_with_person = {}
             intfars_with_person = {}
             for part_id, intfars in self.execute_query(db, query_intfars, (disc_id,)):
@@ -353,7 +354,7 @@ class Database:
 
     def get_doinks_stats(self, disc_id):
         query = "SELECT doinks FROM participants WHERE doinks != 'None' AND disc_id=?"
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             return self.execute_query(db, query, (disc_id,)).fetchall()
 
     def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game):
@@ -417,7 +418,7 @@ class Database:
         query_best = query_prefix + " best_stats" + query_cols
         query_worst = query_prefix + " worst_stats " + query_cols
 
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             self.execute_query(db, query_best, (game_id, intfar_id, intfar_reason, max_kills,
                                                 max_kills_id, min_deaths, min_deaths_id, max_kda,
                                                 max_kda_id, max_damage, max_damage_id,
@@ -445,7 +446,7 @@ class Database:
             raise DBException(exc.args)
 
     def generate_ticket_id(self, disc_id):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query = "SELECT MAX(ticket) FROM bets WHERE better_id=?"
             curr_id = self.execute_query(db, query, (disc_id,)).fetchone()
             if curr_id is None or curr_id[0] is None:
@@ -453,7 +454,7 @@ class Database:
             return curr_id[0] + 1
 
     def get_all_bets(self, disc_id=None):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query = "SELECT better_id, id, amount, event_id, game_duration, target, ticket, result, payout FROM bets "
             query += "WHERE result != 0"
             params = None
@@ -489,7 +490,7 @@ class Database:
             return data_for_person if disc_id is None else data_for_person[disc_id]
 
     def get_active_bets(self, disc_id=None):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query = "SELECT better_id, id, amount, event_id, game_duration, target, ticket FROM bets "
             query += "WHERE result=0 "
             params = None
@@ -524,28 +525,28 @@ class Database:
             return data_for_person if disc_id is None else data_for_person.get(disc_id)
 
     def get_base_bet_return(self, event_id):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query = "SELECT max_return FROM betting_events WHERE id=?"
             return self.execute_query(db, query, (event_id,)).fetchone()[0]
 
     def get_token_balance(self, disc_id):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query = "SELECT tokens FROM betting_balance WHERE disc_id=?"
             return self.execute_query(db, query, (disc_id,)).fetchone()[0]
 
     def get_max_tokens_details(self):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query = "SELECT MAX(tokens), disc_id FROM betting_balance"
             return self.execute_query(db, query).fetchone()
 
     def update_token_balance(self, disc_id, amount, increment=True):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             sign_str = "+" if increment else "-"
             query = f"UPDATE betting_balance SET tokens=tokens{sign_str}? WHERE disc_id=?"
             self.execute_query(db, query, (amount, disc_id))
 
     def get_bet_id(self, disc_id, event_id, target=None, ticket=None):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query = ""
             if ticket is None:
                 query = "SELECT id FROM bets WHERE better_id=? AND event_id=? "
@@ -559,13 +560,13 @@ class Database:
             return None if result is None else result[0]
 
     def get_better_id(self, bet_id, ticket):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query = "SELECT better_id FROM bets WHERE id=? OR ticket=?"
             result = self.execute_query(db, query, (bet_id, ticket)).fetchone()
             return None if result is None else result[0]
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query_bet = "INSERT INTO bets(better_id, event_id, amount, "
             query_bet += "game_duration, target,  ticket, result) "
             query_bet += "VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -575,7 +576,7 @@ class Database:
             return self.execute_query(db, "SELECT last_insert_rowid()").fetchone()[0]
 
     def cancel_bet(self, bet_id, disc_id):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query_del = "DELETE FROM bets WHERE id=? AND better_id=? AND result=0"
             query_amount = "SELECT amount FROM bets WHERE id=? AND better_id=? AND result=0"
             amount = self.execute_query(db, query_amount, (bet_id, disc_id)).fetchone()[0]
@@ -584,7 +585,7 @@ class Database:
             return amount
 
     def cancel_multi_bet(self, ticket, disc_id):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query_del = "DELETE FROM bets WHERE better_id=? AND ticket=?"
             query_amount = "SELECT amount FROM bets WHERE better_id=? AND ticket=?"
             amounts = self.execute_query(db, query_amount, (disc_id, ticket)).fetchall()
@@ -595,13 +596,13 @@ class Database:
 
     def mark_bet_as_resolved(self, bet_id, success, value):
         result_val = 1 if success else -1
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query_bet = "UPDATE bets SET result=?, payout=? WHERE id=?"
             payout = value if success else None
             self.execute_query(db, query_bet, (result_val, payout, bet_id))
 
     def reset_bets(self):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query_bets = "DELETE FROM bets WHERE result=0"
             query_balance = "UPDATE betting_balance SET tokens=100"
             self.execute_query(db, query_bets)
@@ -612,7 +613,7 @@ class Database:
         self.update_token_balance(receiver, amount, increment=True)
 
     def get_reports(self, disc_id=None, context=None):
-        with (closing(self.get_connection()) if context is None else context) as db:
+        with (self.get_connection() if context is None else context) as db:
             query_select = "SELECT disc_id, reports FROM registered_summoners"
             params = None
             if disc_id is not None:
@@ -622,12 +623,12 @@ class Database:
             return self.execute_query(db, query_select, params).fetchall()
 
     def report_user(self, disc_id):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query_update = "UPDATE registered_summoners SET reports=reports+1 WHERE disc_id=?"
             self.execute_query(db, query_update, (disc_id,))
             return self.get_reports(disc_id, db)[0][1]
 
     def update_payout(self, bet_id, payout):
-        with closing(self.get_connection()) as db:
+        with self.get_connection() as db:
             query_update = "UPDATE bets SET payout=? WHERE id=?"
             self.execute_query(db, query_update, (payout, bet_id))

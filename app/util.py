@@ -1,7 +1,7 @@
-def get_discord_data(pipe, command_types, commands, params):
+def discord_request(pipe, command_types, commands, params):
     """
     Request some information from the Discord API.
-    This is done by using a pipe to the seperate process hosting the Discord Bot.
+    This is done by using a pipe to the separate process hosting the Discord Bot.
 
     @param pipe Multiprocessing Pipe object connecting to the process running the Discord Bot.
     @param command_types Type of command to execute in the other process ('func' or 'bot_command').
