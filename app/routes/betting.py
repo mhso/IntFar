@@ -121,7 +121,9 @@ def create_bet():
     target_names = data["targetNames"]
     disc_id = data["disc_id"]
 
-    if disc_id is None:
+    logged_in_user, logged_in_name, logged_in_avatar = get_user_details()
+
+    if disc_id is None or logged_in_user is None:
         return get_response("Error: You need to be logged in to place a bet.", 403)
 
     game_start = discord_request(bot_conn, "func", "get_game_start", None)
@@ -139,7 +141,6 @@ def create_bet():
     event_descs = [
         [get_dynamic_bet_desc(e, t), a] for (e, t, a) in zip(events, target_names, amounts)
     ]
-    _, logged_in_name, logged_in_avatar = get_user_details()
 
     bet_data = {
         "name": logged_in_name, "events": event_descs,
@@ -164,10 +165,13 @@ def delete_bet():
     data = flask.request.form
     betting_handler = flask.current_app.config["BET_HANDLER"]
     bot_conn = flask.current_app.config["BOT_CONN"]
+    conf = flask.current_app.config["APP_CONFIG"]
 
     disc_id = data["disc_id"]
 
-    if disc_id is None:
+    logged_in_user, logged_in_name, _ = get_user_details()
+
+    if disc_id is None or logged_in_user is None:
         return get_response("Error: You need to be logged in to cancel a bet.", 403)
 
     ticket = None if data["betType"] == "single" else int(data["betId"])
@@ -186,7 +190,7 @@ def delete_bet():
         "betting_balance": new_balance
     }
 
-    tokens_name = betting_handler.config.betting_tokens
+    tokens_name = conf.betting_tokens
 
     logged_in_name = get_user_details()[1]
 

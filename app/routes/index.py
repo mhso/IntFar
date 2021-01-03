@@ -57,3 +57,40 @@ def index():
         logged_in_user=logged_in_user, logged_in_name=logged_in_name,
         logged_in_avatar=logged_in_avatar
     )
+
+@start_page.route("/active_game", methods=["GET"])
+def get_active_game_info():
+    logged_in_user = get_user_details()[0]
+
+    if logged_in_user is None:
+        return flask.make_response(("Error: You need to be verified to access this data.", 401))
+
+    active_game = flask.current_app.config["ACTIVE_GAME"]
+
+    return flask.make_response((flask.current_app.config["ACTIVE_GAME"], 200))
+
+@start_page.route("/game_started", methods=["POST"])
+def active_game_started():
+    data = flask.request.form
+    conf = flask.current_app.config["APP_CONFIG"]
+
+    secret = data.get("secret")
+
+    if secret != conf.discord_token:
+        return flask.make_response(("Error: Unauthorized access.", 401))
+
+    flask.current_app.config["ACTIVE_GAME"] = data.get("game_id")
+    flask.current_app.config["GAME_START"] = data.get("game_start")
+
+@start_page.route("/game_ended", methods=["POST"])
+def active_game_ended():
+    data = flask.request.form
+    conf = flask.current_app.config["APP_CONFIG"]
+
+    secret = data.get("secret")
+
+    if secret != conf.discord_token:
+        return flask.make_response(("Error: Unauthorized access.", 401))
+
+    flask.current_app.config["ACTIVE_GAME"] = None
+    flask.current_app.config["GAME_START"] = None

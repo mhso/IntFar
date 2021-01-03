@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     conf.log("Starting Flask web app...")
     flask_end, bot_end_flask = Pipe()
-    flask_process = Process(target=run_flask.run_app, args=(database_client, betting_handler, flask_end))
+    flask_process = Process(target=run_flask.run_app, args=(database_client, betting_handler, conf, flask_end))
     flask_process.start()
 
     conf.discord_token = auth["discordToken"]

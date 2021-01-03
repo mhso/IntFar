@@ -1,5 +1,6 @@
 import random
 import asyncio
+import requests
 from typing import Coroutine
 import discord
 from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
@@ -257,6 +258,12 @@ class DiscordClient(discord.Client):
         self.betting_handler = betting_handler
         self.time_initialized = datetime.now()
 
+    def send_game_update(self, endpoint, data):
+        try:
+            requests.post(f"https://mhooge.com/intfar/{endpoint}", data=data)
+        except requests.exceptions.RequestException as e:
+            self.config.log("Error ignored in online_monitor: " + str(e))
+
     async def poll_for_game_end(self):
         """
         This method is called periodically when a game is active.
@@ -298,6 +305,11 @@ class DiscordClient(discord.Client):
                 self.active_game = None
                 self.game_start = None
                 self.users_in_game = None # Reset the list of users who are in a game.
+                req_data = {
+                    "secret": self.config.discord_token
+                }
+                self.send_game_update("game_ended", req_data)
+
                 asyncio.create_task(self.poll_for_game_start())
             except Exception as e:
                 self.config.log("Exception after game was over!!!", self.config.log_error)
@@ -329,6 +341,12 @@ class DiscordClient(discord.Client):
         game_status = self.check_game_status()
 
         if game_status == 1: # Game has started.
+            req_data = {
+                "game_id": self.active_game,
+                "game_start": self.game_start,
+                "secret": self.config.discord_token
+            }
+            self.send_game_update("game_started", req_data)
             await self.poll_for_game_end()
         elif game_status == 0: # Sleep for 10 minutes and check game status again.
             await self.poll_for_game_start()
