@@ -41,7 +41,6 @@ def create_app(database, bet_handler, conf, bot_pipe):
     web_app.config["LOGGED_IN_USERS"] = {}
     web_app.config["RIOT_API"] = riot_api.APIClient(conf)
     web_app.config["ACTIVE_GAME"] = None
-    web_app.config["GAME_START"] = None
 
     web_app.secret_key = open("app/static/secret.txt").readline()
 

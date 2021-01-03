@@ -21,8 +21,8 @@
                         <th>Games</th>
                         <th>%</th>
                     </tr>
-                    {% for name, games, intfars, intfar_pct, avatar in intfar_all %}
-                        {{ list_entry.entry(name, games, intfars, intfar_pct, avatar) }}
+                    {% for name, disc_id, games, intfars, intfar_pct, avatar in intfar_all %}
+                        {{ list_entry.entry(disc_id, name, games, intfars, intfar_pct, avatar) }}
                     {% endfor %}
                 </table>
             </div>
@@ -36,8 +36,8 @@
                         <th>Games</th>
                         <th>%</th>
                     </tr>
-                    {% for name, games, intfars, intfar_pct, avatar in intfar_month %}
-                        {{ list_entry.entry(name, games, intfars, intfar_pct, avatar) }}
+                    {% for name, disc_id, games, intfars, intfar_pct, avatar in intfar_month %}
+                        {{ list_entry.entry(disc_id, name, games, intfars, intfar_pct, avatar) }}
                     {% endfor %}
                 </table>
             </div>

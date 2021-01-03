@@ -40,7 +40,7 @@
                             <th>%</th>
                         </tr>
                         {% for name, disc_id, games, intfars, pct, avatar in relations %}
-                            {{ list_entry.entry(name, games, intfars, pct, avatar) }}
+                            {{ list_entry.entry(disc_id, name, games, intfars, pct, avatar) }}
                         {% endfor %}
                     </table>
                 </div>

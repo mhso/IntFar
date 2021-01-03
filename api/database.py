@@ -6,7 +6,7 @@ from sqlite3 import DatabaseError, OperationalError, ProgrammingError
 from contextlib import closing
 from api import game_stats
 from api.util import TimeZone
-from app.user import generate_secret
+from app.util import generate_user_secret
 
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
@@ -96,7 +96,7 @@ class Database:
     def add_user(self, summ_name, summ_id, discord_id):
         status = ""
         summ_info = self.summoner_from_discord_id(discord_id)
-        secret = generate_secret()
+        secret = generate_user_secret()
         if summ_info is not None:
             disc_id, summ_names, summ_ids = summ_info
             summ_names.append(summ_name)

@@ -1,5 +1,5 @@
 import flask
-from app.user import get_hashed_secret
+from app.util import get_hashed_secret
 
 verify_page = flask.Blueprint("verify", __name__, template_folder="templates")
 

@@ -1,7 +1,6 @@
 import flask
 from api.util import current_month
-from app.util import discord_request
-from app.user import get_user_details
+from app.util import discord_request, get_user_details, make_template_context
 
 user_page = flask.Blueprint("users", __name__, template_folder="templates")
 
@@ -56,13 +55,9 @@ def user(disc_id):
 
     intfar_relation_data = get_relations_data(disc_id, bot_conn, database)
 
-    logged_in_user, logged_in_name, logged_in_avatar = get_user_details()
-
-    return flask.render_template(
+    return make_template_context(
         "profile.html", disc_id=disc_id, nickname=nickname, avatar=avatar,
         relations=intfar_relation_data, curr_month=curr_month,
         intfar_data_all=[games_all, intfars_all, pct_all],
-        intfar_data_month=[games_month, intfars_month, pct_month],
-        logged_in_user=logged_in_user, logged_in_name=logged_in_name,
-        logged_in_avatar=logged_in_avatar
+        intfar_data_month=[games_month, intfars_month, pct_month]
     )

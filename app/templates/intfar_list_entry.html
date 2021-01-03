@@ -1,7 +1,11 @@
-{% macro entry(name, games, intfars, intfar_pct, avatar) -%}
+{% macro entry(disc_id, name, games, intfars, intfar_pct, avatar) -%}
 <tr class="intfar-list-entry list-entry">
-    <td><img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar"></td>
-    <td>{{ name }}</td>
+    <td>
+        <a href="{{ url_for('users.user', disc_id=disc_id) }}">
+            <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
+        </a>
+    </td>
+    <td><a href="{{ url_for('users.user', disc_id=disc_id) }}">{{ name }}</a></td>
     <td>{{ intfars }}</td>
     <td>{{ games }}</td>
     <td>{{ intfar_pct }}%</td>

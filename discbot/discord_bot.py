@@ -343,7 +343,6 @@ class DiscordClient(discord.Client):
         if game_status == 1: # Game has started.
             req_data = {
                 "game_id": self.active_game,
-                "game_start": self.game_start,
                 "secret": self.config.discord_token
             }
             self.send_game_update("game_started", req_data)
