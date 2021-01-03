@@ -38,7 +38,7 @@ def discord_request(pipe, command_types, commands, params):
 def get_game_info():
     active_game = flask.current_app.config["ACTIVE_GAME"]
     if active_game is None:
-        return { "game_duration": 3, "game_mode": "CLASSIC" }
+        return None
 
     riot_api = flask.current_app.config["RIOT_API"]
     game_data = riot_api.get_game_details(active_game)

@@ -80,6 +80,7 @@ def active_game_started():
         return flask.make_response(("Error: Unauthorized access.", 401))
 
     flask.current_app.config["ACTIVE_GAME"] = data.get("game_id")
+    return flask.make_response(("Success! Active game ID updated.", 200))
 
 @start_page.route("/game_ended", methods=["POST"])
 def active_game_ended():
@@ -92,4 +93,4 @@ def active_game_ended():
         return flask.make_response(("Error: Unauthorized access.", 401))
 
     flask.current_app.config["ACTIVE_GAME"] = None
-    flask.current_app.config["GAME_START"] = None
+    return flask.make_response(("Success! Active game ID deleted.", 200))

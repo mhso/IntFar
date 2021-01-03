@@ -1,12 +1,12 @@
-{% macro navbar(discord_id, name, avatar) -%}
-<div class="intfar-navbar row">
+{% macro navbar(discord_id, name, avatar, game_duration, game_mode) -%}
+<div class="intfar-navbar">
     <div class="navbar-menu">
         <a href="{{ url_for('index.index') }}">Home</a> | <a href="{{ url_for('betting.home') }}">Betting</a> | 
         <a href="{{ url_for('doinks.home') }}">Doinks</a> | <a href="{{ url_for('stats.home') }}">Stats</a>
     </div>
     <div class="navbar-active-game{% if game_duration %} game-active{% endif %}">
         Active game: <span class="active-game-mode">{{ game_mode }}</span><br>
-        Time since start: <span class="active-game-duration"></span>.
+        Time since start: <span class="active-game-duration"></span>
         <script>
             {% if game_duration %}
             gameIsActive = true;

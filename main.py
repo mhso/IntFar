@@ -10,6 +10,8 @@ if __name__ == "__main__":
     auth = json.load(open("discbot/auth.json"))
 
     conf = Config()
+    conf.discord_token = auth["discordToken"]
+    conf.riot_key = auth["riotDevKey"] if conf.use_dev_token else auth["riotAPIKey"]
 
     conf.log("Initializing database...")
     database_client = Database(conf)
@@ -19,9 +21,6 @@ if __name__ == "__main__":
     flask_end, bot_end_flask = Pipe()
     flask_process = Process(target=run_flask.run_app, args=(database_client, betting_handler, conf, flask_end))
     flask_process.start()
-
-    conf.discord_token = auth["discordToken"]
-    conf.riot_key = auth["riotDevKey"] if conf.use_dev_token else auth["riotAPIKey"]
 
     while True:
         conf.log("Starting Discord Client...")
