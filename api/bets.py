@@ -423,6 +423,8 @@ class BettingHandler:
         first = True
         any_target = False
         bet_id = None
+        used_events = set()
+
         try:
             balance = self.database.get_token_balance(disc_id)
             for bet_amount, event, target, target_name in zip(amounts, events, targets, target_names):
@@ -433,6 +435,12 @@ class BettingHandler:
                     return (False, data, None)
 
                 amount, event_id, game_duration, bet_desc = data
+
+                if (event_id, target) in used_events:
+                    return (False, "Error: Duplicate Event in bet.", None)
+
+                used_events.add((event_id, target))
+
                 balance -= amount
 
                 bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id,

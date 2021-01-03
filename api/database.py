@@ -29,8 +29,17 @@ class Database:
         for k, v in user_entries.items():
             self.summoners.append((k, v[0], v[1]))
 
+        self.persistent_connection = None
+
     def get_connection(self):
-        return sqlite3.connect(self.config.database)
+        return closing(sqlite3.connect(self.config.database))
+
+    def start_persistent_connection(self):
+        self.persistent_connection = None
+
+    def stop_persistent_connection(self):
+        self.persistent_connection.close()
+        self.persistent_connection = None
 
     def execute_query(self, db, query, query_params=None):
         try:

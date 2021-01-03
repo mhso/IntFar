@@ -20,16 +20,13 @@ def get_logged_in_user(database, user_id):
     return None
 
 def get_user_details():
-    if current_app.config.get("LOGGED_IN_USER") is not None:
-        return (
-            current_app.config["LOGGED_IN_USER"],
-            current_app.config["LOGGED_IN_NAME"],
-            current_app.config["LOGGED_IN_AVATAR"]
-        )
-
     database = current_app.config["DATABASE"]
     bot_conn = current_app.config["BOT_CONN"]
     logged_in_user = get_logged_in_user(database, request.cookies.get("user_id"))
+
+    if current_app.config["LOGGED_IN_USERS"].get(logged_in_user) is not None:
+        return (logged_in_user,) + current_app.config["LOGGED_IN_USERS"][logged_in_user]
+
     logged_in_name = "Unknown"
     logged_in_avatar = None
     if logged_in_user is not None:
@@ -38,8 +35,6 @@ def get_user_details():
         if avatar is not None:
             logged_in_avatar = url_for("static", filename=avatar.replace("app/static/", ""))
 
-        current_app.config["LOGGED_IN_USER"] = logged_in_user
-        current_app.config["LOGGED_IN_NAME"] = logged_in_name
-        current_app.config["LOGGED_IN_AVATAR"] = logged_in_avatar
+        current_app.config["LOGGED_IN_USERS"][logged_in_user] = (logged_in_name, logged_in_avatar)
 
     return logged_in_user, logged_in_name, logged_in_avatar

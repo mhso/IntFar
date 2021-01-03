@@ -32,6 +32,7 @@ def create_app(database, bet_handler, bot_pipe):
     web_app.config["DATABASE"] = database
     web_app.config["BET_HANDLER"] = bet_handler
     web_app.config["BOT_CONN"] = bot_pipe
+    web_app.config["LOGGED_IN_USERS"] = {}
     web_app.secret_key = open("app/static/secret.txt").readline()
 
     return web_app
