@@ -58,8 +58,11 @@ def get_intfar_data(disc_id, database):
 
     return {
         "curr_month": curr_month,
-        "intfar_data_all": [games_all, intfars_all, pct_all],
-        "intfar_data_month": [games_month, intfars_month, pct_month],
+        "intfar_data": [
+            ["Games", games_all, games_month],
+            ["Intfars", intfars_all, intfars_month],
+            ["Percent", pct_all, pct_month]
+        ],
         "intfar_criteria_data": criteria_stats, "streak": longest_streak,
         "non_streak": longest_non_streak, "is_ifotm": user_is_ifotm
     }
