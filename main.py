@@ -39,5 +39,8 @@ if __name__ == "__main__":
         try:
             our_end.recv() # Wait for bot to say it has died.
         except BrokenPipeError:
-            print("Stopping bot.", flush=True)
+            print("Stopping bot...", flush=True)
             flask_process.kill()
+        except KeyboardInterrupt:
+            conf.log("Stopping bot...")
+            exit(0)
