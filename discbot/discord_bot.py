@@ -250,7 +250,7 @@ class DiscordClient(discord.Client):
         self.active_game = None
         self.game_start = None
         self.channel_to_write = None
-        self.test_channel = None
+        self.test_guild = None
         self.initialized = False
         self.polling_active = False
         self.last_message_time = {}
@@ -1284,12 +1284,14 @@ class DiscordClient(discord.Client):
                         # if more than one user is active in voice.
                         await self.user_joined_voice(member.id, True)
                 for text_channel in guild.text_channels:
-                    if text_channel.id == CHANNEL_ID: # Find the 'int-far-spam' channel.
+                    # Find the 'int-far-spam' channel.
+                    if text_channel.id == CHANNEL_ID and self.config.env == "production":
                         self.channel_to_write = text_channel
                         asyncio.create_task(self.sleep_until_monthly_infar())
                         break
-            elif guild.id == MY_SERVER_ID:
-                self.test_channel = guild.text_channels[0]
+            elif guild.id == MY_SERVER_ID and self.config.env == "dev":
+                self.channel_to_write = guild.text_channels[0]
+                await guild.chunk()
 
         if self.flask_conn is not None: # Listen for external commands from web page.
             asyncio.create_task(self.listen_for_external_command())
@@ -2196,6 +2198,10 @@ class DiscordClient(discord.Client):
 
     async def on_message(self, message):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
+            return
+
+        if ((self.config.env == "dev" and message.guild.id != MY_SERVER_ID)
+                or (self.config.env == "production" and message.guild.id != DISCORD_SERVER_ID)):
             return
 
         msg = message.content.strip()

@@ -6,6 +6,7 @@ class Config:
         self.debug = True
         self.testing = False
         self.discord_token = ""
+        self.env = ""
         self.riot_key = ""
         self.status_interval_dormant = 60 * 2 # 2 minutes wait time between checking for status.
         self.status_interval_ingame = 30 # 30 seconds wait time when in-game.

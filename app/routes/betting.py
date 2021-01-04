@@ -171,7 +171,7 @@ def delete_bet():
     success, cancel_data = betting_handler.delete_bet(int(disc_id), bet_id, ticket, game_start)
 
     if not success:
-        return make_json_response(data, 400)
+        return make_json_response(cancel_data, 400)
 
     new_balance, amount_refunded = cancel_data
 

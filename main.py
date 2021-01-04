@@ -12,6 +12,10 @@ if __name__ == "__main__":
     conf = Config()
     conf.discord_token = auth["discordToken"]
     conf.riot_key = auth["riotDevKey"] if conf.use_dev_token else auth["riotAPIKey"]
+    conf.env = auth["env"]
+
+    env_desc = "DEVELOPMENT" if conf.env == "dev" else "PRODUCTION"
+    conf.log(f"+++++ Running in {env_desc} mode +++++")
 
     conf.log("Initializing database...")
     database_client = Database(conf)
