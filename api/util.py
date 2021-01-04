@@ -1,5 +1,18 @@
 from datetime import tzinfo, timedelta, datetime
 
+INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
+
+DOINKS_REASONS = [
+    "KDA larger than 10", "More than 20 kills", "Half of the teams damage",
+    "Getting a pentakill", "Vision score larger than 100",
+    "Kill participation over 80%", "Securing all epic monsters"
+]
+
+MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December"
+]
+
 class TimeZone(tzinfo):
     """
     Class for representing the time zone of Copenhagen (UTC+1).
@@ -18,11 +31,6 @@ class TimeZone(tzinfo):
         if dt.month == 3 and dt.day > 28:
             return timedelta(0, 0, 0, 0, 0, 1, 0)
         return timedelta(0, 0, 0, 0, 0, 1, 0)
-
-MONTH_NAMES = [
-    "January", "February", "March", "April", "May", "June", "July",
-    "August", "September", "October", "November", "December"
-]
 
 def current_month():
     return MONTH_NAMES[datetime.now().month-1]
@@ -68,3 +76,24 @@ def format_duration(dt_1, dt_2):
     if years > 0:
         response = f"{years} years, " + response
     return response
+
+def organize_intfar_stats(games_played, intfar_reason_ids):
+    intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
+    for reason_id in intfar_reason_ids:
+        intfar_ids = [int(x) for x in reason_id[0]]
+        for index, intfar_id in enumerate(intfar_ids):
+            if intfar_id == 1:
+                intfar_counts[index] += 1
+
+    pct_intfar = (0 if games_played == 0
+                  else int(len(intfar_reason_ids) / games_played * 100))
+    return games_played, len(intfar_reason_ids), intfar_counts, pct_intfar
+
+def organize_doinks_stats(doinks_reason_ids):
+    doinks_counts = {x: 0 for x in range(len(DOINKS_REASONS))}
+    for reason_id in doinks_reason_ids:
+        intfar_ids = [int(x) for x in reason_id[0]]
+        for index, intfar_id in enumerate(intfar_ids):
+            if intfar_id == 1:
+                doinks_counts[index] += 1
+    return doinks_counts

@@ -98,7 +98,7 @@ class Database:
         summ_info = self.summoner_from_discord_id(discord_id)
         secret = generate_user_secret()
         if summ_info is not None:
-            disc_id, summ_names, summ_ids = summ_info
+            _, summ_names, summ_ids = summ_info
             summ_names.append(summ_name)
             summ_ids.append(summ_id)
             status = f"Added smurf '{summ_name}' with  summoner ID '{summ_id}'."
@@ -143,12 +143,12 @@ class Database:
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
     def get_doinks_count(self, context=None):
-        query_doinks = "SELECT Count(*) FROM participants WHERE doinks != 'None'"
+        query_doinks = "SELECT Count(*) FROM participants WHERE doinks IS NOT NULL"
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_doinks).fetchone()
 
     def get_doinks_reason_counts(self, context=None):
-        query_doinks_multis = "SELECT doinks FROM participants WHERE doinks != 'None'"
+        query_doinks_multis = "SELECT doinks FROM participants WHERE doinks IS NOT NULL"
 
         with (self.get_connection() if context is None else context) as db:
             doinks_reasons_data = self.execute_query(db, query_doinks_multis).fetchall()
@@ -170,12 +170,12 @@ class Database:
             return self.execute_query(db, query_games).fetchone()
 
     def get_intfar_count(self, context=None):
-        query_intfars = "SELECT Count(int_far) FROM best_stats WHERE int_far != 'None'"
+        query_intfars = "SELECT Count(int_far) FROM best_stats WHERE int_far IS NOT NULL"
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_intfars).fetchone()
 
     def get_intfar_reason_counts(self, context=None):
-        query_intfar_multis = "SELECT intfar_reason FROM best_stats WHERE intfar_reason != 'None'"
+        query_intfar_multis = "SELECT intfar_reason FROM best_stats WHERE intfar_reason IS NOT NULL"
 
         with (self.get_connection() if context is None else context) as db:
             intfar_multis_data = self.execute_query(db, query_intfar_multis).fetchall()
@@ -353,7 +353,7 @@ class Database:
             return games_with_person, intfars_with_person
 
     def get_doinks_stats(self, disc_id):
-        query = "SELECT doinks FROM participants WHERE doinks != 'None' AND disc_id=?"
+        query = "SELECT doinks FROM participants WHERE doinks IS NOT NULL AND disc_id=?"
         with self.get_connection() as db:
             return self.execute_query(db, query, (disc_id,)).fetchall()
 
@@ -462,8 +462,8 @@ class Database:
                 query += " AND better_id=?"
                 params = (disc_id,)
             query += " ORDER BY id"
-            data_for_person = {}
             data = self.execute_query(db, query, params).fetchall()
+            data_for_person = {}
             bet_ids = []
             amounts = []
             events = []
@@ -481,7 +481,9 @@ class Database:
                 targets.append(target)
 
                 if ticket is None or ticket != next_ticket or discord_id != next_better:
-                    data_for_person[discord_id].append((bet_ids, amounts, events, targets, game_duration, result, payout))
+                    data_for_person[discord_id].append(
+                        (bet_ids, amounts, events, targets, game_duration, result, payout)
+                    )
                     bet_ids = []
                     amounts = []
                     events = []
@@ -516,7 +518,9 @@ class Database:
                 events.append(event_id)
                 targets.append(target)
                 if ticket is None or ticket != next_ticket or discord_id != next_better:
-                    data_for_person[discord_id].append((bet_ids, amounts, events, targets, game_duration, ticket))
+                    data_for_person[discord_id].append(
+                        (bet_ids, amounts, events, targets, game_duration, ticket, None)
+                    )
                     bet_ids = []
                     amounts = []
                     events = []

@@ -1,17 +1,19 @@
 <html>
 {% include 'head.html' %}
-{% import "intfar_list_entry.html" as list_entry %}
+{% import "intfar_list_entry.html" as intfar_entry %}
+{% import "bets_list_entry.html" as betting_entry %}
 {% import "navbar.html" as navbar %}
 <body>
     {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, game_duration, game_mode) }}
     <div id="profile-wrapper" class="container-flex">
         <img class="discord-avatar" src="{{ avatar }}"><br>
         <h1>{{ nickname }}</h1>
+        {% if is_ifotm %}<h2 id="ifotm-indicator">Top Int-Far of the Month Candidate</h2>{% endif %}
         <div class="row">
             <div class="col-lg-3">
                 <h2>Stats</h2>
             </div>
-            <div class="col-lg-3">
+            <div id="profile-intfars" class="col-lg-3">
                 <h2>Intfars</h2>
                 <div class="row">
                     <div class="col-lg-1"></div>
@@ -30,27 +32,89 @@
                     <div class="col-lg-1"></div>
                 </div>
                 <div class="row">
-                    <h3>Intfar Relations</h3>
-                    <table class="nice-table">
-                        <tr class="list-first intfar-list-entry">
-                            <th></th>
-                            <th>Games with</th>
-                            <th>Int</th>
-                            <th>Games</th>
-                            <th>%</th>
-                        </tr>
-                        {% for name, disc_id, games, intfars, pct, avatar in relations %}
-                            {{ list_entry.entry(disc_id, name, games, intfars, pct, avatar) }}
+                    <div class="col-lg-3"></div>
+                    <div class="col-lg-6">
+                        <h3>Criteria Met</h3>
+                        {% for reason, count in intfar_criteria_data %}
+                        <span class="left">{{ reason }}:</span> <span class="right">{{ count }}</span><br>
                         {% endfor %}
-                    </table>
+                    </div>
+                    <div class="col-lg-3"></div>
+                </div>
+                <div class="row">
+                <h3>Streaks</h3>
+                <div class="col-lg-2"></div>
+                <div class="col-lg-8">
+                    <span class="left">Longest Int-Far streak:</span> <span class="right">{{ streak }}</span>
+                    <span class="left">Longest no-Int-Far streak:</span> <span class="right">{{ non_streak }}</span>
+                </div>
+                <div class="col-lg-2"></div>
+                </div>
+                <div class="row">
+                    <h3>Intfar Relations</h3>
+                    <div class="col-lg-12">
+                        <table class="nice-table">
+                            <tr class="list-first intfar-list-entry">
+                                <th></th>
+                                <th>Games with</th>
+                                <th>Int</th>
+                                <th>Gms</th>
+                                <th>%</th>
+                            </tr>
+                            {% for name, disc_id, games, intfars, pct, avatar in intfar_relations %}
+                                {{ intfar_entry.entry(disc_id, name, games, intfars, pct, avatar) }}
+                            {% endfor %}
+                        </table>
+                    </div>
                 </div>
             </div>
-            <div class="col-lg-3">
+            <div id="profile-doinks" class="col-lg-3">
                 <h2>Doinks</h2>
+                <div class="row">
+                    <div class="col-lg-2"></div>
+                    <div class="col-lg-8">
+                        Big Doinks awarded: <strong>{{ doinks }}</strong>
+                        <h3>Criteria Met</h3>
+                        {% for reason, count in doinks_criteria_data %}
+                        <span class="left">{{ reason }}:</span> <span class="right">{{ count }}</span><br>
+                        {% endfor %}
+                    </div>
+                    <div class="col-lg-2"></div>
+                </div>
             </div>
-            <div class="col-lg-3">
+            <div id="profile-bets" class="col-lg-3">
                 <h2>Bets</h2>
-
+                <div class="row">
+                    <div class="col-lg-12">
+                        <h3>Active Bets</h3>
+                        {% if active_bets == [] %}
+                        <p id="no-active-bets">There are currently no active bets.</p>
+                        {% endif %}
+                        <table class="nice-table{% if active_bets == [] %} empty-list{% endif %}">
+                            <tr class="list-first list-entry">
+                                <th>Event</th>
+                                <th>GBP</th>
+                                <th>Result</th>
+                            </tr>
+                            {% for events, result, payout in active_bets %}
+                                {{ betting_entry.entry(false, false, logged_in_user, events, result, payout, false) }}
+                            {% endfor %}
+                        </table>
+                    </div>
+                    <div class="col-lg-12">
+                        <table class="nice-table">
+                            <h3>All Bets</h3>
+                            <tr class="list-first list-entry">
+                                <th>Event</th>
+                                <th>GBP</th>
+                                <th>Result</th>
+                            </tr>
+                            {% for events, result, payout in resolved_bets %}
+                                {{ betting_entry.entry(false, false, logged_in_user, events, result, payout, false) }}
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

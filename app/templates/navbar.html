@@ -1,8 +1,7 @@
 {% macro navbar(discord_id, name, avatar, game_duration, game_mode) -%}
 <div class="intfar-navbar">
     <div class="navbar-menu">
-        <a href="{{ url_for('index.index') }}">Home</a> | <a href="{{ url_for('betting.home') }}">Betting</a> | 
-        <a href="{{ url_for('doinks.home') }}">Doinks</a> | <a href="{{ url_for('stats.home') }}">Stats</a>
+        <a href="{{ url_for('index.index') }}">Home</a><span>|</span><a href="{{ url_for('betting.home') }}">Betting</a><span>|</span><a href="{{ url_for('doinks.home') }}">Doinks</a><span>|</span><a href="{{ url_for('stats.home') }}">Stats</a>
     </div>
     <div class="navbar-active-game{% if game_duration %} game-active{% endif %}">
         Active game: <span class="active-game-mode">{{ game_mode }}</span><br>
@@ -16,7 +15,7 @@
         </script>
     </div>
     <div class="navbar-user">
-        <a class="navbar-username hidden-xs" href="{% if discord_id %} {{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
+        <a class="navbar-username d-none d-sm-inline" href="{% if discord_id %} {{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
             <span>{{ name }}</span>
         </a>
         <a href="{% if discord_id %}{{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">

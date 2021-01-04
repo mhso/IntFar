@@ -2,13 +2,17 @@
 {% for bet_id, event, amount in events %}
 <tr class="bets-list-entry list-entry{% if loop.first and loop.last %} bet-single{% elif loop.first %} bet-main{% else %} bet-follow{% endif %}"
     data-betid="{{ bet_id }}"{% if result and result != -1 and result != 1 %}data-ticket="{{ result }}"{% endif %}>
+    {% if avatar %}
     <td>{% if loop.first %}
         <a href="{{ url_for('users.user', disc_id=better_id) }}">
             <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
         </a>
         {% endif %}
     </td>
-    <td>{% if loop.first %}<a href="{{ url_for('users.user', disc_id=better_id) }}">{{ name }}</a>{% endif%}</td>
+    {% endif %}
+    {% if name %}
+    <td class="d-none d-sm-table-cell">{% if loop.first %}<a href="{{ url_for('users.user', disc_id=better_id) }}">{{ name }}</a>{% endif%}</td>
+    {% endif %}
     <td>{% if not loop.first %}<span class="emph">and</span> {% endif %}{{ event }}</td>
     <td>{{ amount }}</td>
     <td {% if result == 1 %}class="bet-won"{% elif result == -1 %}class="bet-lost"{% endif %}>

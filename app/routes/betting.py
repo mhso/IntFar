@@ -20,8 +20,7 @@ def get_bets(bot_conn, database, only_active):
     presentable_data = []
     for disc_id in all_bets:
         bets = all_bets[disc_id]
-        reformatted = [x + (None,) for x in bets] if only_active else bets
-        for bet_ids, amounts, events, targets, _, result_or_ticket, payout in reformatted:
+        for bet_ids, amounts, events, targets, _, result_or_ticket, payout in bets:
             event_descs = [(i, get_dynamic_bet_desc(e, names_dict.get(t)), a) for (e, t, a, i) in zip(events, targets, amounts, bet_ids)]
             presentable_data.append(
                 (disc_id, names_dict[disc_id], event_descs, result_or_ticket, payout, avatar_dict[disc_id])

@@ -10,7 +10,7 @@ from datetime import datetime
 from discbot.montly_intfar import MonthlyIntfar
 from api import riot_api, game_stats, bets
 from api.database import DBException
-from api.util import format_duration, round_digits, MONTH_NAMES
+import api.util as api_util
 
 DISCORD_SERVER_ID = 619073595561213953
 MY_SERVER_ID = 512363920044982272
@@ -25,14 +25,6 @@ def load_flavor_texts(filename):
 INTFAR_FLAVOR_TEXTS = load_flavor_texts("intfar")
 
 NO_INTFAR_FLAVOR_TEXTS = load_flavor_texts("no_intfar")
-
-INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
-
-DOINKS_REASONS = [
-    "KDA larger than 10", "More than 20 kills", "More damage than rest of the team combined",
-    "Getting a pentakill", "Vision score larger than 100",
-    "Kill participation larger than 80%", "Securing all epic monsters"
-]
 
 MOST_DEATHS_FLAVORS = load_flavor_texts("most_deaths")
 
@@ -675,7 +667,7 @@ class DiscordClient(discord.Client):
             mention_list = []
             kda = game_stats.calc_kda(stats)
             if kda > 10.0:
-                mention_list.append((0, round_digits(kda)))
+                mention_list.append((0, api_util.round_digits(kda)))
             if stats["kills"] > 20:
                 mention_list.append((1, stats["kills"]))
             damage_dealt = stats["totalDamageDealtToChampions"]
@@ -697,7 +689,7 @@ class DiscordClient(discord.Client):
 
         mentions_str = ""
         any_mentions = False
-        mentions_by_reason = {d_id: ["0" for _ in DOINKS_REASONS] for d_id in mentions}
+        mentions_by_reason = {d_id: ["0" for _ in api_util.DOINKS_REASONS] for d_id in mentions}
         for disc_id in mentions:
             user_str = ""
             if mentions[disc_id] != []:
@@ -745,7 +737,7 @@ class DiscordClient(discord.Client):
             if "10-20" in stats["creepsPerMinDeltas"]:
                 cs_per_min = (cs_per_min + stats["creepsPerMinDeltas"]["10-20"]) / 2
             if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
-                mentions[disc_id].append((2, round_digits(cs_per_min)))
+                mentions[disc_id].append((2, api_util.round_digits(cs_per_min)))
             epic_monsters_secured = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
             if stats["lane"] == "JUNGLE" and epic_monsters_secured == 0:
                 mentions[disc_id].append((3, epic_monsters_secured))
@@ -1105,7 +1097,7 @@ class DiscordClient(discord.Client):
             # Go through the criteria the chosen Int-Far met and list them in a readable format.
             for (count, (reason_index, stat_value)) in enumerate(intfar_data[final_intfar]):
                 key = reason_keys[reason_index]
-                reason_text = get_reason_flavor_text(round_digits(stat_value), key)
+                reason_text = get_reason_flavor_text(api_util.round_digits(stat_value), key)
                 reason_ids[reason_index] = "1"
                 if count > 0:
                     reason_text = " **AND** " + reason_text
@@ -1198,7 +1190,7 @@ class DiscordClient(discord.Client):
                 nibs_guild = guild
                 break
 
-        month_name = MONTH_NAMES[prev_month-1]
+        month_name = api_util.MONTH_NAMES[prev_month-1]
         color = discord.Color.from_rgb(*colors[prev_month-1])
         role_name = f"Int-Far of the Month - {month_name}"
 
@@ -1222,7 +1214,7 @@ class DiscordClient(discord.Client):
         format_time = monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S")
         self.config.log(f"Monthly Int-Far will be crowned at {format_time} UTC+1")
         dt_now = datetime.now(monitor.cph_timezone)
-        duration = format_duration(dt_now, monitor.time_at_announcement)
+        duration = api_util.format_duration(dt_now, monitor.time_at_announcement)
         self.config.log(f"Time until then: {duration}")
 
         time_to_sleep = 60
@@ -1231,7 +1223,7 @@ class DiscordClient(discord.Client):
 
         month = monitor.time_at_announcement.month
         prev_month = month - 1 if month != 1 else 12
-        month_name = MONTH_NAMES[prev_month-1]
+        month_name = api_util.MONTH_NAMES[prev_month-1]
 
         intfar_data = self.database.get_intfars_of_the_month()
         intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
@@ -1354,7 +1346,7 @@ class DiscordClient(discord.Client):
 
     def get_uptime(self, dt_init):
         dt_now = datetime.now()
-        return format_duration(dt_init, dt_now)
+        return api_util.format_duration(dt_init, dt_now)
 
     async def handle_uptime_msg(self, message):
         uptime_formatted = self.get_uptime(self.time_initialized)
@@ -1471,41 +1463,29 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_intfar_msg(self, message, target_name):
-        current_month = MONTH_NAMES[datetime.now().month-1]
-
-        def get_intfar_stats(disc_id, monthly=False):
-            games_played, intfar_reason_ids = self.database.get_intfar_stats(disc_id, monthly)
-            intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
-            for reason_id in intfar_reason_ids:
-                intfar_ids = [int(x) for x in reason_id[0]]
-                for index, intfar_id in enumerate(intfar_ids):
-                    if intfar_id == 1:
-                        intfar_counts[index] += 1
-
-            pct_intfar = (0 if games_played == 0
-                          else int(len(intfar_reason_ids) / games_played * 100))
-            return games_played, intfar_reason_ids, intfar_counts, pct_intfar
+        current_month = api_util.current_month()
 
         def format_for_all(disc_id, monthly=False):
             person_to_check = self.get_discord_nick(disc_id)
-            games_played, intfar_reason_ids, _, pct_intfar = get_intfar_stats(disc_id, monthly)
-            msg = f"{person_to_check}: Int-Far **{len(intfar_reason_ids)}** times "
+            games_played, intfar_reason_ids = self.database.get_intfar_stats(disc_id, monthly)
+            games_played, intfars, _, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
+            msg = f"{person_to_check}: Int-Far **{intfars}** times "
             msg += f"**({pct_intfar}%** of {games_played} games) "
             msg = self.insert_emotes(msg)
-            return msg, len(intfar_reason_ids), pct_intfar
+            return msg, intfars, pct_intfar
 
         def format_for_single(disc_id):
             person_to_check = self.get_discord_nick(disc_id)
-            games_played, intfar_reason_ids, intfar_counts, pct_intfar = get_intfar_stats(disc_id)
+            games_played, intfar_reason_ids = self.database.get_intfar_stats(disc_id, False)
+            games_played, intfars, intfar_counts, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
             intfars_of_the_month = self.database.get_intfars_of_the_month()
             user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
 
-            msg = f"{person_to_check} has been Int-Far **{len(intfar_reason_ids)}** times "
+            msg = f"{person_to_check} has been Int-Far **{intfars}** times "
             msg += "{emote_unlimited_chins}"
-            if len(intfar_reason_ids) > 0:
-                monthly_games, monthly_intfars = self.database.get_intfar_stats(disc_id, True)
-                pct_monthly = (0 if monthly_games == 0
-                               else int(len(monthly_intfars) / monthly_games * 100))
+            if intfars > 0:
+                monthly_games, monthly_infar_ids = self.database.get_intfar_stats(disc_id, True)
+                monthly_games, monthly_intfars, _, pct_monthly = api_util.organize_intfar_stats(monthly_games, monthly_infar_ids)
 
                 ratio_desc = "\n" + f"In total, he was Int-Far in **{pct_intfar}%** of his "
                 ratio_desc += f"{games_played} games played.\n"
@@ -1513,7 +1493,7 @@ class DiscordClient(discord.Client):
                 ratio_desc += f"of his {monthly_games} games played (**{pct_monthly}%**)\n"
 
                 reason_desc = "Int-Fars awarded so far:\n"
-                for reason_id, reason in enumerate(INTFAR_REASONS):
+                for reason_id, reason in enumerate(api_util.INTFAR_REASONS):
                     reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
 
                 longest_streak = self.database.get_longest_intfar_streak(disc_id)
@@ -1533,9 +1513,8 @@ class DiscordClient(discord.Client):
 
                 msg += ratio_desc + reason_desc + streak_desc + no_streak_desc + relations_desc
                 if user_is_ifotm:
-                    month_name = MONTH_NAMES[datetime.now().month-1]
                     msg += f"\n**{person_to_check} currently stands to be Int-Far of the Month "
-                    msg += f"of {month_name}!**"
+                    msg += f"of {current_month}!**"
             msg = self.insert_emotes(msg)
             return msg
 
@@ -1577,23 +1556,18 @@ class DiscordClient(discord.Client):
     async def handle_doinks_msg(self, message, target_name):
         def get_doinks_stats(disc_id, expanded=True):
             person_to_check = self.get_discord_nick(disc_id)
-            doink_reason_ids = self.database.get_doinks_stats(disc_id)
-            intfar_counts = {x: 0 for x in range(len(DOINKS_REASONS))}
-            for reason_id in doink_reason_ids:
-                intfar_ids = [int(x) for x in reason_id[0]]
-                for index, intfar_id in enumerate(intfar_ids):
-                    if intfar_id == 1:
-                        intfar_counts[index] += 1
-            msg = f"{person_to_check} has earned {len(doink_reason_ids)} "
+            doinks_reason_ids = self.database.get_doinks_stats(disc_id)
+            doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
+            msg = f"{person_to_check} has earned {len(doinks_reason_ids)} "
             msg += self.insert_emotes("{emote_Doinks}")
-            if expanded and len(doink_reason_ids) > 0:
+            if expanded and len(doinks_reason_ids) > 0:
                 reason_desc = "\n" + "Big doinks awarded so far:"
-                for reason_id, reason in enumerate(DOINKS_REASONS):
-                    reason_desc += f"\n - {reason}: **{intfar_counts[reason_id]}**"
+                for reason_id, reason in enumerate(api_util.DOINKS_REASONS):
+                    reason_desc += f"\n - {reason}: **{doinks_counts[reason_id]}**"
 
                 msg += reason_desc
 
-            return msg, len(doink_reason_ids)
+            return msg, len(doinks_reason_ids)
 
         response = ""
         if target_name is not None: # Check intfar stats for someone else.
@@ -1665,7 +1639,7 @@ class DiscordClient(discord.Client):
                  game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
 
             if min_or_max_value is not None:
-                min_or_max_value = round_digits(min_or_max_value)
+                min_or_max_value = api_util.round_digits(min_or_max_value)
                 game_info = self.riot_api.get_game_details(game_id)
                 summ_ids = self.database.summoner_from_discord_id(target_id)[2]
                 game_summary = game_stats.get_finished_game_summary(game_info, summ_ids, self.riot_api)
@@ -1996,6 +1970,7 @@ class DiscordClient(discord.Client):
         response_dm += url + "\n"
         response_dm += "This will enable you to interact with the Int-Far bot from "
         response_dm += "the website, fx. to see stats or place bets.\n"
+        response_dm += "To log in to a new device (phone fx.), simply use the above link again.\n"
         response_dm += "Don't show this link to anyone, or they will be able to log in as you!"
 
         mention = self.get_mention_str(message.author.id)
@@ -2012,8 +1987,8 @@ class DiscordClient(discord.Client):
         response = (
             "Check out the amazing Int-Far website:\n" +
             "https://mhooge.com/intfar\n" +
-            "Write `!website_verify` to see how to sign in to the website, " +
-            "where you can create bets and see stats."
+            "Write `!website_verify` to sign in to the website, " +
+            "allowing you to create bets and see stats."
         )
 
         await message.channel.send(response)
@@ -2070,7 +2045,7 @@ class DiscordClient(discord.Client):
 
     async def handle_doinks_criteria_msg(self, message):
         response = "Criteria for being awarded {emote_Doinks}:"
-        for reason in DOINKS_REASONS:
+        for reason in api_util.DOINKS_REASONS:
             response += f"\n - {reason}"
         await message.channel.send(self.insert_emotes(response))
 

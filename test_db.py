@@ -19,10 +19,21 @@ if len(argv) > 2:
 
 try:
     while True:
-        query = input(">")
-        result = conn.cursor().execute(query)
-        for row in result:
-            print(row)
-        conn.commit()
+        try:
+            query = input(">")
+            if query in ("q", "quit", "exit"):
+                break
+            result = conn.cursor().execute(query).fetchall()
+            for row in result:
+                print(row)
+            if result != []:
+                print(f"Rows returned: {len(result)}")
+            else:
+                rows_affected = conn.cursor().execute("SELECT changes()").fetchone()[0]
+                print(f"Rows affected: {rows_affected}")
+
+            conn.commit()
+        except KeyboardInterrupt:
+            pass
 finally:
     conn.close()
