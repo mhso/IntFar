@@ -6,7 +6,7 @@
 <body>
     {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, game_duration, game_mode) }}
     <div id="profile-wrapper" class="container-flex">
-        <img class="discord-avatar" src="{{ avatar }}"><br>
+        <img id="profile-avatar" class="discord-avatar" src="{{ avatar }}"><br>
         <h1>{{ nickname }}</h1>
         {% if is_ifotm %}<h2 class="fancy-title">Int-Far of the Month Lead</h2>{% endif %}
         {% if is_goodest_boi %}<h2 class="fancy-title">Goodest Boi</h2>{% endif %}
@@ -116,7 +116,7 @@
 
                 <!-- Doinks Relations -->
                 <div class="row">
-                    <h3>Intfar Relations</h3>
+                    <h3>Doinks Relations</h3>
                     <div class="col-lg-12">
                         <table class="nice-table">
                             <tr class="list-first intfar-list-entry">
@@ -135,7 +135,7 @@
             </div>
             <div id="profile-bets" class="col-md-6 col-xxl-3">
                 <h2>Bets</h2>
-                <p>Good boi points: <strong>{{ tokens_data }}</strong></p>
+                <p>Good boi points: <strong>{{ betting_tokens }}</strong></p>
                 <div class="row">
                     <div class="col-lg-12">
                         <h3>Active Bets</h3>

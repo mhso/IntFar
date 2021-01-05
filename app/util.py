@@ -31,7 +31,14 @@ def discord_request(pipe, command_types, commands, params):
         if not isinstance(params, list):
             params = [params for _ in range(max_len_args)]
 
-    pipe.send((command_types, commands, params))
+    tuple_params = []
+    for param in params:
+        if not isinstance(param, tuple):
+            tuple_params.append((param,))
+        else:
+            tuple_params.append(param)
+
+    pipe.send((command_types, commands, tuple_params))
     result = pipe.recv()
     return result if any_list else result[0]
 

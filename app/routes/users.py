@@ -156,7 +156,7 @@ def user(disc_id):
     bot_conn = flask.current_app.config["BOT_CONN"]
 
     discord_data = discord_request(
-        bot_conn, "func", ["get_discord_nick", "get_discord_avatar"], disc_id
+        bot_conn, ["func", "func"], ["get_discord_nick", "get_discord_avatar"], [disc_id, (disc_id, 128)]
     )
     nickname = discord_data[0]
     avatar = discord_data[1]

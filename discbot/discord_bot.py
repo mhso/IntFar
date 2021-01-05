@@ -450,7 +450,7 @@ class DiscordClient(discord.Client):
             nicknames.append(name)
         return nicknames
 
-    async def get_discord_avatar(self, discord_id=None):
+    async def get_discord_avatar(self, discord_id=None, size=64):
         users_to_search = ([x[0] for x in self.database.summoners]
                            if discord_id is None
                            else [discord_id])
@@ -460,14 +460,16 @@ class DiscordClient(discord.Client):
             if member is None:
                 return None
 
-            caching_time = self.cached_avatars.get(member.id, 0)
+            key = f"{member.id}_{size}"
+
+            caching_time = self.cached_avatars.get(key, 0)
             time_now = time()
             # We cache avatars for an hour.
-            path = f"app/static/img/avatars/{member.id}.png"
+            path = f"app/static/img/avatars/{member.id}_{size}.png"
             if time_now - caching_time > 3600:
                 try:
-                    await member.avatar_url_as(format="png", size=64).save(path)
-                    self.cached_avatars[member.id] = time_now
+                    await member.avatar_url_as(format="png", size=size).save(path)
+                    self.cached_avatars[key] = time_now
                 except (DiscordException, HTTPException, NotFound) as exc:
                     print(exc)
                     return None
@@ -2377,7 +2379,7 @@ class DiscordClient(discord.Client):
             if self.flask_conn.poll():
                 command_types, commands, paramses = self.flask_conn.recv()
                 results = []
-                for (command_type, command, *params) in zip(command_types, commands, paramses):
+                for (command_type, command, params) in zip(command_types, commands, paramses):
                     result = None
                     if command_type == "func":
                         if params[0] is None and len(params) == 1:
