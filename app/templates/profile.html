@@ -8,16 +8,21 @@
     <div id="profile-wrapper" class="container-flex">
         <img class="discord-avatar" src="{{ avatar }}"><br>
         <h1>{{ nickname }}</h1>
-        {% if is_ifotm %}<h2 id="ifotm-indicator">Top Int-Far of the Month Candidate</h2>{% endif %}
-        <div class="row">
-            <div class="col-lg-3">
+        {% if is_ifotm %}<h2 class="fancy-title">Int-Far of the Month Lead</h2>{% endif %}
+        {% if is_goodest_boi %}<h2 class="fancy-title">Goodest Boi</h2>{% endif %}
+        {% if most_doinks %}<h2 class="fancy-title">King Dave</h2>{% endif %}
+        {% if most_intfars %}<h2 class="fancy-title">Grey Screen Enthusiast</h2>{% endif %}
+        {% if most_reports %}<h2 class="fancy-title">Toxic Timmy</h2>{% endif %}
+        <div class="row" style="margin-top: 1rem">
+            <div class="col-md-6 col-xxl-3">
                 <h2>Stats</h2>
             </div>
-            <div id="profile-intfars" class="col-lg-3">
+            <div id="profile-intfars" class="col-md-6 col-xxl-3">
                 <h2>Intfars</h2>
                 <div class="row">
-                    <div class="col-lg-1"></div>
-                    <div class="col-lg-10">
+                    <!-- Int-Far Stats -->
+                    <div class="col-1 d-sm-none col-xxl-1 d-xxl-block"></div>
+                    <div class="col-10 col-sm-6 col-md-12 col-lg-7 col-xl-6 col-xxl-10">
                         <table class="nice-table">
                             <tr>
                                 <th></th>
@@ -33,27 +38,44 @@
                             {% endfor %}
                         </table>
                     </div>
-                    <div class="col-lg-1"></div>
-                </div>
-                <div class="row">
-                    <div class="col-lg-3"></div>
-                    <div class="col-lg-6">
-                        <h3>Criteria Met</h3>
-                        {% for reason, count in intfar_criteria_data %}
-                        <span class="left">{{ reason }}:</span> <span class="right">{{ count }}</span><br>
-                        {% endfor %}
+                    <div class="col-1 d-sm-none col-xl-1 d-xl-block"></div>
+
+                    <!-- Int-Far Criteria -->
+                    <div class="col-2 d-sm-none col-md-block col-md-2 col-xxl-2 d-lg-none d-xxl-block"></div>
+                    <div class="col-8 col-sm-6 col-md-7 col-lg-5 col-xxl-8">
+                        <h3 class="d-sm-none d-md-block d-lg-none d-xxl-block">Criteria Met</h3>
+                        <table class="nice-table profile-simple-stats">
+                            {% for reason, count in intfar_criteria_data %}
+                            <tr>
+                                <td>{{ reason }}:</td>
+                                <td>{{ count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
                     </div>
-                    <div class="col-lg-3"></div>
+                    <div class="col-2 d-sm-none col-md-block col-md-3 col-xl-2 d-xl-none d-xxl-block"></div>
                 </div>
+
+                <!-- Int-Far Streaks -->
                 <div class="row">
-                <h3>Streaks</h3>
-                <div class="col-lg-2"></div>
-                <div class="col-lg-8">
-                    <span class="left">Longest Int-Far streak:</span> <span class="right">{{ streak }}</span>
-                    <span class="left">Longest no-Int-Far streak:</span> <span class="right">{{ non_streak }}</span>
+                    <h3>Streaks</h3>
+                    <div class="col-1 col-sm-3 col-md-1 col-lg-2 col-xl-3 col-xxl-2"></div>
+                    <div class="col-10 col-sm-6 col-md-9 col-lg-8 col-xl-6 col-xxl-8">
+                        <table class="nice-table profile-simple-stats">
+                            <tr>
+                                <td>Longest Int-Far streak:</td>
+                                <td>{{ streak }}</td>
+                            </tr>
+                            <tr>
+                                <td>Longest no-Int-Far streak:</td>
+                                <td>{{ non_streak }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-1 col-sm-3 col-md-2 col-lg-2 col-xl-3 col-xxl-2"></div>
                 </div>
-                <div class="col-lg-2"></div>
-                </div>
+
+                <!-- Int-Far Relations -->
                 <div class="row">
                     <h3>Intfar Relations</h3>
                     <div class="col-lg-12">
@@ -61,8 +83,8 @@
                             <tr class="list-first intfar-list-entry">
                                 <th></th>
                                 <th>Games with</th>
-                                <th>Int</th>
-                                <th>Gms</th>
+                                <th>IF</th>
+                                <th>G</th>
                                 <th>%</th>
                             </tr>
                             {% for name, disc_id, games, intfars, pct, avatar in intfar_relations %}
@@ -72,22 +94,48 @@
                     </div>
                 </div>
             </div>
-            <div id="profile-doinks" class="col-lg-3">
+            <div id="profile-doinks" class="col-md-6 col-xxl-3">
                 <h2>Doinks</h2>
+                <!-- Big Doinks -->
                 <div class="row">
-                    <div class="col-lg-2"></div>
-                    <div class="col-lg-8">
+                    <div class="col-1 col-sm-3 col-md-1 col-lg-2 col-xl-3 col-xxl-1"></div>
+                    <div class="col-10 col-sm-6 col-md-10 col-lg-8 col-xl-6 col-xxl-10">
                         Big Doinks awarded: <strong>{{ doinks }}</strong>
                         <h3>Criteria Met</h3>
-                        {% for reason, count in doinks_criteria_data %}
-                        <span class="left">{{ reason }}:</span> <span class="right">{{ count }}</span><br>
-                        {% endfor %}
+                        <table class="nice-table profile-simple-stats">
+                            {% for reason, count in doinks_criteria_data %}
+                            <tr>
+                                <td>{{ reason }}:</td>
+                                <td>{{ count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
                     </div>
-                    <div class="col-lg-2"></div>
+                    <div class="col-1 col-sm-3 col-md-1 col-lg-2 col-xl-3 col-xxl-1"></div>
+                </div>
+
+                <!-- Doinks Relations -->
+                <div class="row">
+                    <h3>Intfar Relations</h3>
+                    <div class="col-lg-12">
+                        <table class="nice-table">
+                            <tr class="list-first intfar-list-entry">
+                                <th></th>
+                                <th>Games with</th>
+                                <th>D</th>
+                                <th>G</th>
+                                <th>%</th>
+                            </tr>
+                            {% for name, disc_id, games, doinks, pct, avatar in doinks_relations %}
+                                {{ intfar_entry.entry(disc_id, name, games, doinks, pct, avatar) }}
+                            {% endfor %}
+                        </table>
+                    </div>
                 </div>
             </div>
-            <div id="profile-bets" class="col-lg-3">
+            <div id="profile-bets" class="col-md-6 col-xxl-3">
                 <h2>Bets</h2>
+                <p>Good boi points: <strong>{{ tokens_data }}</strong></p>
                 <div class="row">
                     <div class="col-lg-12">
                         <h3>Active Bets</h3>

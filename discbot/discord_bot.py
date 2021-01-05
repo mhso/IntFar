@@ -95,6 +95,7 @@ VALID_COMMANDS = {
         ("Show big doinks plays you (or someone else) did! " +
          "'!doinks all' lists all doinks stats for all users.")
     ),
+    "doinks_relations": ("(person)", "Show who you (or someone else) get Big Doinks the most with."),
     "doinks_criteria": (None, "Show the different criterias needed for acquiring a doink."),
     "best": (
         "[stat] (person)",
@@ -560,7 +561,9 @@ class DiscordClient(discord.Client):
         game_desc = "Game won!" if game_won else "Game lost."
         response = f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
         response_bets = "\n**--- Results of bets made that game ---**\n"
-        max_tokens_before, max_tokens_holder = self.database.get_max_tokens_details()
+        max_tokens, max_tokens_holder = self.database.get_max_tokens_details()
+        new_max_tokens_holder = None
+        max_tokens_name = None
 
         any_bets = False # Bool to indicate whether any bets were made.
         for disc_id, _, _ in self.database.summoners:
@@ -578,7 +581,7 @@ class DiscordClient(discord.Client):
                 self.betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
             # Get list of active bets for the current user.
-            bets_made = self.betting_handler.get_active_bets(disc_id)
+            bets_made = self.database.get_bets(True, disc_id)
             balance_before = self.database.get_token_balance(disc_id)
             tokens_earned = gain_for_user # Variable for tracking tokens gained for the user.
             tokens_lost = -1 # Variable for tracking tokens lost for the user.
@@ -638,11 +641,16 @@ class DiscordClient(discord.Client):
 
                 tokens_now = balance_before + tokens_earned # Record how many tokens the user has now.
 
-                if tokens_now > max_tokens_before and disc_id != max_tokens_holder:
-                    # This person now has the most tokens of all users!
-                    response_bets += f"{disc_name} now has the most {tokens_name} of everyone! "
-                    response_bets += "***HAIL TO THE KING!!!***\n"
-                    await self.assign_top_tokens_role(max_tokens_holder, disc_id)
+                if tokens_now > max_tokens and disc_id != max_tokens_holder:
+                    # Someone now has the most betting tokens!
+                    max_tokens = tokens_now
+                    new_max_tokens_holder = disc_id
+                    max_tokens_name = disc_id
+
+        # This person now has the most tokens of all users!
+        response_bets += f"{max_tokens_name} now has the most {tokens_name} of everyone! "
+        response_bets += "***HAIL TO THE KING!!!***\n"
+        await self.assign_top_tokens_role(max_tokens_holder, new_max_tokens_holder)
 
         if any_bets:
             response += response_bets
@@ -1366,7 +1374,7 @@ class DiscordClient(discord.Client):
         pct_doinks = int((doinks / games) * 100)
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         doinks_emote = self.insert_emotes("{emote_Doinks}")
-        all_bets = self.database.get_all_bets()
+        all_bets = self.database.get_bets(False)
 
         tokens_name = self.config.betting_tokens
         bets_won = 0
@@ -1429,38 +1437,6 @@ class DiscordClient(discord.Client):
         if user_data is None: # Summoner name gave no result, try Discord name.
             return self.get_discord_id(name)
         return user_data[0]
-
-    def get_intfar_relation_stats(self, target_id):
-        data = []
-        games_relations, intfars_relations = self.database.get_intfar_relations(target_id)
-        for disc_id, total_games in games_relations.items():
-            intfars = intfars_relations.get(disc_id, 0)
-            data.append((disc_id, total_games, intfars, int((intfars / total_games) * 100)))
-
-        return sorted(data, key=lambda x: x[2], reverse=True)
-
-    async def handle_intfar_relations_msg(self, message, target_name):
-        target_id = None
-        if target_name is not None: # Check intfar stats for someone else.
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
-        else: # Check intfar stats for the person sending the message.
-            target_id = message.author.id
-
-        data = self.get_intfar_relation_stats(target_id)
-
-        response = f"Breakdown of players {self.get_discord_nick(target_id)} has inted with:\n"
-        for disc_id, total_games, intfars, ratio in data:
-            nick = self.get_discord_nick(disc_id)
-            response += f"- {nick}: **{intfars}** times "
-            response += f"(**{ratio}%** of **{total_games}** games)\n"
-
-        await message.channel.send(response)
 
     async def handle_intfar_msg(self, message, target_name):
         current_month = api_util.current_month()
@@ -1553,6 +1529,44 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    def get_intfar_relation_stats(self, target_id):
+        data = []
+        total_intfars = len(self.database.get_intfar_stats(target_id)[1])
+        games_relations, intfars_relations = self.database.get_intfar_relations(target_id)
+        for disc_id, total_games in games_relations.items():
+            intfars = intfars_relations.get(disc_id, 0)
+            data.append(
+                (
+                    disc_id, total_games, intfars, int((intfars / total_intfars) * 100),
+                    int((intfars / total_games) * 100)
+                )
+            )
+
+        return sorted(data, key=lambda x: x[2], reverse=True)
+
+    async def handle_intfar_relations_msg(self, message, target_name):
+        target_id = None
+        if target_name is not None: # Check intfar stats for someone else.
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+        else: # Check intfar stats for the person sending the message.
+            target_id = message.author.id
+
+        data = self.get_intfar_relation_stats(target_id)
+
+        response = f"Breakdown of players {self.get_discord_nick(target_id)} has inted with:\n"
+        for disc_id, total_games, intfars, intfar_ratio, games_ratio in data:
+            nick = self.get_discord_nick(disc_id)
+            response += f"- {nick}: **{intfars}** times (**{intfar_ratio}%**) "
+            response += f"(**{games_ratio}%** of **{total_games}** games)\n"
+
+        await message.channel.send(response)
+
     async def handle_doinks_msg(self, message, target_name):
         def get_doinks_stats(disc_id, expanded=True):
             person_to_check = self.get_discord_nick(disc_id)
@@ -1590,6 +1604,44 @@ class DiscordClient(discord.Client):
                 response = get_doinks_stats(target_id)[0]
         else: # Check intfar stats for the person sending the message.
             response = get_doinks_stats(message.author.id)[0]
+
+        await message.channel.send(response)
+
+    def get_doinks_relation_stats(self, target_id):
+        data = []
+        games_relations, doinks_relations = self.database.get_doinks_relations(target_id)
+        total_doinks = len(self.database.get_doinks_stats(target_id))
+        for disc_id, total_games in games_relations.items():
+            doinks = doinks_relations.get(disc_id, 0)
+            data.append(
+                (
+                    disc_id, total_games, doinks, int((doinks / total_doinks) * 100),
+                    int((doinks / total_games) * 100)
+                )
+            )
+
+        return sorted(data, key=lambda x: x[2], reverse=True)
+
+    async def handle_doinks_relations_msg(self, message, target_name):
+        target_id = None
+        if target_name is not None: # Check doinks relations for someone else.
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+        else: # Check doinks relations for the person sending the message.
+            target_id = message.author.id
+
+        data = self.get_doinks_relation_stats(target_id)
+
+        response = f"Breakdown of who {self.get_discord_nick(target_id)} has gotten Big Doinks with:\n"
+        for disc_id, total_games, doinks, doinks_ratio, games_ratio in data:
+            nick = self.get_discord_nick(disc_id)
+            response += f"- {nick}: **{doinks}** times (**{doinks_ratio}%**) "
+            response += f"(**{games_ratio}%** of **{total_games}** games)\n"
 
         await message.channel.send(response)
 
@@ -1805,7 +1857,7 @@ class DiscordClient(discord.Client):
 
     async def handle_active_bets_msg(self, message, target_name):
         def get_bet_description(disc_id, single_person=True):
-            active_bets = self.betting_handler.get_active_bets(disc_id)
+            active_bets = self.database.get_bets(True, disc_id)
             recepient = self.get_discord_nick(disc_id)
 
             response = ""
@@ -1883,7 +1935,7 @@ class DiscordClient(discord.Client):
         else:
             target_name = message.author.name
 
-        all_bets = self.database.get_all_bets(target_id)
+        all_bets = self.database.get_bets(False, target_id)
         tokens_name = self.config.betting_tokens
         bets_won = 0
         had_target = 0
@@ -2237,6 +2289,9 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "doinks"):
                 target_name = self.get_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
+            elif cmd_equals(first_command, "doinks_relations"):
+                target_name = self.get_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_doinks_relations_msg, message, target_name)
             elif cmd_equals(first_command, "doinks_criteria"):
                 await self.handle_doinks_criteria_msg(message)
             elif cmd_equals(first_command, "help"):

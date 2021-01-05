@@ -128,6 +128,11 @@ class Database:
                 return (disc_id, summ_names, summ_ids)
         return None
 
+    def get_max_reports_details(self):
+        with self.get_connection() as db:
+            query = "SELECT MAX(reports), disc_id FROM registered_summoners"
+            return self.execute_query(db, query).fetchone()
+
     def get_most_extreme_stat(self, stat, best, maximize=True):
         aggregator = "MAX" if maximize else "MIN"
         table = "best_stats" if best else "worst_stats"
@@ -146,6 +151,15 @@ class Database:
         query_doinks = "SELECT Count(*) FROM participants WHERE doinks IS NOT NULL"
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_doinks).fetchone()
+
+    def get_max_doinks_details(self):
+        with self.get_connection() as db:
+            query = """
+            SELECT MAX(counts.c), counts.disc_id FROM 
+            (SELECT disc_id, Count(*) as c FROM participants 
+            WHERE doinks IS NOT NULL GROUP BY disc_id) AS counts;
+            """
+            return self.execute_query(db, query).fetchone()
 
     def get_doinks_reason_counts(self, context=None):
         query_doinks_multis = "SELECT doinks FROM participants WHERE doinks IS NOT NULL"
@@ -314,6 +328,25 @@ class Database:
                     return count, prev_intfar
             return len(int_fars), prev_intfar # All the int-fars is the current int-far!
 
+    def get_max_intfar_details(self):
+        with self.get_connection() as db:
+            query = """
+            SELECT MAX(pcts.pct), pcts.intboi FROM 
+            (
+                SELECT (intfar_counts.c / games_counts.c) * 100 AS pct, intfar_counts.int_far AS intboi FROM
+                (
+                    SELECT int_far, CAST(Count(*) as real) as c FROM best_stats
+                    WHERE int_far IS NOT NULL GROUP BY int_far
+                ) AS intfar_counts,
+                (
+                    SELECT disc_id, CAST(Count(*) as real) as c FROM participants
+                    GROUP BY disc_id
+                ) AS games_counts
+                WHERE int_far=disc_id AND games_counts.c > 10
+            ) AS pcts;
+            """
+            return self.execute_query(db, query).fetchone()
+
     def get_intfar_stats(self, disc_id, monthly=False):
         query_total = "SELECT Count(*) FROM participants WHERE disc_id=?"
         query_intfar = (
@@ -338,7 +371,7 @@ class Database:
         """
         query_intfars = """
         SELECT disc_id, Count(*) as c FROM best_stats bs, participants p
-        WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=?
+        WHERE int_far IS NOT NULL AND bs.game_id=p.game_id AND int_far=?
         GROUP BY disc_id ORDER BY c DESC
         """
         with self.get_connection() as db:
@@ -356,6 +389,28 @@ class Database:
         query = "SELECT doinks FROM participants WHERE doinks IS NOT NULL AND disc_id=?"
         with self.get_connection() as db:
             return self.execute_query(db, query, (disc_id,)).fetchall()
+
+    def get_doinks_relations(self, disc_id):
+        query_games = """
+        SELECT p2.disc_id, Count(*) as c FROM participants p1, participants p2
+        WHERE p1.disc_id != p2.disc_id AND p1.game_id = p2.game_id AND p1.disc_id=?
+        GROUP BY p1.disc_id, p2.disc_id ORDER BY c DESC;
+        """
+        query_doinks = """
+        SELECT p2.disc_id, Count(*) as c FROM participants p1, participants p2
+        WHERE p1.disc_id != p2.disc_id AND p1.game_id = p2.game_id AND p1.doinks IS NOT NULL AND p1.disc_id=?
+        GROUP BY p1.disc_id, p2.disc_id ORDER BY c DESC
+        """
+        with self.get_connection() as db:
+            games_with_person = {}
+            doinks_with_person = {}
+            for part_id, doinks in self.execute_query(db, query_doinks, (disc_id,)):
+                if disc_id == part_id:
+                    continue
+                doinks_with_person[part_id] = doinks
+            for part_id, games in db.cursor().execute(query_games, (disc_id,)):
+                games_with_person[part_id] = games
+            return games_with_person, doinks_with_person
 
     def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game):
         kills_by_our_team = data[0][1]["kills_by_team"]
@@ -453,15 +508,23 @@ class Database:
                 return 0
             return curr_id[0] + 1
 
-    def get_all_bets(self, disc_id=None):
+    def get_bets(self, only_active, disc_id=None):
         with self.get_connection() as db:
-            query = "SELECT better_id, id, amount, event_id, game_duration, target, ticket, result, payout FROM bets "
-            query += "WHERE result != 0"
+            query = "SELECT better_id, id, amount, event_id, game_duration, target, ticket"
+            if not only_active:
+                query += ", result, payout"
+            query += " FROM bets WHERE "
+            if not only_active:
+                query += "result != 0"
+            else:
+                query += "result = 0"
+
             params = None
             if disc_id is not None:
                 query += " AND better_id=?"
                 params = (disc_id,)
             query += " ORDER BY id"
+
             data = self.execute_query(db, query, params).fetchall()
             data_for_person = {}
             bet_ids = []
@@ -469,58 +532,28 @@ class Database:
             events = []
             targets = []
 
-            for index, (discord_id, bet_id, amount, event_id, game_duration, target, ticket, result, payout) in enumerate(data):
+            for index, row in enumerate(data):
+                discord_id = row[0]
                 if discord_id not in data_for_person:
                     data_for_person[discord_id] = []
 
-                next_ticket = None if index == len(data) - 1 else data[index+1][-3]
+                next_ticket = None if index == len(data) - 1 else data[index+1][6]
                 next_better = None if index == len(data) - 1 else data[index+1][0]
-                bet_ids.append(bet_id)
-                amounts.append(amount)
-                events.append(event_id)
-                targets.append(target)
+                bet_ids.append(row[1])
+                amounts.append(row[2])
+                events.append(row[3])
+                targets.append(row[5])
+
+                ticket = row[6]
 
                 if ticket is None or ticket != next_ticket or discord_id != next_better:
-                    data_for_person[discord_id].append(
-                        (bet_ids, amounts, events, targets, game_duration, result, payout)
-                    )
-                    bet_ids = []
-                    amounts = []
-                    events = []
-                    targets = []
+                    data_tuple = (bet_ids, amounts, events, targets, row[4])
+                    if only_active: # Include ticket in tuple, if only active bets.
+                        data_tuple = data_tuple + (row[-1],)
+                    else: # Include both result and payout if resolved bets.
+                        data_tuple = data_tuple + (row[-2], row[-1])
 
-            return data_for_person if disc_id is None else data_for_person[disc_id]
-
-    def get_active_bets(self, disc_id=None):
-        with self.get_connection() as db:
-            query = "SELECT better_id, id, amount, event_id, game_duration, target, ticket FROM bets "
-            query += "WHERE result=0 "
-            params = None
-            if disc_id is not None:
-                query += "AND better_id=? "
-                params = (disc_id,)
-            query += "ORDER BY id"
-            data = self.execute_query(db, query, params).fetchall()
-            data_for_person = {}
-            bet_ids = []
-            amounts = []
-            events = []
-            targets = []
-
-            for index, (discord_id, bet_id, amount, event_id, game_duration, target, ticket) in enumerate(data):
-                if discord_id not in data_for_person:
-                    data_for_person[discord_id] = []
-
-                next_ticket = None if index == len(data) - 1 else data[index+1][-1]
-                next_better = None if index == len(data) - 1 else data[index+1][0]
-                bet_ids.append(bet_id)
-                amounts.append(amount)
-                events.append(event_id)
-                targets.append(target)
-                if ticket is None or ticket != next_ticket or discord_id != next_better:
-                    data_for_person[discord_id].append(
-                        (bet_ids, amounts, events, targets, game_duration, ticket, None)
-                    )
+                    data_for_person[discord_id].append(data_tuple)
                     bet_ids = []
                     amounts = []
                     events = []

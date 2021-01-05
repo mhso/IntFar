@@ -1,5 +1,5 @@
 from sys import argv
-from discbot.test.assertion import Assertion
+from test.assertion import Assertion
 from api import bets
 from api.database import Database
 from api.config import Config
@@ -32,7 +32,7 @@ def test_game_won_success(bet_handler, db_client, test_runner):
     test_runner.assert_true(success, "Bet placed.")
     test_runner.assert_equals(balance, 100 - int(bet_amount[0]), "Token balance after bet placed.")
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     test_runner.assert_equals(len(active_bets), 1, "# Active bets after bet placed.")
 
@@ -55,7 +55,7 @@ def test_game_won_success(bet_handler, db_client, test_runner):
 
     test_runner.assert_equals(new_balance, 100 - int(bet_amount[0]) + bet_value, "Token balance after win.")
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     test_runner.assert_equals(len(active_bets), 0, "# Active bets after bet resolved.")
 
@@ -97,7 +97,7 @@ def test_game_won_fail(bet_handler, db_client, test_runner):
 
     test_runner.assert_false(success, "Bet not placed - Amount too low.")
 
-    timestamp_late = 60 * (bets.BettingHandler.MAX_BETTING_THRESHOLD)
+    timestamp_late = 60 * (bets.MAX_BETTING_THRESHOLD)
     success, response = bet_handler.place_bet(disc_id, bet_amount, timestamp_late,
                                               bet_str, bet_target, target_name)
     if LOUD:
@@ -122,7 +122,7 @@ def test_game_won_fail(bet_handler, db_client, test_runner):
     test_runner.assert_true(success, "Bet placed.")
     test_runner.assert_equals(balance, 100 - int(bet_amount[0]), "Token balance after bet placed.")
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     test_runner.assert_equals(len(active_bets), 1, "# Active bets after bet placed.")
 
@@ -138,7 +138,7 @@ def test_game_won_fail(bet_handler, db_client, test_runner):
 
     test_runner.assert_equals(new_balance, 100 - int(bet_amount[0]), "Token balance after loss.")
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     test_runner.assert_equals(len(active_bets), 0, "# Active bets after bet resolved.")
 
@@ -162,7 +162,7 @@ def test_no_intfar(bet_handler, db_client, test_runner):
 
     test_runner.assert_true(success, "Bet placed.")
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     test_runner.assert_equals(len(active_bets), 1, "# Active bets after bet placed.")
 
@@ -178,7 +178,7 @@ def test_no_intfar(bet_handler, db_client, test_runner):
     bet_handler.place_bet(disc_id, bet_amount, game_timestamp,
                           bet_str, bet_target, target_name)
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     bet_id, amount, event_id, target, bet_timestamp, _ = active_bets[0]
 
@@ -260,7 +260,7 @@ def test_multi_bet_success(bet_handler, db_client, test_runner):
 
     test_runner.assert_true(success, "Bet placed.")
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     test_runner.assert_equals(len(active_bets), 1, "# Active bets after bet placed.")
 
@@ -276,7 +276,7 @@ def test_multi_bet_success(bet_handler, db_client, test_runner):
     bet_handler.place_bet(disc_id, bet_amount, game_timestamp,
                           bet_str, bet_target, target_name)
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     bet_ids, amounts, event_ids, targets, bet_timestamp, _ = active_bets[0]
 
@@ -290,7 +290,7 @@ def test_multi_bet_success(bet_handler, db_client, test_runner):
     bet_handler.place_bet(disc_id, bet_amount, game_timestamp,
                           bet_str, bet_target, target_name)
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     bet_ids, amounts, event_ids, targets, bet_timestamp, _ = active_bets[0]
 
@@ -316,7 +316,7 @@ def test_multi_bet_success(bet_handler, db_client, test_runner):
     if LOUD:
         print(response)
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     bet_ids, amounts, event_ids, targets, bet_timestamp, _ = active_bets[0]
 
@@ -336,7 +336,7 @@ def test_multi_bet_success(bet_handler, db_client, test_runner):
     success, response = bet_handler.place_bet(disc_id, bet_amount, game_timestamp,
                                               bet_str, bet_target, target_name)
 
-    active_bets = bet_handler.get_active_bets(disc_id)
+    active_bets = db_client(True, disc_id)
 
     bet_ids, amounts, event_ids, targets, bet_timestamp, ticket = active_bets[0]
 

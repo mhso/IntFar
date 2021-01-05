@@ -10,7 +10,7 @@ user_page = flask.Blueprint("users", __name__, template_folder="templates")
 def user_unknown():
     return flask.render_template("no_user.html")
 
-def get_relations_data(disc_id, bot_conn, database):
+def get_intfar_relations_data(disc_id, bot_conn, database):
     relations_data = []
     games_relations, intfars_relations = database.get_intfar_relations(disc_id)
     for discord_id, total_games in games_relations.items():
@@ -56,16 +56,47 @@ def get_intfar_data(disc_id, database):
     intfars_of_the_month = database.get_intfars_of_the_month()
     user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
 
+    max_intfar_id = database.get_max_intfar_details()[1]
+
     return {
         "curr_month": curr_month,
         "intfar_data": [
-            ["Games", games_all, games_month],
-            ["Intfars", intfars_all, intfars_month],
-            ["Percent", pct_all, pct_month]
+            ["Games:", games_all, games_month],
+            ["Intfars:", intfars_all, intfars_month],
+            ["Percent:", f"{pct_all}%", f"{pct_month}%"]
         ],
         "intfar_criteria_data": criteria_stats, "streak": longest_streak,
-        "non_streak": longest_non_streak, "is_ifotm": user_is_ifotm
+        "non_streak": longest_non_streak, "is_ifotm": user_is_ifotm,
+        "most_intfars": max_intfar_id == disc_id
     }
+
+def get_doinks_relations_data(disc_id, bot_conn, database):
+    relations_data = []
+    games_relations, doinks_relations = database.get_doinks_relations(disc_id)
+    for discord_id, total_games in games_relations.items():
+        doinks = doinks_relations.get(discord_id, 0)
+        relations_data.append(
+            (discord_id, total_games, doinks, int((doinks / total_games) * 100))
+        )
+
+    relations_data.sort(key=lambda x: x[2], reverse=True)
+
+    avatars = discord_request(
+        bot_conn, "func", "get_discord_avatar", [x[0] for x in relations_data]
+    )
+    avatars = [
+        flask.url_for("static", filename=avatar.replace("app/static/", ""))
+        for avatar in avatars
+    ]
+    nicknames = discord_request(
+        bot_conn, "func", "get_discord_nick", [x[0] for x in relations_data]
+    )
+    full_data = [
+        (x,) + y + (z,)
+        for (x, y, z) in zip(nicknames, relations_data, avatars)
+    ]
+
+    return {"doinks_relations": full_data}
 
 def get_doinks_data(disc_id, database):
     doinks_reason_ids = database.get_doinks_stats(disc_id)
@@ -74,12 +105,15 @@ def get_doinks_data(disc_id, database):
     for reason_id, reason in enumerate(api_util.DOINKS_REASONS):
         criteria_stats.append((reason, doinks_counts[reason_id]))
 
+    max_doinks_id = database.get_max_doinks_details()[1]
+
     return {
-        "doinks": len(doinks_reason_ids), "doinks_criteria_data": criteria_stats
+        "doinks": len(doinks_reason_ids), "doinks_criteria_data": criteria_stats,
+        "most_doinks": max_doinks_id == disc_id
     }
 
 def get_bets(disc_id, database, bot_conn, only_active):
-    bets = database.get_active_bets(disc_id) if only_active else database.get_all_bets(disc_id)
+    bets = database.get_bets(only_active, disc_id)
     if bets is None:
         return []
 
@@ -103,6 +137,14 @@ def get_betting_data(disc_id, database, bot_conn):
         "active_bets": active_bets
     }
 
+def get_betting_tokens_data(disc_id, database):
+    tokens = database.get_token_balance(disc_id)
+    max_tokens_holder = database.get_max_tokens_details()[1]
+    return {
+        "betting_tokens": tokens,
+        "is_goodest_boi": max_tokens_holder == disc_id
+    }
+
 @user_page.route("/<disc_id>")
 def user(disc_id):
     if disc_id == "None":
@@ -122,16 +164,22 @@ def user(disc_id):
         avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
     intfar_data = get_intfar_data(disc_id, database)
-    intfar_relation_data = get_relations_data(disc_id, bot_conn, database)
+    intfar_relation_data = get_intfar_relations_data(disc_id, bot_conn, database)
     doinks_data = get_doinks_data(disc_id, database)
+    doinks_relation_data = get_doinks_relations_data(disc_id, bot_conn, database)
     betting_data = get_betting_data(disc_id, database, bot_conn)
+    tokens_data = get_betting_tokens_data(disc_id, database)
+    most_reports_id = database.get_max_reports_details()[1]
 
     context = {
-        "disc_id": disc_id, "nickname": nickname, "avatar": avatar
+        "disc_id": disc_id, "nickname": nickname, "avatar": avatar,
+        "most_reports": most_reports_id == disc_id
     }
     context.update(intfar_data)
     context.update(intfar_relation_data)
     context.update(doinks_data)
+    context.update(doinks_relation_data)
     context.update(betting_data)
+    context.update(tokens_data)
 
     return make_template_context("profile.html", **context)

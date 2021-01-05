@@ -167,9 +167,6 @@ class BettingHandler:
     def award_tokens_for_playing(self, disc_id, tokens_gained):
         self.database.update_token_balance(disc_id, tokens_gained, True)
 
-    def get_active_bets(self, disc_id):
-        return self.database.get_active_bets(disc_id)
-
     def get_bet_return_desc(self, bet_str, target_id, target_name):
         event_id = BETTING_IDS.get(bet_str)
         if event_id is None:

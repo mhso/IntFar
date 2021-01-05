@@ -8,7 +8,7 @@ from api.bets import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
 def get_bets(bot_conn, database, only_active):
-    all_bets = database.get_active_bets() if only_active else database.get_all_bets()
+    all_bets = database.get_bets(only_active)
     names = discord_request(bot_conn, "func", "get_discord_nick", None)
     avatars = discord_request(bot_conn, "func", "get_discord_avatar", None)
     avatars = [
