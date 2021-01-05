@@ -144,6 +144,7 @@ VALID_COMMANDS = {
         "See the return award of a specific betting event (targetting 'person', if given)."
     ),
     "website": (None, "See information about the Int-Far website."),
+    "website_profile": ("(person)", "Get a link to your (or someone else's) Int-Far profile."),
     "website_verify": (
         None,
         "Running this command will cause the bot to send you a secret link. " +
@@ -1467,7 +1468,7 @@ class DiscordClient(discord.Client):
 
                 ratio_desc = "\n" + f"In total, he was Int-Far in **{pct_intfar}%** of his "
                 ratio_desc += f"{games_played} games played.\n"
-                ratio_desc += f"In {current_month}, he was Int-Far in **{len(monthly_intfars)}** "
+                ratio_desc += f"In {current_month}, he was Int-Far in **{monthly_intfars}** "
                 ratio_desc += f"of his {monthly_games} games played (**{pct_monthly}%**)\n"
 
                 reason_desc = "Int-Fars awarded so far:\n"
@@ -2047,6 +2048,24 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    async def handle_profile_msg(self, message, target_name):
+        target_id = message.author.id
+        if target_name is not None:
+            target_name = target_name.lower()
+            target_id = self.try_get_user_data(target_name.strip())
+            if target_id is None:
+                msg = "Error: Invalid summoner or Discord name "
+                msg += f"{self.get_emoji_by_name('PepeHands')}"
+                await message.channel.send(msg)
+                return
+
+        target_name = self.get_discord_nick(target_id)
+
+        response = f"URL to {target_name}'s Int-Far profile:\n"
+        response += f"http://mhooge.com/intfar/user/{target_id}"
+
+        await message.channel.send(response)
+
     async def handle_report_msg(self, message, target_name):
         target_name = target_name.lower()
         target_id = self.try_get_user_data(target_name.strip())
@@ -2197,7 +2216,10 @@ class DiscordClient(discord.Client):
         if cmd in ADMIN_COMMANDS:
             return message.author.id == MY_DISC_ID
 
-        is_main_cmd = cmd in VALID_COMMANDS or cmd in CUTE_COMMANDS
+        if cmd in CUTE_COMMANDS:
+            return True
+
+        is_main_cmd = cmd in VALID_COMMANDS
         valid_cmd = None
         if is_main_cmd:
             valid_cmd = cmd
@@ -2344,6 +2366,9 @@ class DiscordClient(discord.Client):
                 await self.get_data_and_respond(self.handle_token_balance_msg, message, target_name)
             elif cmd_equals(first_command, "website"):
                 await self.get_data_and_respond(self.handle_website_msg, message)
+            elif cmd_equals(first_command, "website_profile"):
+                target_name = self.get_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_profile_msg, message, target_name)
             elif cmd_equals(first_command, "website_verify"):
                 response = await self.handle_verify_msg(message)
                 dm_sent = await self.send_dm(response, message.author.id)
