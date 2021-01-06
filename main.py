@@ -26,7 +26,13 @@ if __name__ == "__main__":
 
     conf.log("Starting Flask web app...")
     flask_end, bot_end_flask = Pipe()
-    flask_process = Process(target=run_flask.run_app, args=(database_client, betting_handler, riot_api, conf, flask_end))
+    flask_process = Process(
+        name="Flask Web App",
+        target=run_flask.run_app,
+        args=(
+            database_client, betting_handler, riot_api, conf, flask_end
+        )
+    )
     flask_process.start()
 
     while True:
@@ -35,7 +41,11 @@ if __name__ == "__main__":
         our_end, bot_end_us = Pipe()
 
         bot_process = Process(
-            target=run_client, args=(conf, database_client, betting_handler, riot_api, bot_end_us, bot_end_flask)
+            name="Discord Bot",
+            target=run_client,
+            args=(
+                conf, database_client, betting_handler, riot_api, bot_end_us, bot_end_flask
+            )
         )
         bot_process.start()
 

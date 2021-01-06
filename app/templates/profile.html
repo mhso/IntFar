@@ -10,12 +10,29 @@
         <h1>{{ nickname }}</h1>
         {% if is_ifotm %}<h2 class="fancy-title">Int-Far of the Month Lead</h2>{% endif %}
         {% if is_goodest_boi %}<h2 class="fancy-title">Goodest Boi</h2>{% endif %}
-        {% if most_doinks %}<h2 class="fancy-title">King Dave</h2>{% endif %}
+        {% if most_doinks %}<h2 class="fancy-title">Young King Dave</h2>{% endif %}
         {% if most_intfars %}<h2 class="fancy-title">Grey Screen Enthusiast</h2>{% endif %}
         {% if most_reports %}<h2 class="fancy-title">Toxic Timmy</h2>{% endif %}
         <div class="row" style="margin-top: 1rem">
             <div class="col-md-6 col-xxl-3">
                 <h2>Stats</h2>
+                {% for data in game_stats %}
+                <h3>{% if loop.first %}Best Stats{% else %}Worst Stats{% endif %}</h3>
+                <table class="nice-table profile-simple-stats">
+                    <tr class="list-first">
+                        <th>Stat Description</th>
+                        <th>Times {% if loop.first %}Best{% else %}Worst{% endif %}</th>
+                        <th>{% if loop.first %}Best{% else %}Worst{% endif %} Ever</th>
+                    </tr>
+                    {% for row in data %}
+                    <tr>
+                        {% for col in row %}
+                        <td>{{ col }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% endfor %}
             </div>
             <div id="profile-intfars" class="col-md-6 col-xxl-3">
                 <h2>Intfars</h2>
@@ -31,8 +48,8 @@
                             </tr>
                             {% for row in intfar_data %}
                             <tr>
-                                {% for data in row %}
-                                <td>{{ data }}</td>
+                                {% for col in row %}
+                                <td>{{ col }}</td>
                                 {% endfor %}
                             </tr>
                             {% endfor %}
@@ -136,7 +153,38 @@
             <div id="profile-bets" class="col-md-6 col-xxl-3">
                 <h2>Bets</h2>
                 <p>Good boi points: <strong>{{ betting_tokens }}</strong></p>
+
                 <div class="row">
+                    <!-- Various Betting Stats -->
+                    <div class="d-none d-sm-block col-sm-3 d-md-block col-md-1 d-lg-block col-lg-2 d-xl-block col-xl-3"></div>
+                    <div class="col-12 col-sm-6 col-md-10 col-lg-8 col-xl-6 col-xxl-12">
+                        <table class="nice-table profile-simple-stats">
+                            {% for desc, count in betting_stats %}
+                            <tr>
+                                <td>{{ desc }}:</td>
+                                <td>{{ count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        <br>
+                        {% if bet_event_hi_freq %}
+                            Event bet on most often:
+                            <p>{{ bet_event_hi_freq }}</p>
+                        {% endif %}
+                        {% if bet_won_hi_freq %}
+                            Event won most often:
+                            <p>{{ bet_won_hi_freq }}</p>
+                        {% endif %}
+                        {% if bet_person_hi_freq %}
+                            Other person bet on most often:
+                            <p>{{ bet_person_hi_freq }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="d-none d-sm-block col-sm-3 d-md-block col-md-1 d-lg-block col-lg-2 d-xl-block col-xl-3"></div>
+                </div>
+
+                <div class="row">
+                    <!-- Active Bets -->
                     <div class="col-lg-12">
                         <h3>Active Bets</h3>
                         {% if active_bets == [] %}
@@ -153,7 +201,8 @@
                             {% endfor %}
                         </table>
                     </div>
-                    <div class="col-lg-12">
+                    <!-- Resolved Bets -->
+                    <div id="profile-resolved-bets" class="col-lg">
                         <table class="nice-table">
                             <h3>All Bets</h3>
                             <tr class="list-first list-entry">

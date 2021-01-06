@@ -3,12 +3,8 @@
 <body>
     <div id="verify-wrapper">
         <h1>You are now verified!</h1>
-        <h1><u>BIG NICE!</u></h1>
-        <a href="{{ url_for('index.index') }}">
-            <button id="verify-home-btn">Home</button>
-        </a><a href="{{ url_for('users.user', disc_id=disc_id) }}">
-            <button id="verify-profile-btn">Profile</button>
-        </a>
+        <img src="{{ url_for('static', filename='img/peberno.png') }}">
+        <a href="{{ url_for('index.index') }}"><button class="standard-btn">Home</button></a><a href="{{ url_for('users.user', disc_id=disc_id) }}"><button class="standard-btn">Profile</button></a>
     </div>
 </body>
 </html>

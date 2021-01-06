@@ -8,6 +8,17 @@ DOINKS_REASONS = [
     "Kill participation over 80%", "Securing all epic monsters"
 ]
 
+STAT_COMMANDS = [
+    "kills", "deaths", "kda", "damage",
+    "cs", "gold", "kp", "vision_wards", "vision_score"
+]
+
+STAT_QUANTITY_DESC = [
+    ("most", "fewest"), ("fewest", "most"), ("highest", "lowest"), ("most", "least"),
+    ("most", "least"), ("most", "least"), ("highest", "lowest"), ("most", "fewest"),
+    ("highest", "lowest")
+]
+
 MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June", "July",
     "August", "September", "October", "November", "December"

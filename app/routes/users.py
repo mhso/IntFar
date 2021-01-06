@@ -1,7 +1,7 @@
 import flask
 import api.util as api_util
 from app.util import discord_request, make_template_context
-from api.bets import get_dynamic_bet_desc
+from api.bets import get_dynamic_bet_desc, BETTING_DESC
 
 user_page = flask.Blueprint("users", __name__, template_folder="templates")
 
@@ -130,11 +130,88 @@ def get_bets(disc_id, database, bot_conn, only_active):
     return presentable_data
 
 def get_betting_data(disc_id, database, bot_conn):
+    database = flask.current_app.config["DATABASE"]
+    bot_conn = flask.current_app.config["BOT_CONN"]
+
     resolved_bets = get_bets(disc_id, database, bot_conn, False)
     active_bets = get_bets(disc_id, database, bot_conn, True)
+    bets = database.get_bets(False, disc_id)
+
+    betting_stats = []
+    bet_event_hi_freq = None
+    bet_won_hi_freq = None
+    bet_person_hi_freq = None
+
+    if bets != []:
+        bets_won = 0
+        total_amount = 0
+        total_payout = 0
+        highest_amount = 0
+        highest_payout = 0
+        events_counts = {x: 0 for x in BETTING_DESC}
+        events_won_counts = {x: 0 for x in BETTING_DESC}
+        target_counts = {d_id: 0 for d_id, _, _ in database.summoners}
+        total_bets = 0
+
+        for _, amounts, events, targets, _, result, payout in bets:
+            amount_bet = 0
+            for amount, event, target in zip(amounts, events, targets):
+                amount_bet += amount
+                total_bets += 1
+
+                events_counts[event] += 1
+                if target is not None and target != disc_id:
+                    target_counts[target] += 1
+                if result == 1:
+                    events_won_counts[event] += 1
+
+            if amount_bet > highest_amount:
+                highest_amount = amount_bet
+            total_amount += amount_bet
+
+            if payout is not None:
+                if payout > highest_payout:
+                    highest_payout = payout
+
+                total_payout += payout
+
+            if result == 1:
+                bets_won += 1
+
+        most_often_event, most_often_event_count = max(events_counts.items(), key=lambda x: x[1])
+        most_often_event_name = BETTING_DESC[most_often_event]
+
+        most_won_event, most_won_event_count = max(events_won_counts.items(), key=lambda x: x[1])
+        if most_won_event_count > 0:
+            most_won_event_name = BETTING_DESC[most_won_event]
+            most_won_even_desc = f"{most_won_event_name} ({most_won_event_count} times)"
+        else:
+            most_won_even_desc = "No bets won yet"
+
+        most_often_target, most_often_target_count = max(target_counts.items(), key=lambda x: x[1])
+        if most_often_target_count > 0:
+            most_often_target_name = discord_request(
+                bot_conn, "func", "get_discord_nick", most_often_target
+            )
+            most_often_target_desc = f"{most_often_target_name} ({most_often_target_count} times)"
+        else:
+            most_often_target_desc = "No one"
+
+        pct_won = int((bets_won / len(bets)) * 100)
+
+        betting_stats = [
+            ("Bets made", len(bets)), ("Bets won", f"{bets_won} ({pct_won}%)"),
+            ("Biggest bet amount", highest_amount), ("Biggest payout", highest_payout)
+        ]
+        bet_event_hi_freq = f"{most_often_event_name} ({most_often_event_count} times)"
+        bet_won_hi_freq = most_won_even_desc
+        bet_person_hi_freq = most_often_target_desc
+
     return {
-        "resolved_bets": resolved_bets,
-        "active_bets": active_bets
+        "resolved_bets": resolved_bets, "active_bets": active_bets,
+        "betting_stats": betting_stats, "bet_event_hi_freq": bet_event_hi_freq,
+        "bet_won_hi_freq": bet_won_hi_freq, "bet_person_hi_freq": bet_person_hi_freq
+
     }
 
 def get_betting_tokens_data(disc_id, database):
@@ -145,15 +222,42 @@ def get_betting_tokens_data(disc_id, database):
         "is_goodest_boi": max_tokens_holder == disc_id
     }
 
+def get_game_stats(disc_id, database):
+    best_stats = []
+    worst_stats = []
+    for best in (True, False):
+        for stat in api_util.STAT_COMMANDS:
+            maximize = not ((stat != "deaths") ^ best)
+            (stat_count,
+             min_or_max_value,
+             _) = database.get_stat(stat + "_id", stat, best, disc_id, maximize)
+
+            pretty_stat = stat.capitalize() if len(stat) > 3 else stat.upper()
+            stat_index = api_util.STAT_COMMANDS.index(stat)
+            quantity_type = 0 if best else 1
+            pretty_quantity = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type].capitalize()
+            pretty_desc = f"{pretty_quantity} {pretty_stat}"
+
+            if best:
+                best_stats.append((pretty_desc, stat_count, api_util.round_digits(min_or_max_value)))
+            else:
+                worst_stats.append((pretty_desc, stat_count, api_util.round_digits(min_or_max_value)))
+
+    return {
+        "game_stats": [best_stats, worst_stats]
+    }
+
 @user_page.route("/<disc_id>")
 def user(disc_id):
     if disc_id == "None":
         return flask.render_template("no_user.html")
 
     disc_id = int(disc_id)
-
     database = flask.current_app.config["DATABASE"]
     bot_conn = flask.current_app.config["BOT_CONN"]
+
+    if not database.user_exists(disc_id):
+        flask.abort(404)
 
     discord_data = discord_request(
         bot_conn, ["func", "func"], ["get_discord_nick", "get_discord_avatar"], [disc_id, (disc_id, 128)]
@@ -169,6 +273,7 @@ def user(disc_id):
     doinks_relation_data = get_doinks_relations_data(disc_id, bot_conn, database)
     betting_data = get_betting_data(disc_id, database, bot_conn)
     tokens_data = get_betting_tokens_data(disc_id, database)
+    game_stat_data = get_game_stats(disc_id, database)
     most_reports_id = database.get_max_reports_details()[1]
 
     context = {
@@ -181,5 +286,6 @@ def user(disc_id):
     context.update(doinks_relation_data)
     context.update(betting_data)
     context.update(tokens_data)
+    context.update(game_stat_data)
 
     return make_template_context("profile.html", **context)

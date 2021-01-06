@@ -24,16 +24,18 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     root = "/intfar/"
 
     # Set up the blueprints for all the pages/routes.
-    from app.routes import index, users, verify, betting, doinks, stats
+    from app.routes import index, users, verify, betting, doinks, stats, errors
     web_app.register_blueprint(index.start_page, url_prefix=root)
     web_app.register_blueprint(users.user_page, url_prefix=root + "user/")
     web_app.register_blueprint(verify.verify_page, url_prefix=root + "verify/")
     web_app.register_blueprint(betting.betting_page, url_prefix=root + "betting/")
     web_app.register_blueprint(doinks.doinks_page, url_prefix=root + "doinks/")
     web_app.register_blueprint(stats.stats_page, url_prefix=root + "stats/")
+    web_app.register_error_handler(500, errors.handle_internal_error)
+    web_app.register_error_handler(404, errors.handle_missing_page_error)
 
     # Set up Flask lifetime variables.
-    web_app.config['TESTING'] = True
+    web_app.config['PROPAGATE_EXCEPTIONS'] = False
     web_app.config["APP_CONFIG"] = conf
     web_app.config["DATABASE"] = database
     web_app.config["BET_HANDLER"] = bet_handler

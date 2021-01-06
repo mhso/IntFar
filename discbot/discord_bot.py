@@ -8,7 +8,7 @@ from time import time
 from traceback import print_exc
 from datetime import datetime
 from discbot.montly_intfar import MonthlyIntfar
-from api import riot_api, game_stats, bets
+from api import game_stats, bets
 from api.database import DBException
 import api.util as api_util
 
@@ -164,19 +164,8 @@ CUTE_COMMANDS = {
     "intpapi": "Flirt with the Int-Far in spanish."
 }
 
-STAT_COMMANDS = [
-    "kills", "deaths", "kda", "damage",
-    "cs", "gold", "kp", "vision_wards", "vision_score"
-]
-
 ADMIN_COMMANDS = [
     "restart"
-]
-
-QUANTITY_DESC = [
-    ("most", "fewest"), ("fewest", "most"), ("highest", "lowest"), ("most", "least"),
-    ("most", "least"), ("most", "least"), ("highest", "lowest"), ("most", "fewest"),
-    ("highest", "lowest")
 ]
 
 def cmd_equals(text, cmd):
@@ -1361,7 +1350,7 @@ class DiscordClient(discord.Client):
         await message.channel.send(message_2)
 
     async def handle_stats_msg(self, message):
-        valid_stats = ", ".join("'" + cmd + "'" for cmd in STAT_COMMANDS)
+        valid_stats = ", ".join("'" + cmd + "'" for cmd in api_util.STAT_COMMANDS)
         response = "**--- Valid stats ---**\n```"
         response += valid_stats
         response += "\n```"
@@ -1682,9 +1671,9 @@ class DiscordClient(discord.Client):
         Get the value of the requested stat for the requested player.
         F.x. '!best damage dumbledonger'.
         """
-        if second_cmd in STAT_COMMANDS: # Check if the requested stat is a valid stat.
+        if second_cmd in api_util.STAT_COMMANDS: # Check if the requested stat is a valid stat.
             stat = second_cmd
-            stat_index = STAT_COMMANDS.index(stat)
+            stat_index = api_util.STAT_COMMANDS.index(stat)
             self.config.log(f"Stat requested: {first_cmd} {stat}")
             best = first_cmd == "best"
             quantity_type = 0 if best else 1
@@ -1693,7 +1682,7 @@ class DiscordClient(discord.Client):
             # lowest is worse, except with deaths, where the opposite is the case.
             maximize = not ((stat != "deaths") ^ best)
             # Get a readable description, such as 'most deaths' or 'lowest kp'.
-            readable_stat = QUANTITY_DESC[stat_index][quantity_type] + " " + stat
+            readable_stat = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type] + " " + stat
 
             response = ""
             target_id = message.author.id
