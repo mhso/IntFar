@@ -3,7 +3,7 @@ from api import riot_api
 from flask_cors import CORS
 from logging.config import dictConfig
 
-def create_app(database, bet_handler, conf, bot_pipe):
+def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     dictConfig({
         'version': 1,
         'formatters': {'default': {
@@ -39,7 +39,7 @@ def create_app(database, bet_handler, conf, bot_pipe):
     web_app.config["BET_HANDLER"] = bet_handler
     web_app.config["BOT_CONN"] = bot_pipe
     web_app.config["LOGGED_IN_USERS"] = {}
-    web_app.config["RIOT_API"] = riot_api.APIClient(conf)
+    web_app.config["RIOT_API"] = riot_api
     web_app.config["ACTIVE_GAME"] = None
 
     web_app.secret_key = open("app/static/secret.txt").readline()

@@ -17,7 +17,7 @@ database_client = Database(conf)
 
 conf.log("Starting Discord Client...")
 
-client = DiscordClient(conf, database_client)
+client = DiscordClient(conf, database_client, None, None, None)
 
 def do_stuff(disc_client):
     print(disc_client.get_all_emojis())

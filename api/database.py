@@ -549,7 +549,7 @@ class Database:
                 if ticket is None or ticket != next_ticket or discord_id != next_better:
                     data_tuple = (bet_ids, amounts, events, targets, row[4])
                     if only_active: # Include ticket in tuple, if only active bets.
-                        data_tuple = data_tuple + (row[-1],)
+                        data_tuple = data_tuple + (row[-1], None)
                     else: # Include both result and payout if resolved bets.
                         data_tuple = data_tuple + (row[-2], row[-1])
 

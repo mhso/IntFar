@@ -1,4 +1,3 @@
-import json
 import flask
 from api.util import current_month
 from app.util import (
@@ -79,7 +78,10 @@ def active_game_started():
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))
 
-    flask.current_app.config["ACTIVE_GAME"] = data.get("game_id")
+    del data["secret"]
+
+    flask.current_app.config["ACTIVE_GAME"] = data
+    print(f"SAVING ACTIVE GAME: {data}", flush=True)
     return flask.make_response(("Success! Active game ID updated.", 200))
 
 @start_page.route("/game_ended", methods=["POST"])
@@ -93,4 +95,5 @@ def active_game_ended():
         return flask.make_response(("Error: Unauthorized access.", 401))
 
     flask.current_app.config["ACTIVE_GAME"] = None
+    print("REMOVING ACTIVE GAME", flush=True)
     return flask.make_response(("Success! Active game ID deleted.", 200))

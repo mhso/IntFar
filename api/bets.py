@@ -27,7 +27,8 @@ BETTING_IDS = {
     "doinks_monsters": 15,
     "most_kills": 16,
     "most_damage": 17,
-    "most_kp": 18
+    "most_kp": 18,
+    "highest_kda": 19
 }
 
 BETTING_DESC = {
@@ -48,9 +49,14 @@ BETTING_DESC = {
     14: "someone being awarded doinks for high KP",
     15: "someone being awarded doinks for securing all epic monsters",
     16: "someone getting the most kills",
-    17: "someone doing the most damamge",
-    18: "someone having the highest kill participation"
+    17: "someone doing the most damage",
+    18: "someone having the highest kill participation",
+    19: "someone having the highest KDA",
 }
+
+BETTING_STATS = [
+    "kills", "damage", "kp", "kda"
+]
 
 def get_dynamic_bet_desc(event_id, target_person=None):
     bet_desc = BETTING_DESC[event_id]
@@ -127,9 +133,9 @@ def resolve_doinks_for_monsters(doinks, target_id):
     return resolve_doinks_by_reason(doinks, target_id, 6)
 
 def resolve_most_kills(game_data, target_id):
-    # Ties for most kills are included. If more than one person has most kills, bet is still won.
+    # Ties for most kills are NOT included. If more than one person has most kills, bet is lost.
     most_kills_ties = game_stats.get_outlier(game_data, "kills", asc=False, include_ties=True)[0]
-    return target_id in most_kills_ties
+    return target_id in most_kills_ties and len(most_kills_ties) == 1
 
 def resolve_most_damage(game_data, target_id):
     # Ties for most damage is included. If more than one person has most dmg, bet is still won.
@@ -138,9 +144,14 @@ def resolve_most_damage(game_data, target_id):
     return target_id in most_damage_ties
 
 def resolve_highest_kp(game_data, target_id):
-    # Ties for highest kp is included. If more than one person has highest kp, bet is still won.
+    # Ties for highest kp is NOT included. If more than one person has highest kp, bet is lost.
     highest_kp_ties = game_stats.get_outlier(game_data, "kp", asc=False, include_ties=True)[0]
-    return target_id in highest_kp_ties
+    return target_id in highest_kp_ties and len(highest_kp_ties) == 1
+
+def resolve_highest_kda(game_data, target_id):
+    # Ties for highets KDA is NOT included. If more than one person has highest KDA, bet is lost.
+    highest_kda_ties = game_stats.get_outlier(game_data, "kda", asc=False, include_ties=True)[0]
+    return target_id in highest_kda_ties and len(highest_kda_ties) == 1
 
 RESOLVE_INTFAR_BET_FUNCS = [
     resolve_not_intfar, resolve_is_intfar, resolve_is_intfar_by_kda,
@@ -154,7 +165,7 @@ RESOLVE_DOINKS_BET_FUNCS = [
 ]
 
 RESOLVE_STATS_BET_FUNCS = [
-    resolve_most_kills, resolve_most_damage, resolve_highest_kp
+    resolve_most_kills, resolve_most_damage, resolve_highest_kp, resolve_highest_kda
 ]
 
 class BettingHandler:
@@ -187,32 +198,17 @@ class BettingHandler:
             response += "the game, 3x return if 3 people, etc)."
         return response
 
-    def get_doinks_reason_return(self, target, reason):
-        reason_count = 0
-        num_games = 0
-        if target is None:
-            doinks_reason_ids = self.database.get_doinks_reason_counts()
-            num_games = self.database.get_games_count()[0]
-            reason_count = doinks_reason_ids[reason]
-        else:
-            num_games = self.database.get_intfar_stats(target)[0]
-            doinks_reason_ids = self.database.get_doinks_stats(target)
-            for reason_id in doinks_reason_ids:
-                if reason_id[0][reason] == "1":
-                    reason_count += 1
-
-        return reason_count / num_games
-
-    def get_doinks_return(self, target):
-        if target is None:
+    def get_intfar_return(self, target, is_intfar):
+        if target is None or not is_intfar:
             games_total = self.database.get_games_count()[0]
-            doinks_total = self.database.get_doinks_count()[0]
-            return doinks_total / games_total
+            intfars_total = self.database.get_intfar_count()[0]
+            ratio = intfars_total / games_total
+            if not is_intfar:
+                ratio = 1 - ratio
+            return ratio
 
-        games_played = self.database.get_intfar_stats(target)[0]
-        doinks_reason_ids = self.database.get_doinks_stats(target)
-
-        return len(doinks_reason_ids) / games_played
+        games_played, intfar_reason_ids = self.database.get_intfar_stats(target)
+        return len(intfar_reason_ids) / games_played
 
     def get_intfar_reason_return(self, target, reason):
         reason_count = 0
@@ -229,17 +225,38 @@ class BettingHandler:
 
         return reason_count / num_games
 
-    def get_intfar_return(self, target, is_intfar):
-        if target is None or not is_intfar:
+    def get_doinks_return(self, target):
+        if target is None:
             games_total = self.database.get_games_count()[0]
-            intfars_total = self.database.get_intfar_count()[0]
-            ratio = intfars_total / games_total
-            if not is_intfar:
-                ratio = 1 - ratio
-            return ratio
+            doinks_total = self.database.get_doinks_count()[0]
+            return doinks_total / games_total
 
-        games_played, intfar_reason_ids = self.database.get_intfar_stats(target)
-        return len(intfar_reason_ids) / games_played
+        games_played = self.database.get_intfar_stats(target)[0]
+        doinks_reason_ids = self.database.get_doinks_stats(target)
+
+        return len(doinks_reason_ids) / games_played
+
+    def get_doinks_reason_return(self, target, reason):
+        reason_count = 0
+        num_games = 0
+        if target is None:
+            doinks_reason_ids = self.database.get_doinks_reason_counts()
+            num_games = self.database.get_games_count()[0]
+            reason_count = doinks_reason_ids[reason]
+        else:
+            num_games = self.database.get_intfar_stats(target)[0]
+            doinks_reason_ids = self.database.get_doinks_stats(target)
+            for reason_id in doinks_reason_ids:
+                if reason_id[0][reason] == "1":
+                    reason_count += 1
+
+        return reason_count / num_games
+
+    def get_stats_return(self, target, stat_id):
+        stat = BETTING_STATS[stat_id]
+        best_in_stat_count = self.database.get_stat(stat + "_id", stat, True, target)[0]
+        num_games = self.database.get_intfar_stats(target)[0]
+        return best_in_stat_count / num_games
 
     def get_dynamic_bet_return(self, event_id, target):
         if event_id > 1:
@@ -252,6 +269,8 @@ class BettingHandler:
                 ratio = self.get_doinks_return(target)
             elif event_id < 16:
                 ratio = self.get_doinks_reason_return(target, event_id - 9)
+            elif event_id < 20:
+                ratio = self.get_stats_return(target, event_id - 16)
 
             if ratio == 0.0: # If event has never happened, return the "base" ratio.
                 return self.database.get_base_bet_return(event_id)
@@ -295,7 +314,7 @@ class BettingHandler:
             elif event_id < 16:
                 resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id-8]
                 success = resolve_func(doinks, target_id)
-            elif event_id < 19:
+            elif event_id < 20:
                 resolve_func = RESOLVE_STATS_BET_FUNCS[event_id-16]
                 success = resolve_func(stats, target_id)
 

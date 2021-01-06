@@ -226,7 +226,7 @@ def get_streak_flavor_text(nickname, streak):
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 class DiscordClient(discord.Client):
-    def __init__(self, config, database, betting_handler, pipe_conn, flask_conn=None):
+    def __init__(self, config, database, betting_handler, riot_api, pipe_conn, flask_conn=None):
         super().__init__(
             intents=discord.Intents(members=True,
                                     voice_states=True,
@@ -234,7 +234,7 @@ class DiscordClient(discord.Client):
                                     emojis=True,
                                     guild_messages=True)
         )
-        self.riot_api = riot_api.APIClient(config)
+        self.riot_api = riot_api
         self.config = config
         self.database = database
         self.pipe_conn = pipe_conn
@@ -278,8 +278,8 @@ class DiscordClient(discord.Client):
         if game_status == 2: # Game is over.
             try:
                 self.config.log("GAME OVER!!")
-                self.config.log(f"Active game: {self.active_game}")
-                game_info = self.riot_api.get_game_details(self.active_game, tries=2)
+                self.config.log(f"Active game: {self.active_game['id']}")
+                game_info = self.riot_api.get_game_details(self.active_game["id"], tries=2)
 
                 if game_info is None:
                     self.config.log("Game info is None! Weird stuff.", self.config.log_error)
@@ -336,9 +336,9 @@ class DiscordClient(discord.Client):
 
         if game_status == 1: # Game has started.
             req_data = {
-                "game_id": self.active_game,
                 "secret": self.config.discord_token
             }
+            req_data.update(self.active_game)
             self.send_game_update("game_started", req_data)
             await self.poll_for_game_end()
         elif game_status == 0: # Sleep for 10 minutes and check game status again.
@@ -383,15 +383,14 @@ class DiscordClient(discord.Client):
             for summ_name, summ_id in zip(summ_names, summ_ids):
                 game_data = self.riot_api.get_active_game(summ_id)
                 if game_data is not None:
-                    game_id = game_data["gameId"]
                     game_start = int(game_data["gameStartTime"] / 1000)
                     active_game_start = game_start
-                    game_for_summoner = game_id
+                    game_for_summoner = game_data
                     active_name = summ_name
                     active_id = summ_id
                     break
             if game_for_summoner is not None:
-                game_ids.add(game_for_summoner)
+                game_ids.add(game_for_summoner["gameId"])
                 users_in_current_game.append((disc_id, [active_name], [active_id]))
                 active_game = game_for_summoner
 
@@ -399,10 +398,17 @@ class DiscordClient(discord.Client):
             return 0
 
         if active_game is not None and self.active_game is None:
-            self.active_game = active_game
             self.config.log(active_game_start)
             if active_game_start == 0:
                 active_game_start = int(time())
+
+            self.active_game = {
+                "id": active_game["gameId"],
+                "start": active_game_start,
+                "map_id": game_data["mapId"],
+                "game_mode": game_data["gameMode"]
+            }
+
             self.game_start = active_game_start
             self.config.log(f"Game start: {datetime.fromtimestamp(self.game_start)}")
             self.users_in_game = users_in_current_game
@@ -413,6 +419,13 @@ class DiscordClient(discord.Client):
 
     def get_game_start(self):
         return self.game_start
+
+    def get_active_game(self):
+        data = self.active_game
+        if data is not None:
+            data["map_name"] = self.riot_api.get_map_name(data["map_id"])
+
+        return data
 
     def get_mention_str(self, disc_id):
         """
@@ -596,7 +609,7 @@ class DiscordClient(discord.Client):
                     response_bets += "-----------------------------\n"
                 response_bets += f"Result of bets {mention} made:\n"
 
-                for bet_ids, amounts, events, targets, bet_timestamp, _ in bets_made:
+                for bet_ids, amounts, events, targets, bet_timestamp, _, _ in bets_made:
                     any_bets = True
                     # Resolve current bet which the user made, marks it as won/lost in DB.
                     bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_ids, amounts,
@@ -650,10 +663,11 @@ class DiscordClient(discord.Client):
                     new_max_tokens_holder = disc_id
                     max_tokens_name = disc_id
 
-        # This person now has the most tokens of all users!
-        response_bets += f"{max_tokens_name} now has the most {tokens_name} of everyone! "
-        response_bets += "***HAIL TO THE KING!!!***\n"
-        await self.assign_top_tokens_role(max_tokens_holder, new_max_tokens_holder)
+        if new_max_tokens_holder is not None:
+            # This person now has the most tokens of all users!
+            response_bets += f"{max_tokens_name} now has the most {tokens_name} of everyone! "
+            response_bets += "***HAIL TO THE KING!!!***\n"
+            await self.assign_top_tokens_role(max_tokens_holder, new_max_tokens_holder)
 
         if any_bets:
             response += response_bets
@@ -744,9 +758,11 @@ class DiscordClient(discord.Client):
             damage_dealt = stats["totalDamageDealtToChampions"]
             if stats["role"] != "DUO_SUPPORT" and damage_dealt < 8000:
                 mentions[disc_id].append((1, damage_dealt))
-            cs_per_min = stats["creepsPerMinDeltas"]["0-10"]
-            if "10-20" in stats["creepsPerMinDeltas"]:
-                cs_per_min = (cs_per_min + stats["creepsPerMinDeltas"]["10-20"]) / 2
+            cs_per_min = 5
+            if "creepsPerMinDeltas" in stats:
+                cs_per_min = stats["creepsPerMinDeltas"]["0-10"]
+                if "10-20" in stats["creepsPerMinDeltas"]:
+                    cs_per_min = (cs_per_min + stats["creepsPerMinDeltas"]["10-20"]) / 2
             if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
                 mentions[disc_id].append((2, api_util.round_digits(cs_per_min)))
             epic_monsters_secured = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
@@ -981,6 +997,7 @@ class DiscordClient(discord.Client):
                             combined_stats = participant["stats"]
                             combined_stats["timestamp"] = game_info["gameCreation"]
                             combined_stats["mapId"] = game_info["mapId"]
+                            combined_stats["gameDuration"] = int(game_info["gameDuration"])
                             combined_stats.update(participant["timeline"])
                             filtered_stats.append((disc_id, combined_stats))
 
@@ -1060,6 +1077,28 @@ class DiscordClient(discord.Client):
         sorted_by_gold = sorted(filtered_data, key=lambda x: x[1]["goldEarned"])
         return sorted_by_gold[0][0]
 
+    def get_intfar_qualifiers(self, intfar_details):
+        max_intfar_count = 1
+        intfar_counts = {}
+        max_count_intfar = None
+        qualifier_data = {}
+        # Look through details for the people qualifying for Int-Far.
+        # The one with most criteria met gets chosen.
+        for (index, (tied_intfars, stat_value)) in enumerate(intfar_details):
+            if tied_intfars is not None:
+                for intfar_disc_id in tied_intfars:
+                    if intfar_disc_id not in intfar_counts:
+                        intfar_counts[intfar_disc_id] = 0
+                        qualifier_data[intfar_disc_id] = []
+                    current_intfar_count = intfar_counts[intfar_disc_id] + 1
+                    intfar_counts[intfar_disc_id] = current_intfar_count
+                    if current_intfar_count >= max_intfar_count:
+                        max_intfar_count = current_intfar_count
+                        max_count_intfar = intfar_disc_id
+                    qualifier_data[intfar_disc_id].append((index, stat_value))
+
+        return qualifier_data, max_count_intfar, max_intfar_count
+
     async def declare_intfar(self, filtered_stats):
         """
         Called when the currently active game is over.
@@ -1073,36 +1112,25 @@ class DiscordClient(discord.Client):
             response += "and no stats will be saved."
             await self.channel_to_write.send(self.insert_emotes(response))
             return None
+        elif filtered_stats[0][1]["gameDuration"] < 5 * 60: # Game was less than 5 mins long.
+            self.config.log(
+                "That game lasted less than 5 minutes {emote_zinking} assuming it was a remake."
+            )
+            return None
 
         intfar_details = self.get_intfar_details(filtered_stats, filtered_stats[0][1]["mapId"])
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
-        intfar_counts = {}
-        max_intfar_count = 1
-        max_count_intfar = None
         final_intfar = None
-        intfar_data = {}
-
-        # Look through details for the people qualifying for Int-Far.
-        # The one with most criteria met gets chosen.
-        for (index, (tied_intfars, stat_value)) in enumerate(intfar_details):
-            if tied_intfars is not None:
-                for intfar_disc_id in tied_intfars:
-                    if intfar_disc_id not in intfar_counts:
-                        intfar_counts[intfar_disc_id] = 0
-                        intfar_data[intfar_disc_id] = []
-                    current_intfar_count = intfar_counts[intfar_disc_id] + 1
-                    intfar_counts[intfar_disc_id] = current_intfar_count
-                    if current_intfar_count >= max_intfar_count:
-                        max_intfar_count = current_intfar_count
-                        max_count_intfar = intfar_disc_id
-                    intfar_data[intfar_disc_id].append((index, stat_value))
+        (intfar_data,
+         max_count_intfar,
+         max_intfar_count) = self.get_intfar_qualifiers(intfar_details)
 
         reason_ids = ["0", "0", "0", "0"]
 
         redeemed_text, doinks = self.get_big_doinks(filtered_stats)
 
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
-        if max_count_intfar is not None: # Save data for the current game and send int-far message.
+        if max_count_intfar is not None: # Send int-far message.
             final_intfar = self.resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)
             reason = ""
             # Go through the criteria the chosen Int-Far met and list them in a readable format.
@@ -1144,7 +1172,8 @@ class DiscordClient(discord.Client):
         if not self.config.testing:
             try: # Save stats.
                 self.database.record_stats(intfar_id, intfar_reason, doinks,
-                                           self.active_game, filtered_stats, self.users_in_game)
+                                           self.active_game["id"], filtered_stats,
+                                           self.users_in_game)
                 self.database.create_backup()
             except DBException as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
@@ -1340,7 +1369,7 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_betting_msg(self, message):
-        max_mins = bets.BettingHandler.MAX_BETTING_THRESHOLD
+        max_mins = bets.MAX_BETTING_THRESHOLD
         tokens_name = self.config.betting_tokens
         response = "Betting usage: `!bet [amount] [event] (person)`\n"
         response += "This places a bet on the next (or current) match.\n"
@@ -1872,7 +1901,7 @@ class DiscordClient(discord.Client):
             else:
                 tokens_name = self.config.betting_tokens
                 response = f"{recepient} has the following active bets:"
-                for _, amounts, events, targets, _, ticket in active_bets:
+                for _, amounts, events, targets, _, ticket, _ in active_bets:
                     bets_str = "\n - "
                     total_cost = 0
                     if len(amounts) > 1:
@@ -2421,6 +2450,6 @@ class DiscordClient(discord.Client):
                 self.flask_conn.send(results)
             await asyncio.sleep(0.05)
 
-def run_client(config, database, betting_handler, main_pipe, flask_pipe):
-    client = DiscordClient(config, database, betting_handler, main_pipe, flask_pipe)
+def run_client(config, database, betting_handler, riot_api, main_pipe, flask_pipe):
+    client = DiscordClient(config, database, betting_handler, riot_api, main_pipe, flask_pipe)
     client.run(config.discord_token)

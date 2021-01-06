@@ -4,6 +4,7 @@ import run_flask
 from api.database import Database
 from api.bets import BettingHandler
 from api.config import Config
+from api.riot_api import APIClient
 from discbot.discord_bot import run_client
 
 if __name__ == "__main__":
@@ -21,9 +22,11 @@ if __name__ == "__main__":
     database_client = Database(conf)
     betting_handler = BettingHandler(conf, database_client)
 
+    riot_api = APIClient(conf)
+
     conf.log("Starting Flask web app...")
     flask_end, bot_end_flask = Pipe()
-    flask_process = Process(target=run_flask.run_app, args=(database_client, betting_handler, conf, flask_end))
+    flask_process = Process(target=run_flask.run_app, args=(database_client, betting_handler, riot_api, conf, flask_end))
     flask_process.start()
 
     while True:
@@ -32,7 +35,7 @@ if __name__ == "__main__":
         our_end, bot_end_us = Pipe()
 
         bot_process = Process(
-            target=run_client, args=(conf, database_client, betting_handler, bot_end_us, bot_end_flask)
+            target=run_client, args=(conf, database_client, betting_handler, riot_api, bot_end_us, bot_end_flask)
         )
         bot_process.start()
 

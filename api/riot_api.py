@@ -1,4 +1,6 @@
 from time import sleep
+from glob import glob
+from os import remove
 from os.path import exists
 import json
 import requests
@@ -21,17 +23,21 @@ class APIClient:
             response_json = requests.get(url).json()
             return response_json[0]
         except requests.exceptions.RequestException as exc:
-            self.config.log("Exception when getting newest champions.json file!")
+            self.config.log("Exception when getting newest game version!")
             self.config.log(exc)
             return None
 
     def get_latest_champions_file(self):
         url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/champion.json"
         self.config.log(f"Downloading latest champions file: '{self.get_champions_file()}'")
+
+        old_file = glob("api/champions-*.json")[0]
+
         try:
             response_json = requests.get(url).json()
             f_out = open(self.get_champions_file(), "w", encoding="utf-8")
             json.dump(response_json, f_out)
+            remove(old_file)
         except requests.exceptions.RequestException as exc:
             self.config.log("Exception when getting newest champions.json file!")
             self.config.log(exc)
@@ -78,6 +84,14 @@ class APIClient:
             for champ_name in champion_data["data"]:
                 if int(champion_data["data"][champ_name]["key"]) == champ_id:
                     return champion_data["data"][champ_name]["name"]
+        return None
+
+    def get_map_name(self, map_id):
+        with open("api/maps.json", encoding="UTF-8") as fp:
+            map_data = json.load(fp)
+            for map_info in map_data:
+                if map_info["mapId"] == map_id:
+                    return map_info["mapName"]
         return None
 
     def is_good_map(self, map_id):

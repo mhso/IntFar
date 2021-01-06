@@ -1,6 +1,7 @@
 import json
 import flask
 import secrets
+from time import time
 from hashlib import sha256
 
 def discord_request(pipe, command_types, commands, params):
@@ -45,16 +46,15 @@ def discord_request(pipe, command_types, commands, params):
 def get_game_info():
     active_game = flask.current_app.config["ACTIVE_GAME"]
     if active_game is None:
-        return None
+        bot_conn = flask.current_app.config["BOT_CONN"]
+        active_game = discord_request(bot_conn, "func", "get_active_game", None)
+        if active_game is None:
+            return None
+        flask.current_app.config["ACTIVE_GAME"] = active_game
 
-    riot_api = flask.current_app.config["RIOT_API"]
-    game_data = riot_api.get_game_details(active_game)
+    active_game["game_duration"] = time() - active_game["start"]
 
-    data = {
-        "game_duration": game_data["gameLength"],
-        "game_mode": game_data["gameMode"]
-    }
-    return data
+    return active_game
 
 def generate_user_secret():
     return secrets.token_hex(nbytes=32)
