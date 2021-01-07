@@ -1,4 +1,3 @@
-from time import time
 import flask
 import api.util as api_util
 from app.util import discord_request, make_template_context
@@ -143,7 +142,7 @@ def get_betting_data(disc_id, database, bot_conn):
     bet_won_hi_freq = None
     bet_person_hi_freq = None
 
-    if bets != []:
+    if bets is not None:
         bets_won = 0
         total_amount = 0
         total_payout = 0
@@ -248,18 +247,22 @@ def get_game_stats(disc_id, database):
             quantity_type = 0 if best else 1
             pretty_quantity = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type].capitalize()
             pretty_desc = f"{pretty_quantity} {pretty_stat}"
+            if min_or_max_value is None:
+                min_or_max_value = "NA"
+            else:
+                min_or_max_value = api_util.round_digits(min_or_max_value)
 
             if best:
                 best_stats.append(
                     (
-                        [pretty_desc, stat_count, api_util.round_digits(min_or_max_value)],
+                        [pretty_desc, stat_count, min_or_max_value],
                         stat_is_gold
                     )
                 )
             else:
                 worst_stats.append(
                     (
-                        [pretty_desc, stat_count, api_util.round_digits(min_or_max_value)],
+                        [pretty_desc, stat_count, min_or_max_value],
                         stat_is_gold
                     )
                 )
@@ -288,7 +291,6 @@ def user(disc_id):
     if avatar is not None:
         avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
-    start_db_io = time()
     database.start_persistent_connection()
     intfar_data = get_intfar_data(disc_id, database)
     intfar_relation_data = get_intfar_relations_data(disc_id, bot_conn, database)
@@ -299,9 +301,6 @@ def user(disc_id):
     game_stat_data = get_game_stats(disc_id, database)
     most_reports_id = database.get_max_reports_details()[1]
     database.close_persistent_connection()
-    end_db_io = time()
-
-    print(f"Time taken for DB IO: {end_db_io - start_db_io} seconds.", flush=True)
 
     context = {
         "disc_id": disc_id, "nickname": nickname, "avatar": avatar,

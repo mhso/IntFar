@@ -217,8 +217,11 @@
                     </div>
                     <!-- Resolved Bets -->
                     <div id="profile-resolved-bets" class="col-lg">
-                        <table class="nice-table">
-                            <h3>All Bets</h3>
+                        <h3>All Bets</h3>
+                        {% if resolved_bets == [] %}
+                        <p id="no-active-bets">No bets have been made (yet).</p>
+                        {% endif %}
+                        <table class="nice-table{% if resolved_bets == [] %} empty-list{% endif %}">
                             <tr class="list-first list-entry">
                                 <th>Event</th>
                                 <th>GBP</th>
