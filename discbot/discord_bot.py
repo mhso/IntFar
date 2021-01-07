@@ -1671,6 +1671,7 @@ class DiscordClient(discord.Client):
         Get the value of the requested stat for the requested player.
         F.x. '!best damage dumbledonger'.
         """
+        check_best_ever_keywords = {"all", "ever"}
         if second_cmd in api_util.STAT_COMMANDS: # Check if the requested stat is a valid stat.
             stat = second_cmd
             stat_index = api_util.STAT_COMMANDS.index(stat)
@@ -1690,7 +1691,7 @@ class DiscordClient(discord.Client):
 
             if target_name is not None: # Get someone else's stat information.
                 target_name = target_name.lower()
-                if target_name == "all":
+                if target_name in check_best_ever_keywords:
                     target_id = None
                 else:
                     target_id = self.try_get_user_data(target_name.strip())
@@ -1719,7 +1720,7 @@ class DiscordClient(discord.Client):
 
             emote_to_use = "{emote_pog}" if best else "{emote_peberno}"
 
-            if target_name == "all":
+            if target_name in check_best_ever_keywords:
                 response = f"The {readable_stat} ever in a game was {min_or_max_value} "
                 response += f"by {recepient} " + self.insert_emotes(emote_to_use) + "\n"
                 response += f"He got this as {game_summary}"

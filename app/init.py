@@ -1,5 +1,4 @@
 from flask import Flask
-from api import riot_api
 from flask_cors import CORS
 from logging.config import dictConfig
 
@@ -35,7 +34,7 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     web_app.register_error_handler(404, errors.handle_missing_page_error)
 
     # Set up Flask lifetime variables.
-    web_app.config['PROPAGATE_EXCEPTIONS'] = False
+    web_app.config["PROPAGATE_EXCEPTIONS"] = False
     web_app.config["APP_CONFIG"] = conf
     web_app.config["DATABASE"] = database
     web_app.config["BET_HANDLER"] = bet_handler

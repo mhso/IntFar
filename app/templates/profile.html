@@ -16,23 +16,37 @@
         <div class="row" style="margin-top: 1rem">
             <div class="col-md-6 col-xxl-3">
                 <h2>Stats</h2>
-                {% for data in game_stats %}
-                <h3>{% if loop.first %}Best Stats{% else %}Worst Stats{% endif %}</h3>
-                <table class="nice-table profile-simple-stats">
-                    <tr class="list-first">
-                        <th>Stat Description</th>
-                        <th>Times {% if loop.first %}Best{% else %}Worst{% endif %}</th>
-                        <th>{% if loop.first %}Best{% else %}Worst{% endif %} Ever</th>
-                    </tr>
-                    {% for row in data %}
-                    <tr>
-                        {% for col in row %}
-                        <td>{{ col }}</td>
+                <div class="row">
+                    <div class="d-sm-block col-sm-2 d-md-none d-xl-block col-xl-2 d-xxl-none"></div>
+                    <div class="col-sm-8 col-md-12 col-xl-8 col-xxl-12">
+                        {% for data, any_gold in game_stats %}
+                        {% set best = loop.first %}
+                        <h3>{% if best %}Best Stats{% else %}Worst Stats{% endif %}</h3>
+                        <table class="nice-table profile-simple-stats">
+                            <tr class="list-first">
+                                <th>Stat Description</th>
+                                <th>Times {% if best %}Best{% else %}Worst{% endif %}</th>
+                                <th>{% if best %}Best{% else %}Worst{% endif %} Ever</th>
+                            </tr>
+                            {% for row_data, is_gold in data %}
+                            <tr>
+                                {% for col_data in row_data %}
+                                <td{% if is_gold and loop.last %} class="gold-stat"{% endif %}>
+                                    {{ col_data }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% if any_gold %}
+                        <p class="gold-description">
+                            <span class="gold-stat">Gold</span> means {% if best %}best{% else %}worst{% endif %} stat of everyone <strong>EVER!!</strong>
+                        </p>
+                        {% endif %}
                         {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </table>
-                {% endfor %}
+                    </div>
+                    <div class="d-sm-block col-sm-2 d-md-none d-xl-block col-xl-2 d-xxl-none"></div>
+                </div>
             </div>
             <div id="profile-intfars" class="col-md-6 col-xxl-3">
                 <h2>Intfars</h2>

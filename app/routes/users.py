@@ -1,3 +1,4 @@
+from time import time
 import flask
 import api.util as api_util
 from app.util import discord_request, make_template_context
@@ -224,13 +225,23 @@ def get_betting_tokens_data(disc_id, database):
 
 def get_game_stats(disc_id, database):
     best_stats = []
+    any_gold_best = False
     worst_stats = []
+    any_gold_worst = False
     for best in (True, False):
         for stat in api_util.STAT_COMMANDS:
             maximize = not ((stat != "deaths") ^ best)
             (stat_count,
              min_or_max_value,
              _) = database.get_stat(stat + "_id", stat, best, disc_id, maximize)
+
+            best_or_worst_ever_id = database.get_most_extreme_stat(stat, best, maximize)[0]
+            stat_is_gold = best_or_worst_ever_id == disc_id
+            if stat_is_gold:
+                if best:
+                    any_gold_best = True
+                else:
+                    any_gold_worst = True
 
             pretty_stat = stat.capitalize() if len(stat) > 3 else stat.upper()
             stat_index = api_util.STAT_COMMANDS.index(stat)
@@ -239,12 +250,22 @@ def get_game_stats(disc_id, database):
             pretty_desc = f"{pretty_quantity} {pretty_stat}"
 
             if best:
-                best_stats.append((pretty_desc, stat_count, api_util.round_digits(min_or_max_value)))
+                best_stats.append(
+                    (
+                        [pretty_desc, stat_count, api_util.round_digits(min_or_max_value)],
+                        stat_is_gold
+                    )
+                )
             else:
-                worst_stats.append((pretty_desc, stat_count, api_util.round_digits(min_or_max_value)))
+                worst_stats.append(
+                    (
+                        [pretty_desc, stat_count, api_util.round_digits(min_or_max_value)],
+                        stat_is_gold
+                    )
+                )
 
     return {
-        "game_stats": [best_stats, worst_stats]
+        "game_stats": [(best_stats, any_gold_best), (worst_stats, any_gold_worst)]
     }
 
 @user_page.route("/<disc_id>")
@@ -267,6 +288,8 @@ def user(disc_id):
     if avatar is not None:
         avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
+    start_db_io = time()
+    database.start_persistent_connection()
     intfar_data = get_intfar_data(disc_id, database)
     intfar_relation_data = get_intfar_relations_data(disc_id, bot_conn, database)
     doinks_data = get_doinks_data(disc_id, database)
@@ -275,6 +298,10 @@ def user(disc_id):
     tokens_data = get_betting_tokens_data(disc_id, database)
     game_stat_data = get_game_stats(disc_id, database)
     most_reports_id = database.get_max_reports_details()[1]
+    database.close_persistent_connection()
+    end_db_io = time()
+
+    print(f"Time taken for DB IO: {end_db_io - start_db_io} seconds.", flush=True)
 
     context = {
         "disc_id": disc_id, "nickname": nickname, "avatar": avatar,

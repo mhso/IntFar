@@ -6,13 +6,6 @@
     <div class="navbar-active-game{% if game_duration %} game-active{% endif %}">
         Active game: <span class="active-game-mode">{{ game_mode }} on {{ game_map }}</span><br>
         Time since start: <span class="active-game-duration"></span>
-        <script>
-            {% if game_duration %}
-            gameIsActive = true;
-            updateDuration({{ game_duration }});
-            {% endif %}
-            startMonitor();
-        </script>
     </div>
     <div class="navbar-user">
         <a class="navbar-username d-none d-sm-inline" href="{% if discord_id %} {{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
@@ -26,4 +19,12 @@
         </a>
     </div>
 </div>
+<script src="{{ url_for('static', filename='js/game_monitor.js') }}"></script>
+<script>
+    {% if game_duration %}
+    gameIsActive = true;
+    updateDuration({{ game_duration }});
+    {% endif %}
+    startMonitor();
+</script>
 {%- endmacro %}
