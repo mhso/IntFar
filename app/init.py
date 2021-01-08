@@ -1,3 +1,4 @@
+from multiprocessing import Lock
 from flask import Flask
 from flask_cors import CORS
 from logging.config import dictConfig
@@ -24,12 +25,14 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
 
     # Set up the blueprints for all the pages/routes.
     from app.routes import index, users, verify, betting, doinks, stats, errors
+    from app.util import create_session_id
     web_app.register_blueprint(index.start_page, url_prefix=root)
     web_app.register_blueprint(users.user_page, url_prefix=root + "user/")
     web_app.register_blueprint(verify.verify_page, url_prefix=root + "verify/")
     web_app.register_blueprint(betting.betting_page, url_prefix=root + "betting/")
     web_app.register_blueprint(doinks.doinks_page, url_prefix=root + "doinks/")
     web_app.register_blueprint(stats.stats_page, url_prefix=root + "stats/")
+    web_app.before_request(create_session_id)
     web_app.register_error_handler(500, errors.handle_internal_error)
     web_app.register_error_handler(404, errors.handle_missing_page_error)
 
@@ -42,6 +45,9 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     web_app.config["LOGGED_IN_USERS"] = {}
     web_app.config["RIOT_API"] = riot_api
     web_app.config["ACTIVE_GAME"] = None
+    web_app.config["USER_COUNT"] = 0
+    web_app.config["CONN_MAP"] = {}
+    web_app.config["CONN_LOCK"] = Lock()
 
     web_app.secret_key = open("app/static/secret.txt").readline()
 

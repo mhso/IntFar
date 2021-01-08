@@ -36,8 +36,10 @@
                 <p id="bet-payout">
                     Minimum Payout: <span id="bet-payout-value">0 GBP</span>
                 </p>
-                <button id="bet-add-event" onclick="addEvent();">Add Event</button>
-                <button id="bet-submit" disabled onclick="makeBet(this);">
+                <button id="bet-add-event" class="cooldown-btn" onclick="buttonClick(this, addEvent);">
+                    <span>Add Event</span>
+                </button>
+                <button id="bet-submit" class="cooldown-btn" disabled onclick="buttonClick(this, makeBet, this);">
                     <span id="bet-submit-text">Finalize Bet</span>
                     <div class="loading-icon d-none"></div>
                 </button>

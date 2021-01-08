@@ -7,10 +7,10 @@ from api.bets import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
-def get_bets(bot_conn, database, only_active):
+def get_bets(database, only_active):
     all_bets = database.get_bets(only_active)
-    names = discord_request(bot_conn, "func", "get_discord_nick", None)
-    avatars = discord_request(bot_conn, "func", "get_discord_avatar", None)
+    names = discord_request("func", "get_discord_nick", None)
+    avatars = discord_request("func", "get_discord_avatar", None)
     avatars = [
         flask.url_for("static", filename=avatar.replace("app/static/", ""))
         for avatar in avatars
@@ -31,14 +31,13 @@ def get_bets(bot_conn, database, only_active):
 @betting_page.route('/')
 def home():
     database = flask.current_app.config["DATABASE"]
-    bot_conn = flask.current_app.config["BOT_CONN"]
-    resolved_bets = get_bets(bot_conn, database, False)
-    active_bets = get_bets(bot_conn, database, True)
+    resolved_bets = get_bets(database, False)
+    active_bets = get_bets(database, True)
     logged_in_user = get_user_details()[0]
 
     all_events = [(bet_id, bet_id.replace("_", " ").capitalize()) for bet_id in BETTING_IDS]
     all_ids = [x[0] for x in database.summoners]
-    all_names = discord_request(bot_conn, "func", "get_discord_nick", None)
+    all_names = discord_request("func", "get_discord_nick", None)
 
     token_balance = "?"
     if logged_in_user is not None:
@@ -54,7 +53,6 @@ def home():
 def get_payout():
     data = flask.request.get_json()
     betting_handler = flask.current_app.config["BET_HANDLER"]
-    bot_conn = flask.current_app.config["BOT_CONN"]
     events = data["events"]
     amounts = data["amounts"]
     targets = data["targets"]
@@ -64,7 +62,7 @@ def get_payout():
     except ValueError:
         pass
 
-    game_start = discord_request(bot_conn, "func", "get_game_start", None)
+    game_start = discord_request("func", "get_game_start", None)
     duration = 0 if game_start is None else time() - game_start
     if duration > 60 * MAX_BETTING_THRESHOLD:
         return make_json_response("Error: Game is too far progressed to create bet bet amount value.", 400)
@@ -94,7 +92,6 @@ def create_bet():
     data = flask.request.get_json()
     database = flask.current_app.config["DATABASE"]
     betting_handler = flask.current_app.config["BET_HANDLER"]
-    bot_conn = flask.current_app.config["BOT_CONN"]
     events = [int(x) for x in data["events"]]
     event_strs = []
     for event in events:
@@ -113,7 +110,7 @@ def create_bet():
     if disc_id is None or logged_in_user is None:
         return make_json_response("Error: You need to be logged in to place a bet.", 403)
 
-    game_start = discord_request(bot_conn, "func", "get_game_start", None)
+    game_start = discord_request("func", "get_game_start", None)
 
     success, response, placed_bet_data = betting_handler.place_bet(
         int(disc_id), amounts, game_start, event_strs, targets, target_names
@@ -144,7 +141,7 @@ def create_bet():
         response = response.replace("Multi-bet successfully placed! ", "")
     disc_msg += response
 
-    discord_request(bot_conn, "func", "send_message_unprompted", disc_msg)
+    discord_request("func", "send_message_unprompted", disc_msg)
 
     return make_json_response(bet_data, 200)
 
@@ -152,7 +149,6 @@ def create_bet():
 def delete_bet():
     data = flask.request.form
     betting_handler = flask.current_app.config["BET_HANDLER"]
-    bot_conn = flask.current_app.config["BOT_CONN"]
     conf = flask.current_app.config["APP_CONFIG"]
 
     disc_id = data["disc_id"]
@@ -165,7 +161,7 @@ def delete_bet():
     ticket = None if data["betType"] == "single" else int(data["betId"])
     bet_id = None if data["betType"] == "multi" else int(data["betId"])
 
-    game_start = discord_request(bot_conn, "func", "get_game_start", None)
+    game_start = discord_request("func", "get_game_start", None)
 
     success, cancel_data = betting_handler.delete_bet(int(disc_id), bet_id, ticket, game_start)
 
@@ -190,6 +186,6 @@ def delete_bet():
         disc_msg += f"Multi-bet with ticket ID {ticket} for {amount_refunded} {tokens_name} successfully cancelled.\n"
     disc_msg += f"Your {tokens_name} balance is now `{new_balance}`."
 
-    discord_request(bot_conn, "func", "send_message_unprompted", disc_msg)
+    discord_request("func", "send_message_unprompted", disc_msg)
 
     return make_json_response(return_data, 200)

@@ -4,7 +4,26 @@ import secrets
 from time import time
 from hashlib import sha256
 
-def discord_request(pipe, command_types, commands, params):
+def register_discord_connection():
+    bot_conn = flask.current_app.config["BOT_CONN"]
+    conn_map = flask.current_app.config["CONN_MAP"]
+    conn_lock = flask.current_app.config["CONN_LOCK"]
+    sess_id = flask.session["user_id"]
+
+    conn_lock.acquire()
+    new_conn = discord_request("register", None, None, bot_conn)
+    conn_lock.release()
+
+    conn_map[sess_id] = new_conn
+
+def create_session_id():
+    conn_map = flask.current_app.config["CONN_MAP"]
+    if "user_id" not in flask.session or flask.session["user_id"] not in conn_map:
+        flask.current_app.config["USER_COUNT"] = flask.current_app.config["USER_COUNT"] + 1
+        flask.session["user_id"] = flask.current_app.config["USER_COUNT"]
+        register_discord_connection()
+
+def discord_request(command_types, commands, params, pipe=None):
     """
     Request some information from the Discord API.
     This is done by using a pipe to the separate process hosting the Discord Bot.
@@ -17,37 +36,50 @@ def discord_request(pipe, command_types, commands, params):
     @param params Parameters for each of the command_types/commands.
     Can either be a value, a tuple of values, or a list of values or tuple of values.
     """
+    # if "user_id" not in flask.session or flask.session["user_id"] not in conn_map:
+    #     create_session_id()
+
+    sess_id = flask.session["user_id"]
+    conn_map = flask.current_app.config["CONN_MAP"]
+    if pipe is None:
+        pipe = conn_map[sess_id]
+
     args_tuple = (command_types, commands, params)
     any_list = any(isinstance(x, list) for x in args_tuple)
+    command_type_list = command_types
+    command_list = commands
+    param_list = params
     if not any_list:
-        command_types = [command_types]
-        commands = [commands]
-        params = [params]
+        command_type_list = [command_types]
+        command_list = [commands]
+        param_list = [params]
     else:
         max_len_args = max(len(x) for x in args_tuple if isinstance(x, list))
         if not isinstance(commands, list):
-            commands = [commands for _ in range(max_len_args)]
+            command_list = [commands for _ in range(max_len_args)]
         if not isinstance(command_types, list):
-            command_types = [command_types for _ in range(max_len_args)]
+            command_type_list = [command_types for _ in range(max_len_args)]
         if not isinstance(params, list):
-            params = [params for _ in range(max_len_args)]
+            param_list = [params for _ in range(max_len_args)]
 
     tuple_params = []
-    for param in params:
+    for param in param_list:
         if not isinstance(param, tuple):
             tuple_params.append((param,))
         else:
             tuple_params.append(param)
-
-    pipe.send((command_types, commands, tuple_params))
-    result = pipe.recv()
-    return result if any_list else result[0]
+    try:
+        pipe.send((sess_id, command_type_list, command_list, tuple_params))
+        result = pipe.recv()
+        return result if any_list else result[0]
+    except (EOFError, BrokenPipeError): # We timed out. Re-establish connection and try again.
+        register_discord_connection()
+        return discord_request(command_types, commands, params, conn_map[sess_id])
 
 def get_game_info():
     active_game = flask.current_app.config["ACTIVE_GAME"]
     if active_game is None:
-        bot_conn = flask.current_app.config["BOT_CONN"]
-        active_game = discord_request(bot_conn, "func", "get_active_game", None)
+        active_game = discord_request("func", "get_active_game", None)
         if active_game is None:
             return None
         flask.current_app.config["ACTIVE_GAME"] = active_game
@@ -74,7 +106,6 @@ def get_logged_in_user(database, user_id):
 
 def get_user_details():
     database = flask.current_app.config["DATABASE"]
-    bot_conn = flask.current_app.config["BOT_CONN"]
     logged_in_user = get_logged_in_user(database, flask.request.cookies.get("user_id"))
 
     if flask.current_app.config["LOGGED_IN_USERS"].get(logged_in_user) is not None:
@@ -83,7 +114,7 @@ def get_user_details():
     logged_in_name = "Unknown"
     logged_in_avatar = None
     if logged_in_user is not None:
-        discord_data = discord_request(bot_conn, "func", ["get_discord_nick", "get_discord_avatar"], logged_in_user)
+        discord_data = discord_request("func", ["get_discord_nick", "get_discord_avatar"], logged_in_user)
         logged_in_name = discord_data[0]
         avatar = discord_data[1]
         if avatar is not None:

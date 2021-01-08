@@ -10,7 +10,7 @@ user_page = flask.Blueprint("users", __name__, template_folder="templates")
 def user_unknown():
     return flask.render_template("no_user.html")
 
-def get_intfar_relations_data(disc_id, bot_conn, database):
+def get_intfar_relations_data(disc_id, database):
     relations_data = []
     games_relations, intfars_relations = database.get_intfar_relations(disc_id)
     for discord_id, total_games in games_relations.items():
@@ -22,14 +22,14 @@ def get_intfar_relations_data(disc_id, bot_conn, database):
     relations_data.sort(key=lambda x: x[2], reverse=True)
 
     avatars = discord_request(
-        bot_conn, "func", "get_discord_avatar", [x[0] for x in relations_data]
+        "func", "get_discord_avatar", [x[0] for x in relations_data]
     )
     avatars = [
         flask.url_for("static", filename=avatar.replace("app/static/", ""))
         for avatar in avatars
     ]
     nicknames = discord_request(
-        bot_conn, "func", "get_discord_nick", [x[0] for x in relations_data]
+        "func", "get_discord_nick", [x[0] for x in relations_data]
     )
     full_data = [
         (x,) + y + (z,)
@@ -70,7 +70,7 @@ def get_intfar_data(disc_id, database):
         "most_intfars": max_intfar_id == disc_id
     }
 
-def get_doinks_relations_data(disc_id, bot_conn, database):
+def get_doinks_relations_data(disc_id, database):
     relations_data = []
     games_relations, doinks_relations = database.get_doinks_relations(disc_id)
     for discord_id, total_games in games_relations.items():
@@ -82,14 +82,14 @@ def get_doinks_relations_data(disc_id, bot_conn, database):
     relations_data.sort(key=lambda x: x[2], reverse=True)
 
     avatars = discord_request(
-        bot_conn, "func", "get_discord_avatar", [x[0] for x in relations_data]
+        "func", "get_discord_avatar", [x[0] for x in relations_data]
     )
     avatars = [
         flask.url_for("static", filename=avatar.replace("app/static/", ""))
         for avatar in avatars
     ]
     nicknames = discord_request(
-        bot_conn, "func", "get_discord_nick", [x[0] for x in relations_data]
+        "func", "get_discord_nick", [x[0] for x in relations_data]
     )
     full_data = [
         (x,) + y + (z,)
@@ -112,12 +112,12 @@ def get_doinks_data(disc_id, database):
         "most_doinks": max_doinks_id == disc_id
     }
 
-def get_bets(disc_id, database, bot_conn, only_active):
+def get_bets(disc_id, database, only_active):
     bets = database.get_bets(only_active, disc_id)
     if bets is None:
         return []
 
-    names = discord_request(bot_conn, "func", "get_discord_nick", None)
+    names = discord_request("func", "get_discord_nick", None)
     names_dict = dict(zip((x[0] for x in database.summoners), names))
     presentable_data = []
 
@@ -129,12 +129,11 @@ def get_bets(disc_id, database, bot_conn, only_active):
     presentable_data.sort(key=lambda x: x[0][0], reverse=True)
     return presentable_data
 
-def get_betting_data(disc_id, database, bot_conn):
+def get_betting_data(disc_id, database):
     database = flask.current_app.config["DATABASE"]
-    bot_conn = flask.current_app.config["BOT_CONN"]
 
-    resolved_bets = get_bets(disc_id, database, bot_conn, False)
-    active_bets = get_bets(disc_id, database, bot_conn, True)
+    resolved_bets = get_bets(disc_id, database, False)
+    active_bets = get_bets(disc_id, database, True)
     bets = database.get_bets(False, disc_id)
 
     betting_stats = []
@@ -191,7 +190,7 @@ def get_betting_data(disc_id, database, bot_conn):
         most_often_target, most_often_target_count = max(target_counts.items(), key=lambda x: x[1])
         if most_often_target_count > 0:
             most_often_target_name = discord_request(
-                bot_conn, "func", "get_discord_nick", most_often_target
+                "func", "get_discord_nick", most_often_target
             )
             most_often_target_desc = f"{most_often_target_name} ({most_often_target_count} times)"
         else:
@@ -278,13 +277,12 @@ def user(disc_id):
 
     disc_id = int(disc_id)
     database = flask.current_app.config["DATABASE"]
-    bot_conn = flask.current_app.config["BOT_CONN"]
 
     if not database.user_exists(disc_id):
         flask.abort(404)
 
     discord_data = discord_request(
-        bot_conn, ["func", "func"], ["get_discord_nick", "get_discord_avatar"], [disc_id, (disc_id, 128)]
+        ["func", "func"], ["get_discord_nick", "get_discord_avatar"], [disc_id, (disc_id, 128)]
     )
     nickname = discord_data[0]
     avatar = discord_data[1]
@@ -293,10 +291,10 @@ def user(disc_id):
 
     database.start_persistent_connection()
     intfar_data = get_intfar_data(disc_id, database)
-    intfar_relation_data = get_intfar_relations_data(disc_id, bot_conn, database)
+    intfar_relation_data = get_intfar_relations_data(disc_id, database)
     doinks_data = get_doinks_data(disc_id, database)
-    doinks_relation_data = get_doinks_relations_data(disc_id, bot_conn, database)
-    betting_data = get_betting_data(disc_id, database, bot_conn)
+    doinks_relation_data = get_doinks_relations_data(disc_id, database)
+    betting_data = get_betting_data(disc_id, database)
     tokens_data = get_betting_tokens_data(disc_id, database)
     game_stat_data = get_game_stats(disc_id, database)
     most_reports_id = database.get_max_reports_details()[1]

@@ -1,13 +1,13 @@
 import random
 import asyncio
-import requests
-from typing import Coroutine
-import discord
-from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
 from time import time
 from traceback import print_exc
 from datetime import datetime
+import requests
+import discord
+from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
 from discbot.montly_intfar import MonthlyIntfar
+from discbot.app_listener import listen_for_request
 from api import game_stats, bets
 from api.database import DBException
 import api.util as api_util
@@ -215,7 +215,7 @@ def get_streak_flavor_text(nickname, streak):
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 class DiscordClient(discord.Client):
-    def __init__(self, config, database, betting_handler, riot_api, pipe_conn, flask_conn=None):
+    def __init__(self, config, database, betting_handler, riot_api, **kwargs):
         super().__init__(
             intents=discord.Intents(members=True,
                                     voice_states=True,
@@ -223,11 +223,12 @@ class DiscordClient(discord.Client):
                                     emojis=True,
                                     guild_messages=True)
         )
-        self.riot_api = riot_api
         self.config = config
         self.database = database
-        self.pipe_conn = pipe_conn
-        self.flask_conn = flask_conn
+        self.riot_api = riot_api
+        self.betting_handler = betting_handler
+        self.main_conn = kwargs.get("main_pipe")
+        self.flask_conn = kwargs.get("flask_pipe")
         self.cached_avatars = {}
         self.users_in_game = None
         self.active_game = None
@@ -238,7 +239,6 @@ class DiscordClient(discord.Client):
         self.polling_active = False
         self.last_message_time = {}
         self.timeout_length = {}
-        self.betting_handler = betting_handler
         self.time_initialized = datetime.now()
 
     def send_game_update(self, endpoint, data):
@@ -394,8 +394,8 @@ class DiscordClient(discord.Client):
             self.active_game = {
                 "id": active_game["gameId"],
                 "start": active_game_start,
-                "map_id": game_data["mapId"],
-                "game_mode": game_data["gameMode"]
+                "map_id": active_game["mapId"],
+                "game_mode": active_game["gameMode"]
             }
 
             self.game_start = active_game_start
@@ -1315,7 +1315,7 @@ class DiscordClient(discord.Client):
                 await guild.chunk()
 
         if self.flask_conn is not None: # Listen for external commands from web page.
-            asyncio.create_task(self.listen_for_external_command())
+            asyncio.create_task(listen_for_request(self))
 
     async def handle_helper_msg(self, message):
         """
@@ -2406,7 +2406,7 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "restart"):
                 response = self.insert_emotes("I will kill myself and come back stronger! {emote_nazi}")
                 await message.channel.send(response)
-                self.pipe_conn.send("We restarting!")
+                self.main_conn.send("We restarting!")
                 exit(0)
 
     async def send_message_unprompted(self, message):
@@ -2418,28 +2418,9 @@ class DiscordClient(discord.Client):
         elif before.channel is not None and after.channel is None: # User left.
             await self.user_left_voice(member.id)
 
-    async def listen_for_external_command(self):
-        while True:
-            if self.flask_conn.poll():
-                command_types, commands, paramses = self.flask_conn.recv()
-                results = []
-                for (command_type, command, params) in zip(command_types, commands, paramses):
-                    result = None
-                    if command_type == "func":
-                        if params[0] is None and len(params) == 1:
-                            result = self.__getattribute__(command)()
-                        else:
-                            result = self.__getattribute__(command)(*params)
-
-                        if isinstance(result, Coroutine):
-                            result = await result
-                    elif command_type == "bot_command":
-                        pass # Do bot command.
-                    results.append(result)
-
-                self.flask_conn.send(results)
-            await asyncio.sleep(0.05)
-
 def run_client(config, database, betting_handler, riot_api, main_pipe, flask_pipe):
-    client = DiscordClient(config, database, betting_handler, riot_api, main_pipe, flask_pipe)
+    client = DiscordClient(
+        config, database, betting_handler, riot_api,
+        main_pipe=main_pipe, flask_pipe=flask_pipe
+    )
     client.run(config.discord_token)

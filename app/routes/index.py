@@ -10,7 +10,6 @@ start_page = flask.Blueprint("index", __name__, template_folder="templates")
 @start_page.route('/index')
 def index():
     database = flask.current_app.config["DATABASE"]
-    bot_conn = flask.current_app.config["BOT_CONN"]
     curr_month = current_month()
 
     intfar_all_data = []
@@ -30,13 +29,13 @@ def index():
             (disc_id, games_played_monthly, len(intfar_reason_ids_monthly), pct_intfar_monthly)
         )
 
-    avatars = discord_request(bot_conn, "func", "get_discord_avatar", None)
+    avatars = discord_request("func", "get_discord_avatar", None)
     if avatars is not None:
         avatars = [
             flask.url_for("static", filename=avatar.replace("app/static/", ""))
             for avatar in avatars
         ]
-    nicknames = discord_request(bot_conn, "func", "get_discord_nick", None)
+    nicknames = discord_request("func", "get_discord_nick", None)
 
     intfar_all_data = [
         (x,) + y + (z,)
@@ -74,14 +73,19 @@ def active_game_started():
     conf = flask.current_app.config["APP_CONFIG"]
 
     secret = data.get("secret")
+    print(f"Secret: {secret}", flush=True)
+    print(f"Headers: {flask.request.headers}")
 
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))
 
-    del data["secret"]
+    saved_data = dict(data)
+    del saved_data["secret"]
+    saved_data["start"] = float(saved_data["start"])
+    saved_data["map_id"] = int(saved_data["start"])
 
-    flask.current_app.config["ACTIVE_GAME"] = data
-    print(f"SAVING ACTIVE GAME: {data}", flush=True)
+    flask.current_app.config["ACTIVE_GAME"] = saved_data
+    print(f"SAVING ACTIVE GAME: {saved_data}", flush=True)
     return flask.make_response(("Success! Active game ID updated.", 200))
 
 @start_page.route("/game_ended", methods=["POST"])
@@ -90,6 +94,8 @@ def active_game_ended():
     conf = flask.current_app.config["APP_CONFIG"]
 
     secret = data.get("secret")
+    print(f"Secret: {secret}", flush=True)
+    print(f"Headers: {flask.request.headers}")
 
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))

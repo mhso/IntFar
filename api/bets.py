@@ -256,7 +256,7 @@ class BettingHandler:
         stat = BETTING_STATS[stat_id]
         best_in_stat_count = self.database.get_stat(stat + "_id", stat, True, target)[0]
         num_games = self.database.get_intfar_stats(target)[0]
-        return best_in_stat_count / num_games
+        return best_in_stat_count / num_games if num_games == 0 else 0
 
     def get_dynamic_bet_return(self, event_id, target):
         if event_id > 1:
@@ -272,7 +272,7 @@ class BettingHandler:
             elif event_id < 20:
                 ratio = self.get_stats_return(target, event_id - 16)
 
-            if ratio == 0.0: # If event has never happened, return the "base" ratio.
+            if ratio <= 0.0001: # If event has never happened, return the "base" ratio.
                 return self.database.get_base_bet_return(event_id)
 
             return 1 / ratio
@@ -526,7 +526,7 @@ class BettingHandler:
             return (False, "Bet was not cancelled: Game is underway!")
 
         if self.database.get_better_id(bet_id, ticket) != disc_id:
-            return (False, "Bet was not cancelled: You don't own this bet!")
+            return (False, "Bet was not cancelled: Bet does not exist, or you don't own the bet!")
 
         if ticket is None:
             amount_refunded = self.database.cancel_bet(bet_id, disc_id)

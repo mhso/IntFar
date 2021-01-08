@@ -1,7 +1,7 @@
 {% macro entry(name, better_id, logged_in_user, events, result, payout, avatar) -%}
 {% for bet_id, event, amount in events %}
 <tr class="bets-list-entry list-entry{% if loop.first and loop.last %} bet-single{% elif loop.first %} bet-main{% else %} bet-follow{% endif %}"
-    data-betid="{{ bet_id }}"{% if result and result != -1 and result != 1 %}data-ticket="{{ result }}"{% endif %}>
+    data-bet_id="{{ bet_id }}"{% if result and result != -1 and result != 1 %}data-ticket="{{ result }}"{% endif %}>
     {% if avatar %}
     <td>{% if loop.first %}
         <a href="{{ url_for('users.user', disc_id=better_id) }}">
