@@ -1,5 +1,6 @@
 import random
 import asyncio
+from threading import Thread
 from time import time
 from traceback import print_exc
 from datetime import datetime
@@ -239,6 +240,7 @@ class DiscordClient(discord.Client):
         self.polling_active = False
         self.last_message_time = {}
         self.timeout_length = {}
+        self.app_listener_thread = None
         self.time_initialized = datetime.now()
 
     def send_game_update(self, endpoint, data):
@@ -650,7 +652,7 @@ class DiscordClient(discord.Client):
                     # Someone now has the most betting tokens!
                     max_tokens = tokens_now
                     new_max_tokens_holder = disc_id
-                    max_tokens_name = disc_id
+                    max_tokens_name = self.get_discord_nick(disc_id)
 
         if new_max_tokens_holder is not None:
             # This person now has the most tokens of all users!
@@ -668,7 +670,7 @@ class DiscordClient(discord.Client):
         Returns a string describing people who have been redeemed by playing
         exceptionally well.
         Criteria for being redeemed:
-            - Having a KDA of 10+
+            - Having a KDA of 10 or more
             - Getting more than 20 kills
             - Doing more damage than the rest of the team combined
             - Getting a penta-kill
@@ -680,7 +682,7 @@ class DiscordClient(discord.Client):
         for disc_id, stats in data:
             mention_list = []
             kda = game_stats.calc_kda(stats)
-            if kda > 10.0:
+            if kda >= 10.0:
                 mention_list.append((0, api_util.round_digits(kda)))
             if stats["kills"] > 20:
                 mention_list.append((1, stats["kills"]))
@@ -1315,7 +1317,8 @@ class DiscordClient(discord.Client):
                 await guild.chunk()
 
         if self.flask_conn is not None: # Listen for external commands from web page.
-            asyncio.create_task(listen_for_request(self))
+            event_loop = asyncio.get_event_loop()
+            self.app_listener_thread = Thread(target=listen_for_request, args=(self, event_loop)).start()
 
     async def handle_helper_msg(self, message):
         """
@@ -2302,7 +2305,6 @@ class DiscordClient(discord.Client):
             self.timeout_length[message.author.id] = 0 # Reset timeout length.
 
             second_command = None if len(split) < 2 else split[1].lower()
-            third_command = None if len(split) < 3 else split[2].lower()
             if cmd_equals(first_command, "register"): # Register the user who sent the command.
                 if len(split) > 1:
                     summ_name = " ".join(split[1:])

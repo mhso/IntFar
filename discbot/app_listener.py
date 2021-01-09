@@ -1,15 +1,15 @@
 import asyncio
-from time import time
+from time import time, sleep
 from typing import Coroutine
 from multiprocessing import Pipe
 from multiprocessing.connection import wait
 
-async def listen_for_request(disc_client):
+def listen_for_request(disc_client, event_loop):
     max_timeout = 60
     max_connections = 100
     timeouts = {}
     connections = {0: disc_client.flask_conn}
-    while True:
+    while not disc_client.is_closed():
         for conn in wait(connections.values(), 0.001): # Loop through pending connections.
             try:
                 conn_id, command_types, commands, paramses = conn.recv()
@@ -32,7 +32,8 @@ async def listen_for_request(disc_client):
                         else:
                             result = disc_client.__getattribute__(command)(*params)
                         if isinstance(result, Coroutine):
-                            result = await result
+                            future = asyncio.run_coroutine_threadsafe(result, event_loop)
+                            result = future.result(3)
                     elif command_type == "bot_command":
                         pass # Do bot command.
                     results.append(result)
@@ -54,4 +55,4 @@ async def listen_for_request(disc_client):
             connections[conn_id].close()
             del connections[conn_id]
 
-        await asyncio.sleep(0.01)
+        sleep(0.01)

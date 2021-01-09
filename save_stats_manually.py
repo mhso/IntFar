@@ -47,7 +47,7 @@ class TestMock(DiscordClient):
             intfar, intfar_reason, doinks = betting_data
             await asyncio.sleep(1)
             if self.task in ("all", "bets"):
-                if self.loud:
+                if not self.loud:
                     self.channel_to_write = MockChannel()
 
                 await self.resolve_bets(filtered, intfar, intfar_reason, doinks)

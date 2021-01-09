@@ -3,7 +3,7 @@ from datetime import tzinfo, timedelta, datetime
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
-    "KDA larger than 10", "More than 20 kills", "Half of the teams damage",
+    "KDA larger than or equal to 10", "More than 20 kills", "Half of the teams damage",
     "Getting a pentakill", "Vision score larger than 100",
     "Kill participation over 80%", "Securing all epic monsters"
 ]

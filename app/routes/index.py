@@ -73,8 +73,6 @@ def active_game_started():
     conf = flask.current_app.config["APP_CONFIG"]
 
     secret = data.get("secret")
-    print(f"Secret: {secret}", flush=True)
-    print(f"Headers: {flask.request.headers}")
 
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))
@@ -94,8 +92,6 @@ def active_game_ended():
     conf = flask.current_app.config["APP_CONFIG"]
 
     secret = data.get("secret")
-    print(f"Secret: {secret}", flush=True)
-    print(f"Headers: {flask.request.headers}")
 
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))
