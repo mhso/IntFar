@@ -8,8 +8,8 @@
         <h1>Betting</h1>
         
         <div class="row">
-            <div class="d-none d-sm-block col-lg-3"></div>
-            <div id="make-bet-wrapper" class="col-xs-12 col-lg-3">
+            <div class="d-lg-block col-lg-1 d-xl-none"></div>
+            <div id="make-bet-wrapper" class="col-12 col-lg-4">
                 <h2>Make Bet</h2>
                 <select id="bet-event" onchange="betEventChanged();">
                     {% for event_id, event_name in bet_events %}
@@ -45,7 +45,8 @@
                 </button>
                 <p id="bet-status"></p>
             </div>
-            <div class="col-xs-12 col-lg-4">
+            <div class="d-md-block col-md-2 d-lg-none"></div>
+            <div class="col-12 col-md-8 col-lg-6 col-xl-4">
                 <h2>Current Bet</h2>
                 <div id="bet-events-wrapper">
                     <table id="bet-events-list">
@@ -58,27 +59,9 @@
                     </table>
                 </div>
             </div>
-            <div class="d-none d-sm-block col-lg-3"></div>
-        </div>
-
-        <div id="bets-lists-wrapper" class="row">
-            <div class="d-none d-sm-block col-lg-1 order-lg-1"></div>
-            <div id="bets-all" class="col-xs-12 col-lg-5 order-last order-lg-2">
-                <h2>All Bets</h2>
-                <table class="nice-table">
-                    <tr class="list-first list-entry">
-                        <th class="d-none d-sm-block"></th>
-                        <th>By</th>
-                        <th>Event</th>
-                        <th>GBP</th>
-                        <th>Result</th>
-                    </tr>
-                    {% for better_id, name, events, result, payout, avatar in resolved_bets %}
-                        {{ list_entry.entry(name, better_id, logged_in_user, events, result, payout, avatar) }}
-                    {% endfor %}
-                </table>
-            </div>
-            <div id="bets-active" class="col-xs-12 col-lg-5 order-first order-lg-3">
+            <div class="d-none d-md-block col-md-2 d-lg-block col-lg-1 d-xl-none"></div>
+            <div class="d-none d-lg-block col-lg-2 d-xl-none"></div>
+            <div id="bets-active" class="col-12 col-lg-8 col-xl-4">
                 <h2>Active Bets</h2>
                 {% if active_bets == [] %}
                 <p id="no-active-bets">There are currently no active bets.</p>
@@ -96,7 +79,54 @@
                     {% endfor %}
                 </table>
             </div>
-            <div class="d-none d-sm-block col-lg-1 order-lg-4"></div>
+            <div class="d-none d-lg-block col-lg-2 d-xl-none"></div>
+        </div>
+
+        <div id="bets-lists-wrapper" class="row">
+            <div class="d-none d-sm-block col-sm-1 d-md-block col-md-2 d-lg-block col-lg-3 d-xl-none d-xxl-block col-xxl-1"></div>
+            <div id="tokens-all" class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-4">
+                <h2>Good-Boi Points</h2>
+                <table class="nice-table">
+                    <tr class="list-first list-entry">
+                        <th class="d-none d-sm-block"></th>
+                        <th>Lad</th>
+                        <th>Points</th>
+                    </tr>
+                    {% for disc_id, name, tokens, avatar in all_token_balances %}
+                    <tr class="list-entry tokens-list-entry">
+                        <td>
+                            <a href="{{ url_for('users.user', disc_id=disc_id) }}">
+                                <img src="{{ avatar }}" class="discord-avatar">
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('users.user', disc_id=disc_id) }}">
+                                {{ name }}
+                            </a>
+                        </td>
+                        <td>{{ tokens }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <div class="d-none  d-sm-block col-sm-1 d-md-block col-md-2 d-lg-block col-lg-3 d-xl-none col-xxl-1"></div>
+            <div class="d-none d-sm-block d-lg-block col-lg-1 d-xl-none col-xxl-1"></div>
+            <div id="bets-all" class="col-12 col-lg-10 col-xl-8 col-xxl-6">
+                <h2>All Bets</h2>
+                <table class="nice-table">
+                    <tr class="list-first list-entry">
+                        <th class="d-none d-sm-block"></th>
+                        <th>By</th>
+                        <th>Event</th>
+                        <th>GBP</th>
+                        <th>Result</th>
+                    </tr>
+                    {% for better_id, name, events, result, payout, avatar in resolved_bets %}
+                        {{ list_entry.entry(name, better_id, logged_in_user, events, result, payout, avatar) }}
+                    {% endfor %}
+                </table>
+            </div>
+            <div class="d-none d-lg-block col-lg-1 d-xl-none d-xxl-block"></div>
         </div>
     </div>
 </body>

@@ -43,15 +43,26 @@ def home():
     all_events = [(bet_id, bet_id.replace("_", " ").capitalize()) for bet_id in BETTING_IDS]
     all_ids = [x[0] for x in database.summoners]
     all_names = app_util.discord_request("func", "get_discord_nick", None)
+    all_avatars = app_util.discord_request("func", "get_discord_avatar", None)
 
-    token_balance = "?"
+    all_balances = database.get_token_balance()
+    all_token_balances = []
+    for balance, disc_id in all_balances:
+        index = all_ids.index(disc_id)
+        name = all_names[index]
+        avatar = flask.url_for("static", filename=all_avatars[index].replace("app/static/", ""))
+        all_token_balances.append((disc_id, name, format_tokens_amount(balance), avatar))
+
+    user_token_balance = "?"
     if logged_in_user is not None:
-        token_balance = format_tokens_amount(database.get_token_balance(logged_in_user))
+        user_token_balance = format_tokens_amount(database.get_token_balance(logged_in_user))
 
     return app_util.make_template_context(
         "betting.html", resolved_bets=resolved_bets,
         active_bets=active_bets, bet_events=all_events,
-        targets=list(zip(all_ids, all_names)), token_balance=token_balance
+        targets=list(zip(all_ids, all_names)),
+        token_balance=user_token_balance,
+        all_token_balances=all_token_balances
     )
 
 @betting_page.route("/payout", methods=["POST"])

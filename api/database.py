@@ -566,10 +566,21 @@ class Database:
             query = "SELECT max_return FROM betting_events WHERE id=?"
             return self.execute_query(db, query, (event_id,)).fetchone()[0]
 
-    def get_token_balance(self, disc_id):
+    def get_token_balance(self, disc_id=None):
         with self.get_connection() as db:
-            query = "SELECT tokens FROM betting_balance WHERE disc_id=?"
-            return self.execute_query(db, query, (disc_id,)).fetchone()[0]
+            query = "SELECT tokens"
+            if disc_id is None:
+                query += ", disc_id"
+
+            query += " FROM betting_balance "
+
+            params = None
+            if disc_id is not None:
+                query += "WHERE disc_id=? "
+                params = (disc_id,)
+            query += "ORDER BY tokens DESC"
+            data = self.execute_query(db, query, params).fetchall()
+            return data if disc_id is None else data[0][0]
 
     def get_max_tokens_details(self):
         with self.get_connection() as db:

@@ -10,8 +10,8 @@
         </div>
 
         <div id="intfar-list-wrapper" class="row">
-            <div class="d-none d-sm-block col-lg-3"></div>
-            <div id="intfar-all" class="col-xs-12 col-lg-3">
+            <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 col-xl-2"></div>
+            <div id="intfar-all" class="col-xs-12 col-sm-10 col-md-8 col-lg-6 col-xl-4">
                 <h2>All Time</h2>
                 <table class="nice-table">
                     <tr class="list-first intfar-list-entry">
@@ -26,7 +26,9 @@
                     {% endfor %}
                 </table>
             </div>
-            <div id="intfar-month" class="col-xs-12 col-lg-3">
+            <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 d-xl-none"></div>
+            <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 d-xl-none"></div>
+            <div id="intfar-month" class="col-xs-12 col-sm-10 col-md-8 col-lg-6 col-xl-4">
                 <h2>For {{ curr_month }}</h2>
                 <table class="nice-table">
                     <tr class="list-first intfar-list-entry">
@@ -41,7 +43,7 @@
                     {% endfor %}
                 </table>
             </div>
-            <div class="d-none d-sm-block col-lg-3"></div>
+            <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 col-xl-2"></div>
         </div>
     </div>
 </body>
