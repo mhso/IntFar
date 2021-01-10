@@ -51,7 +51,7 @@ BETTING_DESC = {
     16: "someone getting the most kills",
     17: "someone doing the most damage",
     18: "someone having the highest kill participation",
-    19: "someone having the highest KDA",
+    19: "someone having the highest KDA"
 }
 
 BETTING_STATS = [
@@ -202,13 +202,13 @@ class BettingHandler:
         if target is None or not is_intfar:
             games_total = self.database.get_games_count()[0]
             intfars_total = self.database.get_intfar_count()[0]
-            ratio = intfars_total / games_total
+            ratio = intfars_total / games_total if games_total > 0 else 0
             if not is_intfar:
                 ratio = 1 - ratio
             return ratio
 
         games_played, intfar_reason_ids = self.database.get_intfar_stats(target)
-        return len(intfar_reason_ids) / games_played
+        return len(intfar_reason_ids), games_played
 
     def get_intfar_reason_return(self, target, reason):
         reason_count = 0
@@ -223,7 +223,7 @@ class BettingHandler:
                 if reason_id[0][reason] == "1":
                     reason_count += 1
 
-        return reason_count / num_games
+        return reason_count, num_games
 
     def get_doinks_return(self, target):
         if target is None:
@@ -234,7 +234,7 @@ class BettingHandler:
         games_played = self.database.get_intfar_stats(target)[0]
         doinks_reason_ids = self.database.get_doinks_stats(target)
 
-        return len(doinks_reason_ids) / games_played
+        return len(doinks_reason_ids), games_played
 
     def get_doinks_reason_return(self, target, reason):
         reason_count = 0
@@ -250,32 +250,35 @@ class BettingHandler:
                 if reason_id[0][reason] == "1":
                     reason_count += 1
 
-        return reason_count / num_games
+        return reason_count, num_games
 
     def get_stats_return(self, target, stat_id):
         stat = BETTING_STATS[stat_id]
         best_in_stat_count = self.database.get_stat(stat + "_id", stat, True, target)[0]
         num_games = self.database.get_intfar_stats(target)[0]
-        return best_in_stat_count / num_games if num_games == 0 else 0
+        return best_in_stat_count, num_games
 
     def get_dynamic_bet_return(self, event_id, target):
         if event_id > 1:
-            ratio = 0
+            count = 0
+            num_games = 0
             if event_id < 4:
-                ratio = self.get_intfar_return(target, event_id == 3)
+                count, num_games = self.get_intfar_return(target, event_id == 3)
             elif event_id < 8:
-                ratio = self.get_intfar_reason_return(target, event_id - 4)
+                count, num_games = self.get_intfar_reason_return(target, event_id - 4)
             elif event_id == 8:
-                ratio = self.get_doinks_return(target)
+                count, num_games = self.get_doinks_return(target)
             elif event_id < 16:
-                ratio = self.get_doinks_reason_return(target, event_id - 9)
+                count, num_games = self.get_doinks_reason_return(target, event_id - 9)
             elif event_id < 20:
-                ratio = self.get_stats_return(target, event_id - 16)
+                count, num_games = self.get_stats_return(target, event_id - 16)
 
-            if ratio <= 0.0001: # If event has never happened, return the "base" ratio.
+            if num_games == 0: # No games has been played for given target, ratio is 0.
                 return self.database.get_base_bet_return(event_id)
+            if count == 0: # Event never happened, set ratio to amount of games played.
+                return num_games
 
-            return 1 / ratio
+            return num_games / count
 
         return self.database.get_base_bet_return(event_id)
 
