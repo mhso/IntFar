@@ -1,16 +1,15 @@
 from time import time
 import flask
-from app.util import (
-    discord_request, get_user_details, make_json_response, make_template_context
-)
+import app.util as app_util
 from api.bets import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
+from api.util import format_tokens_amount
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
 def get_bets(database, only_active):
     all_bets = database.get_bets(only_active)
-    names = discord_request("func", "get_discord_nick", None)
-    avatars = discord_request("func", "get_discord_avatar", None)
+    names = app_util.discord_request("func", "get_discord_nick", None)
+    avatars = app_util.discord_request("func", "get_discord_avatar", None)
     avatars = [
         flask.url_for("static", filename=avatar.replace("app/static/", ""))
         for avatar in avatars
@@ -21,9 +20,15 @@ def get_bets(database, only_active):
     for disc_id in all_bets:
         bets = all_bets[disc_id]
         for bet_ids, amounts, events, targets, _, result_or_ticket, payout in bets:
-            event_descs = [(i, get_dynamic_bet_desc(e, names_dict.get(t)), a) for (e, t, a, i) in zip(events, targets, amounts, bet_ids)]
+            event_descs = [
+                (i, get_dynamic_bet_desc(e, names_dict.get(t)), format_tokens_amount(a))
+                for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
+            ]
             presentable_data.append(
-                (disc_id, names_dict[disc_id], event_descs, result_or_ticket, payout, avatar_dict[disc_id])
+                (
+                    disc_id, names_dict[disc_id], event_descs, result_or_ticket,
+                    format_tokens_amount(payout), avatar_dict[disc_id]
+                )
             )
     presentable_data.sort(key=lambda x: x[2][0][0], reverse=True)
     return presentable_data
@@ -33,20 +38,20 @@ def home():
     database = flask.current_app.config["DATABASE"]
     resolved_bets = get_bets(database, False)
     active_bets = get_bets(database, True)
-    logged_in_user = get_user_details()[0]
+    logged_in_user = app_util.get_user_details()[0]
 
     all_events = [(bet_id, bet_id.replace("_", " ").capitalize()) for bet_id in BETTING_IDS]
     all_ids = [x[0] for x in database.summoners]
-    all_names = discord_request("func", "get_discord_nick", None)
+    all_names = app_util.discord_request("func", "get_discord_nick", None)
 
     token_balance = "?"
     if logged_in_user is not None:
-        token_balance = database.get_token_balance(logged_in_user)
+        token_balance = format_tokens_amount(database.get_token_balance(logged_in_user))
 
-    return make_template_context(
+    return app_util.make_template_context(
         "betting.html", resolved_bets=resolved_bets,
-        active_bets=active_bets, bet_events=all_events, targets=list(zip(all_ids, all_names)),
-        token_balance=token_balance
+        active_bets=active_bets, bet_events=all_events,
+        targets=list(zip(all_ids, all_names)), token_balance=token_balance
     )
 
 @betting_page.route("/payout", methods=["POST"])
@@ -62,18 +67,21 @@ def get_payout():
     except ValueError:
         pass
 
-    game_start = discord_request("func", "get_game_start", None)
+    game_start = app_util.discord_request("func", "get_game_start", None)
     duration = 0 if game_start is None else time() - game_start
     if duration > 60 * MAX_BETTING_THRESHOLD:
-        return make_json_response("Error: Game is too far progressed to create bet bet amount value.", 400)
+        return app_util.make_json_response("Error: Game is too far progressed to create bet bet amount value.", 400)
 
     total_reward = 0
+    amounts_values = []
     for event, amount, target in zip(events, amounts, targets):
         target = None if target in ("invalid", "any") else target
         try:
-            amount = int(amount)
+            amount = betting_handler.parse_bet_amount(amount)
         except ValueError:
-            return make_json_response("Error: Invalid bet amount value.", 400)
+            return app_util.make_json_response("Error: Invalid bet amount value.", 400)
+
+        amounts_values.append(amount)
 
         value = betting_handler.get_bet_value(int(amount), int(event), duration, target)[0]
         if target is not None:
@@ -82,10 +90,10 @@ def get_payout():
         total_reward += value
 
     return_data = {
-        "cost": sum(int(x) for x in amounts),
-        "payout": int(total_reward * len(amounts))
+        "cost": format_tokens_amount(sum(int(x) for x in amounts_values)),
+        "payout": format_tokens_amount(int(total_reward * len(amounts_values)))
     }
-    return make_json_response(return_data, 200)
+    return app_util.make_json_response(return_data, 200)
 
 @betting_page.route("/create", methods=["POST"])
 def create_bet():
@@ -105,22 +113,24 @@ def create_bet():
     target_names = data["targetNames"]
     disc_id = data["disc_id"]
 
-    logged_in_user, logged_in_name, logged_in_avatar = get_user_details()
+    logged_in_user, logged_in_name, logged_in_avatar = app_util.get_user_details()
 
     if disc_id is None or logged_in_user is None:
-        return make_json_response("Error: You need to be logged in to place a bet.", 403)
+        return app_util.make_json_response("Error: You need to be logged in to place a bet.", 403)
 
-    game_start = discord_request("func", "get_game_start", None)
+    game_start = app_util.discord_request("func", "get_game_start", None)
 
     success, response, placed_bet_data = betting_handler.place_bet(
         int(disc_id), amounts, game_start, event_strs, targets, target_names
     )
 
     if not success:
-        return make_json_response(response, 400)
+        return app_util.make_json_response(response, 400)
 
     bet_id, ticket = placed_bet_data
     new_balance = database.get_token_balance(disc_id)
+
+    amounts = [betting_handler.parse_bet_amount(amount) for amount in amounts]
 
     event_descs = [
         [get_dynamic_bet_desc(e, t), a] for (e, t, a) in zip(events, target_names, amounts)
@@ -141,9 +151,9 @@ def create_bet():
         response = response.replace("Multi-bet successfully placed! ", "")
     disc_msg += response
 
-    discord_request("func", "send_message_unprompted", disc_msg)
+    app_util.discord_request("func", "send_message_unprompted", disc_msg)
 
-    return make_json_response(bet_data, 200)
+    return app_util.make_json_response(bet_data, 200)
 
 @betting_page.route("/delete", methods=["POST"])
 def delete_bet():
@@ -153,20 +163,20 @@ def delete_bet():
 
     disc_id = data["disc_id"]
 
-    logged_in_user, logged_in_name, _ = get_user_details()
+    logged_in_user, logged_in_name, _ = app_util.get_user_details()
 
     if disc_id is None or logged_in_user is None:
-        return make_json_response("Error: You need to be logged in to cancel a bet.", 403)
+        return app_util.make_json_response("Error: You need to be logged in to cancel a bet.", 403)
 
     ticket = None if data["betType"] == "single" else int(data["betId"])
     bet_id = None if data["betType"] == "multi" else int(data["betId"])
 
-    game_start = discord_request("func", "get_game_start", None)
+    game_start = app_util.discord_request("func", "get_game_start", None)
 
     success, cancel_data = betting_handler.delete_bet(int(disc_id), bet_id, ticket, game_start)
 
     if not success:
-        return make_json_response(cancel_data, 400)
+        return app_util.make_json_response(cancel_data, 400)
 
     new_balance, amount_refunded = cancel_data
 
@@ -177,7 +187,7 @@ def delete_bet():
 
     tokens_name = conf.betting_tokens
 
-    logged_in_name = get_user_details()[1]
+    logged_in_name = app_util.get_user_details()[1]
 
     disc_msg = f"Stealthy! {logged_in_name} just cancelled a bet using the website!\n"
     if data["betType"] == "single":
@@ -186,6 +196,6 @@ def delete_bet():
         disc_msg += f"Multi-bet with ticket ID {ticket} for {amount_refunded} {tokens_name} successfully cancelled.\n"
     disc_msg += f"Your {tokens_name} balance is now `{new_balance}`."
 
-    discord_request("func", "send_message_unprompted", disc_msg)
+    app_util.discord_request("func", "send_message_unprompted", disc_msg)
 
-    return make_json_response(return_data, 200)
+    return app_util.make_json_response(return_data, 200)

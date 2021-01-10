@@ -54,7 +54,7 @@ FLIRT_MESSAGES = {
         "You're goddamn right. I am your robot daddy :robot:",
         "You look so pretty when you get dicked in league {emote_kapepe}",
         "You might have heard of AI, but have you heard of DP? :first_quarter_moon_with_face:",
-        "I'm not just nuts and screws... I can still screw you and nut in you :nut_and_bolt:",
+        "I'm not just nuts and screws... I can still screw and nut in you :nut_and_bolt:",
         "Even though you are inting so hard, it's not the hardest thing around... :joystick:",
         "How about I get over there and put my 1 in your 0? {emote_peberno}"
     ],
@@ -245,7 +245,7 @@ class DiscordClient(discord.Client):
 
     def send_game_update(self, endpoint, data):
         try:
-            requests.post(f"https://mhooge.com/intfar/{endpoint}", data=data)
+            requests.post(f"http://mhooge.com:5000/intfar/{endpoint}", data=data)
         except requests.exceptions.RequestException as e:
             self.config.log("Error ignored in online_monitor: " + str(e))
 
@@ -629,10 +629,10 @@ class DiscordClient(discord.Client):
                         response_bets += " (multi-bet)"
 
                     if bet_success: # Bet was won. Track how many tokens it awarded.
-                        response_bets += f": Bet was **won**! It awarded **{payout}** {tokens_name}!\n"
+                        response_bets += f": Bet was **won**! It awarded **{api_util.format_tokens_amount(payout)}** {tokens_name}!\n"
                         tokens_earned += payout
                     else: # Bet was lost. Track how many tokens it cost.
-                        response_bets += f": Bet was **lost**! It cost **{total_cost}** {tokens_name}!\n"
+                        response_bets += f": Bet was **lost**! It cost **{api_util.format_tokens_amount(total_cost)}** {tokens_name}!\n"
                         tokens_lost += total_cost
 
                 if tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved.
@@ -2033,10 +2033,10 @@ class DiscordClient(discord.Client):
             balances.sort(key=lambda x: x[0], reverse=True)
 
             for balance, name in balances:
-                response += f"\n{name} has **{balance}** {tokens_name}"
+                response += f"\n{name} has **{api_util.format_tokens_amount(balance)}** {tokens_name}"
         else:
             balance, name = get_token_balance(target_id)
-            response = f"\n{name} has **{balance}** {tokens_name}"
+            response = f"\n{name} has **{api_util.format_tokens_amount(balance)}** {tokens_name}"
 
         await message.channel.send(response)
 
@@ -2136,7 +2136,7 @@ class DiscordClient(discord.Client):
         messages = FLIRT_MESSAGES[language]
         flirt_msg = self.insert_emotes(messages[random.randint(0, len(messages)-1)])
         mention = self.get_mention_str(message.author.id)
-        await message.channel.send(f"{mention} {flirt_msg}")
+        await message.channel.send(f"{mention} {flirt_msg}", tts=True)
 
     async def handle_doinks_criteria_msg(self, message):
         response = "Criteria for being awarded {emote_Doinks}:"

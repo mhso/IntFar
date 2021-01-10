@@ -88,6 +88,23 @@ def format_duration(dt_1, dt_2):
         response = f"{years} years, " + response
     return response
 
+def format_tokens_amount(tokens):
+    if tokens is None:
+        return None
+
+    as_str = str(tokens)
+    if tokens < 1000:
+        return as_str
+
+    formatted = ""
+    for i in range(len(as_str), 0, -1):
+        reverse_i = len(as_str) - i
+        if reverse_i > 0 and i % 3 == 0:
+            formatted += "."
+        formatted += as_str[reverse_i]
+
+    return formatted
+
 def organize_intfar_stats(games_played, intfar_reason_ids):
     intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
     for reason_id in intfar_reason_ids:

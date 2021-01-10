@@ -122,9 +122,15 @@ def get_bets(disc_id, database, only_active):
     presentable_data = []
 
     for bet_ids, amounts, events, targets, _, result_or_ticket, payout in bets:
-        event_descs = [(i, get_dynamic_bet_desc(e, names_dict.get(t)), a) for (e, t, a, i) in zip(events, targets, amounts, bet_ids)]
+        event_descs = [
+            (
+                i, get_dynamic_bet_desc(e, names_dict.get(t)),
+                api_util.format_tokens_amount(a)
+            )
+            for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
+        ]
         presentable_data.append(
-            (event_descs, result_or_ticket, payout)
+            (event_descs, result_or_ticket, api_util.format_tokens_amount(payout))
         )
     presentable_data.sort(key=lambda x: x[0][0], reverse=True)
     return presentable_data
@@ -200,7 +206,8 @@ def get_betting_data(disc_id, database):
 
         betting_stats = [
             ("Bets made", len(bets)), ("Bets won", f"{bets_won} ({pct_won}%)"),
-            ("Biggest bet amount", highest_amount), ("Biggest payout", highest_payout)
+            ("Biggest bet amount", api_util.format_tokens_amount(highest_amount)),
+            ("Biggest payout", api_util.format_tokens_amount(highest_payout))
         ]
         bet_event_hi_freq = f"{most_often_event_name} ({most_often_event_count} times)"
         bet_won_hi_freq = most_won_even_desc
@@ -214,7 +221,7 @@ def get_betting_data(disc_id, database):
     }
 
 def get_betting_tokens_data(disc_id, database):
-    tokens = database.get_token_balance(disc_id)
+    tokens = api_util.format_tokens_amount(database.get_token_balance(disc_id))
     max_tokens_holder = database.get_max_tokens_details()[1]
     return {
         "betting_tokens": tokens,

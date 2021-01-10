@@ -597,9 +597,14 @@ class Database:
             return None if result is None else result[0]
 
     def get_better_id(self, bet_id, ticket):
+        if ticket is not None:
+            ticket = int(ticket)
+        if bet_id is not None:
+            bet_id = int(bet_id)
+
         with self.get_connection() as db:
-            query = "SELECT better_id FROM bets WHERE id=? OR ticket=?"
-            result = self.execute_query(db, query, (int(bet_id), int(ticket))).fetchone()
+            query = "SELECT better_id FROM bets WHERE id=? OR (ticket=? OR ticket IS NULL)"
+            result = self.execute_query(db, query, (bet_id, ticket)).fetchone()
             return None if result is None else result[0]
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):

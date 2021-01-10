@@ -48,6 +48,19 @@ class Assertion:
             self.failed += 1
             self.print_failed(name, f"Failed! Expected: {expected}, actual: {value}.")
 
+    def assert_exception(self, expr, exc_class, name):
+        try:
+            expr()
+            self.failed += 1
+            self.print_failed(name, "Failed! No exception was raised.")
+        except Exception as exc:
+            if isinstance(exc, type(exc_class)):
+                self.passed += 1
+                self.print_passed(name, f"Passed. Exception {exc_class} was raised.")
+            else:
+                self.failed += 1
+                self.print_failed(name, f"Failed! Expected exception: {exc_class}, actual: {exc}.")
+
     def print_test_summary(self):
         self.current_test = None
         print("============================================================")

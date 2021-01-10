@@ -17,11 +17,9 @@ def register_discord_connection():
     conn_map[sess_id] = new_conn
 
 def create_session_id():
-    conn_map = flask.current_app.config["CONN_MAP"]
-    if "user_id" not in flask.session or flask.session["user_id"] not in conn_map:
+    if "user_id" not in flask.session:
         flask.current_app.config["USER_COUNT"] = flask.current_app.config["USER_COUNT"] + 1
         flask.session["user_id"] = flask.current_app.config["USER_COUNT"]
-        register_discord_connection()
 
 def discord_request(command_types, commands, params, pipe=None):
     """
@@ -36,11 +34,11 @@ def discord_request(command_types, commands, params, pipe=None):
     @param params Parameters for each of the command_types/commands.
     Can either be a value, a tuple of values, or a list of values or tuple of values.
     """
-    # if "user_id" not in flask.session or flask.session["user_id"] not in conn_map:
-    #     create_session_id()
+    conn_map = flask.current_app.config["CONN_MAP"]
+    if flask.session["user_id"] not in conn_map and command_types != "register":
+        register_discord_connection()
 
     sess_id = flask.session["user_id"]
-    conn_map = flask.current_app.config["CONN_MAP"]
     if pipe is None:
         pipe = conn_map[sess_id]
 
@@ -72,8 +70,8 @@ def discord_request(command_types, commands, params, pipe=None):
         pipe.send((sess_id, command_type_list, command_list, tuple_params))
         result = pipe.recv()
         return result if any_list else result[0]
-    except (EOFError, BrokenPipeError): # We timed out. Re-establish connection and try again.
-        register_discord_connection()
+    except (EOFError, BrokenPipeError, ConnectionResetError):
+        register_discord_connection() # We timed out. Re-establish connection and try again.
         return discord_request(command_types, commands, params, conn_map[sess_id])
 
 def get_game_info():

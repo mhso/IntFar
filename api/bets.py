@@ -2,7 +2,7 @@ from time import time
 from datetime import datetime
 from traceback import print_exc
 from api.database import DBException
-from api.util import format_duration, round_digits
+from api.util import format_duration, round_digits, format_tokens_amount
 from api import game_stats
 
 MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
@@ -353,7 +353,7 @@ class BettingHandler:
             response += "You bet on **all** the following happening:"
 
             for amount, _, _, base_return, bet_desc in data:
-                response += f"\n - `{bet_desc}` for **{amount}** {tokens_name} "
+                response += f"\n - `{bet_desc}` for **{format_tokens_amount(amount)}** {tokens_name} "
                 response += f"(**{base_return}x** return)."
             response += f"\nThis bet uses the following ticket ID: {ticket}. "
             response += "You will need this ticket to cancel the bet.\n"
@@ -381,6 +381,23 @@ class BettingHandler:
     def get_bet_error_msg(self, bet_desc, error):
         return f"Bet was not placed: {bet_desc} - {error}"
 
+    def parse_bet_amount(self, amount_str):
+        mult = 1
+        if amount_str[-1].lower() == "t":
+            mult = 1e12
+            amount_str = amount_str[:-1]
+        elif amount_str[-1].lower() == "b":
+            mult = 1e9
+            amount_str = amount_str[:-1]
+        elif amount_str[-1].lower() == "m":
+            mult = 1e6
+            amount_str = amount_str[:-1]
+        elif amount_str[-1].lower() == "k":
+            mult = 1e3
+            amount_str = amount_str[:-1]
+
+        return int(float(amount_str) * mult)
+
     def check_bet_validity(self, disc_id, bet_amount, game_timestamp, bet_str, balance, bet_target, target_name, ticket):
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
@@ -400,7 +417,7 @@ class BettingHandler:
         min_amount = MINIMUM_BETTING_AMOUNT
         amount = 0
         try:
-            amount = balance if bet_amount == "all" else int(bet_amount)
+            amount = balance if bet_amount == "all" else self.parse_bet_amount(bet_amount.strip())
 
             if amount < min_amount: # Bet was for less than the minimum allowed amount.
                 err_msg = self.get_bet_error_msg(
@@ -492,7 +509,7 @@ class BettingHandler:
         if game_duration > 0:
             reward_equation += f" x {ratio_readable}"
 
-        reward_equation += f" = **{final_value}** {tokens_name}"
+        reward_equation += f" = **{format_tokens_amount(final_value)}** {tokens_name}"
 
         if any_target:
             reward_equation += " (minimum)\n"
@@ -559,7 +576,7 @@ class BettingHandler:
             new_balance, amount_refunded = data
             if ticket is None:
                 bet_desc = get_dynamic_bet_desc(event_id, target_name)
-                response = f"Bet on `{bet_desc}` for {amount_refunded} {tokens_name} successfully cancelled.\n"
+                response = f"Bet on `{bet_desc}` for {format_tokens_amount(amount_refunded)} {tokens_name} successfully cancelled.\n"
             else:
                 response = f"Multi-bet with ticket ID {ticket} successfully cancelled.\n"
             response += f"Your {tokens_name} balance is now `{new_balance}`."
@@ -601,8 +618,8 @@ class BettingHandler:
 
         receiver_balance = self.database.get_token_balance(receiver_id)
 
-        response = f"Transfer of **{amount}** {tokens_name} to {receiver_name} succesfully made.\n"
-        response += f"You now have **{balance - amount}** {tokens_name}.\n"
-        response += f"{receiver_name} now has **{receiver_balance}** {tokens_name}."
+        response = f"Transfer of **{format_tokens_amount(amount)}** {tokens_name} to {receiver_name} succesfully made.\n"
+        response += f"You now have **{format_tokens_amount(balance - amount)}** {tokens_name}.\n"
+        response += f"{receiver_name} now has **{format_tokens_amount(receiver_balance)}** {tokens_name}."
 
         return (True, response)

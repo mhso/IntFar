@@ -3,6 +3,7 @@ from test.assertion import Assertion
 from api import bets
 from api.database import Database
 from api.config import Config
+from api.util import format_tokens_amount
 
 LOUD = False
 
@@ -361,7 +362,6 @@ def test_multi_bet_fail(bet_handler, db_client, test_runner):
     bet_str = ["no_intfar", "game_win"]
     bet_target = [None, None]
     target_name = [None, None]
-    game_data = (None, None, None, [(0, {"gameWon": True})])
 
     test_runner.set_current_test("Multi-bet (fail)")
     wipe_db(db_client)
@@ -379,7 +379,7 @@ def test_multi_bet_fail(bet_handler, db_client, test_runner):
     test_runner.assert_equals(balance, 100, "Token balance not affected.")
 
     success, response, _  = bet_handler.place_bet(disc_id, ["20", "no"], game_timestamp,
-                                                 bet_str, bet_target, target_name)
+                                                  bet_str, bet_target, target_name)
 
     if LOUD:
         print(response)
@@ -402,6 +402,39 @@ def test_multi_bet_fail(bet_handler, db_client, test_runner):
 
     test_runner.assert_false(success, "Bet not placed - Not enough tokens 2.")
 
+def test_misc(bet_handler, db_client, test_runner):
+    test_runner.set_current_test("Misc Tests")
+
+    tokens = [
+        6, 100, 1000, 10000, 100000, 1000000000
+    ]
+    expected = [
+        "6", "100", "1.000", "10.000", "100.000", "1.000.000.000"
+    ]
+
+    for token_amount, expected_format in zip(tokens, expected):
+        formatted = format_tokens_amount(token_amount)
+
+        test_runner.assert_equals(
+            formatted, expected_format, f"Formatted tokens, {expected_format}."
+        )
+
+    amount_strs = [
+        "10", "100", "100000", "1K", "1k", "3B", "3.5b",
+        "7.2M", "132.213M", "4T", "12.321312572T", "1.2345K"
+    ]
+    expected = [
+        10, 100, 100000, 1000, 1000, 3000000000, 3500000000,
+        7200000, 132213000, int(4e12), 12321312572000, 1234
+    ]
+
+    for amount_str, expected_format in zip(amount_strs, expected):
+        formatted = bet_handler.parse_bet_amount(amount_str)
+
+        test_runner.assert_equals(
+            formatted, expected_format, f"Betting amount success - {expected_format}."
+        )
+
 def wipe_db(db_client):
     db_client.reset_bets()
 
@@ -423,7 +456,8 @@ def run_tests():
         test_game_won_success, test_game_won_fail,
         test_award_tokens_for_game, test_no_intfar,
         #test_dynamic_bet_return,
-        test_multi_bet_success, test_multi_bet_fail
+        test_multi_bet_success, test_multi_bet_fail,
+        test_misc
     ]
 
     tests_to_run = tests if test_to_run == -1 else [tests[test_to_run]]
