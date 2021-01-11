@@ -1,4 +1,5 @@
 from datetime import tzinfo, timedelta, datetime
+import secrets
 
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
@@ -104,6 +105,9 @@ def format_tokens_amount(tokens):
         formatted += as_str[reverse_i]
 
     return formatted
+
+def generate_user_secret():
+    return secrets.token_hex(nbytes=32)
 
 def organize_intfar_stats(games_played, intfar_reason_ids):
     intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}

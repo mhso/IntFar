@@ -206,6 +206,7 @@ def get_betting_data(disc_id, database):
 
         betting_stats = [
             ("Bets made", len(bets)), ("Bets won", f"{bets_won} ({pct_won}%)"),
+            ("Total points spent", api_util.format_tokens_amount(total_amount)),
             ("Biggest bet amount", api_util.format_tokens_amount(highest_amount)),
             ("Biggest payout", api_util.format_tokens_amount(highest_payout))
         ]

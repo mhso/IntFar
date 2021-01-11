@@ -1,6 +1,5 @@
 import json
 import flask
-import secrets
 from time import time
 from hashlib import sha256
 
@@ -85,9 +84,6 @@ def get_game_info():
     active_game["game_duration"] = time() - active_game["start"]
 
     return active_game
-
-def generate_user_secret():
-    return secrets.token_hex(nbytes=32)
 
 def get_hashed_secret(secret):
     return sha256(bytes(secret, encoding="utf-8")).hexdigest()

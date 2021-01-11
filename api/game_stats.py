@@ -105,3 +105,57 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
                 response += f"\n - {name} ({champ})"
 
     return response
+
+def get_filtered_stats(database, users_in_game, game_info):
+    """
+    Get relevant stats from the given game data and filter the data
+    that is relevant for the Discord users that participated in the game.
+    """
+    kills_per_team = {100: 0, 200: 0}
+    damage_per_team = {100: 0, 200: 0}
+    our_team = 100
+    filtered_stats = []
+    active_users = users_in_game
+    for part_info in game_info["participantIdentities"]:
+        for participant in game_info["participants"]:
+            if part_info["participantId"] == participant["participantId"]:
+                kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
+                damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
+                # We loop through the static 'self.users_in_game' list and not the dynamic
+                # 'self.active_players' for safety.
+                for disc_id, _, summ_ids in database.summoners:
+                    if part_info["player"]["summonerId"] in summ_ids:
+                        our_team = participant["teamId"]
+                        combined_stats = participant["stats"]
+                        combined_stats["timestamp"] = game_info["gameCreation"]
+                        combined_stats["mapId"] = game_info["mapId"]
+                        combined_stats["gameDuration"] = int(game_info["gameDuration"])
+                        combined_stats.update(participant["timeline"])
+                        filtered_stats.append((disc_id, combined_stats))
+
+                        if users_in_game is not None:
+                            user_in_list = False
+                            for user_disc_id, _, _ in users_in_game:
+                                if user_disc_id == disc_id:
+                                    user_in_list = True
+                                    break
+                            if not user_in_list:
+                                summ_data = (disc_id, part_info["player"]["summonerName"],
+                                                part_info["player"]["summonerId"])
+                                active_users.append(summ_data)
+
+    for _, stats in filtered_stats:
+        stats["kills_by_team"] = kills_per_team[our_team]
+        stats["damage_by_team"] = damage_per_team[our_team]
+        for team in game_info["teams"]:
+            if team["teamId"] == our_team:
+                stats["baronKills"] = team["baronKills"]
+                stats["dragonKills"] = team["dragonKills"]
+                stats["heraldKills"] = team["riftHeraldKills"]
+                stats["gameWon"] = team["win"] == "Win"
+            else:
+                stats["enemyBaronKills"] = team["baronKills"]
+                stats["enemyDragonKills"] = team["dragonKills"]
+                stats["enemyHeraldKills"] = team["riftHeraldKills"]
+
+    return filtered_stats, active_users

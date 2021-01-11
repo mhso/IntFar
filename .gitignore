@@ -12,3 +12,4 @@ vendor
 composer.lock
 bet_messages.txt
 fix_payouts.py
+data

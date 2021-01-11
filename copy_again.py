@@ -2,7 +2,7 @@ import json
 from contextlib import closing
 from api.database import Database
 from api.config import Config
-from app.util import generate_user_secret
+from api.util import generate_user_secret
 
 auth = json.load(open("discbot/auth.json"))
 

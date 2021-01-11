@@ -5,8 +5,7 @@ import sqlite3
 from sqlite3 import DatabaseError, OperationalError, ProgrammingError
 from contextlib import closing
 from api import game_stats
-from api.util import TimeZone
-from app.util import generate_user_secret
+from api.util import TimeZone, generate_user_secret
 
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
@@ -174,6 +173,11 @@ class Database:
                         doinks_counts[index] += 1
 
             return doinks_counts
+
+    def get_game_ids(self):
+        query = "SELECT game_id FROM best_stats"
+        with self.get_connection() as db:
+            return self.execute_query(db, query).fetchall()
 
     def get_games_count(self, context=None):
         query_games = """

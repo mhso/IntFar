@@ -6,6 +6,7 @@ from api.bets import BettingHandler
 from discbot.discord_bot import DiscordClient
 from api.config import Config
 from api.riot_api import APIClient
+from api.game_stats import get_filtered_stats
 
 class MockChannel:
     async def send(self, data):
@@ -36,7 +37,9 @@ class TestMock(DiscordClient):
         ]
         self.active_game = {"id": self.game_id}
         game_info = self.riot_api.get_game_details(self.game_id)
-        filtered = self.get_filtered_stats(game_info)
+        filtered, self.users_in_game = get_filtered_stats(
+            self.database, self.users_in_game, game_info
+        )
 
         if self.loud:
             betting_data = await self.declare_intfar(filtered)

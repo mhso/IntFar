@@ -240,7 +240,6 @@ class DiscordClient(discord.Client):
         self.polling_active = False
         self.last_message_time = {}
         self.timeout_length = {}
-        self.app_listener_thread = None
         self.time_initialized = datetime.now()
 
     def send_game_update(self, endpoint, data):
@@ -277,7 +276,9 @@ class DiscordClient(discord.Client):
                     raise ValueError("Game info is None!")
 
                 self.config.log(f"Users in game before: {self.users_in_game}")
-                filtered_stats = self.get_filtered_stats(game_info)
+                filtered_stats, self.users_in_game = game_stats.get_filtered_stats(
+                    self.database, self.users_in_game, game_info
+                )
                 self.config.log(f"Users in game after: {self.users_in_game}")
 
                 betting_data = await self.declare_intfar(filtered_stats)
@@ -966,59 +967,6 @@ class DiscordClient(discord.Client):
             (intfar_kp_id, kp), (intfar_vision_id, vision_score)
         ]
 
-    def get_filtered_stats(self, game_info):
-        """
-        Get relevant stats from the given game data and filter the data
-        that is relevant for the Discord users that participated in the game.
-        """
-        kills_per_team = {100: 0, 200: 0}
-        damage_per_team = {100: 0, 200: 0}
-        our_team = 100
-        filtered_stats = []
-        for part_info in game_info["participantIdentities"]:
-            for participant in game_info["participants"]:
-                if part_info["participantId"] == participant["participantId"]:
-                    kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
-                    damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
-                    # We loop through the static 'self.users_in_game' list and not the dynamic
-                    # 'self.active_players' for safety.
-                    for disc_id, _, summ_ids in self.database.summoners:
-                        if part_info["player"]["summonerId"] in summ_ids:
-                            our_team = participant["teamId"]
-                            combined_stats = participant["stats"]
-                            combined_stats["timestamp"] = game_info["gameCreation"]
-                            combined_stats["mapId"] = game_info["mapId"]
-                            combined_stats["gameDuration"] = int(game_info["gameDuration"])
-                            combined_stats.update(participant["timeline"])
-                            filtered_stats.append((disc_id, combined_stats))
-
-                            if self.users_in_game is not None:
-                                user_in_list = False
-                                for user_disc_id, _, _ in self.users_in_game:
-                                    if user_disc_id == disc_id:
-                                        user_in_list = True
-                                        break
-                                if not user_in_list:
-                                    summ_data = (disc_id, part_info["player"]["summonerName"],
-                                                 part_info["player"]["summonerId"])
-                                    self.users_in_game.append(summ_data)
-
-        for _, stats in filtered_stats:
-            stats["kills_by_team"] = kills_per_team[our_team]
-            stats["damage_by_team"] = damage_per_team[our_team]
-            for team in game_info["teams"]:
-                if team["teamId"] == our_team:
-                    stats["baronKills"] = team["baronKills"]
-                    stats["dragonKills"] = team["dragonKills"]
-                    stats["heraldKills"] = team["riftHeraldKills"]
-                    stats["gameWon"] = team["win"] == "Win"
-                else:
-                    stats["enemyBaronKills"] = team["baronKills"]
-                    stats["enemyDragonKills"] = team["dragonKills"]
-                    stats["enemyHeraldKills"] = team["riftHeraldKills"]
-
-        return filtered_stats
-
     def resolve_intfar_ties(self, intfar_data, max_count, game_data):
         """
         Resolve a potential tie in who should be Int-Far. This can happen if two or more
@@ -1318,7 +1266,7 @@ class DiscordClient(discord.Client):
 
         if self.flask_conn is not None: # Listen for external commands from web page.
             event_loop = asyncio.get_event_loop()
-            self.app_listener_thread = Thread(target=listen_for_request, args=(self, event_loop)).start()
+            Thread(target=listen_for_request, args=(self, event_loop)).start()
 
     async def handle_helper_msg(self, message):
         """
