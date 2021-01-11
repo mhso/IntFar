@@ -6,10 +6,10 @@ from traceback import print_exc
 from datetime import datetime
 import requests
 import discord
-from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
+from discord.errors import InvalidArgument, NotFound, DiscordException, HTTPException, Forbidden
 from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
-from api import game_stats, bets
+from api import game_stats, bets, award_qualifiers
 from api.database import DBException
 import api.util as api_util
 
@@ -666,59 +666,20 @@ class DiscordClient(discord.Client):
 
         await self.channel_to_write.send(response)
 
-    def get_big_doinks(self, data):
-        """
-        Returns a string describing people who have been redeemed by playing
-        exceptionally well.
-        Criteria for being redeemed:
-            - Having a KDA of 10 or more
-            - Getting more than 20 kills
-            - Doing more damage than the rest of the team combined
-            - Getting a penta-kill
-            - Having a vision score of 100+
-            - Having a kill-participation of 80%+
-            - Securing all epic monsters
-        """
-        mentions = {} # List of mentioned users for the different criteria.
-        for disc_id, stats in data:
-            mention_list = []
-            kda = game_stats.calc_kda(stats)
-            if kda >= 10.0:
-                mention_list.append((0, api_util.round_digits(kda)))
-            if stats["kills"] > 20:
-                mention_list.append((1, stats["kills"]))
-            damage_dealt = stats["totalDamageDealtToChampions"]
-            if damage_dealt > stats["damage_by_team"]:
-                mention_list.append((2, damage_dealt))
-            if stats["pentaKills"] > 0:
-                mention_list.append((3, None))
-            if stats["visionScore"] > 100:
-                mention_list.append((4, stats["visionScore"]))
-            kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
-            if kp > 80:
-                mention_list.append((5, kp))
-            own_epics = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
-            enemy_epics = stats["enemyBaronKills"] + stats["enemyDragonKills"] + stats["enemyHeraldKills"]
-            if stats["lane"] == "JUNGLE" and own_epics > 3 and enemy_epics == 0:
-                mention_list.append((6, kp))
-            if mention_list != []:
-                mentions[disc_id] = mention_list
-
+    def get_big_doinks_msg(self, doinks):
         mentions_str = ""
         any_mentions = False
-        mentions_by_reason = {d_id: ["0" for _ in api_util.DOINKS_REASONS] for d_id in mentions}
-        for disc_id in mentions:
+        for disc_id in doinks:
             user_str = ""
-            if mentions[disc_id] != []:
+            if doinks[disc_id] != []:
                 prefix = "\n" if any_mentions else ""
                 user_str = f"{prefix} {self.get_mention_str(disc_id)} was insane that game! "
-                intfars_removed = len(mentions[disc_id])
+                intfars_removed = len(doinks[disc_id])
                 user_str += f"He is awarded {intfars_removed} " + "{emote_Doinks} for "
                 any_mentions = True
 
-            for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
+            for (count, (stat_index, stat_value)) in enumerate(doinks[disc_id]):
                 prefix = " *and* " if count > 0 else ""
-                mentions_by_reason[disc_id][stat_index] = "1"
                 user_str += prefix + get_redeeming_flavor_text(stat_index, stat_value)
             mentions_str += user_str
 
@@ -727,40 +688,9 @@ class DiscordClient(discord.Client):
             mentions_str += f"\nHe is also given {points} bonus {tokens_name} "
             mentions_str += "for being great {emote_swell}"
 
-        formatted_mentions = {d_id: "".join(mentions_by_reason[d_id])
-                              for d_id in mentions_by_reason}
+        return None if not any_mentions else mentions_str
 
-        return (None, {}) if not any_mentions else (mentions_str, formatted_mentions)
-
-    def get_honorable_mentions(self, data):
-        """
-        Returns a string describing honorable mentions (questionable stats),
-        that wasn't quite bad enough to be named Int-Far for.
-        Honorable mentions are given for:
-            - Having 0 control wards purchased.
-            - Being adc/mid/top/jungle and doing less than 8000 damage.
-            - Being adc/mid/top and having less than 5 cs/min.
-            - Being jungle and securing no epic monsters.
-        """
-        mentions = {} # List of mentioned users for the different criteria.
-        for disc_id, stats in data:
-            mentions[disc_id] = []
-            if stats["mapId"] != 21 and stats["visionWardsBoughtInGame"] == 0:
-                mentions[disc_id].append((0, stats["visionWardsBoughtInGame"]))
-            damage_dealt = stats["totalDamageDealtToChampions"]
-            if stats["role"] != "DUO_SUPPORT" and damage_dealt < 8000:
-                mentions[disc_id].append((1, damage_dealt))
-            cs_per_min = 5
-            if "creepsPerMinDeltas" in stats:
-                cs_per_min = stats["creepsPerMinDeltas"]["0-10"]
-                if "10-20" in stats["creepsPerMinDeltas"]:
-                    cs_per_min = (cs_per_min + stats["creepsPerMinDeltas"]["10-20"]) / 2
-            if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
-                mentions[disc_id].append((2, api_util.round_digits(cs_per_min)))
-            epic_monsters_secured = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
-            if stats["lane"] == "JUNGLE" and epic_monsters_secured == 0:
-                mentions[disc_id].append((3, epic_monsters_secured))
-
+    def get_honorable_mentions_msg(self, mentions):
         mentions_str = "Honorable mentions goes out to:\n"
         any_mentions = False
         for disc_id in mentions:
@@ -776,84 +706,6 @@ class DiscordClient(discord.Client):
             mentions_str += user_str
 
         return None if not any_mentions else mentions_str
-
-    def intfar_by_kda(self, data):
-        """
-        Returns the info of the Int-Far, if this person has a truly terrible KDA.
-        This is determined by:
-            - KDA being the lowest of the group
-            - KDA being less than 1.3
-            - Number of deaths being more than 2.
-        Returns None if none of these criteria matches a person.
-        """
-        tied_intfars, stats = game_stats.get_outlier(data, "kda", include_ties=True)
-        lowest_kda = game_stats.calc_kda(stats)
-        deaths = stats["deaths"]
-        kda_criteria = self.config.kda_lower_threshold
-        death_criteria = self.config.kda_death_criteria
-        if lowest_kda < kda_criteria and deaths > death_criteria:
-            return (tied_intfars, lowest_kda)
-        return (None, None)
-
-    def intfar_by_deaths(self, data):
-        """
-        Returns the info of the Int-Far, if this person has hecking many deaths.
-        This is determined by:
-            - Having the max number of deaths in the group
-            - Number of deaths being more than 9.
-            - KDA being less than 2.1
-        Returns None if none of these criteria matches a person.
-        """
-        tied_intfars, stats = game_stats.get_outlier(data, "deaths", asc=False, include_ties=True)
-        highest_deaths = stats["deaths"]
-        kda = game_stats.calc_kda(stats)
-        death_criteria = self.config.death_lower_threshold
-        kda_criteria = self.config.death_kda_criteria
-        if highest_deaths > death_criteria and kda < kda_criteria:
-            return (tied_intfars, highest_deaths)
-        return (None, None)
-
-    def intfar_by_kp(self, data):
-        """
-        Returns the info of the Int-Far, if this person has very low kill participation.
-        This is determined by:
-            - Having the lowest KP in the group
-            - KP being less than 25
-            - Number of kills + assists being less than 10
-            - Turrets + Inhibitors destroyed < 3
-        Returns None if none of these criteria matches a person.
-        """
-        team_kills = data[0][1]["kills_by_team"]
-        tied_intfars, stats = game_stats.get_outlier(data, "kp", total_kills=team_kills, include_ties=True)
-        lowest_kp = game_stats.calc_kill_participation(stats, team_kills)
-        kills = stats["kills"]
-        assists = stats["assists"]
-        structures_destroyed = stats["turretKills"] + stats["inhibitorKills"]
-        kp_criteria = self.config.kp_lower_threshold
-        takedowns_criteria = self.config.kp_takedowns_criteria
-        structures_criteria = self.config.kp_structures_criteria
-        if (lowest_kp < kp_criteria and kills + assists < takedowns_criteria
-                and structures_destroyed < structures_criteria):
-            return (tied_intfars, lowest_kp)
-        return (None, None)
-
-    def intfar_by_vision_score(self, data):
-        """
-        Returns the info of the Int-Far, if this person has very low kill vision score.
-        This is determined by:
-            - Having the lowest vision score in the group
-            - Vision score being less than 9
-            - KDA being less than 3
-        Returns None if none of these criteria matches a person.
-        """
-        tied_intfars, stats = game_stats.get_outlier(data, "visionScore", include_ties=True)
-        lowest_score = stats["visionScore"]
-        kda = game_stats.calc_kda(stats)
-        vision_criteria = self.config.vision_score_lower_threshold
-        kda_criteria = self.config.vision_kda_criteria
-        if lowest_score < vision_criteria and kda < kda_criteria:
-            return (tied_intfars, lowest_score)
-        return (None, None)
 
     def get_streak_msg(self, intfar_id, intfar_streak, prev_intfar):
         """
@@ -943,101 +795,6 @@ class DiscordClient(discord.Client):
         message = self.insert_emotes(message)
         await self.channel_to_write.send(message)
 
-    def get_intfar_details(self, stats, map_id):
-        intfar_kda_id, kda = self.intfar_by_kda(stats)
-        if intfar_kda_id is not None:
-            self.config.log("Int-Far because of KDA.")
-
-        intfar_deaths_id, deaths = self.intfar_by_deaths(stats)
-        if intfar_deaths_id is not None:
-            self.config.log("Int-Far because of deaths.")
-
-        intfar_kp_id, kp = self.intfar_by_kp(stats)
-        if intfar_kp_id is not None:
-            self.config.log("Int-Far because of kill participation.")
-
-        intfar_vision_id, vision_score = None, None
-        if map_id != 21:
-            intfar_vision_id, vision_score = self.intfar_by_vision_score(stats)
-            if intfar_vision_id is not None:
-                self.config.log("Int-Far because of vision score.")
-
-        return [
-            (intfar_kda_id, kda), (intfar_deaths_id, deaths),
-            (intfar_kp_id, kp), (intfar_vision_id, vision_score)
-        ]
-
-    def resolve_intfar_ties(self, intfar_data, max_count, game_data):
-        """
-        Resolve a potential tie in who should be Int-Far. This can happen if two or more
-        people meet the same criteria, with the same stats within these criteria.
-        If so, the one with either most deaths or least gold gets chosen as Int-Far.
-        """
-        filtered_data = []
-        for disc_id, stats in game_data:
-            if disc_id in intfar_data:
-                filtered_data.append((disc_id, stats))
-
-        ties = []
-        for disc_id in intfar_data:
-            if len(intfar_data[disc_id]) == max_count:
-                ties.append(disc_id)
-
-        if len(ties) == 1:
-            self.config.log("There are no ties.")
-            return ties[0]
-
-        self.config.log("There are Int-Far ties!")
-
-        sorted_by_deaths = sorted(filtered_data, key=lambda x: x[1]["deaths"], reverse=True)
-        max_count = sorted_by_deaths[0][1]["deaths"]
-        ties = []
-        for disc_id, stats in sorted_by_deaths:
-            if stats["deaths"] == max_count:
-                ties.append(disc_id)
-
-        if len(ties) == 1:
-            self.config.log("Ties resolved by amount of deaths.")
-            return ties[0]
-
-        sorted_by_kda = sorted(filtered_data, key=lambda x: game_stats.calc_kda(x[1]))
-        max_count = game_stats.calc_kda(sorted_by_deaths[0][1])
-        ties = []
-        for disc_id, stats in sorted_by_kda:
-            if game_stats.calc_kda(stats) == max_count:
-                ties.append(disc_id)
-
-        if len(ties) == 1:
-            self.config.log("Ties resolved by KDA.")
-            return ties[0]
-
-        self.config.log("Ties resolved by gold earned.")
-
-        sorted_by_gold = sorted(filtered_data, key=lambda x: x[1]["goldEarned"])
-        return sorted_by_gold[0][0]
-
-    def get_intfar_qualifiers(self, intfar_details):
-        max_intfar_count = 1
-        intfar_counts = {}
-        max_count_intfar = None
-        qualifier_data = {}
-        # Look through details for the people qualifying for Int-Far.
-        # The one with most criteria met gets chosen.
-        for (index, (tied_intfars, stat_value)) in enumerate(intfar_details):
-            if tied_intfars is not None:
-                for intfar_disc_id in tied_intfars:
-                    if intfar_disc_id not in intfar_counts:
-                        intfar_counts[intfar_disc_id] = 0
-                        qualifier_data[intfar_disc_id] = []
-                    current_intfar_count = intfar_counts[intfar_disc_id] + 1
-                    intfar_counts[intfar_disc_id] = current_intfar_count
-                    if current_intfar_count >= max_intfar_count:
-                        max_intfar_count = current_intfar_count
-                        max_count_intfar = intfar_disc_id
-                    qualifier_data[intfar_disc_id].append((index, stat_value))
-
-        return qualifier_data, max_count_intfar, max_intfar_count
-
     async def declare_intfar(self, filtered_stats):
         """
         Called when the currently active game is over.
@@ -1057,23 +814,19 @@ class DiscordClient(discord.Client):
             )
             return None
 
-        intfar_details = self.get_intfar_details(filtered_stats, filtered_stats[0][1]["mapId"])
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
-        final_intfar = None
-        (intfar_data,
-         max_count_intfar,
-         max_intfar_count) = self.get_intfar_qualifiers(intfar_details)
-
         reason_ids = ["0", "0", "0", "0"]
 
-        redeemed_text, doinks = self.get_big_doinks(filtered_stats)
+        doinks_mentions, doinks = award_qualifiers.get_big_doinks(filtered_stats)
+        redeemed_text = self.get_big_doinks_msg(doinks_mentions)
 
+        final_intfar, final_intfar_data = award_qualifiers.get_intfar(filtered_stats, self.config)
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
-        if max_count_intfar is not None: # Send int-far message.
-            final_intfar = self.resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)
+
+        if final_intfar is not None: # Send int-far message.
             reason = ""
             # Go through the criteria the chosen Int-Far met and list them in a readable format.
-            for (count, (reason_index, stat_value)) in enumerate(intfar_data[final_intfar]):
+            for (count, (reason_index, stat_value)) in enumerate(final_intfar_data):
                 key = reason_keys[reason_index]
                 reason_text = get_reason_flavor_text(api_util.round_digits(stat_value), key)
                 reason_ids[reason_index] = "1"
@@ -1088,7 +841,8 @@ class DiscordClient(discord.Client):
         else: # No one was bad enough to be Int-Far.
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
-            honorable_mention_text = self.get_honorable_mentions(filtered_stats)
+            honorable_mentions = award_qualifiers.get_honorable_mentions(filtered_stats)
+            honorable_mention_text = self.get_honorable_mentions_msg(honorable_mentions)
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
             if redeemed_text is not None:
@@ -1410,7 +1164,7 @@ class DiscordClient(discord.Client):
             return self.get_discord_id(name)
         return user_data[0]
 
-    async def handle_intfar_msg(self, message, target_name):
+    async def handle_intfar_msg(self, message, target_id):
         current_month = api_util.current_month()
 
         def format_for_all(disc_id, monthly=False):
@@ -1467,37 +1221,27 @@ class DiscordClient(discord.Client):
             return msg
 
         response = ""
-        if target_name is not None: # Check intfar stats for someone else.
-            target_name = target_name.lower()
-            if target_name == "all":
-                messages_all_time = []
-                messages_monthly = []
-                for disc_id, _, _ in self.database.summoners:
-                    resp_str_all_time, intfars, pct_all_time = format_for_all(disc_id)
-                    resp_str_month, intfars_month, pct_month = format_for_all(disc_id, monthly=True)
+        if target_id is None: # Check intfar stats for everyone.
+            messages_all_time = []
+            messages_monthly = []
+            for disc_id, _, _ in self.database.summoners:
+                resp_str_all_time, intfars, pct_all_time = format_for_all(disc_id)
+                resp_str_month, intfars_month, pct_month = format_for_all(disc_id, monthly=True)
 
-                    messages_all_time.append((resp_str_all_time, intfars, pct_all_time))
-                    messages_monthly.append((resp_str_month, intfars_month, pct_month))
+                messages_all_time.append((resp_str_all_time, intfars, pct_all_time))
+                messages_monthly.append((resp_str_month, intfars_month, pct_month))
 
-                messages_all_time.sort(key=lambda x: (x[1], x[2]), reverse=True)
-                messages_monthly.sort(key=lambda x: (x[1], x[2]), reverse=True)
+            messages_all_time.sort(key=lambda x: (x[1], x[2]), reverse=True)
+            messages_monthly.sort(key=lambda x: (x[1], x[2]), reverse=True)
 
-                response = "**--- All time stats ---**\n"
-                for data in messages_all_time:
-                    response += f"- {data[0]}\n"
-                response += f"**--- Stats for {current_month} ---**\n"
-                for data in messages_monthly:
-                    response += f"- {data[0]}\n"
-            else:
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
-                response = format_for_single(target_id)
-        else: # Check intfar stats for the person sending the message.
-            response = format_for_single(message.author.id)
+            response = "**--- All time stats ---**\n"
+            for data in messages_all_time:
+                response += f"- {data[0]}\n"
+            response += f"**--- Stats for {current_month} ---**\n"
+            for data in messages_monthly:
+                response += f"- {data[0]}\n"
+        else: # Check intfar stats for a specific person.
+            response = format_for_single(target_id)
 
         await message.channel.send(response)
 
@@ -1516,19 +1260,7 @@ class DiscordClient(discord.Client):
 
         return sorted(data, key=lambda x: x[2], reverse=True)
 
-    async def handle_intfar_relations_msg(self, message, target_name):
-        target_id = None
-        if target_name is not None: # Check intfar stats for someone else.
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
-        else: # Check intfar stats for the person sending the message.
-            target_id = message.author.id
-
+    async def handle_intfar_relations_msg(self, message, target_id):
         data = self.get_intfar_relation_stats(target_id)
 
         response = f"Breakdown of players {self.get_discord_nick(target_id)} has inted with:\n"
@@ -1539,7 +1271,7 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_doinks_msg(self, message, target_name):
+    async def handle_doinks_msg(self, message, target_id):
         def get_doinks_stats(disc_id, expanded=True):
             person_to_check = self.get_discord_nick(disc_id)
             doinks_reason_ids = self.database.get_doinks_stats(disc_id)
@@ -1556,26 +1288,16 @@ class DiscordClient(discord.Client):
             return msg, len(doinks_reason_ids)
 
         response = ""
-        if target_name is not None: # Check intfar stats for someone else.
-            target_name = target_name.lower()
-            if target_name == "all":
-                messages = []
-                for disc_id, _, _ in self.database.summoners:
-                    resp_str, intfars = get_doinks_stats(disc_id, expanded=False)
-                    messages.append((resp_str, intfars))
-                messages.sort(key=lambda x: x[1], reverse=True)
-                for resp_str, _ in messages:
-                    response += "- " + resp_str + "\n"
-            else:
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
-                response = get_doinks_stats(target_id)[0]
-        else: # Check intfar stats for the person sending the message.
-            response = get_doinks_stats(message.author.id)[0]
+        if target_id is None: # Check doinks for everyone.
+            messages = []
+            for disc_id, _, _ in self.database.summoners:
+                resp_str, intfars = get_doinks_stats(disc_id, expanded=False)
+                messages.append((resp_str, intfars))
+            messages.sort(key=lambda x: x[1], reverse=True)
+            for resp_str, _ in messages:
+                response += "- " + resp_str + "\n"
+        else: # Check doinks for a specific person.
+            response = get_doinks_stats(target_id)[0]
 
         await message.channel.send(response)
 
@@ -1594,19 +1316,7 @@ class DiscordClient(discord.Client):
 
         return sorted(data, key=lambda x: x[2], reverse=True)
 
-    async def handle_doinks_relations_msg(self, message, target_name):
-        target_id = None
-        if target_name is not None: # Check doinks relations for someone else.
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
-        else: # Check doinks relations for the person sending the message.
-            target_id = message.author.id
-
+    async def handle_doinks_relations_msg(self, message, target_id):
         data = self.get_doinks_relation_stats(target_id)
 
         response = f"Breakdown of who {self.get_discord_nick(target_id)} has gotten Big Doinks with:\n"
@@ -1617,12 +1327,11 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_stat_msg(self, message, first_cmd, second_cmd, target_name):
+    async def handle_stat_msg(self, message, first_cmd, second_cmd, target_id):
         """
         Get the value of the requested stat for the requested player.
         F.x. '!best damage dumbledonger'.
         """
-        check_best_ever_keywords = {"all", "ever"}
         if second_cmd in api_util.STAT_COMMANDS: # Check if the requested stat is a valid stat.
             stat = second_cmd
             stat_index = api_util.STAT_COMMANDS.index(stat)
@@ -1637,23 +1346,9 @@ class DiscordClient(discord.Client):
             readable_stat = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type] + " " + stat
 
             response = ""
-            target_id = message.author.id
-            recepient = message.author.name
+            check_all = target_id is None
 
-            if target_name is not None: # Get someone else's stat information.
-                target_name = target_name.lower()
-                if target_name in check_best_ever_keywords:
-                    target_id = None
-                else:
-                    target_id = self.try_get_user_data(target_name.strip())
-                    if target_id is None:
-                        msg = "Error: Invalid summoner or Discord name "
-                        msg += f"{self.get_emoji_by_name('PepeHands')}"
-                        await message.channel.send(msg)
-                        return
-                    recepient = self.get_discord_nick(target_id)
-
-            if target_id is None:
+            if check_all: # Get best/worst ever stat of everyone.
                 (target_id,
                  min_or_max_value,
                  game_id) = self.database.get_most_extreme_stat(stat, best, maximize)
@@ -1662,7 +1357,9 @@ class DiscordClient(discord.Client):
                 (stat_count, # <- How many times the stat has occured.
                  min_or_max_value, # <- Highest/lowest occurance of the stat value.
                  game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
+                recepient = self.get_discord_nick(target_id)
 
+            game_summary = None
             if min_or_max_value is not None:
                 min_or_max_value = api_util.round_digits(min_or_max_value)
                 game_info = self.riot_api.get_game_details(game_id)
@@ -1671,7 +1368,7 @@ class DiscordClient(discord.Client):
 
             emote_to_use = "{emote_pog}" if best else "{emote_peberno}"
 
-            if target_name in check_best_ever_keywords:
+            if check_all:
                 response = f"The {readable_stat} ever in a game was {min_or_max_value} "
                 response += f"by {recepient} " + self.insert_emotes(emote_to_use) + "\n"
                 response += f"He got this as {game_summary}"
@@ -1689,21 +1386,9 @@ class DiscordClient(discord.Client):
             response += self.insert_emotes("{emote_carole_fucking_baskin}")
             await message.channel.send(response)
 
-    async def handle_game_msg(self, message, target_name):
+    async def handle_game_msg(self, message, target_id):
         summoner_ids = None
-        target_id = None
-        if target_name == "me":
-            target_id = message.author.id
-            target_name = message.author.name
-        else:
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
-            target_name = self.get_discord_nick(target_id)
+        target_name = self.get_discord_nick(target_id)
 
         for disc_id, _, summ_ids in self.database.summoners:
             if disc_id == target_id:
@@ -1764,53 +1449,20 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_cancel_bet_msg(self, message, betting_event, target_name):
-        target_id = None
-        discord_name = None
-        if target_name is not None: # Bet on a specific person doing a thing.
-            if target_name == "me":
-                target_id = message.author.id
-            else:
-                target_name = target_name.lower()
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
-            discord_name = self.get_discord_nick(target_id)
+    async def handle_cancel_bet_msg(self, message, betting_event, target_id):
+        target_name = None if target_id is None else self.get_discord_nick(target_id)
 
         response = self.betting_handler.cancel_bet(message.author.id, betting_event,
-                                                   self.game_start, target_id, discord_name)[1]
+                                                   self.game_start, target_id, target_name)[1]
         await message.channel.send(response)
 
-    async def handle_bet_return_msg(self, message, betting_event, target_name):
-        target_id = None
-        if target_name is not None:
-            if target_name == "me":
-                target_id = message.author.id
-            else:
-                target_name = target_name.lower()
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
-            target_name = self.get_discord_nick(target_id)
+    async def handle_bet_return_msg(self, message, betting_event, target_id):
+        target_name = None if target_id is None else self.get_discord_nick(target_id)
 
         response = self.betting_handler.get_bet_return_desc(betting_event, target_id, target_name)
         await message.channel.send(response)
 
-    async def handle_give_tokens_msg(self, message, amount, target_name):
-        target_name = target_name.lower()
-        target_id = self.try_get_user_data(target_name.strip())
-        if target_id is None:
-            msg = "Error: Invalid summoner or Discord name "
-            msg += f"{self.get_emoji_by_name('PepeHands')}"
-            await message.channel.send(msg)
-            return
-
+    async def handle_give_tokens_msg(self, message, amount, target_id):
         target_name = self.get_discord_nick(target_id)
 
         max_tokens_before, max_tokens_holder = self.database.get_max_tokens_details()
@@ -1828,7 +1480,7 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_active_bets_msg(self, message, target_name):
+    async def handle_active_bets_msg(self, message, target_id):
         def get_bet_description(disc_id, single_person=True):
             active_bets = self.database.get_bets(True, disc_id)
             recepient = self.get_discord_nick(disc_id)
@@ -1866,18 +1518,6 @@ class DiscordClient(discord.Client):
             return response
 
         response = ""
-        target_id = message.author.id
-        if target_name is not None:
-            target_name = target_name.lower()
-            if target_name == "all":
-                target_id = None
-            else:
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
 
         if target_id is None:
             any_bet = False
@@ -1895,19 +1535,7 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_all_bets_msg(self, message, target_name):
-        target_id = message.author.id
-        if target_name is not None:
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
-            target_name = self.get_discord_nick(target_id)
-        else:
-            target_name = message.author.name
-
+    async def handle_all_bets_msg(self, message, target_id):
         all_bets = self.database.get_bets(False, target_id)
         tokens_name = self.config.betting_tokens
         bets_won = 0
@@ -1940,6 +1568,7 @@ class DiscordClient(discord.Client):
         pct_during = int((during_game / len(all_bets)) * 100)
         event_desc = bets.BETTING_DESC[most_often_event]
 
+        target_name = self.get_discord_nick(target_id)
         response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
         response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
         response += f"- Average amount of {tokens_name} wagered: **{average_amount}**\n"
@@ -1951,25 +1580,13 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_token_balance_msg(self, message, target_name):
+    async def handle_token_balance_msg(self, message, target_id):
         def get_token_balance(disc_id):
             name = self.get_discord_nick(disc_id)
             balance = self.database.get_token_balance(disc_id)
             return balance, name
 
         tokens_name = self.config.betting_tokens
-        target_id = message.author.id
-        if target_name is not None:
-            target_name = target_name.lower()
-            if target_name == "all":
-                target_id = None
-            else:
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
 
         response = ""
         if target_id is None: # Get betting balance for all.
@@ -2018,17 +1635,7 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_profile_msg(self, message, target_name):
-        target_id = message.author.id
-        if target_name is not None:
-            target_name = target_name.lower()
-            target_id = self.try_get_user_data(target_name.strip())
-            if target_id is None:
-                msg = "Error: Invalid summoner or Discord name "
-                msg += f"{self.get_emoji_by_name('PepeHands')}"
-                await message.channel.send(msg)
-                return
-
+    async def handle_profile_msg(self, message, target_id):
         target_name = self.get_discord_nick(target_id)
 
         response = f"URL to {target_name}'s Int-Far profile:\n"
@@ -2036,15 +1643,7 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_report_msg(self, message, target_name):
-        target_name = target_name.lower()
-        target_id = self.try_get_user_data(target_name.strip())
-        if target_id is None:
-            msg = "Error: Invalid summoner or Discord name "
-            msg += f"{self.get_emoji_by_name('PepeHands')}"
-            await message.channel.send(msg)
-            return
-
+    async def handle_report_msg(self, message, target_id):
         target_name = self.get_discord_nick(target_id)
         mention = self.get_mention_str(target_id)
 
@@ -2058,20 +1657,7 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(self.insert_emotes(response))
 
-    async def handle_see_reports_msg(self, message, target_name):
-        target_id = message.author.id
-        if target_name is not None:
-            target_name = target_name.lower()
-            if target_name == "all":
-                target_id = None
-            else:
-                target_id = self.try_get_user_data(target_name.strip())
-                if target_id is None:
-                    msg = "Error: Invalid summoner or Discord name "
-                    msg += f"{self.get_emoji_by_name('PepeHands')}"
-                    await message.channel.send(msg)
-                    return
-
+    async def handle_see_reports_msg(self, message, target_id):
         report_data = self.database.get_reports(target_id)
         response = ""
         for disc_id, reports in report_data:
@@ -2142,11 +1728,31 @@ class DiscordClient(discord.Client):
         msg = self.insert_emotes("This command is not implemented yet {emote_peberno}")
         await message.channel.send(msg)
 
-    def get_target_name(self, split, start_index, end_index=None):
+    def extract_target_name(self, split, start_index, end_index=None):
         end_index = len(split) if end_index is None else end_index
         if len(split) > start_index:
             return " ".join(split[start_index:end_index])
-        return None
+        return "me"
+
+    def get_target_id(self, author_id, target_name, all_allowed):
+        if target_name == "me": # Target ourselves.
+            return author_id
+
+        # Target someone else.
+        target_name = target_name.lower().strip()
+        if target_name in ("all", "ever"):
+            if all_allowed:
+                return None
+            else:
+                raise InvalidArgument("'All' target is not valid for this command.")
+
+        target_id = self.try_get_user_data(target_name)
+
+        if target_id is None:
+            msg = f"Error: Invalid summoner or Discord name {self.get_emoji_by_name('PepeHands')}"
+            raise InvalidArgument(msg)
+
+        return target_id
 
     def get_bet_params(self, split):
         amounts = []
@@ -2164,7 +1770,7 @@ class DiscordClient(discord.Client):
                     end_index = split.index("&", index)
                 except ValueError:
                     end_index = len(split)
-                target = self.get_target_name(split, index+2, end_index)
+                target = self.extract_target_name(split, index+2, end_index)
                 index = end_index + 1
             else:
                 index += 3
@@ -2173,14 +1779,24 @@ class DiscordClient(discord.Client):
             targets.append(target)
         return amounts, events, targets
 
-    async def get_data_and_respond(self, handler, *args):
+    async def get_data_and_respond(self, handler, message, target_name=None, target_all=True, args=None):
         try:
-            await handler(*args)
-        except DBException as exception:
+            handler_args = [message]
+            if args is not None:
+                handler_args.extend(args)
+
+            if target_name is not None:
+                target_id = self.get_target_id(message.author.id, target_name, target_all)
+                handler_args.append(target_id)
+            await handler(*handler_args)
+        except InvalidArgument as arg_exception:
+            await message.channel.send(arg_exception.args[0])
+            self.config.log(arg_exception, self.config.log_error)
+        except DBException as db_exception:
             response = "Something went wrong when querying the database! "
             response += self.insert_emotes("{emote_fu}")
-            await args[0].channel.send(response)
-            self.config.log(exception, self.config.log_error)
+            await message.channel.send(response)
+            self.config.log(db_exception, self.config.log_error)
 
     async def valid_command(self, message, cmd, args):
         if cmd in ADMIN_COMMANDS:
@@ -2274,17 +1890,23 @@ class DiscordClient(discord.Client):
                     response = "**--- Registered bois ---**\n" + response
                 await message.channel.send(self.insert_emotes(response))
             elif cmd_equals(first_command, "intfar"): # Lookup how many intfar 'awards' the given user has.
-                target_name = self.get_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_intfar_msg, message, target_name)
+                target_name = self.extract_target_name(split, 1)
+                await self.get_data_and_respond(
+                    self.handle_intfar_msg, message, target_name
+                )
             elif cmd_equals(first_command, "intfar_relations"):
-                target_name = self.get_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_intfar_relations_msg, message, target_name)
+                target_name = self.extract_target_name(split, 1)
+                await self.get_data_and_respond(
+                    self.handle_intfar_relations_msg, message, target_name, target_all=False
+                )
             elif cmd_equals(first_command, "doinks"):
-                target_name = self.get_target_name(split, 1)
+                target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
             elif cmd_equals(first_command, "doinks_relations"):
-                target_name = self.get_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_doinks_relations_msg, message, target_name)
+                target_name = self.extract_target_name(split, 1)
+                await self.get_data_and_respond(
+                    self.handle_doinks_relations_msg, message, target_name, target_all=False
+                )
             elif cmd_equals(first_command, "doinks_criteria"):
                 await self.handle_doinks_criteria_msg(message)
             elif cmd_equals(first_command, "help"):
@@ -2301,53 +1923,67 @@ class DiscordClient(discord.Client):
                 await self.handle_uptime_msg(message)
             elif (cmd_equals(first_command, "worst") or cmd_equals(first_command, "best")
                   and len(split) > 1): # Get game stats.
-                target_name = self.get_target_name(split, 2)
-                await self.get_data_and_respond(self.handle_stat_msg, message, first_command, second_command, target_name)
+                target_name = self.extract_target_name(split, 2)
+                await self.get_data_and_respond(
+                    self.handle_stat_msg, message, target_name,
+                    args=(first_command, second_command)
+                )
             elif cmd_equals(first_command, "intfar_criteria"):
-                criteria = self.get_target_name(split, 1)
+                criteria = self.extract_target_name(split, 1)
                 await self.handle_intfar_criteria_msg(message, criteria)
             elif cmd_equals(first_command, "game"):
-                target_name = self.get_target_name(split, 1)
+                target_name = self.extract_target_name(split, 1)
                 await self.handle_game_msg(message, target_name)
             elif cmd_equals(first_command, "bet"):
                 try:
                     amounts, events, targets = self.get_bet_params(split)
-                    await self.get_data_and_respond(self.handle_make_bet_msg, message, events, amounts, targets)
-                except ValueError as exc:
+                    await self.handle_make_bet_msg(message, events, amounts, targets)
+                except (ValueError, DBException) as exc:
                     await message.channel.send(str(exc))
             elif cmd_equals(first_command, "cancel_bet"):
-                target_name = self.get_target_name(split, 2)
-                await self.get_data_and_respond(self.handle_cancel_bet_msg, message, second_command, target_name)
+                target_name = self.extract_target_name(split, 2)
+                await self.get_data_and_respond(
+                    self.handle_cancel_bet_msg, message, target_name,
+                    target_all=False, args=(second_command,)
+                )
             elif cmd_equals(first_command, "give_tokens"):
-                target_name = self.get_target_name(split, 2)
-                await self.get_data_and_respond(self.handle_give_tokens_msg, message, second_command, target_name)
+                target_name = self.extract_target_name(split, 2)
+                await self.get_data_and_respond(
+                    self.handle_give_tokens_msg, message, target_name,
+                    target_all=False, args=(second_command,)
+                )
             elif cmd_equals(first_command, "active_bets"):
-                target_name = self.get_target_name(split, 1)
+                target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_active_bets_msg, message, target_name)
             elif cmd_equals(first_command, "bets"):
-                target_name = self.get_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_all_bets_msg, message, target_name)
+                target_name = self.extract_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_all_bets_msg, message, target_name, target_all=False)
             elif cmd_equals(first_command, "bet_return") and len(split) > 1:
-                target_name = self.get_target_name(split, 2)
-                await self.handle_bet_return_msg(message, second_command, target_name)
+                target_name = self.extract_target_name(split, 2)
+                await self.get_data_and_respond(
+                    self.handle_bet_return_msg, message, target_name,
+                    target_all=False, args=(second_command,)
+                )
             elif cmd_equals(first_command, "betting_tokens"):
-                target_name = self.get_target_name(split, 1)
+                target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_token_balance_msg, message, target_name)
             elif cmd_equals(first_command, "website"):
                 await self.get_data_and_respond(self.handle_website_msg, message)
             elif cmd_equals(first_command, "website_profile"):
-                target_name = self.get_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_profile_msg, message, target_name)
+                target_name = self.extract_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_profile_msg, message, target_name, target_all=False)
             elif cmd_equals(first_command, "website_verify"):
                 response = await self.handle_verify_msg(message)
                 dm_sent = await self.send_dm(response, message.author.id)
                 if not dm_sent:
-                    await message.channel.send("Error: DM Message could not be sent for some reason ;(")
+                    await message.channel.send(
+                        "Error: DM Message could not be sent for some reason ;( Try again!"
+                    )
             elif cmd_equals(first_command, "report"):
-                target_name = self.get_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_report_msg, message, target_name)
+                target_name = self.extract_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_report_msg, message, target_name, target_all=False)
             elif cmd_equals(first_command, "reports"):
-                target_name = self.get_target_name(split, 1)
+                target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_see_reports_msg, message, target_name)
             elif cmd_equals(first_command, "intdaddy"):
                 await self.handle_flirtation_msg(message, "english")
