@@ -101,3 +101,6 @@ class APIClient:
                 if map_info["mapId"] == map_id:
                     return map_info["mapName"] in ("Summoner's Rift", "Nexus Blitz")
         return False
+
+    def is_clash(self, queue_id):
+        return queue_id == 700

@@ -202,10 +202,8 @@ class BettingHandler:
         if target is None or not is_intfar:
             games_total = self.database.get_games_count()[0]
             intfars_total = self.database.get_intfar_count()[0]
-            ratio = intfars_total / games_total if games_total > 0 else 0
-            if not is_intfar:
-                ratio = 1 - ratio
-            return ratio
+            intfar_count = intfars_total if is_intfar else games_total - intfars_total
+            return intfar_count, games_total
 
         games_played, intfar_reason_ids = self.database.get_intfar_stats(target)
         return len(intfar_reason_ids), games_played
@@ -229,7 +227,7 @@ class BettingHandler:
         if target is None:
             games_total = self.database.get_games_count()[0]
             doinks_total = self.database.get_doinks_count()[0]
-            return doinks_total / games_total
+            return doinks_total, games_total
 
         games_played = self.database.get_intfar_stats(target)[0]
         doinks_reason_ids = self.database.get_doinks_stats(target)

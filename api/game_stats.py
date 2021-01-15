@@ -127,6 +127,7 @@ def get_filtered_stats(database, users_in_game, game_info):
                     if part_info["player"]["summonerId"] in summ_ids:
                         our_team = participant["teamId"]
                         combined_stats = participant["stats"]
+                        combined_stats["championId"] = participant["championId"]
                         combined_stats["timestamp"] = game_info["gameCreation"]
                         combined_stats["mapId"] = game_info["mapId"]
                         combined_stats["gameDuration"] = int(game_info["gameDuration"])

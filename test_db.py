@@ -1,3 +1,4 @@
+from sqlite3.dbapi2 import ProgrammingError
 from sys import argv
 import sqlite3
 
@@ -33,6 +34,8 @@ try:
                 print(f"Rows affected: {rows_affected}")
 
             conn.commit()
+        except (sqlite3.OperationalError, sqlite3.ProgrammingError) as exc:
+            print(exc.args)
         except KeyboardInterrupt:
             pass
 finally:

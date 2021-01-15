@@ -14,7 +14,7 @@ class MockChannel:
 
 class TestMock(DiscordClient):
     def __init__(self, config, database, betting_handler, riot_api):
-        super().__init__(config, database, betting_handler, riot_api, None, flask_conn=None)
+        super().__init__(config, database, betting_handler, riot_api)
         if len(argv) != 4:
             print("Wrong number of arguments.")
             print("Must supply: [game_id, task, loud] where task in ('all', 'bets', 'stats')")

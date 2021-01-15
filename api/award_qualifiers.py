@@ -41,7 +41,7 @@ def get_big_doinks(data):
         if mention_list != []:
             mentions[disc_id] = mention_list
             format_str = ""
-            for index in range(api_util.DOINKS_REASONS):
+            for index in range(len(api_util.DOINKS_REASONS)):
                 has_doinks_for_stats = False
                 for stat_index, _ in mention_list:
                     if stat_index == index:
@@ -145,7 +145,7 @@ def intfar_by_kp(data, config):
         return (tied_intfars, lowest_kp)
     return (None, None)
 
-def intfar_by_vision_score(self, data):
+def intfar_by_vision_score(data, config):
     """
     Returns the info of the Int-Far, if this person has very low kill vision score.
     This is determined by:
@@ -157,8 +157,8 @@ def intfar_by_vision_score(self, data):
     tied_intfars, stats = game_stats.get_outlier(data, "visionScore", include_ties=True)
     lowest_score = stats["visionScore"]
     kda = game_stats.calc_kda(stats)
-    vision_criteria = self.config.vision_score_lower_threshold
-    kda_criteria = self.config.vision_kda_criteria
+    vision_criteria = config.vision_score_lower_threshold
+    kda_criteria = config.vision_kda_criteria
     if lowest_score < vision_criteria and kda < kda_criteria:
         return (tied_intfars, lowest_score)
     return (None, None)

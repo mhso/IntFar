@@ -33,7 +33,11 @@ def listen_for_request(disc_client, event_loop):
                             result = disc_client.__getattribute__(command)(*params)
                         if isinstance(result, Coroutine):
                             future = asyncio.run_coroutine_threadsafe(result, event_loop)
-                            result = future.result(3)
+                            try:
+                                result = future.result(3)
+                            except TimeoutError as exc:
+                                disc_client.config.log(f"Exception during Discord request: {exc}")
+                                results.append(None)
                     elif command_type == "bot_command":
                         pass # Do bot command.
                     results.append(result)

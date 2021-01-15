@@ -281,7 +281,15 @@ class DiscordClient(discord.Client):
                 )
                 self.config.log(f"Users in game after: {self.users_in_game}")
 
+                if self.riot_api.is_clash(self.active_game["queue_id"]):
+                    multiplier = self.config.clash_multiplier
+                    await self.channel_to_write.send(
+                        "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
+                        f"{multiplier} TIMES AS MUCH!!! <<<<<"
+                    )
+
                 betting_data = await self.declare_intfar(filtered_stats)
+
                 if betting_data is not None:
                     intfar, intfar_reason, doinks = betting_data
                     await asyncio.sleep(1)
@@ -398,7 +406,8 @@ class DiscordClient(discord.Client):
                 "id": active_game["gameId"],
                 "start": active_game_start,
                 "map_id": active_game["mapId"],
-                "game_mode": active_game["gameMode"]
+                "game_mode": active_game["gameMode"],
+                "queue_id": active_game["queueId"]
             }
 
             self.game_start = active_game_start
@@ -566,6 +575,13 @@ class DiscordClient(discord.Client):
         tokens_gained = (self.config.betting_tokens_for_win
                          if game_won
                          else self.config.betting_tokens_for_loss)
+
+        clash_multiplier = 1 
+
+        if self.riot_api.is_clash(self.active_game["queue_id"]):
+            clash_multiplier = self.config.clash_multiplier
+            tokens_gained *= clash_multiplier
+
         game_desc = "Game won!" if game_won else "Game lost."
         response = f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
         response_bets = "\n**--- Results of bets made that game ---**\n"
@@ -595,7 +611,7 @@ class DiscordClient(discord.Client):
             tokens_lost = -1 # Variable for tracking tokens lost for the user.
             disc_name = self.get_discord_nick(disc_id)
 
-            if bets_made is not None: # No active bets for the current user.
+            if bets_made is not None: # There are active bets for the current user.
                 mention = self.get_mention_str(disc_id)
                 if any_bets:
                     response_bets += "-----------------------------\n"
@@ -610,6 +626,8 @@ class DiscordClient(discord.Client):
                                                                         (intfar,
                                                                             intfar_reason,
                                                                             doinks, game_info))
+
+                    payout *= clash_multiplier
 
                     response_bets += " - "
                     total_cost = 0 # Track total cost of the current bet.
@@ -683,7 +701,10 @@ class DiscordClient(discord.Client):
                 user_str += prefix + get_redeeming_flavor_text(stat_index, stat_value)
             mentions_str += user_str
 
-            points = self.config.betting_tokens_for_doinks
+            multiplier = 1
+            if self.riot_api.is_clash(self.active_game["queue_id"]):
+                multiplier = self.config.clash_multiplier
+            points = self.config.betting_tokens_for_doinks * multiplier
             tokens_name = self.config.betting_tokens
             mentions_str += f"\nHe is also given {points} bonus {tokens_name} "
             mentions_str += "for being great {emote_swell}"
@@ -809,9 +830,10 @@ class DiscordClient(discord.Client):
             await self.channel_to_write.send(self.insert_emotes(response))
             return None
         elif filtered_stats[0][1]["gameDuration"] < 5 * 60: # Game was less than 5 mins long.
-            self.config.log(
+            response = (
                 "That game lasted less than 5 minutes {emote_zinking} assuming it was a remake."
             )
+            await self.channel_to_write.send(self.insert_emotes(response))
             return None
 
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
@@ -1728,11 +1750,11 @@ class DiscordClient(discord.Client):
         msg = self.insert_emotes("This command is not implemented yet {emote_peberno}")
         await message.channel.send(msg)
 
-    def extract_target_name(self, split, start_index, end_index=None):
+    def extract_target_name(self, split, start_index, end_index=None, default="me"):
         end_index = len(split) if end_index is None else end_index
         if len(split) > start_index:
             return " ".join(split[start_index:end_index])
-        return "me"
+        return default
 
     def get_target_id(self, author_id, target_name, all_allowed):
         if target_name == "me": # Target ourselves.
@@ -1941,7 +1963,7 @@ class DiscordClient(discord.Client):
                 except (ValueError, DBException) as exc:
                     await message.channel.send(str(exc))
             elif cmd_equals(first_command, "cancel_bet"):
-                target_name = self.extract_target_name(split, 2)
+                target_name = self.extract_target_name(split, 2, default=None)
                 await self.get_data_and_respond(
                     self.handle_cancel_bet_msg, message, target_name,
                     target_all=False, args=(second_command,)
@@ -1959,7 +1981,7 @@ class DiscordClient(discord.Client):
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_all_bets_msg, message, target_name, target_all=False)
             elif cmd_equals(first_command, "bet_return") and len(split) > 1:
-                target_name = self.extract_target_name(split, 2)
+                target_name = self.extract_target_name(split, 2, default=None)
                 await self.get_data_and_respond(
                     self.handle_bet_return_msg, message, target_name,
                     target_all=False, args=(second_command,)
