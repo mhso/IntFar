@@ -331,10 +331,11 @@ class BettingHandler:
             total_value += bet_value
 
         total_value = total_value * amount_multiplier
+        timestamp = int(time())
 
         for bet_id in bet_ids:
             try:
-                self.database.mark_bet_as_resolved(bet_id, all_success, total_value)
+                self.database.mark_bet_as_resolved(bet_id, timestamp, all_success, total_value)
             except DBException:
                 print_exc()
                 self.config.log("Database error during bet resolution!", self.config.log_error)

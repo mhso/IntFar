@@ -37,11 +37,11 @@ class TimeZone(tzinfo):
 
     def dst(self, dt):
         if dt.month < 10 or dt.month > 3:
-            return timedelta(0, 0, 0, 0, 0, 1, 0)
+            return timedelta(0, 0, 0, 0, 0, 0, 0)
         if dt.month == 10 and dt.day < 25:
             return timedelta(0, 0, 0, 0, 0, 1, 0)
         if dt.month == 3 and dt.day > 28:
-            return timedelta(0, 0, 0, 0, 0, 1, 0)
+            return timedelta(0, 0, 0, 0, 0, 0, 0)
         return timedelta(0, 0, 0, 0, 0, 1, 0)
 
 def current_month():

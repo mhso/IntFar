@@ -2,7 +2,6 @@ import json
 from contextlib import closing
 from api.database import Database
 from api.config import Config
-from api.util import generate_user_secret
 
 auth = json.load(open("discbot/auth.json"))
 
@@ -15,7 +14,7 @@ conf_2.database = "copy.db"
 
 database_client_2 = Database(conf_2)
 
-with closing(database_client_1.get_connection()) as db_1:
+with database_client_1.get_connection() as db_1:
     data_best = db_1.cursor().execute("SELECT * FROM best_stats").fetchall()
     data_worst = db_1.cursor().execute("SELECT * FROM worst_stats").fetchall()
     participants = db_1.cursor().execute("SELECT * FROM participants").fetchall()
@@ -34,7 +33,7 @@ with closing(database_client_1.get_connection()) as db_1:
         """
     )
 
-    with closing(database_client_2.get_connection()) as db_2:
+    with database_client_2.get_connection() as db_2:
         for summ in summoners:
             disc_id = int(summ[0])
             secret = summ[3]
@@ -54,7 +53,7 @@ with closing(database_client_1.get_connection()) as db_1:
         query = "INSERT OR IGNORE INTO betting_events(id, max_return) VALUES (?, ?)"
         for data in events:
             db_2.cursor().execute(query, data)
-        query = "INSERT OR IGNORE INTO bets(id, better_id, event_id, amount, game_duration, target, ticket, result, payout) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        query = "INSERT OR IGNORE INTO bets(id, better_id, timestamp, event_id, amount, game_duration, target, ticket, result, payout) VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?)"
         for data in bets:
-            db_2.cursor().execute(query, data + (None,))
+            db_2.cursor().execute(query, data)
         db_2.commit()

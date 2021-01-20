@@ -127,6 +127,11 @@ class Database:
                 return (disc_id, summ_names, summ_ids)
         return None
 
+    def game_exists(self, game_id):
+        with self.get_connection() as db:
+            query = "SELECT game_id FROM best_stats WHERE game_id=?"
+            return self.execute_query(db, query, (game_id,)).fetchone() is not None
+
     def get_max_reports_details(self):
         with self.get_connection() as db:
             query = "SELECT MAX(reports), disc_id FROM registered_summoners"
@@ -514,7 +519,7 @@ class Database:
 
     def get_bets(self, only_active, disc_id=None):
         with self.get_connection() as db:
-            query = "SELECT better_id, id, amount, event_id, game_duration, target, ticket"
+            query = "SELECT better_id, id, timestamp, amount, event_id, game_duration, target, ticket"
             if not only_active:
                 query += ", result, payout"
             query += " FROM bets WHERE "
@@ -541,17 +546,17 @@ class Database:
                 if discord_id not in data_for_person:
                     data_for_person[discord_id] = []
 
-                next_ticket = None if index == len(data) - 1 else data[index+1][6]
+                next_ticket = None if index == len(data) - 1 else data[index+1][7]
                 next_better = None if index == len(data) - 1 else data[index+1][0]
                 bet_ids.append(row[1])
-                amounts.append(row[2])
-                events.append(row[3])
-                targets.append(row[5])
+                amounts.append(row[3])
+                events.append(row[4])
+                targets.append(row[6])
 
-                ticket = row[6]
+                ticket = row[7]
 
                 if ticket is None or ticket != next_ticket or discord_id != next_better:
-                    data_tuple = (bet_ids, amounts, events, targets, row[4])
+                    data_tuple = (bet_ids, row[2], amounts, events, targets, row[5])
                     if only_active: # Include ticket in tuple, if only active bets.
                         data_tuple = data_tuple + (row[-1], None)
                     else: # Include both result and payout if resolved bets.
@@ -624,11 +629,11 @@ class Database:
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):
         with self.get_connection() as db:
-            query_bet = "INSERT INTO bets(better_id, event_id, amount, "
+            query_bet = "INSERT INTO bets(better_id, timestamp, event_id, amount, "
             query_bet += "game_duration, target,  ticket, result) "
             query_bet += "VALUES (?, ?, ?, ?, ?, ?, ?)"
             self.update_token_balance(disc_id, amount, False)
-            self.execute_query(db, query_bet, (disc_id, event_id, amount, game_duration,
+            self.execute_query(db, query_bet, (disc_id, 0, event_id, amount, game_duration,
                                                target_person, ticket, 0))
             return self.execute_query(db, "SELECT last_insert_rowid()").fetchone()[0]
 
@@ -651,12 +656,12 @@ class Database:
             self.update_token_balance(disc_id, amount_total, True)
             return amount_total
 
-    def mark_bet_as_resolved(self, bet_id, success, value):
+    def mark_bet_as_resolved(self, bet_id, timestamp, success, value):
         result_val = 1 if success else -1
         with self.get_connection() as db:
-            query_bet = "UPDATE bets SET result=?, payout=? WHERE id=?"
+            query_bet = "UPDATE bets SET timestamp=?, result=?, payout=? WHERE id=?"
             payout = value if success else None
-            self.execute_query(db, query_bet, (result_val, payout, bet_id))
+            self.execute_query(db, query_bet, (timestamp, result_val, payout, bet_id))
 
     def reset_bets(self):
         with self.get_connection() as db:

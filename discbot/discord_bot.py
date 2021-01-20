@@ -281,6 +281,12 @@ class DiscordClient(discord.Client):
                 )
                 self.config.log(f"Users in game after: {self.users_in_game}")
 
+                self.active_game["queue_id"] = game_info["queueId"]
+
+                if self.database.game_exists(game_info["gameId"]):
+                    self.config.log("We are triggered end of game stuff again... Strange!")
+                    return
+
                 if self.riot_api.is_clash(self.active_game["queue_id"]):
                     multiplier = self.config.clash_multiplier
                     await self.channel_to_write.send(
@@ -406,8 +412,7 @@ class DiscordClient(discord.Client):
                 "id": active_game["gameId"],
                 "start": active_game_start,
                 "map_id": active_game["mapId"],
-                "game_mode": active_game["gameMode"],
-                "queue_id": active_game["queueId"]
+                "game_mode": active_game["gameMode"]
             }
 
             self.game_start = active_game_start
@@ -576,7 +581,7 @@ class DiscordClient(discord.Client):
                          if game_won
                          else self.config.betting_tokens_for_loss)
 
-        clash_multiplier = 1 
+        clash_multiplier = 1
 
         if self.riot_api.is_clash(self.active_game["queue_id"]):
             clash_multiplier = self.config.clash_multiplier
@@ -585,9 +590,7 @@ class DiscordClient(discord.Client):
         game_desc = "Game won!" if game_won else "Game lost."
         response = f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
         response_bets = "\n**--- Results of bets made that game ---**\n"
-        max_tokens, max_tokens_holder = self.database.get_max_tokens_details()
-        new_max_tokens_holder = None
-        max_tokens_name = None
+        max_tokens_holder = self.database.get_max_tokens_details()[1]
 
         any_bets = False # Bool to indicate whether any bets were made.
         for disc_id, _, _ in self.database.summoners:
@@ -617,15 +620,13 @@ class DiscordClient(discord.Client):
                     response_bets += "-----------------------------\n"
                 response_bets += f"Result of bets {mention} made:\n"
 
-                for bet_ids, amounts, events, targets, bet_timestamp, _, _ in bets_made:
+                for bet_ids, _, amounts, events, targets, bet_timestamp, _, _ in bets_made:
                     any_bets = True
                     # Resolve current bet which the user made, marks it as won/lost in DB.
-                    bet_success, payout = self.betting_handler.resolve_bet(disc_id, bet_ids, amounts,
-                                                                        events, bet_timestamp,
-                                                                        targets,
-                                                                        (intfar,
-                                                                            intfar_reason,
-                                                                            doinks, game_info))
+                    bet_success, payout = self.betting_handler.resolve_bet(
+                        disc_id, bet_ids, amounts, events, bet_timestamp, targets,
+                        (intfar, intfar_reason, doinks, game_info)
+                    )
 
                     payout *= clash_multiplier
 
@@ -665,15 +666,9 @@ class DiscordClient(discord.Client):
                     quant_desc = "" if tokens_earned == balance_before else "more than"
                     response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
 
-                tokens_now = balance_before + tokens_earned # Record how many tokens the user has now.
-
-                if tokens_now > max_tokens and disc_id != max_tokens_holder:
-                    # Someone now has the most betting tokens!
-                    max_tokens = tokens_now
-                    new_max_tokens_holder = disc_id
-                    max_tokens_name = self.get_discord_nick(disc_id)
-
-        if new_max_tokens_holder is not None:
+        new_max_tokens_holder = self.database.get_max_tokens_details()[1]
+        if new_max_tokens_holder != max_tokens_holder:
+            max_tokens_name = self.get_discord_nick(new_max_tokens_holder)
             # This person now has the most tokens of all users!
             response_bets += f"{max_tokens_name} now has the most {tokens_name} of everyone! "
             response_bets += "***HAIL TO THE KING!!!***\n"
@@ -903,7 +898,7 @@ class DiscordClient(discord.Client):
         if summoner_info is not None:
             users_in_voice = self.get_users_in_voice()
             self.config.log("Summoner joined voice: " + summoner_info[1][0])
-            if len(users_in_voice) != 0 and not self.polling_active:
+            if len(users_in_voice) > 1 and not self.polling_active:
                 self.config.log("Polling is now active!")
                 self.polling_active = True
                 asyncio.create_task(self.poll_for_game_start(poll_immediately))
@@ -1010,6 +1005,17 @@ class DiscordClient(discord.Client):
         message += f"{mention_me}, come and fix me!!! " + "{emote_angry_gual}"
         await self.channel_to_write.send(self.insert_emotes(message))
 
+    async def get_all_messages(self):
+        counter = 0
+        with open("all_messages.txt", "w", encoding="utf-8") as fp:
+            async for message in self.channel_to_write.history(limit=None, oldest_first=True):
+                if message.author.id == self.user.id:
+                    fp.write(str(message.created_at.timestamp()) + " - " + message.content + "\n")
+                    counter += 1
+                    if counter % 100 == 0:
+                        print(f"Saved {counter} messages.", flush=True)
+        print("Done writing messages!", flush=True)
+
     async def on_ready(self):
         if self.initialized:
             self.config.log("Ready was called, but bot was already initialized... Weird stuff.")
@@ -1039,6 +1045,8 @@ class DiscordClient(discord.Client):
             elif guild.id == MY_SERVER_ID and self.config.env == "dev":
                 self.channel_to_write = guild.text_channels[0]
                 await guild.chunk()
+
+        await self.get_all_messages()
 
         if self.flask_conn is not None: # Listen for external commands from web page.
             event_loop = asyncio.get_event_loop()
@@ -1133,7 +1141,7 @@ class DiscordClient(discord.Client):
 
         for disc_id in all_bets:
             bet_data = all_bets[disc_id]
-            for _, amounts, events, targets, _, result, payout in bet_data:
+            for _, _, amounts, events, targets, _, result, payout in bet_data:
                 for amount, _, _ in zip(amounts, events, targets):
                     total_amount += amount
 
@@ -1516,7 +1524,7 @@ class DiscordClient(discord.Client):
             else:
                 tokens_name = self.config.betting_tokens
                 response = f"{recepient} has the following active bets:"
-                for _, amounts, events, targets, _, ticket, _ in active_bets:
+                for _, _, amounts, events, targets, _, ticket, _ in active_bets:
                     bets_str = "\n - "
                     total_cost = 0
                     if len(amounts) > 1:
@@ -1569,7 +1577,7 @@ class DiscordClient(discord.Client):
         winnings = 0
         event_counts = {x: 0 for x in bets.BETTING_DESC}
 
-        for _, amounts, events, targets, game_time, result, payout in all_bets:
+        for _, _, amounts, events, targets, game_time, result, payout in all_bets:
             for amount, event_id, target in zip(amounts, events, targets):
                 spent += amount
                 event_counts[event_id] += 1

@@ -121,7 +121,7 @@ def get_bets(disc_id, database, only_active):
     names_dict = dict(zip((x[0] for x in database.summoners), names))
     presentable_data = []
 
-    for bet_ids, amounts, events, targets, _, result_or_ticket, payout in bets:
+    for bet_ids, _, amounts, events, targets, _, result_or_ticket, payout in bets:
         event_descs = [
             (
                 i, get_dynamic_bet_desc(e, names_dict.get(t)),
@@ -158,7 +158,7 @@ def get_betting_data(disc_id, database):
         target_counts = {d_id: 0 for d_id, _, _ in database.summoners}
         total_bets = 0
 
-        for _, amounts, events, targets, _, result, payout in bets:
+        for _, _, amounts, events, targets, _, result, payout in bets:
             amount_bet = 0
             for amount, event, target in zip(amounts, events, targets):
                 amount_bet += amount

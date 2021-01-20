@@ -19,7 +19,7 @@ def get_bets(database, only_active):
     presentable_data = []
     for disc_id in all_bets:
         bets = all_bets[disc_id]
-        for bet_ids, amounts, events, targets, _, result_or_ticket, payout in bets:
+        for bet_ids, _, amounts, events, targets, _, result_or_ticket, payout in bets:
             event_descs = [
                 (i, get_dynamic_bet_desc(e, names_dict.get(t)), format_tokens_amount(a))
                 for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
