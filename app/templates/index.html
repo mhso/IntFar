@@ -5,7 +5,32 @@
 <body>
     <div class="wrapper container-flex">
         {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, game_duration, game_mode, map_name) }}
-        <div id="header-wrapper">
+        <div id="header-wrapper-feed" class="header-wrapper">
+            <h1>Feeding Feed</h1>
+        </div>
+
+        <div class="row">
+            <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
+            <div class="col-12 col-md-10 col-lg-8 col-xxl-6">
+                <table class="nice-table">
+                    {% for desc, duration in feed_descs %}
+                    <tr class="feed-entry">
+                        <td>
+                            {% for type, text in desc %}
+                            <span class="{{ type }}">
+                                {{ text }}
+                            </span> 
+                            {% endfor %}
+                        </td>
+                        <td>{{ duration }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
+        </div>
+
+        <div id="header-wrapper-intfars" class="header-wrapper">
             <h1>Inting Bois</h1>
         </div>
 

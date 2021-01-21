@@ -366,7 +366,7 @@ class BettingHandler:
                 capitalized = tokens_name[1:-1].upper()
                 response += f"***ALL YOUR {capitalized}, YOU MAD LAD!!!***\n"
             else:
-                response += f"**{amount}** {tokens_name}.\n"
+                response += f"**{format_tokens_amount(amount)}** {tokens_name}.\n"
             response += f"The return multiplier for that event is **{base_return}**.\n"
 
         if duration == 0:
@@ -534,7 +534,7 @@ class BettingHandler:
 
         response = self.get_bet_placed_text(bet_data, bet_all, game_duration, ticket)
 
-        balance_resp = f"\nYour {tokens_name} balance is now `{balance}`."
+        balance_resp = f"\nYour {tokens_name} balance is now `{format_tokens_amount(balance)}`."
 
         bet_id = None if len(amounts) > 1 else bet_id
 
@@ -581,7 +581,7 @@ class BettingHandler:
                 response = f"Bet on `{bet_desc}` for {format_tokens_amount(amount_refunded)} {tokens_name} successfully cancelled.\n"
             else:
                 response = f"Multi-bet with ticket ID {ticket} successfully cancelled.\n"
-            response += f"Your {tokens_name} balance is now `{new_balance}`."
+            response += f"Your {tokens_name} balance is now `{format_tokens_amount(new_balance)}`."
             return (True, response)
         except DBException:
             print_exc()

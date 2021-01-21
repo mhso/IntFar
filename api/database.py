@@ -184,6 +184,15 @@ class Database:
         with self.get_connection() as db:
             return self.execute_query(db, query).fetchall()
 
+    def get_recent_intfars_and_doinks(self):
+        with (self.get_connection()) as db:
+            query = (
+                "SELECT bs.game_id, timestamp, p.disc_id, doinks, int_far, "
+                "intfar_reason FROM participants AS p, best_stats "
+                "AS bs WHERE p.game_id = bs.game_id ORDER BY timestamp ASC"
+            )
+            return self.execute_query(db, query).fetchall()
+
     def get_games_count(self, context=None):
         query_games = """
         SELECT Count(DISTINCT bs.game_id), timestamp FROM best_stats bs, participants p

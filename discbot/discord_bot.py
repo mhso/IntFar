@@ -1046,8 +1046,6 @@ class DiscordClient(discord.Client):
                 self.channel_to_write = guild.text_channels[0]
                 await guild.chunk()
 
-        await self.get_all_messages()
-
         if self.flask_conn is not None: # Listen for external commands from web page.
             event_loop = asyncio.get_event_loop()
             Thread(target=listen_for_request, args=(self, event_loop)).start()
@@ -1479,14 +1477,14 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_cancel_bet_msg(self, message, betting_event, target_id):
+    async def handle_cancel_bet_msg(self, message, betting_event, target_id=None):
         target_name = None if target_id is None else self.get_discord_nick(target_id)
 
         response = self.betting_handler.cancel_bet(message.author.id, betting_event,
                                                    self.game_start, target_id, target_name)[1]
         await message.channel.send(response)
 
-    async def handle_bet_return_msg(self, message, betting_event, target_id):
+    async def handle_bet_return_msg(self, message, betting_event, target_id=None):
         target_name = None if target_id is None else self.get_discord_nick(target_id)
 
         response = self.betting_handler.get_bet_return_desc(betting_event, target_id, target_name)
