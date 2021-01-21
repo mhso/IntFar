@@ -632,15 +632,21 @@ class Database:
             bet_id = int(bet_id)
 
         with self.get_connection() as db:
-            query = "SELECT better_id FROM bets WHERE id=? OR (ticket=? OR ticket IS NULL)"
-            result = self.execute_query(db, query, (bet_id, ticket)).fetchone()
+            query = "SELECT better_id FROM bets WHERE "
+            if ticket is not None:
+                query += "ticket=?"
+                param = (ticket,)
+            else:
+                query += "id=?"
+                param = (bet_id,)
+            result = self.execute_query(db, query, param).fetchone()
             return None if result is None else result[0]
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):
         with self.get_connection() as db:
             query_bet = "INSERT INTO bets(better_id, timestamp, event_id, amount, "
             query_bet += "game_duration, target,  ticket, result) "
-            query_bet += "VALUES (?, ?, ?, ?, ?, ?, ?)"
+            query_bet += "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
             self.update_token_balance(disc_id, amount, False)
             self.execute_query(db, query_bet, (disc_id, 0, event_id, amount, game_duration,
                                                target_person, ticket, 0))

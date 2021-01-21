@@ -274,33 +274,43 @@ class DiscordClient(discord.Client):
                 if game_info is None:
                     self.config.log("Game info is None! Weird stuff.", self.config.log_error)
                     raise ValueError("Game info is None!")
-
-                self.config.log(f"Users in game before: {self.users_in_game}")
-                filtered_stats, self.users_in_game = game_stats.get_filtered_stats(
-                    self.database, self.users_in_game, game_info
-                )
-                self.config.log(f"Users in game after: {self.users_in_game}")
-
-                self.active_game["queue_id"] = game_info["queueId"]
-
                 if self.database.game_exists(game_info["gameId"]):
                     self.config.log("We are triggered end of game stuff again... Strange!")
                     return
-
-                if self.riot_api.is_clash(self.active_game["queue_id"]):
-                    multiplier = self.config.clash_multiplier
-                    await self.channel_to_write.send(
-                        "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
-                        f"{multiplier} TIMES AS MUCH!!! <<<<<"
+                if not self.riot_api.is_good_map(game_info["mapId"]):
+                    response = "That game was not on Summoner's Rift "
+                    response += "{emote_woahpikachu} no Int-Far will be crowned "
+                    response += "and no stats will be saved."
+                    await self.channel_to_write.send(self.insert_emotes(response))
+                elif game_info["gameDuration"] < 5 * 60: # Game was less than 5 mins long.
+                    response = (
+                        "That game lasted less than 5 minutes " +
+                        "{emote_zinking} assuming it was a remake."
                     )
+                    await self.channel_to_write.send(self.insert_emotes(response))
+                else:
+                    self.config.log(f"Users in game before: {self.users_in_game}")
+                    filtered_stats, self.users_in_game = game_stats.get_filtered_stats(
+                        self.database, self.users_in_game, game_info
+                    )
+                    self.config.log(f"Users in game after: {self.users_in_game}")
 
-                betting_data = await self.declare_intfar(filtered_stats)
+                    self.active_game["queue_id"] = game_info["queueId"]
 
-                if betting_data is not None:
-                    intfar, intfar_reason, doinks = betting_data
-                    await asyncio.sleep(1)
-                    await self.resolve_bets(filtered_stats, intfar, intfar_reason, doinks)
-                    await self.save_stats(filtered_stats, intfar, intfar_reason, doinks)
+                    if self.riot_api.is_clash(self.active_game["queue_id"]):
+                        multiplier = self.config.clash_multiplier
+                        await self.channel_to_write.send(
+                            "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
+                            f"{multiplier} TIMES AS MUCH!!! <<<<<"
+                        )
+
+                    betting_data = await self.declare_intfar(filtered_stats)
+
+                    if betting_data is not None:
+                        intfar, intfar_reason, doinks = betting_data
+                        await asyncio.sleep(1)
+                        await self.resolve_bets(filtered_stats, intfar, intfar_reason, doinks)
+                        await self.save_stats(filtered_stats, intfar, intfar_reason, doinks)
 
                 self.active_game = None
                 self.game_start = None
@@ -471,6 +481,7 @@ class DiscordClient(discord.Client):
         return nicknames
 
     async def get_discord_avatar(self, discord_id=None, size=64):
+        default_avatar = "app/static/img/questionmark.png"
         users_to_search = ([x[0] for x in self.database.summoners]
                            if discord_id is None
                            else [discord_id])
@@ -478,7 +489,7 @@ class DiscordClient(discord.Client):
         for disc_id in users_to_search:
             member = self.get_member_safe(disc_id)
             if member is None:
-                return None
+                return default_avatar
 
             key = f"{member.id}_{size}"
 
@@ -492,7 +503,7 @@ class DiscordClient(discord.Client):
                     self.cached_avatars[key] = time_now
                 except (DiscordException, HTTPException, NotFound) as exc:
                     print(exc)
-                    return None
+                    return default_avatar
 
             avatar_paths.append(path)
         return avatar_paths if discord_id is None else avatar_paths[0]
@@ -818,19 +829,6 @@ class DiscordClient(discord.Client):
         and sends out a status message about the potential Int-Far (if there was one).
         Also saves worst/best stats for the current game.
         """
-        if not self.riot_api.is_good_map(filtered_stats[0][1]["mapId"]):
-            response = "That game was not on Summoner's Rift "
-            response += "{emote_woahpikachu} no Int-Far will be crowned "
-            response += "and no stats will be saved."
-            await self.channel_to_write.send(self.insert_emotes(response))
-            return None
-        elif filtered_stats[0][1]["gameDuration"] < 5 * 60: # Game was less than 5 mins long.
-            response = (
-                "That game lasted less than 5 minutes {emote_zinking} assuming it was a remake."
-            )
-            await self.channel_to_write.send(self.insert_emotes(response))
-            return None
-
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
         reason_ids = ["0", "0", "0", "0"]
 

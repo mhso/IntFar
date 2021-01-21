@@ -172,7 +172,7 @@ def index():
     database = flask.current_app.config["DATABASE"]
     curr_month = api_util.current_month()
 
-    feed_descs = get_feed_data(database)
+    feed_descs = get_feed_data(database, feed_length=25)
 
     intfar_all_data = []
     intfar_month_data = []

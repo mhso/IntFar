@@ -8,6 +8,8 @@ def calc_kda(stats):
     return (stats["kills"] + stats["assists"]) / stats["deaths"]
 
 def calc_kill_participation(stats, total_kills):
+    if total_kills == 0:
+        return 100
     return int((float(stats["kills"] + stats["assists"]) / float(total_kills)) * 100.0)
 
 def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):

@@ -37,6 +37,8 @@ class TestMock(DiscordClient):
         ]
         self.active_game = {"id": self.game_id}
         game_info = self.riot_api.get_game_details(self.game_id)
+        self.active_game["queue_id"] = game_info["queueId"]
+
         filtered, self.users_in_game = get_filtered_stats(
             self.database, self.users_in_game, game_info
         )
