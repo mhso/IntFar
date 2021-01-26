@@ -19,18 +19,19 @@ def get_bets(database, only_active):
     presentable_data = []
     for disc_id in all_bets:
         bets = all_bets[disc_id]
-        for bet_ids, _, amounts, events, targets, _, result_or_ticket, payout in bets:
+        for bet_ids, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
             event_descs = [
                 (i, get_dynamic_bet_desc(e, names_dict.get(t)), format_tokens_amount(a))
                 for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
             ]
+            bet_date = app_util.format_bet_timestamp(timestamp)
             presentable_data.append(
                 (
-                    disc_id, names_dict[disc_id], event_descs, result_or_ticket,
+                    disc_id, names_dict[disc_id], bet_date, event_descs, result_or_ticket,
                     format_tokens_amount(payout), avatar_dict[disc_id]
                 )
             )
-    presentable_data.sort(key=lambda x: x[2][0][0], reverse=True)
+    presentable_data.sort(key=lambda x: x[3][0][0], reverse=True)
     return presentable_data
 
 @betting_page.route('/')

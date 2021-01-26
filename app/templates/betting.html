@@ -74,8 +74,8 @@
                         <th>GBP</th>
                         <th>Ticket</th>
                     </tr>
-                    {% for better_id, name, events, result, payout, avatar in active_bets %}
-                        {{ list_entry.entry(name, better_id, logged_in_user, events, result, payout, avatar) }}
+                    {% for better_id, name, date, events, result, payout, avatar in active_bets %}
+                        {{ list_entry.entry(name, better_id, logged_in_user, date, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
             </div>
@@ -117,12 +117,13 @@
                     <tr class="list-first list-entry">
                         <th class="d-none d-sm-block"></th>
                         <th>By</th>
+                        <th>Date</th>
                         <th>Event</th>
                         <th>GBP</th>
                         <th>Result</th>
                     </tr>
-                    {% for better_id, name, events, result, payout, avatar in resolved_bets %}
-                        {{ list_entry.entry(name, better_id, logged_in_user, events, result, payout, avatar) }}
+                    {% for better_id, name, date, events, result, payout, avatar in resolved_bets %}
+                        {{ list_entry.entry(name, better_id, logged_in_user, date, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
             </div>

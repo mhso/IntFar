@@ -157,7 +157,9 @@ VALID_COMMANDS = {
 
 ALIASES = {
     "give_tokens": ["give"],
-    "betting_tokens": ["gbp"]
+    "betting_tokens": ["gbp"],
+    "best": ["most", "highest"],
+    "worst": ["least", "lowest", "fewest"]
 }
 
 CUTE_COMMANDS = {
@@ -366,7 +368,7 @@ class DiscordClient(discord.Client):
                 return True
         return False
 
-    def add_user(self, summ_name, discord_id):
+    async def add_user(self, summ_name, discord_id):
         if self.user_is_registered(summ_name):
             return "User with that summoner name is already registered."
         summ_id = self.riot_api.get_summoner_id(summ_name.replace(" ", "%20"))
@@ -377,7 +379,7 @@ class DiscordClient(discord.Client):
             users_in_voice = self.get_users_in_voice()
             for disc_id, _, _ in users_in_voice:
                 if discord_id == disc_id: # User is already in voice channel.
-                    self.user_joined_voice(disc_id)
+                    await self.user_joined_voice(disc_id)
                     break
         return status
 
@@ -1362,7 +1364,15 @@ class DiscordClient(discord.Client):
             stat = second_cmd
             stat_index = api_util.STAT_COMMANDS.index(stat)
             self.config.log(f"Stat requested: {first_cmd} {stat}")
-            best = first_cmd == "best"
+            if first_cmd == "best":
+                best = True
+            elif first_cmd in ("most", "highest"):
+                best = stat != "deaths"
+            elif first_cmd in ("least", "fewest", "lowest"):
+                best = stat == "deaths"
+            else:
+                best = False
+
             quantity_type = 0 if best else 1
             # Check whether to find the max or min of some value, when returning
             # 'his most/lowest [stat] ever was ... Usually highest is best,
@@ -1898,7 +1908,7 @@ class DiscordClient(discord.Client):
             if cmd_equals(first_command, "register"): # Register the user who sent the command.
                 if len(split) > 1:
                     summ_name = " ".join(split[1:])
-                    status = self.add_user(summ_name, message.author.id)
+                    status = await self.add_user(summ_name, message.author.id)
                     await message.channel.send(status)
                 else:
                     response = "You must supply a summoner name {emote_angry_gual}"
@@ -1947,8 +1957,13 @@ class DiscordClient(discord.Client):
                 await self.handle_status_msg(message)
             elif cmd_equals(first_command, "uptime"):
                 await self.handle_uptime_msg(message)
-            elif (cmd_equals(first_command, "worst") or cmd_equals(first_command, "best")
-                  and len(split) > 1): # Get game stats.
+            elif (
+                    any(
+                        (
+                            cmd_equals(first_command, quantifier) for quantifier
+                            in ("worst", "least", "lowest", "fewest", "best", "most", "highest")
+                        )
+                    ) and len(split) > 1): # Get game stats.
                 target_name = self.extract_target_name(split, 2)
                 await self.get_data_and_respond(
                     self.handle_stat_msg, message, target_name,

@@ -4,7 +4,7 @@
         <a href="{{ url_for('index.index') }}">Home</a><span>|</span><a href="{{ url_for('betting.home') }}">Betting</a><span>|</span><a href="{{ url_for('doinks.home') }}">Doinks</a><span>|</span><a href="{{ url_for('stats.home') }}">Stats</a>
     </div>
     <div class="navbar-active-game{% if game_duration %} game-active{% endif %}">
-        Active game: <span class="active-game-mode">{{ game_mode }} on {{ game_map }}</span><br>
+        Active game: <span class="active-game-mode">{{ game_mode }}</span><br>
         Time since start: <span class="active-game-duration"></span>
     </div>
     <div class="navbar-user">

@@ -10,9 +10,10 @@ def get_big_doinks(data):
         - Getting more than 20 kills
         - Doing more damage than the rest of the team combined
         - Getting a penta-kill
-        - Having a vision score of 100+
+        - Having a vision score of 75+
         - Having a kill-participation of 80%+
         - Securing all epic monsters
+        - Getting more than 8 cs/min
     """
     mentions = {} # List of mentioned users for the different criteria.
     formatted_mentions = {}
@@ -28,7 +29,7 @@ def get_big_doinks(data):
             mention_list.append((2, damage_dealt))
         if stats["pentaKills"] > 0:
             mention_list.append((3, None))
-        if stats["visionScore"] > 100:
+        if stats["visionScore"] > 75:
             mention_list.append((4, stats["visionScore"]))
         kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
         if kp > 80:
@@ -37,6 +38,9 @@ def get_big_doinks(data):
         enemy_epics = stats["enemyBaronKills"] + stats["enemyDragonKills"] + stats["enemyHeraldKills"]
         if stats["lane"] == "JUNGLE" and own_epics > 3 and enemy_epics == 0:
             mention_list.append((6, kp))
+        cs_per_min = stats["csPerMin"]
+        if cs_per_min >= 8:
+            mention_list.append((7, api_util.round_digits(cs_per_min)))
 
         if mention_list != []:
             mentions[disc_id] = mention_list
@@ -72,11 +76,7 @@ def get_honorable_mentions(data):
         damage_dealt = stats["totalDamageDealtToChampions"]
         if stats["role"] != "DUO_SUPPORT" and damage_dealt < 8000:
             mentions[disc_id].append((1, damage_dealt))
-        cs_per_min = 5
-        if "creepsPerMinDeltas" in stats:
-            cs_per_min = stats["creepsPerMinDeltas"]["0-10"]
-            if "10-20" in stats["creepsPerMinDeltas"]:
-                cs_per_min = (cs_per_min + stats["creepsPerMinDeltas"]["10-20"]) / 2
+        cs_per_min = stats["csPerMin"]
         if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
             mentions[disc_id].append((2, api_util.round_digits(cs_per_min)))
         epic_monsters_secured = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]

@@ -1,6 +1,6 @@
 import flask
 import api.util as api_util
-from app.util import discord_request, make_template_context
+from app.util import discord_request, make_template_context, format_bet_timestamp
 from api.bets import get_dynamic_bet_desc, BETTING_DESC
 
 user_page = flask.Blueprint("users", __name__, template_folder="templates")
@@ -121,7 +121,7 @@ def get_bets(disc_id, database, only_active):
     names_dict = dict(zip((x[0] for x in database.summoners), names))
     presentable_data = []
 
-    for bet_ids, _, amounts, events, targets, _, result_or_ticket, payout in bets:
+    for bet_ids, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
         event_descs = [
             (
                 i, get_dynamic_bet_desc(e, names_dict.get(t)),
@@ -129,10 +129,11 @@ def get_bets(disc_id, database, only_active):
             )
             for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
         ]
+        bet_date = format_bet_timestamp(timestamp)
         presentable_data.append(
-            (event_descs, result_or_ticket, api_util.format_tokens_amount(payout))
+            (bet_date, event_descs, result_or_ticket, api_util.format_tokens_amount(payout))
         )
-    presentable_data.sort(key=lambda x: x[0][0], reverse=True)
+    presentable_data.sort(key=lambda x: x[1][0], reverse=True)
     return presentable_data
 
 def get_betting_data(disc_id, database):

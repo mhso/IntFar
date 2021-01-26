@@ -5,7 +5,7 @@ import sqlite3
 from sqlite3 import DatabaseError, OperationalError, ProgrammingError
 from contextlib import closing
 from api import game_stats
-from api.util import TimeZone, generate_user_secret
+from api.util import TimeZone, generate_user_secret, DOINKS_REASONS
 
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
@@ -171,7 +171,7 @@ class Database:
         with (self.get_connection() if context is None else context) as db:
             doinks_reasons_data = self.execute_query(db, query_doinks_multis).fetchall()
 
-            doinks_counts = [0, 0, 0, 0, 0, 0, 0]
+            doinks_counts = [0 for _ in DOINKS_REASONS]
             for reason in doinks_reasons_data:
                 for index, c in enumerate(reason[0]):
                     if c == "1":
@@ -444,7 +444,7 @@ class Database:
         (min_damage_id, min_damage,
          max_damage_id, max_damage) = game_stats.get_outlier_stat("totalDamageDealtToChampions", data)
         (min_cs_id, min_cs,
-         max_cs_id, max_cs) = game_stats.get_outlier_stat("totalMinionsKilled", data)
+         max_cs_id, max_cs) = game_stats.get_outlier_stat("totalCs", data)
         (min_gold_id, min_gold,
          max_gold_id, max_gold) = game_stats.get_outlier_stat("goldEarned", data)
         max_kp_id, stats = game_stats.get_outlier(data, "kp", asc=False, total_kills=kills_by_our_team)
@@ -492,18 +492,28 @@ class Database:
         query_worst = query_prefix + " worst_stats " + query_cols
 
         with self.get_connection() as db:
-            self.execute_query(db, query_best, (game_id, intfar_id, intfar_reason, max_kills,
-                                                max_kills_id, min_deaths, min_deaths_id, max_kda,
-                                                max_kda_id, max_damage, max_damage_id,
-                                                max_cs, max_cs_id, max_gold, max_gold_id,
-                                                max_kp, max_kp_id, max_wards, max_wards_id,
-                                                max_vision, max_vision_id))
-            self.execute_query(db, query_worst, (game_id, intfar_id, intfar_reason, min_kills,
-                                                 min_kills_id, max_deaths, max_deaths_id, min_kda,
-                                                 min_kda_id, min_damage, min_damage_id,
-                                                 min_cs, min_cs_id, min_gold, min_gold_id,
-                                                 min_kp, min_kp_id, min_wards, min_wards_id,
-                                                 min_vision, min_vision_id))
+            self.execute_query(
+                db, query_best,
+                (
+                    game_id, intfar_id, intfar_reason, max_kills,
+                    max_kills_id, min_deaths, min_deaths_id, max_kda,
+                    max_kda_id, max_damage, max_damage_id,
+                    max_cs, max_cs_id, max_gold, max_gold_id,
+                    max_kp, max_kp_id, max_wards, max_wards_id,
+                    max_vision, max_vision_id
+                )
+            )
+            self.execute_query(
+                db, query_worst,
+                (
+                    game_id, intfar_id, intfar_reason, min_kills,
+                    min_kills_id, max_deaths, max_deaths_id, min_kda,
+                    min_kda_id, min_damage, min_damage_id,
+                    min_cs, min_cs_id, min_gold, min_gold_id,
+                    min_kp, min_kp_id, min_wards, min_wards_id,
+                    min_vision, min_vision_id
+                )
+            )
             query = "INSERT INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"
             for disc_id, _, _ in users_in_game:
                 doink = doinks.get(disc_id, None)
@@ -625,21 +635,13 @@ class Database:
             result = self.execute_query(db, query, args).fetchone()
             return None if result is None else result[0]
 
-    def get_better_id(self, bet_id, ticket):
-        if ticket is not None:
-            ticket = int(ticket)
+    def get_better_id(self, bet_id):
         if bet_id is not None:
             bet_id = int(bet_id)
 
         with self.get_connection() as db:
-            query = "SELECT better_id FROM bets WHERE "
-            if ticket is not None:
-                query += "ticket=?"
-                param = (ticket,)
-            else:
-                query += "id=?"
-                param = (bet_id,)
-            result = self.execute_query(db, query, param).fetchone()
+            query = "SELECT better_id FROM bets WHERE id=?"
+            result = self.execute_query(db, query, (bet_id,)).fetchone()
             return None if result is None else result[0]
 
     def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):

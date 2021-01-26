@@ -544,7 +544,7 @@ class BettingHandler:
         if game_timestamp is not None: # Game has already started.
             return (False, "Bet was not cancelled: Game is underway!")
 
-        if self.database.get_better_id(bet_id, ticket) != disc_id:
+        if ticket is None and self.database.get_better_id(bet_id) != disc_id:
             return (False, "Bet was not cancelled: Bet does not exist, or you don't own the bet!")
 
         if ticket is None:

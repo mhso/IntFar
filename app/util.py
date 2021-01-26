@@ -1,6 +1,7 @@
 import json
 import flask
 from time import time
+from datetime import datetime
 from hashlib import sha256
 
 def register_discord_connection():
@@ -117,6 +118,11 @@ def get_user_details():
         flask.current_app.config["LOGGED_IN_USERS"][logged_in_user] = (logged_in_name, logged_in_avatar)
 
     return logged_in_user, logged_in_name, logged_in_avatar
+
+def format_bet_timestamp(timestamp):
+    if timestamp == 0:
+        return None
+    return datetime.fromtimestamp(timestamp).strftime("%d-%m-%y %H:%M:%S")
 
 def make_json_response(data, http_code):
     if not isinstance(data, dict):

@@ -32,8 +32,8 @@ def listen_for_request(disc_client, event_loop):
                         else:
                             result = disc_client.__getattribute__(command)(*params)
                         if isinstance(result, Coroutine):
-                            future = asyncio.run_coroutine_threadsafe(result, event_loop)
                             try:
+                                future = asyncio.run_coroutine_threadsafe(result, event_loop)
                                 result = future.result(3)
                             except TimeoutError as exc:
                                 disc_client.config.log(f"Exception during Discord request: {exc}")

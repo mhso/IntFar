@@ -123,8 +123,6 @@ def get_filtered_stats(database, users_in_game, game_info):
             if part_info["participantId"] == participant["participantId"]:
                 kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
                 damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
-                # We loop through the static 'self.users_in_game' list and not the dynamic
-                # 'self.active_players' for safety.
                 for disc_id, _, summ_ids in database.summoners:
                     if part_info["player"]["summonerId"] in summ_ids:
                         our_team = participant["teamId"]
@@ -133,6 +131,8 @@ def get_filtered_stats(database, users_in_game, game_info):
                         combined_stats["timestamp"] = game_info["gameCreation"]
                         combined_stats["mapId"] = game_info["mapId"]
                         combined_stats["gameDuration"] = int(game_info["gameDuration"])
+                        combined_stats["totalCs"] = combined_stats["neutralMinionsKilled"] + combined_stats["totalMinionsKilled"]
+                        combined_stats["csPerMin"] = (combined_stats["totalCs"] / game_info["gameDuration"]) * 60
                         combined_stats.update(participant["timeline"])
                         filtered_stats.append((disc_id, combined_stats))
 
@@ -144,7 +144,7 @@ def get_filtered_stats(database, users_in_game, game_info):
                                     break
                             if not user_in_list:
                                 summ_data = (disc_id, part_info["player"]["summonerName"],
-                                                part_info["player"]["summonerId"])
+                                             part_info["player"]["summonerId"])
                                 active_users.append(summ_data)
 
     for _, stats in filtered_stats:
