@@ -602,9 +602,9 @@ class BettingHandler:
             return (False, err_msg)
 
         try:
-            amount = balance if amount_str == "all" else int(amount_str)
+            amount = balance if amount_str == "all" else self.parse_bet_amount(amount_str)
         except ValueError:
-            err_msg = self.get_gift_err_msg("Invalid token amount: '{amount_str}'.")
+            err_msg = self.get_gift_err_msg(f"Invalid token amount: '{amount_str}'.")
             return (False, err_msg)
 
         if balance < amount:

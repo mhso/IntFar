@@ -250,7 +250,7 @@ def get_game_stats(disc_id, database):
                 else:
                     any_gold_worst = True
 
-            pretty_stat = stat.capitalize() if len(stat) > 3 else stat.upper()
+            pretty_stat = stat.replace("_", " ").capitalize() if len(stat) > 3 else stat.upper()
             stat_index = api_util.STAT_COMMANDS.index(stat)
             quantity_type = 0 if best else 1
             pretty_quantity = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type].capitalize()

@@ -13,8 +13,8 @@ from api import game_stats, bets, award_qualifiers
 from api.database import DBException
 import api.util as api_util
 
-DISCORD_SERVER_ID = 619073595561213953
-MY_SERVER_ID = 512363920044982272
+MAIN_GUILD_ID = 619073595561213953
+MY_GUILD_ID = 512363920044982272
 CHANNEL_ID = 730744358751567902
 MY_DISC_ID = 267401734513491969
 
@@ -48,26 +48,8 @@ DOINKS_FLAVORS = load_flavor_texts("doinks")
 STREAK_FLAVORS = load_flavor_texts("streak")
 
 FLIRT_MESSAGES = {
-    "english": [
-        "Hey there... I'm a bot, why don't you get on top? {emote_hairy_retard}",
-        "You like that, you fucking retard? {emote_cummies}",
-        "You're goddamn right. I am your robot daddy :robot:",
-        "You look so pretty when you get dicked in league {emote_kapepe}",
-        "You might have heard of AI, but have you heard of DP? :first_quarter_moon_with_face:",
-        "I'm not just nuts and screws... I can still screw and nut in you :nut_and_bolt:",
-        "Even though you are inting so hard, it's not the hardest thing around... :joystick:",
-        "How about I get over there and put my 1 in your 0? {emote_peberno}"
-    ],
-    "spanish": [
-        "Hola ... Soy un bot, ¿por qué no te subes? {emote_hairy_retard}",
-        "¿Te gusta eso, retrasado? {emote_cummies}",
-        "Estás jodidamente en lo cierto. Soy tu robot papi :robot:",
-        "Te ves tan bonita cuando te follan en la league {emote_kapepe}",
-        "Es posible que haya oído hablar de la IA, pero ¿ha oído hablar de DP? :first_quarter_moon_with_face:",
-        "No soy solo tuercas y tornillos ... todavía puedo atornillarte y atornillarte :nut_and_bolt:",
-        "A pesar de que estás entrando con tanta fuerza, no es lo más difícil que hay .. :joystick:",
-        "¿Qué tal si llego allí y pongo mi 1 en tu 0? {emote_peberno}"
-    ]
+    "english": load_flavor_texts("flirt_english"),
+    "spanish": load_flavor_texts("flirt_spanish")
 }
 
 VALID_COMMANDS = {
@@ -256,7 +238,7 @@ class DiscordClient(discord.Client):
         When this method detects that the game is no longer active,
         it calls the 'declare_intfar' method, which determines who is the Int-Far.
         """
-        self.config.log("Game is underway, polling for game end...")
+        self.config.log("Polling for game end...")
         time_slept = 0
         sleep_per_loop = 0.5
         try:
@@ -276,20 +258,23 @@ class DiscordClient(discord.Client):
                 if game_info is None:
                     self.config.log("Game info is None! Weird stuff.", self.config.log_error)
                     raise ValueError("Game info is None!")
+
                 if self.database.game_exists(game_info["gameId"]):
-                    self.config.log("We are triggered end of game stuff again... Strange!")
-                    return
-                if not self.riot_api.is_good_map(game_info["mapId"]):
+                    self.config.log("We triggered end of game stuff again... Strange!")
+
+                elif not self.riot_api.is_good_map(game_info["mapId"]):
                     response = "That game was not on Summoner's Rift "
                     response += "{emote_woahpikachu} no Int-Far will be crowned "
                     response += "and no stats will be saved."
                     await self.channel_to_write.send(self.insert_emotes(response))
+
                 elif game_info["gameDuration"] < 5 * 60: # Game was less than 5 mins long.
                     response = (
                         "That game lasted less than 5 minutes " +
                         "{emote_zinking} assuming it was a remake."
                     )
                     await self.channel_to_write.send(self.insert_emotes(response))
+
                 else:
                     self.config.log(f"Users in game before: {self.users_in_game}")
                     filtered_stats, self.users_in_game = game_stats.get_filtered_stats(
@@ -314,14 +299,14 @@ class DiscordClient(discord.Client):
                         await self.resolve_bets(filtered_stats, intfar, intfar_reason, doinks)
                         await self.save_stats(filtered_stats, intfar, intfar_reason, doinks)
 
+                    req_data = {
+                        "secret": self.config.discord_token
+                    }
+                    self.send_game_update("game_ended", req_data)
+
                 self.active_game = None
                 self.game_start = None
                 self.users_in_game = None # Reset the list of users who are in a game.
-                req_data = {
-                    "secret": self.config.discord_token
-                }
-                self.send_game_update("game_ended", req_data)
-
                 asyncio.create_task(self.poll_for_game_start())
             except Exception as e:
                 self.config.log("Exception after game was over!!!", self.config.log_error)
@@ -358,6 +343,7 @@ class DiscordClient(discord.Client):
             }
             req_data.update(self.active_game)
             self.send_game_update("game_started", req_data)
+            self.config.log("Game is now active, starting polling for game end...")
             await self.poll_for_game_end()
         elif game_status == 0: # Sleep for 10 minutes and check game status again.
             await self.poll_for_game_start()
@@ -450,7 +436,7 @@ class DiscordClient(discord.Client):
         Return a string that allows for @mention of the given user.
         """
         for guild in self.guilds:
-            if guild.id == DISCORD_SERVER_ID:
+            if guild.id == MAIN_GUILD_ID:
                 for member in guild.members:
                     if member.id == disc_id:
                         return member.mention
@@ -460,7 +446,7 @@ class DiscordClient(discord.Client):
         if isinstance(disc_id, str):
             disc_id = int(disc_id)
 
-        server = self.get_guild(DISCORD_SERVER_ID)
+        server = self.get_guild(MAIN_GUILD_ID)
         for member in server.members:
             if member.id == disc_id:
                 return member
@@ -512,7 +498,7 @@ class DiscordClient(discord.Client):
 
     def get_discord_id(self, nickname):
         for guild in self.guilds:
-            if guild.id == DISCORD_SERVER_ID:
+            if guild.id == MAIN_GUILD_ID:
                 for member in guild.members:
                     if member.nick is not None and member.nick.lower() == nickname:
                         return member.id
@@ -524,7 +510,7 @@ class DiscordClient(discord.Client):
 
     def get_all_emojis(self):
         for guild in self.guilds:
-            if guild.id == DISCORD_SERVER_ID:
+            if guild.id == MAIN_GUILD_ID:
                 return [emoji.url for emoji in guild.emojis]
         return None
 
@@ -533,7 +519,7 @@ class DiscordClient(discord.Client):
         Return the ID of the emoji matching the given name.
         """
         for guild in self.guilds:
-            if guild.id == DISCORD_SERVER_ID:
+            if guild.id == MAIN_GUILD_ID:
                 for emoji in guild.emojis:
                     if emoji.name == emoji_name:
                         return str(emoji)
@@ -542,7 +528,7 @@ class DiscordClient(discord.Client):
     def get_users_in_voice(self):
         users_in_voice = []
         for guild in self.guilds:
-            if guild.id == DISCORD_SERVER_ID:
+            if guild.id == MAIN_GUILD_ID:
                 for channel in guild.voice_channels:
                     members_in_voice = channel.members
                     for member in members_in_voice:
@@ -575,7 +561,7 @@ class DiscordClient(discord.Client):
         role_id = 750111830529146980
         nibs_guild = None
         for guild in self.guilds:
-            if guild.id == DISCORD_SERVER_ID:
+            if guild.id == MAIN_GUILD_ID:
                 nibs_guild = guild
                 break
 
@@ -912,8 +898,8 @@ class DiscordClient(discord.Client):
 
     async def remove_intfar_role(self, intfar_id, role_id):
         nibs_guild = None
-        for guild in self.guilds: # Add all users currently in voice channels as active users.
-            if guild.id == DISCORD_SERVER_ID:
+        for guild in self.guilds:
+            if guild.id == MAIN_GUILD_ID:
                 nibs_guild = guild
                 break
 
@@ -921,8 +907,31 @@ class DiscordClient(discord.Client):
         role = nibs_guild.get_role(role_id)
         await member.remove_roles(role)
 
+    async def reset_monthly_intfar_roles(self, guild):
+        """
+        When a new year has started, we remove Int-Far of the Month roles
+        from all users who got them the previous year.
+        """
+        for month in range(12):
+            month_name = api_util.MONTH_NAMES[month]
+            role_name = f"Int-Far of the Month - {month_name}"
+            for role in guild.roles:
+                if role.name == role_name:
+                    for member in role.members:
+                        self.config.log(f"Removing {role.name} from {member.name}.")
+                        await member.remove_roles(role)
+
     async def assign_monthly_intfar_role(self, month, winner_ids):
+        nibs_guild = None
+        for guild in self.guilds:
+            if guild.id == MAIN_GUILD_ID:
+                nibs_guild = guild
+                break
+
         prev_month = month - 1 if month != 1 else 12
+
+        if prev_month == 1: # Prev month was January, reset previous years IFOTM roles.
+            await self.reset_monthly_intfar_roles(nibs_guild)
 
         # Colors:
         # Light blue, dark blue, cyan, mint,
@@ -934,17 +943,19 @@ class DiscordClient(discord.Client):
             (153, 153, 0), (255, 255, 51), (255, 128, 0), (127, 0, 255)
         ]
 
-        nibs_guild = None
-        for guild in self.guilds: # Add all users currently in voice channels as active users.
-            if guild.id == DISCORD_SERVER_ID:
-                nibs_guild = guild
-                break
-
         month_name = api_util.MONTH_NAMES[prev_month-1]
         color = discord.Color.from_rgb(*colors[prev_month-1])
         role_name = f"Int-Far of the Month - {month_name}"
 
-        role = await nibs_guild.create_role(name=role_name, colour=color)
+        role = None
+        for guild_role in nibs_guild.roles:
+            # Check if role already exists.
+            if guild_role.name == role_name:
+                role = guild_role
+                break
+
+        if role is None:
+            role = await nibs_guild.create_role(name=role_name, colour=color)
 
         for intfar_id in winner_ids:
             member = nibs_guild.get_member(intfar_id)
@@ -1028,7 +1039,7 @@ class DiscordClient(discord.Client):
         self.config.log('Logged on as {0}!'.format(self.user))
         self.initialized = True
         for guild in self.guilds: # Add all users currently in voice channels as active users.
-            if guild.id == DISCORD_SERVER_ID:
+            if guild.id == MAIN_GUILD_ID:
                 await guild.chunk()
                 for voice_channel in guild.voice_channels:
                     members_in_voice = voice_channel.members
@@ -1042,7 +1053,7 @@ class DiscordClient(discord.Client):
                         self.channel_to_write = text_channel
                         asyncio.create_task(self.sleep_until_monthly_infar())
                         break
-            elif guild.id == MY_SERVER_ID and self.config.env == "dev":
+            elif guild.id == MY_GUILD_ID and self.config.env == "dev":
                 self.channel_to_write = guild.text_channels[0]
                 await guild.chunk()
 
@@ -1750,6 +1761,8 @@ class DiscordClient(discord.Client):
                         f" - Having less than {crit_1} vision score\n"
                         f" - Having less than {crit_2} KDA")
 
+        response += "\nThese criteria must all be met to be Int-Far."
+
         await message.channel.send(response)
 
     async def send_dm(self, text, disc_id):
@@ -1873,8 +1886,8 @@ class DiscordClient(discord.Client):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
 
-        if ((self.config.env == "dev" and message.guild.id != MY_SERVER_ID)
-                or (self.config.env == "production" and message.guild.id != DISCORD_SERVER_ID)):
+        if ((self.config.env == "dev" and message.guild.id != MY_GUILD_ID)
+                or (self.config.env == "production" and message.guild.id != MAIN_GUILD_ID)):
             return
 
         msg = message.content.strip()
@@ -1974,7 +1987,9 @@ class DiscordClient(discord.Client):
                 await self.handle_intfar_criteria_msg(message, criteria)
             elif cmd_equals(first_command, "game"):
                 target_name = self.extract_target_name(split, 1)
-                await self.handle_game_msg(message, target_name)
+                await self.get_data_and_respond(
+                    self.handle_game_msg, message, target_name, target_all=False
+                )
             elif cmd_equals(first_command, "bet"):
                 try:
                     amounts, events, targets = self.get_bet_params(split)
@@ -2040,10 +2055,11 @@ class DiscordClient(discord.Client):
         await self.channel_to_write.send(message)
 
     async def on_voice_state_update(self, member, before, after):
-        if before.channel is None and after.channel is not None: # User joined.
-            await self.user_joined_voice(member.id)
-        elif before.channel is not None and after.channel is None: # User left.
-            await self.user_left_voice(member.id)
+        if member.guild.id == MAIN_GUILD_ID:
+            if before.channel is None and after.channel is not None: # User joined.
+                await self.user_joined_voice(member.id)
+            elif before.channel is not None and after.channel is None: # User left.
+                await self.user_left_voice(member.id)
 
 def run_client(config, database, betting_handler, riot_api, main_pipe, flask_pipe):
     client = DiscordClient(

@@ -7,10 +7,10 @@ def get_big_doinks(data):
     exceptionally well.
     Criteria for being redeemed:
         - Having a KDA of 10 or more
-        - Getting more than 20 kills
+        - Getting 20 kills or more
         - Doing more damage than the rest of the team combined
         - Getting a penta-kill
-        - Having a vision score of 75+
+        - Having a vision score of 80+
         - Having a kill-participation of 80%+
         - Securing all epic monsters
         - Getting more than 8 cs/min
@@ -22,14 +22,14 @@ def get_big_doinks(data):
         kda = game_stats.calc_kda(stats)
         if kda >= 10.0:
             mention_list.append((0, api_util.round_digits(kda)))
-        if stats["kills"] > 20:
+        if stats["kills"] >= 20:
             mention_list.append((1, stats["kills"]))
         damage_dealt = stats["totalDamageDealtToChampions"]
         if damage_dealt > stats["damage_by_team"]:
             mention_list.append((2, damage_dealt))
         if stats["pentaKills"] > 0:
             mention_list.append((3, None))
-        if stats["visionScore"] > 75:
+        if stats["visionScore"] > 80:
             mention_list.append((4, stats["visionScore"]))
         kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
         if kp > 80:

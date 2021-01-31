@@ -693,7 +693,7 @@ class Database:
 
     def get_reports(self, disc_id=None, context=None):
         with (self.get_connection() if context is None else context) as db:
-            query_select = "SELECT disc_id, reports FROM registered_summoners"
+            query_select = "SELECT DISTINCT(disc_id), reports FROM registered_summoners"
             params = None
             if disc_id is not None:
                 query_select += " WHERE disc_id=?"
@@ -706,8 +706,3 @@ class Database:
             query_update = "UPDATE registered_summoners SET reports=reports+1 WHERE disc_id=?"
             self.execute_query(db, query_update, (disc_id,))
             return self.get_reports(disc_id, db)[0][1]
-
-    def update_payout(self, bet_id, payout):
-        with self.get_connection() as db:
-            query_update = "UPDATE bets SET payout=? WHERE id=?"
-            self.execute_query(db, query_update, (payout, bet_id))

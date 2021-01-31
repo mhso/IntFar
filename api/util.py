@@ -4,8 +4,8 @@ import secrets
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
-    "KDA larger than or equal to 10", "More than 20 kills", "Half of the teams damage",
-    "Getting a pentakill", "Vision score larger than 75", "Kill participation over 80%",
+    "KDA larger than or equal to 10", "20 kills or more", "Half of the teams damage",
+    "Getting a pentakill", "Vision score larger than 80", "Kill participation over 80%",
     "Securing all epic monsters", "More than 8 cs/min"
 ]
 

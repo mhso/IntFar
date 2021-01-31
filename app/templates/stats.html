@@ -1,0 +1,47 @@
+<html>
+{% include 'head.html' %}
+{% import "navbar.html" as navbar %}
+<body>
+    <div id="betting-wrapper" class="container-flex">
+        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, game_duration, game_mode, map_name) }}
+        <h1>Stats</h1>
+
+        <div class="row">
+            <div class="col-md-1 col-lg-2 col-xl-1 col-xxl-2"></div>
+            {% for data in stats_data %}
+            {% if loop.last %}
+            <div class="d-md-block col-md-1 col-lg-2 d-xl-none"></div>
+            {% endif %}
+            <div class="col-md-10 col-lg-8 col-xl-5 col-xxl-4">
+                {% set best = loop.first %}
+                <h2>{% if best %}Best Stats{% else %}Worst Stats{% endif %}</h2>
+                <table class="nice-table">
+                    <tr class="list-first list-entry">
+                        <th>Stat Description</th>
+                        <th>{% if best %}Best{% else %}Worst{% endif %} Ever</th>
+                        <th>By</th>
+                        <th></th>
+                    </tr>
+                    {% for stat_desc, stat_value, name, avatar in data %}
+                    <tr class="list-entry">
+                        <td>{{ stat_desc }}</td>
+                        <td>{{ stat_value }}</td>
+                        <td class="d-none d-sm-table-cell"><a href="{{ url_for('users.user', disc_id=disc_id) }}">{{ name }}</a></td>
+                        <td>
+                            <a href="{{ url_for('users.user', disc_id=disc_id) }}">
+                                <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% if loop.first %}
+            <div class="col-md-1 d-lg-block col-lg-2 d-xl-none"></div>
+            {% endif %}
+            {% endfor %}
+            <div class="col-md-1 col-lg-2 col-xl-1 col-xxl-2"></div>
+        </div>
+    </div>
+</body>
+</html>
