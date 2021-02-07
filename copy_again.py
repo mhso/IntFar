@@ -53,7 +53,11 @@ with database_client_1.get_connection() as db_1:
         query = "INSERT OR IGNORE INTO betting_events(id, max_return) VALUES (?, ?)"
         for data in events:
             db_2.cursor().execute(query, data)
-        query = "INSERT OR IGNORE INTO bets(id, better_id, timestamp, event_id, amount, game_duration, target, ticket, result, payout) VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?)"
+        query = (
+            "INSERT OR IGNORE INTO bets(id, better_id, guild_id, game_id, timestamp, event_id, "
+            "amount, game_duration, target, ticket, result, payout) "
+            "VALUES (?, ?, 619073595561213953, NULL, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )
         for data in bets:
             db_2.cursor().execute(query, data)
         db_2.commit()

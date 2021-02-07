@@ -94,8 +94,10 @@ def get_game_desc(game_data, best_stats, worst_stats):
     )
 
 def get_bet_desc(bet_data):
-    disc_id, _, timestamp, amounts, events, targets, _, result, payout = bet_data
-    name = discord_request("func", "get_discord_nick", disc_id)
+    disc_id, _, guild_id, timestamp, amounts, events, targets, _, result, payout = bet_data
+    disc_data = discord_request("func", ["get_discord_nick", "get_guild_name"], [disc_id, guild_id])
+    name = disc_data[0]
+    guild = disc_data[1]
     result_desc = "Won" if result == 1 else "Lost"
     tokens = (
         api_util.format_tokens_amount(payout) if result == 1
@@ -103,7 +105,7 @@ def get_bet_desc(bet_data):
     )
     response_list = [
         ("name", name), ("regular", result_desc), ("bold", f"{tokens} GBP"),
-        ("regular", "by betting on")
+        ("regular", "in"), ("bold", guild), ("regular", "by betting on")
     ]
     for i, (event, target) in enumerate(zip(events, targets)):
         target_name = (None if target is None
@@ -123,7 +125,7 @@ def get_feed_data(database, feed_length=10):
         for bet_data in bets[disc_id]:
             all_bets.append((disc_id,) + bet_data)
 
-    all_bets.sort(key=lambda x: x[2])
+    all_bets.sort(key=lambda x: x[3])
 
     all_game_data = database.get_recent_intfars_and_doinks()
     best_stats_ever = []
@@ -145,7 +147,7 @@ def get_feed_data(database, feed_length=10):
         game_data = all_game_data[games_index]
         bet_data = all_bets[bets_index]
         game_timestamp = game_data[1]
-        bet_timestamp = bet_data[2]
+        bet_timestamp = bet_data[3]
         if game_timestamp > bet_timestamp:
             intfar_desc, doinks_desc, stat_descs, duration = get_game_desc(
                 game_data, best_stats_ever, worst_stats_ever
@@ -224,7 +226,7 @@ def get_active_game_info():
         return make_json_response("Error: You need to be verified to access this data.", 401)
 
     json_response = get_game_info()
-    if json_response is None:
+    if json_response == []:
         return make_json_response("No active game", 404)
 
     return make_json_response(json_response, 200)
@@ -242,9 +244,10 @@ def active_game_started():
     saved_data = dict(data)
     del saved_data["secret"]
     saved_data["start"] = float(saved_data["start"])
-    saved_data["map_id"] = int(saved_data["start"])
+    saved_data["map_id"] = int(saved_data["map_id"])
+    saved_data["guild_id"] = int(saved_data["guild_id"])
 
-    flask.current_app.config["ACTIVE_GAME"] = saved_data
+    flask.current_app.config["ACTIVE_GAME"][saved_data["guild_id"]] = saved_data
     print(f"SAVING ACTIVE GAME: {saved_data}", flush=True)
     return flask.make_response(("Success! Active game ID updated.", 200))
 
@@ -258,6 +261,6 @@ def active_game_ended():
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))
 
-    flask.current_app.config["ACTIVE_GAME"] = None
-    print("REMOVING ACTIVE GAME", flush=True)
+    flask.current_app.config["ACTIVE_GAME"][int(data["guild_id"])] = None
+    print(f"REMOVING ACTIVE GAME FOR GUILD: {data['guild_id']}", flush=True)
     return flask.make_response(("Success! Active game ID deleted.", 200))

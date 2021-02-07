@@ -95,20 +95,30 @@ class Database:
     def add_user(self, summ_name, summ_id, discord_id):
         status = ""
         summ_info = self.summoner_from_discord_id(discord_id)
-        secret = generate_user_secret()
         if summ_info is not None:
             _, summ_names, summ_ids = summ_info
             summ_names.append(summ_name)
             summ_ids.append(summ_id)
+            secret = self.get_client_secret(discord_id)
             status = f"Added smurf '{summ_name}' with  summoner ID '{summ_id}'."
         else:
             self.summoners.append((discord_id, [summ_name], [summ_id]))
+            secret = generate_user_secret()
             status = f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
         try:
             with self.get_connection() as db:
-                self.execute_query(db, ("INSERT INTO registered_summoners(disc_id, summ_name, summ_id, secret, reports) " +
-                                        "VALUES (?, ?, ?, ?, ?)"), (discord_id, summ_name, summ_id, secret, 0))
-                self.execute_query(db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100))
+                self.execute_query(
+                    db,
+                    (
+                        "INSERT INTO registered_summoners(disc_id, summ_name, " +
+                        "summ_id, secret, reports) VALUES (?, ?, ?, ?, ?)"
+                    ),
+                    (discord_id, summ_name, summ_id, secret, 0)
+                )
+                if summ_info is not None: # Only create betting balance table if user is new.
+                    self.execute_query(
+                        db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100)
+                    )
                 db.commit()
         except sqlite3.IntegrityError:
             return (False, "A user with that summoner name is already registered!")
@@ -536,9 +546,12 @@ class Database:
                 return 0
             return curr_id[0] + 1
 
-    def get_bets(self, only_active, disc_id=None):
+    def get_bets(self, only_active, disc_id=None, guild_id=None):
         with self.get_connection() as db:
-            query = "SELECT better_id, id, timestamp, amount, event_id, game_duration, target, ticket"
+            query = (
+                "SELECT better_id, id, guild_id, timestamp, amount, " +
+                "event_id, game_duration, target, ticket"
+            )
             if not only_active:
                 query += ", result, payout"
             query += " FROM bets WHERE "
@@ -551,6 +564,10 @@ class Database:
             if disc_id is not None:
                 query += " AND better_id=?"
                 params = (disc_id,)
+            if guild_id is not None:
+                query += " AND guild_id=?"
+                params = params + (guild_id,) if params is not None else (guild_id,)
+
             query += " ORDER BY id"
 
             data = self.execute_query(db, query, params).fetchall()
@@ -565,17 +582,17 @@ class Database:
                 if discord_id not in data_for_person:
                     data_for_person[discord_id] = []
 
-                next_ticket = None if index == len(data) - 1 else data[index+1][7]
+                next_ticket = None if index == len(data) - 1 else data[index+1][8]
                 next_better = None if index == len(data) - 1 else data[index+1][0]
                 bet_ids.append(row[1])
-                amounts.append(row[3])
-                events.append(row[4])
-                targets.append(row[6])
+                amounts.append(row[4])
+                events.append(row[5])
+                targets.append(row[7])
 
-                ticket = row[7]
+                ticket = row[8]
 
                 if ticket is None or ticket != next_ticket or discord_id != next_better:
-                    data_tuple = (bet_ids, row[2], amounts, events, targets, row[5])
+                    data_tuple = (bet_ids, row[2], row[3], amounts, events, targets, row[6])
                     if only_active: # Include ticket in tuple, if only active bets.
                         data_tuple = data_tuple + (row[-1], None)
                     else: # Include both result and payout if resolved bets.
@@ -621,17 +638,17 @@ class Database:
             query = f"UPDATE betting_balance SET tokens=tokens{sign_str}? WHERE disc_id=?"
             self.execute_query(db, query, (amount, disc_id))
 
-    def get_bet_id(self, disc_id, event_id, target=None, ticket=None):
+    def get_bet_id(self, disc_id, event_id, guild_id, target=None, ticket=None):
         with self.get_connection() as db:
             query = ""
             if ticket is None:
-                query = "SELECT id FROM bets WHERE better_id=? AND event_id=? "
+                query = "SELECT id FROM bets WHERE better_id=? AND guild_id=? AND event_id=? "
                 query += "AND (target=? OR target IS NULL) "
                 query += "AND result=0"
-                args = (disc_id, event_id, target)
+                args = (disc_id, guild_id, event_id, target)
             else:
-                query = "SELECT id FROM bets WHERE better_id=? AND ticket=? AND result=0"
-                args = (disc_id, ticket)
+                query = "SELECT id FROM bets WHERE better_id=? AND guild_id=? AND ticket=? AND result=0"
+                args = (disc_id, guild_id, ticket)
             result = self.execute_query(db, query, args).fetchone()
             return None if result is None else result[0]
 
@@ -644,14 +661,18 @@ class Database:
             result = self.execute_query(db, query, (bet_id,)).fetchone()
             return None if result is None else result[0]
 
-    def make_bet(self, disc_id, event_id, amount, game_duration, target_person=None, ticket=None):
+    def make_bet(self, disc_id, guild_id, event_id, amount, game_duration, target_person=None, ticket=None):
         with self.get_connection() as db:
-            query_bet = "INSERT INTO bets(better_id, timestamp, event_id, amount, "
+            query_bet = "INSERT INTO bets(better_id, guild_id, timestamp, event_id, amount, "
             query_bet += "game_duration, target,  ticket, result) "
-            query_bet += "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            query_bet += "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
             self.update_token_balance(disc_id, amount, False)
-            self.execute_query(db, query_bet, (disc_id, 0, event_id, amount, game_duration,
-                                               target_person, ticket, 0))
+            self.execute_query(
+                db, query_bet, (
+                    disc_id, guild_id, 0, event_id, amount,
+                    game_duration, target_person, ticket, 0
+                )
+            )
             return self.execute_query(db, "SELECT last_insert_rowid()").fetchone()[0]
 
     def cancel_bet(self, bet_id, disc_id):

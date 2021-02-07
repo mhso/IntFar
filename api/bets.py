@@ -25,10 +25,20 @@ BETTING_IDS = {
     "doinks_vision": 13,
     "doinks_kp": 14,
     "doinks_monsters": 15,
-    "most_kills": 16,
-    "most_damage": 17,
-    "most_kp": 18,
-    "highest_kda": 19
+    "doinks_cs": 16,
+    "most_kills": 17,
+    "most_damage": 18,
+    "most_kp": 19,
+    "highest_kda": 20
+}
+
+BETTING_TYPES_INDICES = {
+    "game": 0,
+    "intfar": 2,
+    "intfar_reason": 4,
+    "doinks": 8,
+    "doinks_reason": 8,
+    "stats": 17
 }
 
 BETTING_DESC = {
@@ -48,10 +58,11 @@ BETTING_DESC = {
     13: "someone being awarded doinks for high vision score",
     14: "someone being awarded doinks for high KP",
     15: "someone being awarded doinks for securing all epic monsters",
-    16: "someone getting the most kills",
-    17: "someone doing the most damage",
-    18: "someone having the highest kill participation",
-    19: "someone having the highest KDA"
+    16: "someone being awarded doinks for having more than 8 cs/min",
+    17: "someone getting the most kills",
+    18: "someone doing the most damage",
+    19: "someone having the highest kill participation",
+    20: "someone having the highest KDA"
 }
 
 BETTING_STATS = [
@@ -260,16 +271,16 @@ class BettingHandler:
         if event_id > 1:
             count = 0
             num_games = 0
-            if event_id < 4:
+            if event_id < BETTING_TYPES_INDICES["intfar_reason"]:
                 count, num_games = self.get_intfar_return(target, event_id == 3)
-            elif event_id < 8:
-                count, num_games = self.get_intfar_reason_return(target, event_id - 4)
-            elif event_id == 8:
+            elif event_id < BETTING_TYPES_INDICES["doinks"]:
+                count, num_games = self.get_intfar_reason_return(target, event_id - BETTING_TYPES_INDICES["intfar_reason"])
+            elif event_id == BETTING_TYPES_INDICES["doinks"]:
                 count, num_games = self.get_doinks_return(target)
-            elif event_id < 16:
-                count, num_games = self.get_doinks_reason_return(target, event_id - 9)
-            elif event_id < 20:
-                count, num_games = self.get_stats_return(target, event_id - 16)
+            elif event_id < BETTING_TYPES_INDICES["stats"]:
+                count, num_games = self.get_doinks_reason_return(target, event_id - BETTING_TYPES_INDICES["doinks_reason"])
+            elif event_id < len(BETTING_TYPES_INDICES):
+                count, num_games = self.get_stats_return(target, event_id - BETTING_TYPES_INDICES["stats"])
 
             if num_games == 0: # No games has been played for given target, ratio is 0.
                 return self.database.get_base_bet_return(event_id)
@@ -294,8 +305,10 @@ class BettingHandler:
 
         return value, base_return, ratio
 
-    def resolve_bet(self, disc_id, bet_ids, amounts, events, bet_timestamp, targets, game_data):
-        intfar, intfar_reason, doinks, stats = game_data
+    def resolve_bet(
+            self, disc_id, bet_ids, amounts, events, bet_timestamp, targets, game_data
+    ):
+        intfar, intfar_reason, doinks, stats, clash_multiplier = game_data
         # Multiplier for betting on a specific person to do something. If more people are
         # in the game, the multiplier is higher.
         person_multiplier = len(stats)
@@ -309,14 +322,14 @@ class BettingHandler:
             success = False
             if event_id in (0, 1): # The bet concerns winning or losing the game.
                 success = resolve_game_outcome(stats, event_id == 0)
-            elif event_id < 8: # The bet concerns someone being Int-Far for something.
-                resolve_func = RESOLVE_INTFAR_BET_FUNCS[event_id-2]
+            elif event_id < BETTING_TYPES_INDICES["doinks"]: # The bet concerns someone being Int-Far for something.
+                resolve_func = RESOLVE_INTFAR_BET_FUNCS[event_id - BETTING_TYPES_INDICES["intfar"]]
                 success = resolve_func(intfar, intfar_reason, target_id)
-            elif event_id < 16:
-                resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id-8]
+            elif event_id < BETTING_TYPES_INDICES["stats"]:
+                resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id - BETTING_TYPES_INDICES["doinks"]]
                 success = resolve_func(doinks, target_id)
-            elif event_id < 20:
-                resolve_func = RESOLVE_STATS_BET_FUNCS[event_id-16]
+            elif event_id < len(BETTING_TYPES_INDICES):
+                resolve_func = RESOLVE_STATS_BET_FUNCS[event_id - BETTING_TYPES_INDICES["stats"]]
                 success = resolve_func(stats, target_id)
 
             all_success = all_success and success
@@ -330,7 +343,7 @@ class BettingHandler:
 
             total_value += bet_value
 
-        total_value = total_value * amount_multiplier
+        total_value = total_value * amount_multiplier * clash_multiplier
         timestamp = int(time())
 
         for bet_id in bet_ids:
@@ -400,7 +413,10 @@ class BettingHandler:
 
         return int(float(amount_str) * mult)
 
-    def check_bet_validity(self, disc_id, bet_amount, game_timestamp, bet_str, balance, bet_target, target_name, ticket):
+    def check_bet_validity(
+            self, disc_id, guild_id, bet_amount, game_timestamp,
+            bet_str, balance, bet_target, target_name, ticket
+    ):
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
         if event_id is None:
@@ -439,7 +455,7 @@ class BettingHandler:
             )
             return (False, err_msg)
 
-        if self.database.get_bet_id(disc_id, event_id, bet_target, ticket) is not None:
+        if self.database.get_bet_id(disc_id, guild_id, event_id, bet_target, ticket) is not None:
             err_msg = self.get_bet_error_msg(bet_desc, "Such a bet has already been made!")
             return (False, err_msg)
         if balance < amount:
@@ -447,7 +463,7 @@ class BettingHandler:
             return (False, err_msg)
         return (True, (amount, event_id, duration, bet_desc))
 
-    def place_bet(self, disc_id, amounts, game_timestamp, events, targets, target_names):
+    def place_bet(self, disc_id, guild_id, amounts, game_timestamp, events, targets, target_names):
         tokens_name = self.config.betting_tokens
         ticket = None if len(amounts) == 1 else self.database.generate_ticket_id(disc_id)
         bet_data = []
@@ -463,8 +479,10 @@ class BettingHandler:
         try:
             balance = self.database.get_token_balance(disc_id)
             for bet_amount, event, target, target_name in zip(amounts, events, targets, target_names):
-                valid, data = self.check_bet_validity(disc_id, bet_amount, game_timestamp, event,
-                                                      balance, target, target_name, ticket)
+                valid, data = self.check_bet_validity(
+                    disc_id, guild_id, bet_amount, game_timestamp, event,
+                    balance, target, target_name, ticket
+                )
 
                 if not valid:
                     return (False, data, None)
@@ -487,7 +505,10 @@ class BettingHandler:
                 bet_data.append((amount, event_id, target, return_readable, bet_desc))
 
             for amount, event_id, bet_target, base_return, bet_desc in bet_data:
-                bet_id = self.database.make_bet(disc_id, event_id, amount, game_duration, bet_target, ticket)
+                bet_id = self.database.make_bet(
+                    disc_id, guild_id, event_id, amount,
+                    game_duration, bet_target, ticket
+                )
 
                 if not first:
                     reward_equation += " + "
@@ -556,7 +577,7 @@ class BettingHandler:
 
         return (True, (new_balance, amount_refunded))
 
-    def cancel_bet(self, disc_id, bet_str, game_timestamp, target_id, target_name):
+    def cancel_bet(self, disc_id, guild_id, bet_str, game_timestamp, target_id, target_name):
         ticket = None
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
@@ -567,7 +588,7 @@ class BettingHandler:
                 return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
 
         try:
-            bet_id = self.database.get_bet_id(disc_id, event_id, target_id, ticket)
+            bet_id = self.database.get_bet_id(disc_id, event_id, guild_id, target_id, ticket)
             if bet_id is None:
                 return (False, "Bet was not cancelled: No bet exists with the specified parameters.")
 

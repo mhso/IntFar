@@ -7,6 +7,7 @@ from discbot.discord_bot import DiscordClient
 from api.config import Config
 from api.riot_api import APIClient
 from api.game_stats import get_filtered_stats
+from api.util import MAIN_GUILD_ID
 
 class MockChannel:
     async def send(self, data):
@@ -27,14 +28,7 @@ class TestMock(DiscordClient):
     async def on_ready(self):
         await super(TestMock, self).on_ready()
 
-        d1, sm1, si1 = self.database.discord_id_from_summoner("senile felines")
-        d2, sm2, si2 = self.database.discord_id_from_summoner("nønø")
-        d3, sm3, si3 = self.database.discord_id_from_summoner("criller")
-        self.users_in_game = [
-            (d1, sm1, si1),
-            (d2, sm2, si2),
-            (d3, sm3, si3)
-        ]
+        self.users_in_game = []
         self.active_game = {"id": self.game_id}
         game_info = self.riot_api.get_game_details(self.game_id)
         self.active_game["queue_id"] = game_info["queueId"]
@@ -44,7 +38,7 @@ class TestMock(DiscordClient):
         )
 
         if self.loud:
-            betting_data = await self.declare_intfar(filtered)
+            betting_data = await self.declare_intfar(filtered, MAIN_GUILD_ID)
         else:
             betting_data = self.get_intfar_and_doinks(filtered)
 
@@ -53,12 +47,12 @@ class TestMock(DiscordClient):
             await asyncio.sleep(1)
             if self.task in ("all", "bets"):
                 if not self.loud:
-                    self.channel_to_write = MockChannel()
+                    self.channels_to_write[MAIN_GUILD_ID] = MockChannel()
 
-                await self.resolve_bets(filtered, intfar, intfar_reason, doinks)
+                await self.resolve_bets(filtered, intfar, intfar_reason, doinks, MAIN_GUILD_ID)
 
             if self.task in ("all", "stats"):
-                await self.save_stats(filtered, intfar, intfar_reason, doinks)
+                await self.save_stats(filtered, intfar, intfar_reason, doinks, MAIN_GUILD_ID)
 
     def get_intfar_and_doinks(self, filtered_stats):
         intfar_details = self.get_intfar_details(filtered_stats, filtered_stats[0][1]["mapId"])

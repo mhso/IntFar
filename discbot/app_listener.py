@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import TimeoutError as FutureTimeout
 from time import time, sleep
 from typing import Coroutine
 from multiprocessing import Pipe
@@ -35,7 +36,7 @@ def listen_for_request(disc_client, event_loop):
                             try:
                                 future = asyncio.run_coroutine_threadsafe(result, event_loop)
                                 result = future.result(3)
-                            except TimeoutError as exc:
+                            except FutureTimeout as exc:
                                 disc_client.config.log(f"Exception during Discord request: {exc}")
                                 results.append(None)
                     elif command_type == "bot_command":

@@ -94,13 +94,16 @@ class APIClient:
                     return map_info["mapName"]
         return None
 
-    def is_good_map(self, map_id):
+    def map_is_sr(self, map_id):
         with open("api/maps.json", encoding="UTF-8") as fp:
             map_data = json.load(fp)
             for map_info in map_data:
                 if map_info["mapId"] == map_id:
                     return map_info["mapName"] in ("Summoner's Rift", "Nexus Blitz")
         return False
+
+    def is_urf(self, gamemode):
+        return gamemode == "URF"
 
     def is_clash(self, queue_id):
         return queue_id == 700

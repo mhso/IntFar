@@ -2,7 +2,7 @@ from time import time
 import flask
 import app.util as app_util
 from api.bets import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
-from api.util import format_tokens_amount
+from api.util import format_tokens_amount, get_guild_abbreviation, GUILD_IDS, MAIN_GUILD_ID
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
@@ -19,19 +19,20 @@ def get_bets(database, only_active):
     presentable_data = []
     for disc_id in all_bets:
         bets = all_bets[disc_id]
-        for bet_ids, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
+        for bet_ids, guild_id, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
             event_descs = [
                 (i, get_dynamic_bet_desc(e, names_dict.get(t)), format_tokens_amount(a))
                 for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
             ]
             bet_date = app_util.format_bet_timestamp(timestamp)
+            guild_short = get_guild_abbreviation(guild_id)
             presentable_data.append(
                 (
-                    disc_id, names_dict[disc_id], bet_date, event_descs, result_or_ticket,
-                    format_tokens_amount(payout), avatar_dict[disc_id]
+                    disc_id, names_dict[disc_id], bet_date, guild_short, str(guild_id), event_descs,
+                    result_or_ticket, format_tokens_amount(payout), avatar_dict[disc_id]
                 )
             )
-    presentable_data.sort(key=lambda x: x[3][0][0], reverse=True)
+    presentable_data.sort(key=lambda x: x[5][0][0], reverse=True)
     return presentable_data
 
 @betting_page.route('/')
@@ -45,6 +46,7 @@ def home():
     all_ids = [x[0] for x in database.summoners]
     all_names = app_util.discord_request("func", "get_discord_nick", None)
     all_avatars = app_util.discord_request("func", "get_discord_avatar", None)
+    all_guilds = app_util.discord_request("func", "get_guild_name", None)
 
     all_balances = database.get_token_balance()
     all_token_balances = []
@@ -58,12 +60,22 @@ def home():
     if logged_in_user is not None:
         user_token_balance = format_tokens_amount(database.get_token_balance(logged_in_user))
 
+    all_guild_data = []
+    for guild_id, guild_name in zip(GUILD_IDS, all_guilds):
+        all_guild_data.append((guild_id, guild_name))
+
+    main_guild_id = flask.request.cookies.get("main_guild_id")
+    if main_guild_id is None:
+        main_guild_id = MAIN_GUILD_ID
+
     return app_util.make_template_context(
         "betting.html", resolved_bets=resolved_bets,
         active_bets=active_bets, bet_events=all_events,
         targets=list(zip(all_ids, all_names)),
         token_balance=user_token_balance,
-        all_token_balances=all_token_balances
+        all_token_balances=all_token_balances,
+        all_guild_data=all_guild_data,
+        main_guild_id=main_guild_id
     )
 
 @betting_page.route("/payout", methods=["POST"])
@@ -73,13 +85,14 @@ def get_payout():
     events = data["events"]
     amounts = data["amounts"]
     targets = data["targets"]
+    guild_id = data["guildId"]
     players = 1
     try:
         players = int(data["players"])
     except ValueError:
         pass
 
-    game_start = app_util.discord_request("func", "get_game_start", None)
+    game_start = app_util.discord_request("func", "get_game_start", guild_id)
     duration = 0 if game_start is None else time() - game_start
     if duration > 60 * MAX_BETTING_THRESHOLD:
         return app_util.make_json_response("Error: Game is too far progressed to create bet bet amount value.", 400)
@@ -124,16 +137,17 @@ def create_bet():
     targets = [None if t in ("invalid", "any") else int(t) for t in data["targets"]]
     target_names = data["targetNames"]
     disc_id = data["disc_id"]
+    guild_id = data["guildId"]
 
     logged_in_user, logged_in_name, logged_in_avatar = app_util.get_user_details()
 
     if disc_id is None or logged_in_user is None:
         return app_util.make_json_response("Error: You need to be logged in to place a bet.", 403)
 
-    game_start = app_util.discord_request("func", "get_game_start", None)
+    game_start = app_util.discord_request("func", "get_game_start", guild_id)
 
     success, response, placed_bet_data = betting_handler.place_bet(
-        int(disc_id), amounts, game_start, event_strs, targets, target_names
+        int(disc_id), guild_id, amounts, game_start, event_strs, targets, target_names
     )
 
     if not success:
@@ -152,7 +166,8 @@ def create_bet():
         "response": "Bet successfully placed!",
         "name": logged_in_name, "events": event_descs,
         "bet_type": "single" if ticket is None else "multi",
-        "bet_id": bet_id, "ticket": ticket,
+        "bet_id": bet_id, "ticket": ticket, "guild_id": guild_id,
+        "guild_name": get_guild_abbreviation(int(guild_id)),
         "avatar": logged_in_avatar, "betting_balance": new_balance
     }
 
@@ -163,7 +178,7 @@ def create_bet():
         response = response.replace("Multi-bet successfully placed! ", "")
     disc_msg += response
 
-    app_util.discord_request("func", "send_message_unprompted", disc_msg)
+    app_util.discord_request("func", "send_message_unprompted", (disc_msg, guild_id))
 
     return app_util.make_json_response(bet_data, 200)
 
@@ -174,6 +189,7 @@ def delete_bet():
     conf = flask.current_app.config["APP_CONFIG"]
 
     disc_id = data["disc_id"]
+    guild_id = data["guildId"]
 
     logged_in_user, logged_in_name, _ = app_util.get_user_details()
 
@@ -183,7 +199,7 @@ def delete_bet():
     ticket = None if data["betType"] == "single" else int(data["betId"])
     bet_id = None if data["betType"] == "multi" else int(data["betId"])
 
-    game_start = app_util.discord_request("func", "get_game_start", None)
+    game_start = app_util.discord_request("func", "get_game_start", guild_id)
 
     success, cancel_data = betting_handler.delete_bet(int(disc_id), bet_id, ticket, game_start)
 
@@ -203,11 +219,11 @@ def delete_bet():
 
     disc_msg = f"Stealthy! {logged_in_name} just cancelled a bet using the website!\n"
     if data["betType"] == "single":
-        disc_msg += f"Bet with ID {bet_id} for {amount_refunded} {tokens_name} successfully cancelled.\n"
+        disc_msg += f"Bet with ID {bet_id} for {format_tokens_amount(amount_refunded)} {tokens_name} successfully cancelled.\n"
     else:
-        disc_msg += f"Multi-bet with ticket ID {ticket} for {amount_refunded} {tokens_name} successfully cancelled.\n"
-    disc_msg += f"Your {tokens_name} balance is now `{new_balance}`."
+        disc_msg += f"Multi-bet with ticket ID {ticket} for {format_tokens_amount(amount_refunded)} {tokens_name} successfully cancelled.\n"
+    disc_msg += f"Your {tokens_name} balance is now `{format_tokens_amount(new_balance)}`."
 
-    app_util.discord_request("func", "send_message_unprompted", disc_msg)
+    app_util.discord_request("func", "send_message_unprompted", (disc_msg, guild_id))
 
     return app_util.make_json_response(return_data, 200)

@@ -1,5 +1,8 @@
---- Gambling ---
-- Christmas fun with good boi points?
-
---- Misc ---
-- Make a page on mhooge for interacting with the bot and watching stats?
+--- Multi-server Int-Far ---
+- Change 'user_in_game', 'active_game', 'game_start', and 'polling_active' to be a list/dict. One active game per server (or voice channel??).
+- Change polling logic to reflect the above.
+- Figure out what to do with active game on the website. Keep to main guild? Show multiple with a scrolling thing?
+- Investigate whether 'channel_to_write' needs changing.
+- Keep IFOTM and various roles to main guild.
+- Add 'server_id' column to bets in databsase.
+- Add option for selecting which server to tie bet to on website. Save this option in a cookie.

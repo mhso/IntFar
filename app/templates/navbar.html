@@ -1,13 +1,17 @@
-{% macro navbar(discord_id, name, avatar, game_duration, game_mode, game_map) -%}
-<div class="intfar-navbar">
-    <div class="navbar-menu">
+{% macro navbar(discord_id, name, avatar, active_game_data) -%}
+<div class="intfar-navbar row">
+    <div class="navbar-menu order-1 order-lg-1 col-10 col-sm-9 col-lg-4 col-xl-3">
         <a href="{{ url_for('index.index') }}">Home</a><span>|</span><a href="{{ url_for('betting.home') }}">Betting</a><span>|</span><a href="{{ url_for('doinks.home') }}">Doinks</a><span>|</span><a href="{{ url_for('stats.home') }}">Stats</a>
     </div>
-    <div class="navbar-active-game{% if game_duration %} game-active{% endif %}">
-        Active game: <span class="active-game-mode">{{ game_mode }}</span><br>
-        Time since start: <span class="active-game-duration"></span>
+    <div class="navbar-active-game-wrapper order-3 order-lg-2 col-12 col-lg-6">
+        {% for game_data in active_game_data %}
+        <div class="navbar-active-game">
+            Active game: <span class="active-game-mode">{{ game_data[1] }}</span> in <span class="emph">{{ game_data[2] }}</span><br>
+            Time since start: <span class="active-game-duration"></span>
+        </div>
+        {% endfor %}
     </div>
-    <div class="navbar-user">
+    <div class="navbar-user order-2 order-lg-3 col-2 col-sm-3 col-lg-2 col-xl-3">
         <a class="navbar-username d-none d-sm-inline" href="{% if discord_id %} {{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
             <span>{{ name }}</span>
         </a>
@@ -21,9 +25,9 @@
 </div>
 <script src="{{ url_for('static', filename='js/game_monitor.js') }}"></script>
 <script>
-    {% if game_duration %}
+    {% if active_game_data != [] %}
     gameIsActive = true;
-    updateDuration({{ game_duration }});
+    parseData("{{ active_game_data }}");
     {% endif %}
     startMonitor();
 </script>

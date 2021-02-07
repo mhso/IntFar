@@ -72,6 +72,8 @@ CREATE TABLE [betting_events] (
 CREATE TABLE [bets] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
     [better_id] INTEGER NOT NULL,
+    [guild_id] INTEGER NOT NULL,
+    [game_id] INTEGER,
     [timestamp] INTEGER NOT NULL,
     [event_id] INTEGER NOT NULL,
     [amount] INTEGER NOT NULL,

@@ -1,6 +1,17 @@
 from datetime import tzinfo, timedelta, datetime
 import secrets
 
+MAIN_GUILD_ID = 619073595561213953
+
+GUILD_IDS = [ # List of ids of guilds that Int-Far is active in.
+    MAIN_GUILD_ID, 347488541397483543
+]
+
+GUILD_ABBREVIATIONS = {
+    MAIN_GUILD_ID: "LN",
+    347488541397483543: "DC"
+}
+
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
@@ -129,3 +140,6 @@ def organize_doinks_stats(doinks_reason_ids):
             if intfar_id == 1:
                 doinks_counts[index] += 1
     return doinks_counts
+
+def get_guild_abbreviation(guild_id):
+    return GUILD_ABBREVIATIONS.get(guild_id, "")

@@ -4,29 +4,37 @@
 {% import "navbar.html" as navbar %}
 <body>
     <div id="betting-wrapper" class="container-flex">
-        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, game_duration, game_mode, map_name) }}
+        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data) }}
         <h1>Betting</h1>
-        
+
         <div class="row">
             <div class="d-lg-block col-lg-1 d-xl-none"></div>
             <div id="make-bet-wrapper" class="col-12 col-lg-4">
                 <h2>Make Bet</h2>
-                <select id="bet-event" onchange="betEventChanged();">
+                <select id="bet-event" onchange="betEventChanged();" class="bet-inputs">
                     {% for event_id, event_name in bet_events %}
                         <option {% if loop.first %}selected{% endif %} value="{{ event_id }}">{{ event_name }}</option>
                     {% endfor %}
                 </select>
                 <br>
-                <input id="bet-amount" required placeholder="Betting Amount">
+                <input id="bet-amount" required placeholder="Betting Amount" class="bet-inputs">
                 <br>
-                <select disabled id="bet-target">
+                <select disabled id="bet-target" class="bet-inputs">
                     <option selected value="any">No Target</option>
                         {% for target_id, target_name in targets %}
                         <option value="{{ target_id }}">{{ target_name }}</option>
                     {% endfor %}
                 </select>
                 <br>
-                <input id="bet-players" type="number" min="2" max="5" placeholder="Number of Players (Optional)">
+                <input id="bet-players" class="bet-inputs" type="number" min="2" max="5" placeholder="Number of Players (Optional)">
+                <br>
+                <select id="bet-guild" class="bet-inputs">
+                    {% for guild_id, guild_name in all_guild_data %}
+                    <option {% if guild_id == main_guild_id %}selected{% endif %} value="{{ guild_id }}">
+                        {{ guild_name }}
+                    </option>
+                    {% endfor %}
+                </select>
                 <p id="bet-balance">
                     Token Balance: <span id="bet-balance-value">{{ token_balance }} GBP</span>
                 </p>
@@ -70,12 +78,13 @@
                     <tr class="list-first list-entry">
                         <th></th>
                         <th>By</th>
+                        <th>Server</th>
                         <th>Event</th>
                         <th>GBP</th>
                         <th>Ticket</th>
                     </tr>
-                    {% for better_id, name, date, events, result, payout, avatar in active_bets %}
-                        {{ list_entry.entry(name, better_id, logged_in_user, date, events, result, payout, avatar) }}
+                    {% for better_id, name, date, guild, guild_id, events, result, payout, avatar in active_bets %}
+                        {{ list_entry.entry(name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
             </div>
@@ -118,12 +127,13 @@
                         <th class="d-none d-sm-block"></th>
                         <th>By</th>
                         <th>Date</th>
+                        <th>Server</th>
                         <th>Event</th>
                         <th>GBP</th>
                         <th>Result</th>
                     </tr>
-                    {% for better_id, name, date, events, result, payout, avatar in resolved_bets %}
-                        {{ list_entry.entry(name, better_id, logged_in_user, date, events, result, payout, avatar) }}
+                    {% for better_id, name, date, guild, guild_id, events, result, payout, avatar in resolved_bets %}
+                        {{ list_entry.entry(name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
             </div>

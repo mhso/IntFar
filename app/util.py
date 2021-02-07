@@ -1,8 +1,9 @@
 import json
-import flask
 from time import time
 from datetime import datetime
 from hashlib import sha256
+import flask
+from api.util import GUILD_IDS
 
 def register_discord_connection():
     bot_conn = flask.current_app.config["BOT_CONN"]
@@ -75,16 +76,25 @@ def discord_request(command_types, commands, params, pipe=None):
         return discord_request(command_types, commands, params, conn_map[sess_id])
 
 def get_game_info():
-    active_game = flask.current_app.config["ACTIVE_GAME"]
-    if active_game is None:
-        active_game = discord_request("func", "get_active_game", None)
+    active_games = []
+    for guild_id in GUILD_IDS:
+        active_game = flask.current_app.config["ACTIVE_GAME"].get(guild_id)
         if active_game is None:
-            return None
-        flask.current_app.config["ACTIVE_GAME"] = active_game
+            active_game = discord_request("func", "get_active_game", guild_id)
+            if active_game is None:
+                continue
+            flask.current_app.config["ACTIVE_GAME"][guild_id] = active_game
 
-    active_game["game_duration"] = time() - active_game["start"]
+        active_game["game_duration"] = time() - active_game["start"]
+        active_games.append(
+            [
+                int(active_game["game_duration"]),
+                active_game["game_mode"],
+                active_game["game_guild_name"]
+            ]
+        )
 
-    return active_game
+    return active_games
 
 def get_hashed_secret(secret):
     return sha256(bytes(secret, encoding="utf-8")).hexdigest()
@@ -140,8 +150,7 @@ def get_persistent_data():
         "logged_in_avatar": logged_in_avatar,
     }
     game_info = get_game_info()
-    if game_info is not None:
-        data.update(game_info)
+    data["active_game_data"] = game_info
 
     return data
 
