@@ -422,7 +422,7 @@ class DiscordClient(discord.Client):
                 users_in_current_game.append((disc_id, [active_name], [active_id]))
                 active_game = game_for_summoner
 
-        if len(game_ids) > 1: # People are in different games.
+        if len(game_ids) > 1 or len(users_in_current_game) < 2: # People are in different games.
             return 0
 
         if active_game is not None and self.active_game.get(guild_id) is None:
@@ -453,39 +453,42 @@ class DiscordClient(discord.Client):
     def get_active_game(self, guild_id):
         return self.active_game.get(guild_id)
 
-    def get_mention_str(self, disc_id):
+    def get_mention_str(self, disc_id, guild_id=api_util.MAIN_GUILD_ID):
         """
         Return a string that allows for @mention of the given user.
         """
         for guild in self.guilds:
-            if guild.id == api_util.MAIN_GUILD_ID:
+            if guild.id == guild_id:
                 for member in guild.members:
                     if member.id == disc_id:
                         return member.mention
         return None
 
-    def get_member_safe(self, disc_id):
+    def get_member_safe(self, disc_id, guild_id=api_util.MAIN_GUILD_ID):
         if isinstance(disc_id, str):
             disc_id = int(disc_id)
 
-        server = self.get_guild(api_util.MAIN_GUILD_ID)
-        for member in server.members:
-            if member.id == disc_id:
-                return member
+        all_guilds = [g_id for g_id in api_util.GUILD_IDS if g_id != guild_id] 
+
+        for guild_to_search in [guild_id] + all_guilds:
+            server = self.get_guild(guild_to_search)
+            for member in server.members:
+                if member.id == disc_id:
+                    return member
         return None
 
-    def get_discord_nick(self, discord_id=None):
+    def get_discord_nick(self, discord_id=None, guild_id=api_util.MAIN_GUILD_ID):
         """
         Return Discord nickname matching the given Discord ID.
         If 'discord_id' is None, returns all nicknames.
         """
         if discord_id is not None:
-            member = self.get_member_safe(discord_id)
+            member = self.get_member_safe(discord_id, guild_id)
             return None if member is None else member.display_name
 
         nicknames = []
         for disc_id, _, _ in self.database.summoners:
-            member = self.get_member_safe(disc_id)
+            member = self.get_member_safe(disc_id, guild_id)
             name = "Unnamed" if member is None else member.display_name
             nicknames.append(name)
         return nicknames
@@ -652,10 +655,10 @@ class DiscordClient(discord.Client):
             balance_before = self.database.get_token_balance(disc_id)
             tokens_earned = gain_for_user # Variable for tracking tokens gained for the user.
             tokens_lost = -1 # Variable for tracking tokens lost for the user.
-            disc_name = self.get_discord_nick(disc_id)
+            disc_name = self.get_discord_nick(disc_id, guild_id)
 
             if bets_made is not None: # There are active bets for the current user.
-                mention = self.get_mention_str(disc_id)
+                mention = self.get_mention_str(disc_id, guild_id)
                 if any_bets:
                     response_bets += "-----------------------------\n"
                 response_bets += f"Result of bets {mention} made:\n"
@@ -673,7 +676,7 @@ class DiscordClient(discord.Client):
                     for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
                         person = None
                         if target is not None:
-                            person = self.get_discord_nick(target)
+                            person = self.get_discord_nick(target, guild_id)
 
                         bet_desc = bets.get_dynamic_bet_desc(event, person)
 
@@ -706,7 +709,7 @@ class DiscordClient(discord.Client):
 
         new_max_tokens_holder = self.database.get_max_tokens_details()[1]
         if new_max_tokens_holder != max_tokens_holder:
-            max_tokens_name = self.get_discord_nick(new_max_tokens_holder)
+            max_tokens_name = self.get_discord_nick(new_max_tokens_holder, guild_id)
             # This person now has the most tokens of all users!
             response_bets += f"{max_tokens_name} now has the most {tokens_name} of everyone! "
             response_bets += "***HAIL TO THE KING!!!***\n"
@@ -725,7 +728,7 @@ class DiscordClient(discord.Client):
             user_str = ""
             if doinks[disc_id] != []:
                 prefix = "\n" if any_mentions else ""
-                user_str = f"{prefix} {self.get_mention_str(disc_id)} was insane that game! "
+                user_str = f"{prefix} {self.get_mention_str(disc_id, guild_id)} was insane that game! "
                 intfars_removed = len(doinks[disc_id])
                 user_str += f"He is awarded {intfars_removed} " + "{emote_Doinks} for "
                 any_mentions = True
@@ -745,14 +748,14 @@ class DiscordClient(discord.Client):
 
         return None if not any_mentions else mentions_str
 
-    def get_honorable_mentions_msg(self, mentions):
+    def get_honorable_mentions_msg(self, mentions, guild_id):
         mentions_str = "Honorable mentions goes out to:\n"
         any_mentions = False
         for disc_id in mentions:
             user_str = ""
             if mentions[disc_id] != []:
                 prefix = "\n" if any_mentions else ""
-                user_str = f"{prefix}- {self.get_mention_str(disc_id)} for "
+                user_str = f"{prefix}- {self.get_mention_str(disc_id, guild_id)} for "
                 any_mentions = True
 
             for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
@@ -769,9 +772,9 @@ class DiscordClient(discord.Client):
         or by someone else getting Int-Far.
         It also describes whether someone is currently on an Int-Far streak.
         """
-        current_nick = self.get_discord_nick(intfar_id)
-        current_mention = self.get_mention_str(intfar_id)
-        prev_mention = self.get_mention_str(prev_intfar)
+        current_nick = self.get_discord_nick(intfar_id, guild_id)
+        current_mention = self.get_mention_str(intfar_id, guild_id)
+        prev_mention = self.get_mention_str(prev_intfar, guild_id)
         if intfar_id is None:
             if intfar_streak > 1: # No one was Int-Far this game, but a streak was active.
                 for disc_id, _, _ in self.users_in_game[guild_id]:
@@ -787,12 +790,12 @@ class DiscordClient(discord.Client):
                     f"{prev_mention} is over " + "{emote_woahpikachu}")
         return None
 
-    def get_ifotm_lead_msg(self, intfar_id):
+    def get_ifotm_lead_msg(self, intfar_id, guild_id):
         """
         Return a message describing whether the person being Int-Far is now
         in the lead for Int-Far Of The Month (IFOTM) after acquring their new Int-Far award.
         """
-        mention_str = self.get_mention_str(intfar_id)
+        mention_str = self.get_mention_str(intfar_id, guild_id)
         message = f"{mention_str} has now taken the lead for Int-Far of the Month " + "{emote_nazi}"
         intfar_details = self.database.get_intfars_of_the_month()
         monthly_games, monthly_intfars = self.database.get_intfar_stats(intfar_id, monthly=True)
@@ -829,7 +832,7 @@ class DiscordClient(discord.Client):
         """
         Send Int-Far message to the appropriate Discord channel.
         """
-        mention_str = self.get_mention_str(disc_id)
+        mention_str = self.get_mention_str(disc_id, guild_id)
         if mention_str is None:
             self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
                             self.config.log_warning)
@@ -841,7 +844,7 @@ class DiscordClient(discord.Client):
         streak_msg = self.get_streak_msg(disc_id, guild_id, intfar_streak, prev_intfar)
         if streak_msg is not None:
             message += "\n" + streak_msg
-        ifotm_lead_msg = self.get_ifotm_lead_msg(disc_id)
+        ifotm_lead_msg = self.get_ifotm_lead_msg(disc_id, guild_id)
         if ifotm_lead_msg is not None:
             message += "\n" + ifotm_lead_msg
 
@@ -885,7 +888,7 @@ class DiscordClient(discord.Client):
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
             honorable_mentions = award_qualifiers.get_honorable_mentions(filtered_stats)
-            honorable_mention_text = self.get_honorable_mentions_msg(honorable_mentions)
+            honorable_mention_text = self.get_honorable_mentions_msg(honorable_mentions, guild_id)
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
             if redeemed_text is not None:
@@ -1053,7 +1056,7 @@ class DiscordClient(discord.Client):
         This method is called whenenver a critical error occurs.
         It causes the bot to post an error message to the channel, pinging me to fix it.
         """
-        mention_me = self.get_mention_str(ADMIN_DISC_ID)
+        mention_me = self.get_mention_str(ADMIN_DISC_ID, guild_id)
         message = "Oh frick, It appears I've crashed {emote_nat_really_fine} "
         message += f"{mention_me}, come and fix me!!! " + "{emote_angry_gual}"
         await self.channels_to_write[guild_id].send(self.insert_emotes(message))
@@ -1220,7 +1223,7 @@ class DiscordClient(discord.Client):
                     bets_won += 1
 
         pct_won = int((bets_won / total_bets) * 100)
-        highest_payout_name = self.get_discord_nick(highest_payout_user)
+        highest_payout_name = self.get_discord_nick(highest_payout_user, message.guild.id)
 
         response += f"--- Since {earliest_time} ---\n"
         response += f"- **{games}** games have been played\n"
@@ -1263,7 +1266,7 @@ class DiscordClient(discord.Client):
         current_month = api_util.current_month()
 
         def format_for_all(disc_id, monthly=False):
-            person_to_check = self.get_discord_nick(disc_id)
+            person_to_check = self.get_discord_nick(disc_id, message.guild.id)
             games_played, intfar_reason_ids = self.database.get_intfar_stats(disc_id, monthly)
             games_played, intfars, _, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
             msg = f"{person_to_check}: Int-Far **{intfars}** times "
@@ -1272,7 +1275,7 @@ class DiscordClient(discord.Client):
             return msg, intfars, pct_intfar
 
         def format_for_single(disc_id):
-            person_to_check = self.get_discord_nick(disc_id)
+            person_to_check = self.get_discord_nick(disc_id, message.guild.id)
             games_played, intfar_reason_ids = self.database.get_intfar_stats(disc_id, False)
             games_played, intfars, intfar_counts, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
             intfars_of_the_month = self.database.get_intfars_of_the_month()
@@ -1302,7 +1305,7 @@ class DiscordClient(discord.Client):
                 no_streak_desc += f"**{longest_non_streak}** games in a row " + "{emote_pog}\n"
 
                 relations_data = self.get_intfar_relation_stats(disc_id)[0]
-                most_intfars_nick = self.get_discord_nick(relations_data[0])
+                most_intfars_nick = self.get_discord_nick(relations_data[0], message.guild.id)
                 relations_desc = f"He has inted the most when playing with {most_intfars_nick} "
                 relations_desc += f"where he inted {relations_data[2]} games ({relations_data[3]}% "
                 relations_desc += f"of {relations_data[1]} games)"
@@ -1358,9 +1361,12 @@ class DiscordClient(discord.Client):
     async def handle_intfar_relations_msg(self, message, target_id):
         data = self.get_intfar_relation_stats(target_id)
 
-        response = f"Breakdown of players {self.get_discord_nick(target_id)} has inted with:\n"
+        response = (
+            f"Breakdown of players {self.get_discord_nick(target_id, message.guild.id)} " +
+            "has inted with:\n"
+        )
         for disc_id, total_games, intfars, intfar_ratio, games_ratio in data:
-            nick = self.get_discord_nick(disc_id)
+            nick = self.get_discord_nick(disc_id, message.guild.id)
             response += f"- {nick}: **{intfars}** times (**{intfar_ratio}%**) "
             response += f"(**{games_ratio}%** of **{total_games}** games)\n"
 
@@ -1368,7 +1374,7 @@ class DiscordClient(discord.Client):
 
     async def handle_doinks_msg(self, message, target_id):
         def get_doinks_stats(disc_id, expanded=True):
-            person_to_check = self.get_discord_nick(disc_id)
+            person_to_check = self.get_discord_nick(disc_id, message.guild.id)
             doinks_reason_ids = self.database.get_doinks_stats(disc_id)
             doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
             msg = f"{person_to_check} has earned {len(doinks_reason_ids)} "
@@ -1414,9 +1420,12 @@ class DiscordClient(discord.Client):
     async def handle_doinks_relations_msg(self, message, target_id):
         data = self.get_doinks_relation_stats(target_id)
 
-        response = f"Breakdown of who {self.get_discord_nick(target_id)} has gotten Big Doinks with:\n"
+        response = (
+            f"Breakdown of who {self.get_discord_nick(target_id, message.guild.id)} " +
+            "has gotten Big Doinks with:\n"
+        )
         for disc_id, total_games, doinks, doinks_ratio, games_ratio in data:
-            nick = self.get_discord_nick(disc_id)
+            nick = self.get_discord_nick(disc_id, message.guild.id)
             response += f"- {nick}: **{doinks}** times (**{doinks_ratio}%**) "
             response += f"(**{games_ratio}%** of **{total_games}** games)\n"
 
@@ -1430,7 +1439,7 @@ class DiscordClient(discord.Client):
         if second_cmd in api_util.STAT_COMMANDS: # Check if the requested stat is a valid stat.
             stat = second_cmd
             stat_index = api_util.STAT_COMMANDS.index(stat)
-            self.config.log(f"Stat requested: {first_cmd} {stat}")
+
             if first_cmd == "best":
                 best = True
             elif first_cmd in ("most", "highest"):
@@ -1455,12 +1464,12 @@ class DiscordClient(discord.Client):
                 (target_id,
                  min_or_max_value,
                  game_id) = self.database.get_most_extreme_stat(stat, best, maximize)
-                recepient = self.get_discord_nick(target_id)
+                recepient = self.get_discord_nick(target_id, message.guild.id)
             else:
                 (stat_count, # <- How many times the stat has occured.
                  min_or_max_value, # <- Highest/lowest occurance of the stat value.
                  game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
-                recepient = self.get_discord_nick(target_id)
+                recepient = self.get_discord_nick(target_id, message.guild.id)
 
             game_summary = None
             if min_or_max_value is not None:
@@ -1491,7 +1500,7 @@ class DiscordClient(discord.Client):
 
     async def handle_game_msg(self, message, target_id):
         summoner_ids = None
-        target_name = self.get_discord_nick(target_id)
+        target_name = self.get_discord_nick(target_id, message.guild.id)
 
         for disc_id, _, summ_ids in self.database.summoners:
             if disc_id == target_id:
@@ -1540,7 +1549,7 @@ class DiscordClient(discord.Client):
                         msg += f"{self.get_emoji_by_name('PepeHands')}"
                         await message.channel.send(msg)
                         return
-                discord_name = self.get_discord_nick(target_id)
+                discord_name = self.get_discord_nick(target_id, message.guild.id)
             target_ids.append(target_id)
             target_names.append(discord_name)
 
@@ -1555,7 +1564,8 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_cancel_bet_msg(self, message, betting_event, target_id=None):
-        target_name = None if target_id is None else self.get_discord_nick(target_id)
+        target_name = (None if target_id is None 
+                       else self.get_discord_nick(target_id, message.guild.id))
 
         response = self.betting_handler.cancel_bet(
             message.author.id, message.guild.id, betting_event,
@@ -1564,13 +1574,14 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_bet_return_msg(self, message, betting_event, target_id=None):
-        target_name = None if target_id is None else self.get_discord_nick(target_id)
+        target_name = (None if target_id is None
+                       else self.get_discord_nick(target_id, message.guild.id))
 
         response = self.betting_handler.get_bet_return_desc(betting_event, target_id, target_name)
         await message.channel.send(response)
 
     async def handle_give_tokens_msg(self, message, amount, target_id):
-        target_name = self.get_discord_nick(target_id)
+        target_name = self.get_discord_nick(target_id, message.guild.id)
 
         max_tokens_before, max_tokens_holder = self.database.get_max_tokens_details()
 
@@ -1590,7 +1601,7 @@ class DiscordClient(discord.Client):
     async def handle_active_bets_msg(self, message, target_id):
         def get_bet_description(disc_id, single_person=True):
             active_bets = self.database.get_bets(True, disc_id)
-            recepient = self.get_discord_nick(disc_id)
+            recepient = self.get_discord_nick(disc_id, message.guild.id)
 
             response = ""
             if active_bets is None:
@@ -1601,15 +1612,15 @@ class DiscordClient(discord.Client):
             else:
                 tokens_name = self.config.betting_tokens
                 response = f"{recepient} has the following active bets:"
-                bets_by_guild = {guild_id: 0 for guild_id in api_util.GUILD_IDS}
+                bets_by_guild = {guild_id: [] for guild_id in api_util.GUILD_IDS}
                 for bet_data in active_bets:
-                    bets_by_guild[bet_data[1]] = bet_data
+                    bets_by_guild[bet_data[1]].append(bet_data)
 
                 for guild_id in bets_by_guild:
                     guild_bets = bets_by_guild[guild_id]
                     if guild_bets != []:
                         guild_name = self.get_guild_name(guild_id)
-                        response += f"\n=== In {guild_name}: ==="
+                        response += f"\n=== In **{guild_name}** ==="
 
                     for _, guild_id, _, amounts, events, targets, _, ticket, _ in guild_bets:
                         bets_str = "\n - "
@@ -1619,7 +1630,7 @@ class DiscordClient(discord.Client):
                         for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
                             person = None
                             if target is not None:
-                                person = self.get_discord_nick(target)
+                                person = self.get_discord_nick(target, message.guild.id)
 
                             bet_desc = bets.get_dynamic_bet_desc(event, person)
                             bets_str += f"`{bet_desc}`"
@@ -1685,7 +1696,7 @@ class DiscordClient(discord.Client):
         pct_during = int((during_game / len(all_bets)) * 100)
         event_desc = bets.BETTING_DESC[most_often_event]
 
-        target_name = self.get_discord_nick(target_id)
+        target_name = self.get_discord_nick(target_id, message.guild.id)
         response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
         response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
         response += f"- Average amount of {tokens_name} wagered: **{api_util.format_tokens_amount(average_amount)}**\n"
@@ -1699,7 +1710,7 @@ class DiscordClient(discord.Client):
 
     async def handle_token_balance_msg(self, message, target_id):
         def get_token_balance(disc_id):
-            name = self.get_discord_nick(disc_id)
+            name = self.get_discord_nick(disc_id, message.guild.id)
             balance = self.database.get_token_balance(disc_id)
             return balance, name
 
@@ -1732,7 +1743,7 @@ class DiscordClient(discord.Client):
         response_dm += "To log in to a new device (phone fx.), simply use the above link again.\n"
         response_dm += "Don't show this link to anyone, or they will be able to log in as you!"
 
-        mention = self.get_mention_str(message.author.id)
+        mention = self.get_mention_str(message.author.id, message.guild.id)
         response_server = (
             f"Psst, {mention}, I sent you a DM with a secret link, "
             "where you can sign up for the website {emote_peberno}"
@@ -1753,7 +1764,7 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_profile_msg(self, message, target_id):
-        target_name = self.get_discord_nick(target_id)
+        target_name = self.get_discord_nick(target_id, message.guild.id)
 
         response = f"URL to {target_name}'s Int-Far profile:\n"
         response += f"http://mhooge.com/intfar/user/{target_id}"
@@ -1761,8 +1772,8 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_report_msg(self, message, target_id):
-        target_name = self.get_discord_nick(target_id)
-        mention = self.get_mention_str(target_id)
+        target_name = self.get_discord_nick(target_id, message.guild.id)
+        mention = self.get_mention_str(target_id, message.guild.id)
 
         reports = self.database.report_user(target_id)
 
@@ -1778,7 +1789,7 @@ class DiscordClient(discord.Client):
         report_data = self.database.get_reports(target_id)
         response = ""
         for disc_id, reports in report_data:
-            name = self.get_discord_nick(disc_id)
+            name = self.get_discord_nick(disc_id, message.guild.id)
             response += f"{name} has been reported {reports} times.\n"
 
         await message.channel.send(response)
@@ -1786,7 +1797,7 @@ class DiscordClient(discord.Client):
     async def handle_flirtation_msg(self, message, language):
         messages = FLIRT_MESSAGES[language]
         flirt_msg = self.insert_emotes(messages[random.randint(0, len(messages)-1)])
-        mention = self.get_mention_str(message.author.id)
+        mention = self.get_mention_str(message.author.id, message.guild.id)
         await message.channel.send(f"{mention} {flirt_msg}", tts=True)
 
     async def handle_doinks_criteria_msg(self, message):
@@ -2001,7 +2012,7 @@ class DiscordClient(discord.Client):
                 for disc_id, summ_name, _ in self.database.summoners:
                     summ_names = self.database.summoner_from_discord_id(disc_id)[1]
                     formatted_names = ", ".join(summ_names)
-                    nickname = self.get_discord_nick(disc_id)
+                    nickname = self.get_discord_nick(disc_id, message.guild.id)
                     response += f"- {nickname} ({formatted_names})\n"
                 if response == "":
                     response = "No lads are currently signed up {emote_nat_really_fine} but you can change this!!"

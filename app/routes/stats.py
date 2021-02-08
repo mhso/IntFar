@@ -29,7 +29,8 @@ def get_stats(database):
 
             stat_data.append(
                 (
-                    pretty_desc, api_util.round_digits(best_or_worst_ever), user_data[0],
+                    best_or_worst_ever_id, pretty_desc,
+                    api_util.round_digits(best_or_worst_ever), user_data[0],
                     flask.url_for("static", filename=user_data[1].replace("app/static/", ""))
                 )
             )

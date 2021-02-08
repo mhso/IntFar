@@ -1,0 +1,29 @@
+<html>
+{% include 'head.html' %}
+{% import "navbar.html" as navbar %}
+<body>
+    <div id="betting-wrapper" class="container-flex">
+        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data) }}
+        <h1>Doinks</h1>
+
+        <div class="row">
+            <div class="col-md-1 col-lg-2 col-xl-3 col-xxl-4"></div>
+            <div class="col-md-10 col-lg-8 col-xl-6 col-xxl-4">
+                <table class="nice-table">
+                    <tr class="list-first list-entry">
+                        <th>Reason</th>
+                        <th>Awards</th>
+                    </tr>
+                    {% for doinks_desc, doinks_count in doinks_data %}
+                    <tr class="list-entry">
+                        <td>{{ doinks_desc }}</td>
+                        <td>{{ doinks_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <div class="col-md-1 col-lg-2 col-xl-3 col-xxl-4"></div>
+        </div>
+    </div>
+</body>
+</html>

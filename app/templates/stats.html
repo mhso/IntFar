@@ -12,7 +12,7 @@
             {% if loop.last %}
             <div class="d-md-block col-md-1 col-lg-2 d-xl-none"></div>
             {% endif %}
-            <div class="col-md-10 col-lg-8 col-xl-5 col-xxl-4">
+            <div class="col-md-10 col-lg-8 col-xl-5 mx-xl-3 col-xxl-4">
                 {% set best = loop.first %}
                 <h2>{% if best %}Best Stats{% else %}Worst Stats{% endif %}</h2>
                 <table class="nice-table">
@@ -22,7 +22,7 @@
                         <th>By</th>
                         <th></th>
                     </tr>
-                    {% for stat_desc, stat_value, name, avatar in data %}
+                    {% for disc_id, stat_desc, stat_value, name, avatar in data %}
                     <tr class="list-entry">
                         <td>{{ stat_desc }}</td>
                         <td>{{ stat_value }}</td>

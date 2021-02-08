@@ -413,10 +413,15 @@ class Database:
                 games_with_person[part_id] = games
             return games_with_person, intfars_with_person
 
-    def get_doinks_stats(self, disc_id):
-        query = "SELECT doinks FROM participants WHERE doinks IS NOT NULL AND disc_id=?"
+    def get_doinks_stats(self, disc_id=None):
+        query = "SELECT doinks FROM participants WHERE doinks IS NOT NULL"
+        param = None
+        if disc_id is not None:
+            query += " AND disc_id=?"
+            param = (disc_id,)
+
         with self.get_connection() as db:
-            return self.execute_query(db, query, (disc_id,)).fetchall()
+            return self.execute_query(db, query, param).fetchall()
 
     def get_doinks_relations(self, disc_id):
         query_games = """
