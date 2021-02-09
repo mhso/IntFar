@@ -1,7 +1,6 @@
 import asyncio
-from concurrent.futures import TimeoutError as FutureTimeout
+from concurrent.futures import TimeoutError as FutureTimeout, CancelledError
 from time import time, sleep
-from typing import Coroutine
 from multiprocessing import Pipe
 from multiprocessing.connection import wait
 
@@ -32,13 +31,13 @@ def listen_for_request(disc_client, event_loop):
                             result = disc_client.__getattribute__(command)()
                         else:
                             result = disc_client.__getattribute__(command)(*params)
-                        if isinstance(result, Coroutine):
+                        if asyncio.iscoroutine(result):
                             try:
                                 future = asyncio.run_coroutine_threadsafe(result, event_loop)
                                 result = future.result(3)
-                            except FutureTimeout as exc:
+                            except (FutureTimeout, CancelledError) as exc:
                                 disc_client.config.log(f"Exception during Discord request: {exc}")
-                                results.append(None)
+                                result = None
                     elif command_type == "bot_command":
                         pass # Do bot command.
                     results.append(result)

@@ -92,9 +92,9 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
                 champions[participant["summonerId"]] = (participant["summonerName"], champ_played)
 
     game_start = data["gameStartTime"] / 1000
-    duration = data["gameLength"]
+    now = time()
     dt_1 = datetime.fromtimestamp(game_start)
-    dt_2 = datetime.fromtimestamp(game_start + duration)
+    dt_2 = datetime.fromtimestamp(now)
     fmt_duration = format_duration(dt_1, dt_2)
     game_mode = data["gameMode"]
 

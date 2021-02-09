@@ -19,7 +19,8 @@ ADMIN_DISC_ID = 267401734513491969
 
 CHANNEL_IDS = [ # List of channels that Int-Far will write to.
     MAIN_CHANNEL_ID,
-    805218121610166272
+    805218121610166272,
+    808796236692848650
 ]
 
 def load_flavor_texts(filename):
@@ -524,9 +525,9 @@ class DiscordClient(discord.Client):
             avatar_paths.append(path)
         return avatar_paths if discord_id is None else avatar_paths[0]
 
-    def get_discord_id(self, nickname):
+    def get_discord_id(self, nickname, guild_id=api_util.MAIN_GUILD_ID):
         for guild in self.guilds:
-            if guild.id == api_util.MAIN_GUILD_ID:
+            if guild.id == guild_id:
                 for member in guild.members:
                     if member.nick is not None and member.nick.lower() == nickname:
                         return member.id
@@ -947,7 +948,7 @@ class DiscordClient(discord.Client):
                 self.config.log("Polling is now active!")
                 self.polling_active[guild_id] = True
                 asyncio.create_task(self.poll_for_game_start(guild_id, poll_immediately))
-            self.config.log(f"Active users in: {len(users_in_voice)}")
+            self.config.log(f"Active users in {guild_name}: {len(users_in_voice)}")
 
     async def user_left_voice(self, disc_id, guild_id):
         guild_name = self.get_guild_name(guild_id)
@@ -1115,7 +1116,7 @@ class DiscordClient(discord.Client):
                         # if more than one user is active in voice.
                         await self.user_joined_voice(member.id, guild.id, True)
                 for text_channel in guild.text_channels:
-                    # Find the 'int-far-spam' channel.
+                    # Find the channel to write in for each guild.
                     if text_channel.id in CHANNEL_IDS and self.config.env == "production":
                         self.channels_to_write[guild.id] = text_channel
                         break
@@ -1269,12 +1270,13 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    def try_get_user_data(self, name):
-        if name.startswith("<@!"):
-            return int(name[3:-1])
+    def try_get_user_data(self, name, guild_id):
+        if name.startswith("<@"):
+            start_index = 3 if name[2] == "!" else 2
+            return int(name[start_index:-1])
         user_data = self.database.discord_id_from_summoner(name)
         if user_data is None: # Summoner name gave no result, try Discord name.
-            return self.get_discord_id(name)
+            return self.get_discord_id(name, guild_id)
         return user_data[0]
 
     async def handle_intfar_msg(self, message, target_id):
@@ -1536,6 +1538,8 @@ class DiscordClient(discord.Client):
             response = f"{target_name} is "
             response += game_stats.get_active_game_summary(game_data, active_summoner,
                                                            self.database.summoners, self.riot_api)
+            guild_name = self.get_guild_name(message.guild.id)
+            response += f"\nPlaying in *{guild_name}*"
         else:
             response = f"{target_name} is not in a game at the moment "
             response += self.insert_emotes("{emote_simp_but_closeup}")
@@ -1558,7 +1562,7 @@ class DiscordClient(discord.Client):
                     target_id = message.author.id
                 else:
                     target_name = target_name.lower()
-                    target_id = self.try_get_user_data(target_name.strip())
+                    target_id = self.try_get_user_data(target_name.strip(), message.guild.id)
                     if target_id is None:
                         msg = "Error: Invalid summoner or Discord name "
                         msg += f"{self.get_emoji_by_name('PepeHands')}"
@@ -1813,7 +1817,7 @@ class DiscordClient(discord.Client):
         messages = FLIRT_MESSAGES[language]
         flirt_msg = self.insert_emotes(messages[random.randint(0, len(messages)-1)])
         mention = self.get_mention_str(message.author.id, message.guild.id)
-        await message.channel.send(f"{mention} {flirt_msg}", tts=True)
+        await message.channel.send(f"{mention} {flirt_msg}")
 
     async def handle_doinks_criteria_msg(self, message):
         response = "Criteria for being awarded {emote_Doinks}:"
@@ -1879,7 +1883,7 @@ class DiscordClient(discord.Client):
             return " ".join(split[start_index:end_index])
         return default
 
-    def get_target_id(self, author_id, target_name, all_allowed):
+    def get_target_id(self, author_id, guild_id, target_name, all_allowed):
         if target_name == "me": # Target ourselves.
             return author_id
 
@@ -1891,7 +1895,7 @@ class DiscordClient(discord.Client):
             else:
                 raise InvalidArgument("'All' target is not valid for this command.")
 
-        target_id = self.try_get_user_data(target_name)
+        target_id = self.try_get_user_data(target_name, guild_id)
 
         if target_id is None:
             msg = f"Error: Invalid summoner or Discord name {self.get_emoji_by_name('PepeHands')}"
@@ -1931,7 +1935,7 @@ class DiscordClient(discord.Client):
                 handler_args.extend(args)
 
             if target_name is not None:
-                target_id = self.get_target_id(message.author.id, target_name, target_all)
+                target_id = self.get_target_id(message.author.id, message.guild.id, target_name, target_all)
                 handler_args.append(target_id)
             await handler(*handler_args)
         except InvalidArgument as arg_exception:
