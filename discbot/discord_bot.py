@@ -422,7 +422,7 @@ class DiscordClient(discord.Client):
                 users_in_current_game.append((disc_id, [active_name], [active_id]))
                 active_game = game_for_summoner
 
-        if len(game_ids) > 1 or len(users_in_current_game) < 2: # People are in different games.
+        if len(game_ids) > 1: # People are in different games.
             return 0
 
         if active_game is not None and self.active_game.get(guild_id) is None:
@@ -468,10 +468,13 @@ class DiscordClient(discord.Client):
         if isinstance(disc_id, str):
             disc_id = int(disc_id)
 
-        all_guilds = [g_id for g_id in api_util.GUILD_IDS if g_id != guild_id] 
+        all_guilds = [g_id for g_id in api_util.GUILD_IDS if g_id != guild_id]
 
         for guild_to_search in [guild_id] + all_guilds:
             server = self.get_guild(guild_to_search)
+            if server is None:
+                return None
+
             for member in server.members:
                 if member.id == disc_id:
                     return member
@@ -532,6 +535,18 @@ class DiscordClient(discord.Client):
                     if member.name is not None and member.name.lower() == nickname:
                         return member.id
         return None
+
+    def get_guilds_for_user(self, disc_id):
+        guild_ids = []
+        for guild_id in api_util.GUILD_IDS:
+            guild = self.get_guild(guild_id)
+            if guild is None:
+                continue
+
+            for member in guild.members:
+                if member.id == disc_id:
+                    guild_ids.append(guild_id)
+        return guild_ids
 
     def get_guild_name(self, guild_id=None):
         guilds = sorted(

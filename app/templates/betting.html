@@ -29,11 +29,15 @@
                 <input id="bet-players" class="bet-inputs" type="number" min="2" max="5" placeholder="Number of Players (Optional)">
                 <br>
                 <select id="bet-guild" class="bet-inputs">
+                    {% if all_guild_data %}
                     {% for guild_id, guild_name in all_guild_data %}
                     <option {% if guild_id == main_guild_id %}selected{% endif %} value="{{ guild_id }}">
                         {{ guild_name }}
                     </option>
                     {% endfor %}
+                    {% else %}
+                    <option selected value="-1">You are not logged in.</option>
+                    {% endif %}
                 </select>
                 <p id="bet-balance">
                     Token Balance: <span id="bet-balance-value">{{ token_balance }} GBP</span>

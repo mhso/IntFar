@@ -88,7 +88,7 @@ def get_game_info():
         active_game["game_duration"] = time() - active_game["start"]
         active_games.append(
             [
-                int(active_game["game_duration"]),
+                active_game["game_duration"],
                 active_game["game_mode"],
                 active_game["game_guild_name"]
             ]

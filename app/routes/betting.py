@@ -61,8 +61,11 @@ def home():
         user_token_balance = format_tokens_amount(database.get_token_balance(logged_in_user))
 
     all_guild_data = []
-    for guild_id, guild_name in zip(GUILD_IDS, all_guilds):
-        all_guild_data.append((guild_id, guild_name))
+    if logged_in_user is not None:
+        guilds_for_user = app_util.discord_request("func", "get_guilds_for_user", logged_in_user)
+        for guild_id, guild_name in zip(GUILD_IDS, all_guilds):
+            if guild_id in guilds_for_user:
+                all_guild_data.append((guild_id, guild_name))
 
     main_guild_id = flask.request.cookies.get("main_guild_id")
     if main_guild_id is None:
