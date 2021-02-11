@@ -108,6 +108,12 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
 
     return response
 
+def is_unfiltered_stats_well_formed(game_info):
+    pass
+
+def is_filtered_stats_well_formed(filtered_info):
+    pass
+
 def get_filtered_stats(database, users_in_game, game_info):
     """
     Get relevant stats from the given game data and filter the data

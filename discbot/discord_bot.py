@@ -265,7 +265,10 @@ class DiscordClient(discord.Client):
                     raise ValueError("Game info is None!")
 
                 if self.database.game_exists(game_info["gameId"]):
-                    self.config.log("We triggered end of game stuff again... Strange!")
+                    self.config.log(
+                        "We triggered end of game stuff again... Strange!",
+                        self.config.log_warning
+                    )
 
                 elif self.riot_api.is_urf(game_info["gameMode"]):
                     response = "That was an URF game {emote_poggers} "
@@ -282,15 +285,27 @@ class DiscordClient(discord.Client):
                 elif game_info["gameDuration"] < 5 * 60: # Game was less than 5 mins long.
                     response = (
                         "That game lasted less than 5 minutes " +
-                        "{emote_zinking} assuming it was a remake."
+                        "{emote_zinking} assuming it was a remake. " +
+                        "No stats are saved."
                     )
                     await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
                 else:
                     self.config.log(f"Users in game before: {self.users_in_game.get(guild_id)}")
-                    filtered_stats, users_in_game = game_stats.get_filtered_stats(
-                        self.database, self.users_in_game.get(guild_id), game_info
-                    )
+                    try:
+                        filtered_stats, users_in_game = game_stats.get_filtered_stats(
+                            self.database, self.users_in_game.get(guild_id), game_info
+                        )
+                    except ValueError as exc:
+                        self.config.log(
+                            "Game data is not well formed! Exception: " + str(exc),
+                            self.config.log_error
+                        )
+                        await self.send_error_msg(guild_id)
+                        with open("errorlog.txt", "a", encoding="utf-8") as fp:
+                            print_exc(file=fp)
+                        raise exc
+
                     self.users_in_game[guild_id] = users_in_game
                     self.config.log(f"Users in game after: {users_in_game}")
 
@@ -566,6 +581,19 @@ class DiscordClient(discord.Client):
             return None
 
         return guild_names if guild_id is None else guild_names[0]
+
+    def get_channel_name(self, guild_id=None):
+        channel_names = []
+        for g_id in api_util.GUILD_IDS:
+            guild = self.get_guild(g_id)
+            for c_id in CHANNEL_IDS:
+                channel = guild.get_channel(c_id)
+                if channel is not None:
+                    if guild_id is not None and g_id == guild_id:
+                        return channel.name
+                    channel_names.append(channel.name)
+
+        return channel_names
 
     def get_all_emojis(self):
         for guild in self.guilds:
@@ -1538,8 +1566,13 @@ class DiscordClient(discord.Client):
             response = f"{target_name} is "
             response += game_stats.get_active_game_summary(game_data, active_summoner,
                                                            self.database.summoners, self.riot_api)
-            guild_name = self.get_guild_name(message.guild.id)
-            response += f"\nPlaying in *{guild_name}*"
+            for guild_id in api_util.GUILD_IDS:
+                active_game = self.active_game.get(guild_id)
+                if active_game is not None:
+                    if active_game["id"] == game_data["gameId"]:
+                        guild_name = self.get_guild_name(guild_id)
+                        response += f"\nPlaying in *{guild_name}*"
+                        break
         else:
             response = f"{target_name} is not in a game at the moment "
             response += self.insert_emotes("{emote_simp_but_closeup}")
@@ -1575,7 +1608,7 @@ class DiscordClient(discord.Client):
         self.database.start_persistent_connection()
         response = self.betting_handler.place_bet(
             message.author.id, message.guild.id, amounts,
-            self.game_start[message.guild.id], events,
+            self.game_start.get(message.guild.id), events,
             target_ids, target_names
         )[1]
         self.database.close_persistent_connection()
@@ -1588,7 +1621,7 @@ class DiscordClient(discord.Client):
 
         response = self.betting_handler.cancel_bet(
             message.author.id, message.guild.id, betting_event,
-            self.game_start[message.guild.id], target_id, target_name
+            self.game_start.get(message.guild.id), target_id, target_name
         )[1]
         await message.channel.send(response)
 

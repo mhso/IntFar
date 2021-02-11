@@ -460,6 +460,8 @@ class Database:
          max_damage_id, max_damage) = game_stats.get_outlier_stat("totalDamageDealtToChampions", data)
         (min_cs_id, min_cs,
          max_cs_id, max_cs) = game_stats.get_outlier_stat("totalCs", data)
+        (min_cs_per_min_id, min_cs_per_min,
+         max_cs_per_min_id, max_cs_per_min) = game_stats.get_outlier_stat("csPerMin", data)
         (min_gold_id, min_gold,
          max_gold_id, max_gold) = game_stats.get_outlier_stat("goldEarned", data)
         max_kp_id, stats = game_stats.get_outlier(data, "kp", asc=False, total_kills=kills_by_our_team)
@@ -476,18 +478,18 @@ class Database:
             f"{game_id}, {intfar_id}, {intfar_reason}, " +
             f"({max_kills_id} - {max_kills}), ({min_deaths_id} - {min_deaths}), " +
             f"({max_kda_id} - {max_kda}), ({max_damage_id} - {max_damage}), " +
-            f"({max_cs_id} - {max_cs}), ({max_gold_id} - {max_gold}), " +
-            f"({max_kp_id} - {max_kp}), ({max_wards_id} - {max_wards}), " +
-            f"({max_vision_id} - {max_vision})"
+            f"({max_cs_id} - {max_cs}), ({max_cs_per_min_id} - {max_cs_per_min}), " +
+            f"({max_gold_id} - {max_gold}), ({max_kp_id} - {max_kp}), " +
+            f"({max_wards_id} - {max_wards}), ({max_vision_id} - {max_vision})"
         )
         self.config.log(
             "Saving worst stats:\n"+
             f"{game_id}, {intfar_id}, {intfar_reason}, " +
             f"({min_kills_id} - {min_kills}), ({max_deaths_id} - {max_deaths}), " +
             f"({min_kda_id} - {min_kda}), ({min_damage_id} - {min_damage}), " +
-            f"({min_cs_id} - {min_cs}), ({min_gold_id} - {min_gold}), " +
-            f"({min_kp_id} - {min_kp}), ({min_wards_id} - {min_wards}), " +
-            f"({min_vision_id} - {min_vision})"
+            f"({min_cs_id} - {min_cs}), ({min_cs_per_min_id} - {min_cs_per_min}), " +
+            f"({min_gold_id} - {min_gold}), ({min_kp_id} - {min_kp}), " +
+            f"({min_wards_id} - {min_wards}), ({min_vision_id} - {min_vision})"
         )
         self.config.log(
             "Saving participants:\n"+
@@ -498,9 +500,9 @@ class Database:
         query_cols = (
             """
             (game_id, int_far, intfar_reason, kills, kills_id, deaths,
-            deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, gold, gold_id,
-            kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, cs_per_min, cs_per_min_id,
+            gold, gold_id, kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         )
         query_best = query_prefix + " best_stats" + query_cols
@@ -513,9 +515,9 @@ class Database:
                     game_id, intfar_id, intfar_reason, max_kills,
                     max_kills_id, min_deaths, min_deaths_id, max_kda,
                     max_kda_id, max_damage, max_damage_id,
-                    max_cs, max_cs_id, max_gold, max_gold_id,
-                    max_kp, max_kp_id, max_wards, max_wards_id,
-                    max_vision, max_vision_id
+                    max_cs, max_cs_id, max_cs_per_min, max_cs_per_min_id,
+                    max_gold, max_gold_id, max_kp, max_kp_id, max_wards,
+                    max_wards_id, max_vision, max_vision_id
                 )
             )
             self.execute_query(
@@ -524,9 +526,9 @@ class Database:
                     game_id, intfar_id, intfar_reason, min_kills,
                     min_kills_id, max_deaths, max_deaths_id, min_kda,
                     min_kda_id, min_damage, min_damage_id,
-                    min_cs, min_cs_id, min_gold, min_gold_id,
-                    min_kp, min_kp_id, min_wards, min_wards_id,
-                    min_vision, min_vision_id
+                    min_cs, min_cs_id, min_cs_per_min, min_cs_per_min_id,
+                    min_gold, min_gold_id, min_kp, min_kp_id, min_wards,
+                    min_wards_id, min_vision, min_vision_id
                 )
             )
             query = "INSERT INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"

@@ -46,7 +46,7 @@ def home():
     all_ids = [x[0] for x in database.summoners]
     all_names = app_util.discord_request("func", "get_discord_nick", None)
     all_avatars = app_util.discord_request("func", "get_discord_avatar", None)
-    all_guilds = app_util.discord_request("func", "get_guild_name", None)
+    guild_names = app_util.discord_request("func", "get_guild_name", None)
 
     all_balances = database.get_token_balance()
     all_token_balances = []
@@ -63,7 +63,7 @@ def home():
     all_guild_data = []
     if logged_in_user is not None:
         guilds_for_user = app_util.discord_request("func", "get_guilds_for_user", logged_in_user)
-        for guild_id, guild_name in zip(GUILD_IDS, all_guilds):
+        for guild_id, guild_name in zip(GUILD_IDS, guild_names):
             if guild_id in guilds_for_user:
                 all_guild_data.append((guild_id, guild_name))
 
@@ -165,13 +165,16 @@ def create_bet():
         [get_dynamic_bet_desc(e, t), a] for (e, t, a) in zip(events, target_names, amounts)
     ]
 
+    channel_name = app_util.discord_request("func", "get_channel_name", guild_id)
+
     bet_data = {
         "response": "Bet successfully placed!",
         "name": logged_in_name, "events": event_descs,
         "bet_type": "single" if ticket is None else "multi",
         "bet_id": bet_id, "ticket": ticket, "guild_id": guild_id,
         "guild_name": get_guild_abbreviation(int(guild_id)),
-        "avatar": logged_in_avatar, "betting_balance": new_balance
+        "channel_name": channel_name, "avatar": logged_in_avatar,
+        "betting_balance": new_balance
     }
 
     disc_msg = f"Gnarly, {logged_in_name}, you created a bet using the **I N T E R W E B Z**!!!\n"

@@ -1,3 +1,6 @@
+from abc import abstractmethod
+import inspect
+
 COL_HEADER = '\033[95m'
 COL_OKBLUE = '\033[94m'
 COL_OKGREEN = '\033[92m'
@@ -7,14 +10,39 @@ COL_ENDC = '\033[0m'
 COL_BOLD = '\033[1m'
 COL_UNDERLINE = '\033[4m'
 
-class Assertion:
+def makeRegisteringDecorator(decorator):
+    def new_decorator(func):
+        # Call to new_decorator(method)
+        # Exactly like old decorator, but output keeps track of what decorated it
+        R = decorator(func) # apply foreignDecorator, like call to foreignDecorator(method) would have done
+        R.decorator = new_decorator # keep track of decorator
+        #R.original = func         # might as well keep track of everything!
+        return R
+
+    new_decorator.__name__ = decorator.__name__
+    new_decorator.__doc__ = decorator.__doc__
+
+    return new_decorator
+
+def test(func):
+    return func
+
+test = makeRegisteringDecorator(test)
+
+class TestRunner:
     def __init__(self):
         self.passed = 0
         self.failed = 0
         self.current_test = None
+        self.tests = []
+        self.test_args = None
 
-    def set_current_test(self, name):
-        self.current_test = name
+    def before_all(self, *test_args):
+        self.test_args = test_args
+
+    @abstractmethod
+    def before_test(self, *test_args):
+        pass
 
     def print_passed(self, name, desc):
         prefix = "" if self.current_test is None else f"{self.current_test} - "
@@ -67,3 +95,21 @@ class Assertion:
         print(f"{self.passed + self.failed} tests run.")
         self.print_passed("", f"{self.passed} passed.")
         self.print_failed("", f"{self.failed} failed.")
+
+    def get_test_funcs(self, decorator_name):
+        source_lines = inspect.getsourcelines(self.__class__)[0]
+        for i, line in enumerate(source_lines):
+            line = line.strip()
+            if line.split('(')[0].strip() == '@'+decorator_name: # leaving a bit out
+                nextLine = source_lines[i+1]
+                name = nextLine.split('def')[1].split('(')[0].strip()
+                func = self.__getattribute__(name)
+                yield(func)
+
+    def run_tests(self, tests_to_run=None):
+        for test_func in self.get_test_funcs("test"):
+            test_name = test_func.__name__
+            if tests_to_run is None or test_name in tests_to_run:
+                self.current_test = test_name
+                test_func(*self.test_args)
+        self.print_test_summary()

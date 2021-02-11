@@ -48,7 +48,7 @@ class Config:
         if severity == self.log_warning:
             prefix = prefix + " - [Warning]"
         elif severity == self.log_error:
-            prefix = prefix + " - [ERROR]"
+            prefix = prefix + " - [### ERROR ###]"
 
         if self.debug:
             print(prefix + " - " + str(data), flush=True, end=end)
