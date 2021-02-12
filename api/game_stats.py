@@ -1,6 +1,6 @@
 from datetime import datetime
 from time import time
-from api.util import format_duration
+from api.util import format_duration, STAT_COMMANDS
 
 def calc_kda(stats):
     if stats["deaths"] == 0:
@@ -109,10 +109,28 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
     return response
 
 def is_unfiltered_stats_well_formed(game_info):
-    pass
+    game_keys = [
+        "gameId", "gameDuration", "gameCreation", "gameMode", "mapId", "queueId",
+        "participantIdentities", "teams", "participants"
+    ]
+    participant_keys = [
+        "championId", "stats"
+    ]
+    stat_keys = [
+        "goldEarned", "neutralMinionsKilled", "totalMinionsKilled", "gameDuration",
+        "totalCs", "csPerMin"
+    ]
+    team_stat_keys = [
+        "riftHeraldKills", "firstBlood", "dragonKills", "baronKills", "teamId", "win"
+    ]
+    player_keys = ["summonerName", "summonerId"]
 
 def is_filtered_stats_well_formed(filtered_info):
-    pass
+    stat_keys = [
+        "championId", "timestamp", "mapId", "gameDuration", "totalCs", "csPerMin"
+    ]
+    # for disc_id, stats in game_info:
+    #     pass
 
 def get_filtered_stats(database, users_in_game, game_info):
     """

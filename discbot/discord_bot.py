@@ -270,6 +270,12 @@ class DiscordClient(discord.Client):
                         self.config.log_warning
                     )
 
+                elif len(self.users_in_game[guild_id] == 1):
+                    response = "Only one person in that game. "
+                    response += "no Int-Far will be crowned "
+                    response += "and no stats will be saved."
+                    await self.channels_to_write[guild_id].send(response)
+
                 elif self.riot_api.is_urf(game_info["gameMode"]):
                     response = "That was an URF game {emote_poggers} "
                     response += "no Int-Far will be crowned "
@@ -910,11 +916,18 @@ class DiscordClient(discord.Client):
         doinks_mentions, doinks = award_qualifiers.get_big_doinks(filtered_stats)
         redeemed_text = self.get_big_doinks_msg(doinks_mentions, guild_id)
 
-        final_intfar, final_intfar_data = award_qualifiers.get_intfar(filtered_stats, self.config)
+        (final_intfar,
+         final_intfar_data,
+         ties, ties_msg) = award_qualifiers.get_intfar(filtered_stats, self.config)
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
 
         if final_intfar is not None: # Send int-far message.
             reason = ""
+            if ties:
+                self.config.log("There are Int-Far ties.")
+                self.config.log(ties_msg)
+                reason = "There are Int-Far ties! " + ties_msg + "\n"
+
             # Go through the criteria the chosen Int-Far met and list them in a readable format.
             for (count, (reason_index, stat_value)) in enumerate(final_intfar_data):
                 key = reason_keys[reason_index]
@@ -1500,7 +1513,13 @@ class DiscordClient(discord.Client):
             # lowest is worse, except with deaths, where the opposite is the case.
             maximize = not ((stat != "deaths") ^ best)
             # Get a readable description, such as 'most deaths' or 'lowest kp'.
-            readable_stat = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type] + " " + stat
+            quantifier = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type]
+            if quantifier is not None:
+                readable_stat = quantifier + " " + stat
+            else:
+                readable_stat = stat
+
+            readable_stat = readable_stat.replace("_", " ")
 
             response = ""
             check_all = target_id is None
@@ -1513,11 +1532,11 @@ class DiscordClient(discord.Client):
             else:
                 (stat_count, # <- How many times the stat has occured.
                  min_or_max_value, # <- Highest/lowest occurance of the stat value.
-                 game_id) = self.database.get_stat(stat + "_id", stat, best, target_id, maximize)
+                 game_id) = self.database.get_stat(stat, best, target_id, maximize)
                 recepient = self.get_discord_nick(target_id, message.guild.id)
 
             game_summary = None
-            if min_or_max_value is not None:
+            if min_or_max_value is not None and game_id is not None:
                 min_or_max_value = api_util.round_digits(min_or_max_value)
                 game_info = self.riot_api.get_game_details(game_id)
                 summ_ids = self.database.summoner_from_discord_id(target_id)[2]
@@ -1526,9 +1545,15 @@ class DiscordClient(discord.Client):
             emote_to_use = "{emote_pog}" if best else "{emote_peberno}"
 
             if check_all:
-                response = f"The {readable_stat} ever in a game was {min_or_max_value} "
-                response += f"by {recepient} " + self.insert_emotes(emote_to_use) + "\n"
-                response += f"He got this as {game_summary}"
+                if stat == "first_blood":
+                    quant = "most" if best else "least"
+                    response = f"The person who has gotten first blood the {quant} "
+                    response += f"is {recepient} with {min_or_max_value} games "
+                    response += self.insert_emotes(emote_to_use)
+                else:
+                    response = f"The {readable_stat} ever in a game was {min_or_max_value} "
+                    response += f"by {recepient} " + self.insert_emotes(emote_to_use) + "\n"
+                    response += f"He got this as {game_summary}"
             else:
                 response = (f"{recepient} has gotten {readable_stat} in a game " +
                             f"{stat_count} times " + self.insert_emotes(emote_to_use) + "\n")
@@ -1564,8 +1589,10 @@ class DiscordClient(discord.Client):
 
         if game_data is not None:
             response = f"{target_name} is "
-            response += game_stats.get_active_game_summary(game_data, active_summoner,
-                                                           self.database.summoners, self.riot_api)
+            response += game_stats.get_active_game_summary(
+                game_data, active_summoner,
+                self.database.summoners, self.riot_api
+            )
             for guild_id in api_util.GUILD_IDS:
                 active_game = self.active_game.get(guild_id)
                 if active_game is not None:

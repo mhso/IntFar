@@ -24,8 +24,11 @@ def get_stats(database):
             pretty_stat = stat.replace("_", " ").capitalize() if len(stat) > 3 else stat.upper()
             stat_index = api_util.STAT_COMMANDS.index(stat)
             quantity_type = 0 if best else 1
-            pretty_quantity = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type].capitalize()
-            pretty_desc = f"{pretty_quantity} {pretty_stat}"
+            pretty_quantity = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type]
+            if stat == "first_blood":
+                pretty_quantity = "most" if best else "least"
+                pretty_stat += "s"
+            pretty_desc = f"{pretty_quantity.capitalize()} {pretty_stat}"
 
             stat_data.append(
                 (

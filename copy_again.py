@@ -26,10 +26,10 @@ with database_client_1.get_connection() as db_1:
     query_prefix = "INSERT INTO "
     query_cols = (
         """
-        (id, game_id, int_far, intfar_reason, kills, kills_id, deaths,
+        (id, game_id, int_far, intfar_reason, first_blood, kills, kills_id, deaths,
         deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, cs_per_min, cs_per_min_id,
         gold, gold_id, kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
     )
 
@@ -40,11 +40,11 @@ with database_client_1.get_connection() as db_1:
             db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret, summ[4]))
         query = query_prefix + "best_stats" + query_cols
         for data in data_best:
-            reshaped_data = data[:14] + (0.0, None) + data[14:]
+            reshaped_data = data[:4] + (None,) + data[4:]
             db_2.cursor().execute(query, reshaped_data)
         query = query_prefix + "worst_stats" + query_cols
         for data in data_worst:
-            reshaped_data = data[:14] + (0.0, None) + data[14:]
+            reshaped_data = data[:3] + (None,) + data[3:]
             db_2.cursor().execute(query, reshaped_data)
         query = "INSERT OR IGNORE INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"
         for data in participants:

@@ -263,7 +263,7 @@ class BettingHandler:
 
     def get_stats_return(self, target, stat_id):
         stat = BETTING_STATS[stat_id]
-        best_in_stat_count = self.database.get_stat(stat + "_id", stat, True, target)[0]
+        best_in_stat_count = self.database.get_stat(stat, True, target)[0]
         num_games = self.database.get_intfar_stats(target)[0]
         return best_in_stat_count, num_games
 

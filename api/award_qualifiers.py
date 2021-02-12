@@ -163,7 +163,7 @@ def intfar_by_vision_score(data, config):
         return (tied_intfars, lowest_score)
     return (None, None)
 
-def resolve_intfar_ties(intfar_data, max_count, game_data, config):
+def resolve_intfar_ties(intfar_data, max_count, game_data):
     """
     Resolve a potential tie in who should be Int-Far. This can happen if two or more
     people meet the same criteria, with the same stats within these criteria.
@@ -180,10 +180,7 @@ def resolve_intfar_ties(intfar_data, max_count, game_data, config):
             ties.append(disc_id)
 
     if len(ties) == 1:
-        config.log("There are no ties.")
-        return ties[0]
-
-    config.log("There are Int-Far ties!")
+        return ties[0], False, "There are no ties."
 
     sorted_by_deaths = sorted(filtered_data, key=lambda x: x[1]["deaths"], reverse=True)
     max_count = sorted_by_deaths[0][1]["deaths"]
@@ -193,8 +190,7 @@ def resolve_intfar_ties(intfar_data, max_count, game_data, config):
             ties.append(disc_id)
 
     if len(ties) == 1:
-        config.log("Ties resolved by amount of deaths.")
-        return ties[0]
+        return ties[0], True, "Ties resolved by most amount of deaths."
 
     sorted_by_kda = sorted(filtered_data, key=lambda x: game_stats.calc_kda(x[1]))
     max_count = game_stats.calc_kda(sorted_by_deaths[0][1])
@@ -204,13 +200,10 @@ def resolve_intfar_ties(intfar_data, max_count, game_data, config):
             ties.append(disc_id)
 
     if len(ties) == 1:
-        config.log("Ties resolved by KDA.")
-        return ties[0]
-
-    config.log("Ties resolved by gold earned.")
+        return ties[0], True, "Ties resolved by lowest KDA."
 
     sorted_by_gold = sorted(filtered_data, key=lambda x: x[1]["goldEarned"])
-    return sorted_by_gold[0][0]
+    return sorted_by_gold[0][0], True, "Ties resolved by fewest gold earned."
 
 def get_intfar_details(stats, config):
     intfar_kda_id, kda = intfar_by_kda(stats, config)
@@ -267,5 +260,6 @@ def get_intfar(filtered_stats, config):
     if max_count_intfar is None:
         return None, None
 
-    final_intfar = resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats, config)
-    return final_intfar, intfar_data[final_intfar]
+    (final_intfar,
+     ties, tie_desc) = resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)
+    return final_intfar, intfar_data[final_intfar], ties, tie_desc

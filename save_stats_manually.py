@@ -1,13 +1,13 @@
 import asyncio
 import json
 from sys import argv
+from api import award_qualifiers
 from api.database import Database
 from api.bets import BettingHandler
 from discbot.discord_bot import DiscordClient
 from api.config import Config
 from api.riot_api import APIClient
 from api.game_stats import get_filtered_stats
-from api.util import MAIN_GUILD_ID
 
 class MockChannel:
     async def send(self, data):
@@ -16,29 +16,31 @@ class MockChannel:
 class TestMock(DiscordClient):
     def __init__(self, config, database, betting_handler, riot_api):
         super().__init__(config, database, betting_handler, riot_api)
-        if len(argv) != 4:
+        if len(argv) != 5:
             print("Wrong number of arguments.")
-            print("Must supply: [game_id, task, loud] where task in ('all', 'bets', 'stats')")
+            print("Must supply: [game_id, guild_name, task, loud] where task in ('all', 'bets', 'stats')")
             exit(0)
 
         self.game_id = int(argv[1])
-        self.task = argv[2]
-        self.loud = argv[3] == "True"
+        self.guild_to_use = int(argv[2])
+        self.task = argv[3]
+        self.loud = argv[4] == "True"
 
     async def on_ready(self):
         await super(TestMock, self).on_ready()
 
-        self.users_in_game = []
-        self.active_game = {"id": self.game_id}
+        self.active_game[self.guild_to_use] = {"id": self.game_id}
         game_info = self.riot_api.get_game_details(self.game_id)
-        self.active_game["queue_id"] = game_info["queueId"]
+        self.active_game[self.guild_to_use]["queue_id"] = game_info["queueId"]
 
-        filtered, self.users_in_game = get_filtered_stats(
-            self.database, self.users_in_game, game_info
+        filtered, users_in_game = get_filtered_stats(
+            self.database, [], game_info
         )
 
+        self.users_in_game[self.guild_to_use] = users_in_game
+
         if self.loud:
-            betting_data = await self.declare_intfar(filtered, MAIN_GUILD_ID)
+            betting_data = await self.declare_intfar(filtered, self.guild_to_use)
         else:
             betting_data = self.get_intfar_and_doinks(filtered)
 
@@ -47,29 +49,22 @@ class TestMock(DiscordClient):
             await asyncio.sleep(1)
             if self.task in ("all", "bets"):
                 if not self.loud:
-                    self.channels_to_write[MAIN_GUILD_ID] = MockChannel()
+                    self.channels_to_write[self.guild_to_use] = MockChannel()
 
-                await self.resolve_bets(filtered, intfar, intfar_reason, doinks, MAIN_GUILD_ID)
+                await self.resolve_bets(filtered, intfar, intfar_reason, doinks, self.guild_to_use)
 
             if self.task in ("all", "stats"):
-                await self.save_stats(filtered, intfar, intfar_reason, doinks, MAIN_GUILD_ID)
+                await self.save_stats(filtered, intfar, intfar_reason, doinks, self.guild_to_use)
 
     def get_intfar_and_doinks(self, filtered_stats):
-        intfar_details = self.get_intfar_details(filtered_stats, filtered_stats[0][1]["mapId"])
-        (intfar_data,
-         max_count_intfar,
-         max_intfar_count) = self.get_intfar_qualifiers(intfar_details)
+        final_intfar, final_intfar_data = award_qualifiers.get_intfar(filtered_stats, self.config)
+
+        doinks = award_qualifiers.get_big_doinks(filtered_stats)[1]
+
         reason_ids = ["0", "0", "0", "0"]
-        final_intfar = None
-
-        if max_count_intfar is not None: # Send int-far message.
-            final_intfar = self.resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)
-
-            # Go through the criteria the chosen Int-Far met and list them in a readable format.
-            for (reason_index, _) in intfar_data[final_intfar]:
+        if final_intfar is not None: # Send int-far message.
+            for (reason_index, _) in final_intfar_data:
                 reason_ids[reason_index] = "1"
-
-        _, doinks = self.get_big_doinks(filtered_stats)
 
         reasons_str = "".join(reason_ids)
         if reasons_str == "0000":

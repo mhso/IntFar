@@ -240,7 +240,7 @@ def get_game_stats(disc_id, database):
             maximize = not ((stat != "deaths") ^ best)
             (stat_count,
              min_or_max_value,
-             _) = database.get_stat(stat + "_id", stat, best, disc_id, maximize)
+             _) = database.get_stat(stat, best, disc_id, maximize)
 
             best_or_worst_ever_id = database.get_most_extreme_stat(stat, best, maximize)[0]
             stat_is_gold = best_or_worst_ever_id == disc_id
@@ -253,8 +253,13 @@ def get_game_stats(disc_id, database):
             pretty_stat = stat.replace("_", " ").capitalize() if len(stat) > 3 else stat.upper()
             stat_index = api_util.STAT_COMMANDS.index(stat)
             quantity_type = 0 if best else 1
-            pretty_quantity = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type].capitalize()
-            pretty_desc = f"{pretty_quantity} {pretty_stat}"
+            pretty_quantity = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type]
+            if pretty_quantity is not None:
+                pretty_desc = f"{pretty_quantity.capitalize()} {pretty_stat}"
+            else:
+                min_or_max_value = stat_count
+                pretty_desc = pretty_stat
+
             if min_or_max_value is None:
                 min_or_max_value = "NA"
             else:
