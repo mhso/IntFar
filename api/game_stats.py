@@ -108,7 +108,7 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
 
     return response
 
-def is_unfiltered_stats_well_formed(game_info):
+def are_unfiltered_stats_well_formed(game_info):
     game_keys = [
         "gameId", "gameDuration", "gameCreation", "gameMode", "mapId", "queueId",
         "participantIdentities", "teams", "participants"
@@ -117,15 +117,42 @@ def is_unfiltered_stats_well_formed(game_info):
         "championId", "stats"
     ]
     stat_keys = [
-        "goldEarned", "neutralMinionsKilled", "totalMinionsKilled", "gameDuration",
-        "totalCs", "csPerMin"
+        "goldEarned", "neutralMinionsKilled", "totalMinionsKilled", "deaths",
+        "pentaKills", "totalDamageDealtToChampions", "visionWardsBoughtInGame",
+        "kills", "inhibitorKills", "turretKills", "participantId", "assists", "win",
+        "visionScore", "firstBloodKill"
+    ]
+    timeline_keys = [
+        "participantId", "role", "lane"
     ]
     team_stat_keys = [
         "riftHeraldKills", "firstBlood", "dragonKills", "baronKills", "teamId", "win"
     ]
     player_keys = ["summonerName", "summonerId"]
 
-def is_filtered_stats_well_formed(filtered_info):
+    all_keys = [
+        ("Game key", game_keys, []), ("Participant key", participant_keys, ["participants", 0]),
+        ("Stat key", stat_keys, ["participants", 0, "stats"]),
+        ("Timeline key", timeline_keys, ["participants", 0, "timeline"]),
+        ("Team Stat key", team_stat_keys, ["teams", 0]),
+        ("Player key", player_keys, ["participantIdentities", 0, "player"])
+    ]
+
+    keys_not_present = []
+    for key_type, keys, dict_keys in all_keys:
+        container = game_info
+        for dict_key in dict_keys:
+            if container is None:
+                break
+            container = container[dict_key]
+
+        for key in keys:
+            if container is None or not key in container:
+                keys_not_present.append((key_type, key))
+
+    return keys_not_present
+
+def are_filtered_stats_well_formed(filtered_info):
     stat_keys = [
         "championId", "timestamp", "mapId", "gameDuration", "totalCs", "csPerMin"
     ]

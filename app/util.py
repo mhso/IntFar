@@ -75,6 +75,14 @@ def discord_request(command_types, commands, params, pipe=None):
         register_discord_connection() # We timed out. Re-establish connection and try again.
         return discord_request(command_types, commands, params, conn_map[sess_id])
 
+def filter_hidden_games(active_games, logged_in_user):
+    guilds_for_user = discord_request("func", "get_guilds_for_user", logged_in_user)
+    shown_games = []
+    for data in active_games:
+        if data[-1] in guilds_for_user:
+            shown_games.append(data[:-1])
+    return shown_games
+
 def get_game_info():
     active_games = []
     for guild_id in GUILD_IDS:
@@ -90,7 +98,8 @@ def get_game_info():
             [
                 active_game["game_duration"],
                 active_game["game_mode"],
-                active_game["game_guild_name"]
+                active_game["game_guild_name"],
+                guild_id
             ]
         )
 
@@ -150,7 +159,9 @@ def get_persistent_data():
         "logged_in_avatar": logged_in_avatar,
     }
     game_info = get_game_info()
-    data["active_game_data"] = game_info
+    shown_games = filter_hidden_games(game_info, logged_in_user)
+
+    data["active_game_data"] = shown_games
 
     return data
 

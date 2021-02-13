@@ -41,7 +41,7 @@ class TestRunner:
         self.test_args = test_args
 
     @abstractmethod
-    def before_test(self, *test_args):
+    def before_test(self):
         pass
 
     def print_passed(self, name, desc):
@@ -111,5 +111,6 @@ class TestRunner:
             test_name = test_func.__name__
             if tests_to_run is None or test_name in tests_to_run:
                 self.current_test = test_name
+                self.before_test()
                 test_func(*self.test_args)
         self.print_test_summary()

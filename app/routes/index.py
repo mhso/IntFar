@@ -1,9 +1,7 @@
 from time import time
 import flask
 import api.util as api_util
-from app.util import (
-    discord_request, get_user_details, get_game_info, make_template_context, make_json_response
-)
+import app.util as app_util
 from api.bets import get_dynamic_bet_desc
 
 start_page = flask.Blueprint("index", __name__, template_folder="templates")
@@ -36,7 +34,7 @@ def get_intfar_desc(game_data):
     _, _, disc_id, _, intfar_id, intfar_str = game_data
     response_list = None
     if disc_id == intfar_id:
-        name = discord_request("func", "get_discord_nick", disc_id)
+        name = app_util.discord_request("func", "get_discord_nick", disc_id)
         response_list = [
             ("name", name), ("regular", "got"),
             ("feed-award", "Int-Far"), ("regular", "for")
@@ -54,7 +52,7 @@ def get_doinks_desc(game_data):
     _, _, disc_id, doinks_str, _, _ = game_data
     response_list = None
     if doinks_str is not None:
-        name = discord_request("func", "get_discord_nick", disc_id)
+        name = app_util.discord_request("func", "get_discord_nick", disc_id)
         response_list = [
             ("name", name), ("regular", "got"),
             ("feed-award", "Big Doinks"), ("regular", "for")
@@ -76,7 +74,7 @@ def get_stat_desc(game_data, best_stats, worst_stats):
             if stat_game_id == game_id and person_id == disc_id: # Best/worst stat was beaten.
                 stat_index = api_util.STAT_COMMANDS.index(stat)
                 readable_stat = api_util.STAT_QUANTITY_DESC[stat_index][i] + " " + stat
-                name = discord_request("func", "get_discord_nick", disc_id)
+                name = app_util.discord_request("func", "get_discord_nick", disc_id)
                 response_list = [
                     ("name", name), ("regular", "got the"), ("feed-award", readable_stat),
                     ("regular", "ever with"), ("bold", f"{stat_value} {stat}")
@@ -95,7 +93,7 @@ def get_game_desc(game_data, best_stats, worst_stats):
 
 def get_bet_desc(bet_data):
     disc_id, _, guild_id, timestamp, amounts, events, targets, _, result, payout = bet_data
-    disc_data = discord_request("func", ["get_discord_nick", "get_guild_name"], [disc_id, guild_id])
+    disc_data = app_util.discord_request("func", ["get_discord_nick", "get_guild_name"], [disc_id, guild_id])
     name = disc_data[0]
     guild = disc_data[1]
     result_desc = "Won" if result == 1 else "Lost"
@@ -109,7 +107,7 @@ def get_bet_desc(bet_data):
     ]
     for i, (event, target) in enumerate(zip(events, targets)):
         target_name = (None if target is None
-                       else discord_request("func", "get_discord_nick", target))
+                       else app_util.discord_request("func", "get_discord_nick", target))
         dynamic_desc = get_dynamic_bet_desc(event, target_name)
         if i != 0:
             response_list.append(("regular", " and "))
@@ -193,13 +191,13 @@ def index():
             (disc_id, games_played_monthly, len(intfar_reason_ids_monthly), pct_intfar_monthly)
         )
 
-    avatars = discord_request("func", "get_discord_avatar", None)
+    avatars = app_util.discord_request("func", "get_discord_avatar", None)
     if avatars is not None:
         avatars = [
             flask.url_for("static", filename=avatar.replace("app/static/", ""))
             for avatar in avatars
         ]
-    nicknames = discord_request("func", "get_discord_nick", None)
+    nicknames = app_util.discord_request("func", "get_discord_nick", None)
 
     intfar_all_data = [
         (x,) + y + (z,)
@@ -213,23 +211,26 @@ def index():
     intfar_all_data.sort(key=lambda x: (x[3], x[4]), reverse=True)
     intfar_month_data.sort(key=lambda x: (x[3], x[4]), reverse=True)
 
-    return make_template_context(
+    return app_util.make_template_context(
         "index.html", curr_month=curr_month, feed_descs=feed_descs,
         intfar_all=intfar_all_data, intfar_month=intfar_month_data
     )
 
 @start_page.route("/active_game", methods=["GET"])
 def get_active_game_info():
-    logged_in_user = get_user_details()[0]
+    logged_in_user = app_util.get_user_details()[0]
 
     if logged_in_user is None:
-        return make_json_response("Error: You need to be verified to access this data.", 401)
+        return app_util.make_json_response("Error: You need to be verified to access this data.", 401)
 
-    json_response = get_game_info()
-    if json_response == []:
-        return make_json_response("No active game", 404)
+    json_response = app_util.get_game_info()
 
-    return make_json_response(json_response, 200)
+    shown_games = app_util.filter_hidden_games(json_response, logged_in_user)
+
+    if shown_games == []:
+        return app_util.make_json_response("No active game", 404)
+
+    return app_util.make_json_response(shown_games, 200)
 
 @start_page.route("/game_started", methods=["POST"])
 def active_game_started():
@@ -248,7 +249,6 @@ def active_game_started():
     saved_data["guild_id"] = int(saved_data["guild_id"])
 
     flask.current_app.config["ACTIVE_GAME"][saved_data["guild_id"]] = saved_data
-    print(f"SAVING ACTIVE GAME: {saved_data}", flush=True)
     return flask.make_response(("Success! Active game ID updated.", 200))
 
 @start_page.route("/game_ended", methods=["POST"])
@@ -262,5 +262,4 @@ def active_game_ended():
         return flask.make_response(("Error: Unauthorized access.", 401))
 
     flask.current_app.config["ACTIVE_GAME"][int(data["guild_id"])] = None
-    print(f"REMOVING ACTIVE GAME FOR GUILD: {data['guild_id']}", flush=True)
     return flask.make_response(("Success! Active game ID deleted.", 200))

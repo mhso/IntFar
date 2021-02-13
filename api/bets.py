@@ -37,7 +37,7 @@ BETTING_TYPES_INDICES = {
     "intfar": 2,
     "intfar_reason": 4,
     "doinks": 8,
-    "doinks_reason": 8,
+    "doinks_reason": 9,
     "stats": 17
 }
 
@@ -274,13 +274,20 @@ class BettingHandler:
             if event_id < BETTING_TYPES_INDICES["intfar_reason"]:
                 count, num_games = self.get_intfar_return(target, event_id == 3)
             elif event_id < BETTING_TYPES_INDICES["doinks"]:
-                count, num_games = self.get_intfar_reason_return(target, event_id - BETTING_TYPES_INDICES["intfar_reason"])
+                count, num_games = self.get_intfar_reason_return(
+                    target, event_id - BETTING_TYPES_INDICES["intfar_reason"]
+                )
             elif event_id == BETTING_TYPES_INDICES["doinks"]:
                 count, num_games = self.get_doinks_return(target)
             elif event_id < BETTING_TYPES_INDICES["stats"]:
-                count, num_games = self.get_doinks_reason_return(target, event_id - BETTING_TYPES_INDICES["doinks_reason"])
-            elif event_id < len(BETTING_TYPES_INDICES):
-                count, num_games = self.get_stats_return(target, event_id - BETTING_TYPES_INDICES["stats"])
+                count, num_games = self.get_doinks_reason_return(
+                    target, event_id - BETTING_TYPES_INDICES["doinks_reason"]
+                )
+            elif event_id < len(BETTING_IDS):
+                count, num_games = self.get_stats_return(
+                    target, event_id - BETTING_TYPES_INDICES["stats"]
+                )
+
 
             if num_games == 0: # No games has been played for given target, ratio is 0.
                 return self.database.get_base_bet_return(event_id)
@@ -313,9 +320,6 @@ class BettingHandler:
         # in the game, the multiplier is higher.
         person_multiplier = len(stats)
         amount_multiplier = len(amounts)
-        self.config.log(f"Disc ID: {disc_id}")
-        self.config.log(f"Person multiplier: {person_multiplier}")
-        self.config.log(f"Amount of bets: {amount_multiplier}")
         total_value = 0
         all_success = True
         for amount, event_id, target_id in zip(amounts, events, targets):
@@ -328,7 +332,7 @@ class BettingHandler:
             elif event_id < BETTING_TYPES_INDICES["stats"]:
                 resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id - BETTING_TYPES_INDICES["doinks"]]
                 success = resolve_func(doinks, target_id)
-            elif event_id < len(BETTING_TYPES_INDICES):
+            elif event_id < len(BETTING_IDS):
                 resolve_func = RESOLVE_STATS_BET_FUNCS[event_id - BETTING_TYPES_INDICES["stats"]]
                 success = resolve_func(stats, target_id)
 
@@ -590,7 +594,10 @@ class BettingHandler:
         try:
             bet_id = self.database.get_bet_id(disc_id, event_id, guild_id, target_id, ticket)
             if bet_id is None:
-                return (False, "Bet was not cancelled: No bet exists with the specified parameters.")
+                return (
+                    False,
+                    "Bet was not cancelled: No bet exists with the specified parameters."
+                )
 
             success, data = self.delete_bet(disc_id, bet_id, ticket, game_timestamp)
             if not success:
@@ -599,7 +606,10 @@ class BettingHandler:
             new_balance, amount_refunded = data
             if ticket is None:
                 bet_desc = get_dynamic_bet_desc(event_id, target_name)
-                response = f"Bet on `{bet_desc}` for {format_tokens_amount(amount_refunded)} {tokens_name} successfully cancelled.\n"
+                response = (
+                    f"Bet on `{bet_desc}` for {format_tokens_amount(amount_refunded)} " +
+                    f"{tokens_name} successfully cancelled.\n"
+                )
             else:
                 response = f"Multi-bet with ticket ID {ticket} successfully cancelled.\n"
             response += f"Your {tokens_name} balance is now `{format_tokens_amount(new_balance)}`."

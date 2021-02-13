@@ -1,5 +1,6 @@
 import asyncio
 import json
+import argparse
 from sys import argv
 from api import award_qualifiers
 from api.database import Database
@@ -8,23 +9,25 @@ from discbot.discord_bot import DiscordClient
 from api.config import Config
 from api.riot_api import APIClient
 from api.game_stats import get_filtered_stats
+from api.util import GUILD_IDS
+
+GUILDS = {
+    "nibs": GUILD_IDS[0],
+    "circus": GUILD_IDS[1],
+    "core": GUILD_IDS[2]
+}
 
 class MockChannel:
     async def send(self, data):
         await asyncio.sleep(0.1)
 
 class TestMock(DiscordClient):
-    def __init__(self, config, database, betting_handler, riot_api):
+    def __init__(self, args, config, database, betting_handler, riot_api):
         super().__init__(config, database, betting_handler, riot_api)
-        if len(argv) != 5:
-            print("Wrong number of arguments.")
-            print("Must supply: [game_id, guild_name, task, loud] where task in ('all', 'bets', 'stats')")
-            exit(0)
-
-        self.game_id = int(argv[1])
-        self.guild_to_use = int(argv[2])
-        self.task = argv[3]
-        self.loud = argv[4] == "True"
+        self.game_id = args.game_id
+        self.guild_to_use = GUILDS[args.guild_name]
+        self.task = args.task
+        self.loud = not args.silent
 
     async def on_ready(self):
         await super(TestMock, self).on_ready()
@@ -72,7 +75,14 @@ class TestMock(DiscordClient):
 
         return final_intfar, reasons_str, doinks
 
-GAME_ID = 5015736026
+parser = argparse.ArgumentParser()
+
+parser.add_argument("game_id", type=int)
+parser.add_argument("guild_name", type=str, choices=GUILDS)
+parser.add_argument("task", type=str, choices=("all", "bets", "stats"))
+parser.add_argument("-s", "--silent", action="store_true")
+
+args = parser.parse_args()
 
 auth = json.load(open("discbot/auth.json"))
 
@@ -92,6 +102,6 @@ conf.log("Starting Discord Client...")
 
 bet_client = BettingHandler(conf, database_client)
 
-client = TestMock(conf, database_client, bet_client, riot_api)
+client = TestMock(args, conf, database_client, bet_client, riot_api)
 
 client.run(conf.discord_token)

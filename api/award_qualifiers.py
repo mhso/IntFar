@@ -258,7 +258,7 @@ def get_intfar(filtered_stats, config):
      max_intfar_count) = get_intfar_qualifiers(intfar_details)
 
     if max_count_intfar is None:
-        return None, None
+        return None, None, None, None
 
     (final_intfar,
      ties, tie_desc) = resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)

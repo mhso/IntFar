@@ -258,11 +258,37 @@ class DiscordClient(discord.Client):
             try:
                 self.config.log("GAME OVER!!")
                 self.config.log(f"Active game: {self.active_game[guild_id]['id']}")
-                game_info = self.riot_api.get_game_details(self.active_game[guild_id]["id"], tries=2)
+                game_info = self.riot_api.get_game_details(
+                    self.active_game[guild_id]["id"], tries=2
+                )
 
-                if game_info is None:
-                    self.config.log("Game info is None! Weird stuff.", self.config.log_error)
+                retry = 0
+                retries = 4
+                time_to_sleep = 15
+                while game_info is None and retry < retries:
+                    self.config.log(
+                        f"Game info is None! Retrying in {time_to_sleep} secs...",
+                        self.config.log_warning
+                    )
+                    await asyncio.sleep(time_to_sleep)
+                    game_info = self.riot_api.get_game_details(
+                        self.active_game[guild_id]["id"]
+                    )
+                    retry += 1
+
+                if game_info is None: # Game info is still None after 3 retries.
+                    self.config.log(
+                        "Game info is STILL None after 3 retries!", self.config.log_error
+                    )
                     raise ValueError("Game info is None!")
+
+                missing_stats = game_stats.are_unfiltered_stats_well_formed(game_info)
+                if missing_stats != []:
+                    self.config.log(
+                        f"The following unfiltered stats are missing: {missing_stats}",
+                        self.config.log_error
+                    )
+                    raise ValueError("Unfiltered stats are not well formed!")
 
                 if self.database.game_exists(game_info["gameId"]):
                     self.config.log(
@@ -270,7 +296,7 @@ class DiscordClient(discord.Client):
                         self.config.log_warning
                     )
 
-                elif len(self.users_in_game[guild_id] == 1):
+                elif len(self.users_in_game[guild_id]) == 1:
                     response = "Only one person in that game. "
                     response += "no Int-Far will be crowned "
                     response += "and no stats will be saved."
@@ -1164,6 +1190,8 @@ class DiscordClient(discord.Client):
             elif guild.id == MY_GUILD_ID and self.config.env == "dev":
                 CHANNEL_IDS.append(guild.text_channels[0].id)
                 self.channels_to_write[guild.id] = guild.text_channels[0]
+
+        print(self.get_channel_name(api_util.MAIN_GUILD_ID))        
 
         asyncio.create_task(self.sleep_until_monthly_infar())
 
