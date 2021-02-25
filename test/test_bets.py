@@ -1,4 +1,5 @@
 from sys import argv
+from time import time
 from test.runner import TestRunner, test
 from api import bets, award_qualifiers
 from api.database import Database
@@ -396,19 +397,74 @@ class TestWrapper(TestRunner):
         self.assert_equals(balance_after, balance_before, "Tokens were refunded.")
 
     @test
+    def test_many(self, bet_handler, db_client):
+        disc_id = 267401734513491969
+        guild_id = 619073595561213953
+
+        all_bet_amounts = ["10", "20", "30", "15", "25", "7"]
+        all_game_timestamp = [None, time()-30, time()-10000]
+        all_bet_strs = list(bets.BETTING_IDS.keys()) + ["game_win", "game_loss", "no_intfar"]
+        all_bet_targets = []
+        all_target_names = []
+        for event_id in bets.BETTING_IDS.values():
+            if event_id < 3:
+                all_bet_targets.append([None])
+                all_target_names.append([None])
+            elif event_id < 17:
+                all_bet_targets.append([None, 115142485579137029])
+                all_target_names.append([None, "Dave"])
+            else:
+                all_bet_targets.append([115142485579137029])
+                all_target_names.append(["Dave"])
+
+        all_bet_targets.extend([[None], [None], [None]])
+        all_target_names.extend([[None], [None], [None]])
+
+        db_client.start_persistent_connection()
+        db_client.execute_query(
+            db_client.persistent_connection,
+            "UPDATE betting_balance SET tokens=100000000 WHERE disc_id=?",
+            (disc_id,)
+        )
+
+        count = 1
+        for multi_count in range(1, 4):
+            for amount_index in range(0, len(all_bet_amounts), multi_count):
+                bet_amounts = all_bet_amounts[amount_index:amount_index+multi_count]
+                bet_strs = all_bet_strs[amount_index:amount_index+multi_count]
+                for game_timestamp in all_game_timestamp:
+                    for target_ids, target_names in zip(all_bet_targets, all_target_names):
+                        success, _, _ = bet_handler.place_bet(
+                            disc_id, guild_id, bet_amounts, game_timestamp,
+                            bet_strs, target_ids, target_names
+                        )
+
+                        test_name = f"Many Bets #{count} - Bet Placed."
+                        if game_timestamp is not None and time() - game_timestamp > 5 * 60:
+                            self.assert_false(success, test_name)
+                        else:
+                            self.assert_true(success, test_name)
+                        count += 1
+
+        # for active_bets in db_client.get_bets(True, disc_id, guild_id):
+             # resolve all the bets (somehow).
+
+        db_client.close_persistent_connection()
+
+    @test
     def test_multi_bet_fail(self, bet_handler, db_client):
         disc_id = 267401734513491969
         guild_id = 619073595561213953
 
-        bet_amount = ["30", "20"]
+        bet_amounts = ["30", "20"]
         game_timestamp = None
-        bet_str = ["no_intfar", "game_win"]
-        bet_target = [None, None]
-        target_name = [None, None]
+        bet_strs = ["no_intfar", "game_win"]
+        bet_targets = [None, None]
+        target_names = [None, None]
 
         success, response, _ = bet_handler.place_bet(
-            disc_id, guild_id, bet_amount, game_timestamp,
-            ["no_intfar", "whew"], bet_target, target_name)
+            disc_id, guild_id, bet_amounts, game_timestamp,
+            ["no_intfar", "whew"], bet_targets, target_names)
 
         if LOUD:
             print(response)
@@ -421,7 +477,7 @@ class TestWrapper(TestRunner):
 
         success, response, _  = bet_handler.place_bet(
             disc_id, guild_id, ["20", "no"], game_timestamp,
-            bet_str, bet_target, target_name
+            bet_strs, bet_targets, target_names
         )
 
         if LOUD:
@@ -431,7 +487,7 @@ class TestWrapper(TestRunner):
 
         success, response, _  = bet_handler.place_bet(
             disc_id, guild_id, ["20", "90"], game_timestamp,
-            bet_str, bet_target, target_name
+            bet_strs, bet_targets, target_names
         )
 
         if LOUD:
@@ -441,7 +497,7 @@ class TestWrapper(TestRunner):
 
         success, response, _  = bet_handler.place_bet(
             disc_id, guild_id, ["all", "5"], game_timestamp,
-            bet_str, bet_target, target_name
+            bet_strs, bet_targets, target_names
         )
 
         if LOUD:

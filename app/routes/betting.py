@@ -195,7 +195,7 @@ def delete_bet():
     conf = flask.current_app.config["APP_CONFIG"]
 
     disc_id = data["disc_id"]
-    guild_id = data["guildId"]
+    guild_id = int(data["guildId"])
 
     logged_in_user, logged_in_name, _ = app_util.get_user_details()
 

@@ -38,8 +38,8 @@
             {% if result %}{{ result }}{% endif %}
             {% if better_id == logged_in_user and loop.first %}
             <button class="delete-btn"
-                {% if loop.first and loop.last %}onclick="deleteBet({{ bet_id }}, {{ guild_id }});"
-                {% else %}onclick="deleteMultiBet({{ result }}, '{{ guild_id }}');"{% endif %}
+                {% if loop.first and loop.last %}onclick="deleteBet('{{ bet_id }}', '{{ guild_id }}');"
+                {% else %}onclick="deleteMultiBet('{{ result }}', '{{ guild_id }}');"{% endif %}
             >
                 &times;
             </button>

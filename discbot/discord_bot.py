@@ -621,7 +621,7 @@ class DiscordClient(discord.Client):
             for c_id in CHANNEL_IDS:
                 channel = guild.get_channel(c_id)
                 if channel is not None:
-                    if guild_id is not None and g_id == guild_id:
+                    if guild_id is not None and g_id == int(guild_id):
                         return channel.name
                     channel_names.append(channel.name)
 
@@ -744,7 +744,10 @@ class DiscordClient(discord.Client):
                     # Resolve current bet which the user made, marks it as won/lost in DB.
                     bet_success, payout = self.betting_handler.resolve_bet(
                         disc_id, bet_ids, amounts, events, bet_timestamp, targets,
-                        (intfar, intfar_reason, doinks, game_info, clash_multiplier)
+                        (
+                            self.active_game[guild_id]["id"], intfar,
+                            intfar_reason, doinks, game_info, clash_multiplier
+                        )
                     )
 
                     response_bets += " - "
@@ -817,7 +820,7 @@ class DiscordClient(discord.Client):
             multiplier = 1
             if self.riot_api.is_clash(self.active_game[guild_id]["queue_id"]):
                 multiplier = self.config.clash_multiplier
-            points = self.config.betting_tokens_for_doinks * multiplier
+            points = self.config.betting_tokens_for_doinks * len(doinks[disc_id]) * multiplier
             tokens_name = self.config.betting_tokens
             mentions_str += f"\nHe is also given {points} bonus {tokens_name} "
             mentions_str += "for being great {emote_swell}"
@@ -904,7 +907,7 @@ class DiscordClient(discord.Client):
             return message
         return None
 
-    async def send_intfar_message(self, disc_id, guild_id, reason, intfar_streak, prev_intfar):
+    async def send_intfar_message(self, disc_id, guild_id, reason, ties_msg, intfar_streak, prev_intfar):
         """
         Send Int-Far message to the appropriate Discord channel.
         """
@@ -913,13 +916,18 @@ class DiscordClient(discord.Client):
             self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
                             self.config.log_warning)
             mention_str = f"Unknown (w/ discord ID '{disc_id}')"
+
         if reason is None:
             self.config.log("Int-Far reason was None!", self.config.log_warning)
             reason = "being really, really bad"
-        message = get_intfar_flavor_text(mention_str, reason)
+
+        message = ties_msg
+        message += get_intfar_flavor_text(mention_str, reason)
+
         streak_msg = self.get_streak_msg(disc_id, guild_id, intfar_streak, prev_intfar)
         if streak_msg is not None:
             message += "\n" + streak_msg
+
         ifotm_lead_msg = self.get_ifotm_lead_msg(disc_id, guild_id)
         if ifotm_lead_msg is not None:
             message += "\n" + ifotm_lead_msg
@@ -949,10 +957,6 @@ class DiscordClient(discord.Client):
 
         if final_intfar is not None: # Send int-far message.
             reason = ""
-            if ties:
-                self.config.log("There are Int-Far ties.")
-                self.config.log(ties_msg)
-                reason = "There are Int-Far ties! " + ties_msg + "\n"
 
             # Go through the criteria the chosen Int-Far met and list them in a readable format.
             for (count, (reason_index, stat_value)) in enumerate(final_intfar_data):
@@ -963,10 +967,18 @@ class DiscordClient(discord.Client):
                     reason_text = " **AND** " + reason_text
                 reason += reason_text
 
+            full_ties_msg = ""
+            if ties:
+                self.config.log("There are Int-Far ties.")
+                self.config.log(ties_msg)
+                full_ties_msg = "There are Int-Far ties! " + ties_msg + "\n"
+
             if redeemed_text is not None:
                 reason += "\n" + redeemed_text
 
-            await self.send_intfar_message(final_intfar, guild_id, reason, intfar_streak, prev_intfar)
+            await self.send_intfar_message(
+                final_intfar, guild_id, reason, full_ties_msg, intfar_streak, prev_intfar
+            )
         else: # No one was bad enough to be Int-Far.
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
@@ -995,7 +1007,7 @@ class DiscordClient(discord.Client):
             try: # Save stats.
                 self.database.record_stats(intfar_id, intfar_reason, doinks,
                                            self.active_game[guild_id]["id"], filtered_stats,
-                                           self.users_in_game[guild_id])
+                                           self.users_in_game[guild_id], guild_id)
                 self.database.create_backup()
             except DBException as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
@@ -1190,8 +1202,6 @@ class DiscordClient(discord.Client):
             elif guild.id == MY_GUILD_ID and self.config.env == "dev":
                 CHANNEL_IDS.append(guild.text_channels[0].id)
                 self.channels_to_write[guild.id] = guild.text_channels[0]
-
-        print(self.get_channel_name(api_util.MAIN_GUILD_ID))        
 
         asyncio.create_task(self.sleep_until_monthly_infar())
 

@@ -315,7 +315,7 @@ class BettingHandler:
     def resolve_bet(
             self, disc_id, bet_ids, amounts, events, bet_timestamp, targets, game_data
     ):
-        intfar, intfar_reason, doinks, stats, clash_multiplier = game_data
+        game_id, intfar, intfar_reason, doinks, stats, clash_multiplier = game_data
         # Multiplier for betting on a specific person to do something. If more people are
         # in the game, the multiplier is higher.
         person_multiplier = len(stats)
@@ -352,7 +352,9 @@ class BettingHandler:
 
         for bet_id in bet_ids:
             try:
-                self.database.mark_bet_as_resolved(bet_id, timestamp, all_success, total_value)
+                self.database.mark_bet_as_resolved(
+                    bet_id, game_id, timestamp, all_success, total_value
+                )
             except DBException:
                 print_exc()
                 self.config.log("Database error during bet resolution!", self.config.log_error)

@@ -46,11 +46,11 @@ class TestRunner:
 
     def print_passed(self, name, desc):
         prefix = "" if self.current_test is None else f"{self.current_test} - "
-        print(f"{COL_BOLD}{prefix}{COL_ENDC}{name} - {COL_OKGREEN}{desc}{COL_ENDC}")
+        print(f"{COL_BOLD}{prefix}{COL_ENDC}{name} - {COL_OKGREEN}{desc}{COL_ENDC}", flush=True)
 
     def print_failed(self, name, desc):
         prefix = "" if self.current_test is None else f"{self.current_test} - "
-        print(f"{COL_BOLD}{prefix}{COL_ENDC}{name} - {COL_FAIL}{desc}{COL_ENDC}")
+        print(f"{COL_BOLD}{prefix}{COL_ENDC}{name} - {COL_FAIL}{desc}{COL_ENDC}", flush=True)
 
     def assert_true(self, value, name):
         if value:
@@ -101,10 +101,10 @@ class TestRunner:
         for i, line in enumerate(source_lines):
             line = line.strip()
             if line.split('(')[0].strip() == '@'+decorator_name: # leaving a bit out
-                nextLine = source_lines[i+1]
-                name = nextLine.split('def')[1].split('(')[0].strip()
+                next_line = source_lines[i+1]
+                name = next_line.split('def')[1].split('(')[0].strip()
                 func = self.__getattribute__(name)
-                yield(func)
+                yield func
 
     def run_tests(self, tests_to_run=None):
         for test_func in self.get_test_funcs("test"):

@@ -139,8 +139,18 @@ class Database:
 
     def game_exists(self, game_id):
         with self.get_connection() as db:
-            query = "SELECT game_id FROM best_stats WHERE game_id=?"
+            query = "SELECT game_id FROM games WHERE game_id=?"
             return self.execute_query(db, query, (game_id,)).fetchone() is not None
+
+    def delete_game(self, game_id):
+        with self.get_connection() as db:
+            query_1 = "DELETE FROM games WHERE game_id=?"
+            query_1 = "DELETE FROM best_stats WHERE game_id=?"
+            query_2 = "DELETE FROM worst_stats WHERE game_id=?"
+            query_3 = "DELETE FROM participants WHERE game_id=?"
+            self.execute_query(db, query_1, (game_id,))
+            self.execute_query(db, query_2, (game_id,))
+            self.execute_query(db, query_3, (game_id,))
 
     def get_max_reports_details(self):
         with self.get_connection() as db:
@@ -206,34 +216,34 @@ class Database:
             return doinks_counts
 
     def get_game_ids(self):
-        query = "SELECT game_id FROM best_stats"
+        query = "SELECT game_id FROM games"
         with self.get_connection() as db:
             return self.execute_query(db, query).fetchall()
 
     def get_recent_intfars_and_doinks(self):
         with (self.get_connection()) as db:
             query = (
-                "SELECT bs.game_id, timestamp, p.disc_id, doinks, int_far, "
-                "intfar_reason FROM participants AS p, best_stats "
-                "AS bs WHERE p.game_id = bs.game_id ORDER BY timestamp ASC"
+                "SELECT g.game_id, timestamp, p.disc_id, doinks, intfar_id, "
+                "intfar_reason FROM participants AS p, games "
+                "AS g WHERE p.game_id = g.game_id ORDER BY timestamp ASC"
             )
             return self.execute_query(db, query).fetchall()
 
     def get_games_count(self, context=None):
         query_games = """
-        SELECT Count(DISTINCT bs.game_id), timestamp FROM best_stats bs, participants p
-        WHERE bs.game_id = p.game_id ORDER BY id
+        SELECT Count(DISTINCT g.game_id), timestamp FROM games g, participants p
+        WHERE g.game_id = p.game_id
         """
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_games).fetchone()
 
     def get_intfar_count(self, context=None):
-        query_intfars = "SELECT Count(int_far) FROM best_stats WHERE int_far IS NOT NULL"
+        query_intfars = "SELECT Count(intfar_id) FROM games WHERE intfar_id IS NOT NULL"
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_intfars).fetchone()
 
     def get_intfar_reason_counts(self, context=None):
-        query_intfar_multis = "SELECT intfar_reason FROM best_stats WHERE intfar_reason IS NOT NULL"
+        query_intfar_multis = "SELECT intfar_reason FROM games WHERE intfar_reason IS NOT NULL"
 
         with (self.get_connection() if context is None else context) as db:
             intfar_multis_data = self.execute_query(db, query_intfar_multis).fetchall()
@@ -303,13 +313,13 @@ class Database:
         delim_str = self.get_monthly_delimiter()
 
         query_intfars = (
-            "SELECT Count(*) as c, int_far FROM best_stats bs, participants p " +
-            "WHERE int_far != 'None' AND bs.game_id=p.game_id AND int_far=disc_id " +
-            "AND " + delim_str + " GROUP BY int_far ORDER BY c DESC"
+            "SELECT Count(*) as c, intfar_id FROM games g, participants p " +
+            "WHERE intfar_id != 'None' AND g.game_id=p.game_id AND intfar_id=disc_id " +
+            "AND " + delim_str + " GROUP BY intfar_id ORDER BY c DESC"
         )
         query_games = (
-            "SELECT Count(*) as c, disc_id FROM best_stats bs, participants p " +
-            "WHERE bs.game_id=p.game_id " +
+            "SELECT Count(*) as c, disc_id FROM games g, participants p " +
+            "WHERE g.game_id=p.game_id " +
             "AND " + delim_str + " GROUP BY disc_id"
         )
         with self.get_connection() as db:
@@ -325,11 +335,13 @@ class Database:
                 if total_games < self.config.ifotm_min_games:
                     # Disqualify people with less than 5 games played this month.
                     continue
-                pct_intfars.append((intfar_id, total_games, intfars, int((intfars / total_games) * 100)))
+                pct_intfars.append(
+                    (intfar_id, total_games, intfars, int((intfars / total_games) * 100))
+                )
             return sorted(pct_intfars, key=lambda x: (x[3], x[2]), reverse=True)
 
     def get_longest_intfar_streak(self, disc_id):
-        query = "SELECT int_far FROM best_stats ORDER BY id"
+        query = "SELECT intfar_id FROM games ORDER BY game_id"
         with self.get_connection() as db:
             int_fars = self.execute_query(db, query).fetchall()
             max_count = 0
@@ -345,9 +357,9 @@ class Database:
 
     def get_longest_no_intfar_streak(self, disc_id):
         query = """
-        SELECT int_far FROM best_stats bs, participants p
-        WHERE bs.game_id = p.game_id and disc_id=?
-        ORDER BY id
+        SELECT intfar_id FROM games g, participants p
+        WHERE g.game_id = p.game_id and disc_id=?
+        ORDER BY g.game_id
         """
         with self.get_connection() as db:
             int_fars = self.execute_query(db, query, (disc_id,)).fetchall()
@@ -363,7 +375,7 @@ class Database:
             return max_count
 
     def get_current_intfar_streak(self):
-        query = "SELECT int_far FROM best_stats ORDER BY id DESC"
+        query = "SELECT intfar_id FROM games ORDER BY id DESC"
         with self.get_connection() as db:
             int_fars = self.execute_query(db, query).fetchall()
             prev_intfar = int_fars[0][0]
@@ -377,25 +389,25 @@ class Database:
             query = """
             SELECT MAX(pcts.pct), pcts.intboi FROM 
             (
-                SELECT (intfar_counts.c / games_counts.c) * 100 AS pct, intfar_counts.int_far AS intboi FROM
+                SELECT (intfar_counts.c / games_counts.c) * 100 AS pct, intfar_counts.intfar_id AS intboi FROM
                 (
-                    SELECT int_far, CAST(Count(*) as real) as c FROM best_stats
-                    WHERE int_far IS NOT NULL GROUP BY int_far
+                    SELECT intfar_id, CAST(Count(*) as real) as c FROM games
+                    WHERE intfar_id IS NOT NULL GROUP BY intfar_id
                 ) AS intfar_counts,
                 (
                     SELECT disc_id, CAST(Count(*) as real) as c FROM participants
                     GROUP BY disc_id
                 ) AS games_counts
-                WHERE int_far=disc_id AND games_counts.c > 10
+                WHERE intfar_id=disc_id AND games_counts.c > 10
             ) AS pcts;
             """
             return self.execute_query(db, query).fetchone()
 
     def get_intfar_stats(self, disc_id, monthly=False):
-        query_total = "SELECT Count(*) FROM participants WHERE disc_id=?"
+        query_total = "SELECT Count(*) FROM games, participants WHERE disc_id=?"
         query_intfar = (
-            "SELECT intfar_reason FROM best_stats bs, participants p " +
-            "WHERE int_far=? AND disc_id=int_far AND bs.game_id=p.game_id"
+            "SELECT intfar_reason FROM games g, participants p " +
+            "WHERE intfar_id=? AND disc_id=intfar_id AND g.game_id=p.game_id"
         )
         if monthly:
             delim_str = self.get_monthly_delimiter()
@@ -414,8 +426,8 @@ class Database:
         GROUP BY p1.disc_id, p2.disc_id ORDER BY c DESC;
         """
         query_intfars = """
-        SELECT disc_id, Count(*) as c FROM best_stats bs, participants p
-        WHERE int_far IS NOT NULL AND bs.game_id=p.game_id AND int_far=?
+        SELECT disc_id, Count(*) as c FROM games g, participants p
+        WHERE intfar_id IS NOT NULL AND g.game_id=p.game_id AND intfar_id=?
         GROUP BY disc_id ORDER BY c DESC
         """
         with self.get_connection() as db:
@@ -461,7 +473,7 @@ class Database:
                 games_with_person[part_id] = games
             return games_with_person, doinks_with_person
 
-    def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game):
+    def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game, guild_id):
         kills_by_our_team = data[0][1]["kills_by_team"]
         timestamp = data[0][1]["timestamp"] // 1000
         (min_kills_id, min_kills,
@@ -521,20 +533,29 @@ class Database:
         query_prefix = "INSERT INTO "
         query_cols = (
             """
-            (game_id, int_far, intfar_reason, first_blood, kills, kills_id, deaths,
+            (game_id, first_blood, kills, kills_id, deaths,
             deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, cs_per_min, cs_per_min_id,
             gold, gold_id, kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         )
         query_best = query_prefix + " best_stats" + query_cols
         query_worst = query_prefix + " worst_stats " + query_cols
 
         with self.get_connection() as db:
+            query_game = (
+                "INSERT INTO games(game_id, timestamp, intfar_id, " +
+                "intfar_reason, guild_id) VALUES (?, ?, ?, ?, ?)"
+            )
+
+            self.execute_query(
+                db, query_game, (game_id, timestamp, intfar_id, intfar_reason, guild_id)
+            )
+
             self.execute_query(
                 db, query_best,
                 (
-                    game_id, intfar_id, intfar_reason, first_blood_id, max_kills,
+                    game_id, first_blood_id, max_kills,
                     max_kills_id, min_deaths, min_deaths_id, max_kda,
                     max_kda_id, max_damage, max_damage_id,
                     max_cs, max_cs_id, max_cs_per_min, max_cs_per_min_id,
@@ -545,7 +566,7 @@ class Database:
             self.execute_query(
                 db, query_worst,
                 (
-                    game_id, intfar_id, intfar_reason, first_blood_id, min_kills,
+                    game_id, first_blood_id, min_kills,
                     min_kills_id, max_deaths, max_deaths_id, min_kda,
                     min_kda_id, min_damage, min_damage_id,
                     min_cs, min_cs_id, min_cs_per_min, min_cs_per_min_id,
@@ -553,10 +574,10 @@ class Database:
                     min_wards_id, min_vision, min_vision_id
                 )
             )
-            query = "INSERT INTO participants(game_id, disc_id, timestamp, doinks) VALUES (?, ?, ?, ?)"
+            query = "INSERT INTO participants(game_id, disc_id, doinks) VALUES (?, ?, ?)"
             for disc_id, _, _ in users_in_game:
                 doink = doinks.get(disc_id, None)
-                self.execute_query(db, query, (game_id, disc_id, timestamp, doink))
+                self.execute_query(db, query, (game_id, disc_id, doink))
             db.commit()
 
     def create_backup(self):
@@ -578,7 +599,7 @@ class Database:
     def get_bets(self, only_active, disc_id=None, guild_id=None):
         with self.get_connection() as db:
             query = (
-                "SELECT better_id, id, guild_id, timestamp, amount, " +
+                "SELECT better_id, id, guild_id, bets.timestamp, amount, " +
                 "event_id, game_duration, target, ticket"
             )
             if not only_active:
@@ -597,7 +618,7 @@ class Database:
                 query += " AND guild_id=?"
                 params = params + (guild_id,) if params is not None else (guild_id,)
 
-            query += " ORDER BY id"
+            query += " ORDER by id"
 
             data = self.execute_query(db, query, params).fetchall()
             data_for_person = {}
@@ -671,12 +692,18 @@ class Database:
         with self.get_connection() as db:
             query = ""
             if ticket is None:
-                query = "SELECT id FROM bets WHERE better_id=? AND guild_id=? AND event_id=? "
+                query = (
+                    "SELECT id FROM bets WHERE better_id=? " +
+                    "AND guild_id=? AND event_id=? "
+                )
                 query += "AND (target=? OR target IS NULL) "
                 query += "AND result=0"
                 args = (disc_id, guild_id, event_id, target)
             else:
-                query = "SELECT id FROM bets WHERE better_id=? AND guild_id=? AND ticket=? AND result=0"
+                query = (
+                    "SELECT id FROM bets WHERE better_id=? "
+                    "AND guild_id=? AND ticket=? AND result=0"
+                )
                 args = (disc_id, guild_id, ticket)
             result = self.execute_query(db, query, args).fetchone()
             return None if result is None else result[0]
@@ -723,12 +750,12 @@ class Database:
             self.update_token_balance(disc_id, amount_total, True)
             return amount_total
 
-    def mark_bet_as_resolved(self, bet_id, timestamp, success, value):
+    def mark_bet_as_resolved(self, bet_id, game_id, timestamp, success, value):
         result_val = 1 if success else -1
         with self.get_connection() as db:
-            query_bet = "UPDATE bets SET timestamp=?, result=?, payout=? WHERE id=?"
+            query_bet = "UPDATE bets SET game_id=?, timestamp=?, result=?, payout=? WHERE id=?"
             payout = value if success else None
-            self.execute_query(db, query_bet, (timestamp, result_val, payout, bet_id))
+            self.execute_query(db, query_bet, (game_id, timestamp, result_val, payout, bet_id))
 
     def reset_bets(self):
         with self.get_connection() as db:

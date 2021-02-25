@@ -76,8 +76,11 @@ def discord_request(command_types, commands, params, pipe=None):
         return discord_request(command_types, commands, params, conn_map[sess_id])
 
 def filter_hidden_games(active_games, logged_in_user):
-    guilds_for_user = discord_request("func", "get_guilds_for_user", logged_in_user)
     shown_games = []
+    if logged_in_user is None:
+        return shown_games
+
+    guilds_for_user = discord_request("func", "get_guilds_for_user", logged_in_user)
     for data in active_games:
         if data[-1] in guilds_for_user:
             shown_games.append(data[:-1])

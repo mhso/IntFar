@@ -6,18 +6,22 @@ CREATE TABLE [registered_summoners] (
     [reports] INTEGER,
     PRIMARY KEY (disc_id, summ_name)
 );
+CREATE TABLE [games] (
+  [game_id] INTEGER PRIMARY KEY,
+  [timestamp] INTEGER,
+  [intfar_id] INTEGER,
+  [intfar_reason] NVARCHAR(4),
+  [guild_id] INTEGER
+);
 CREATE TABLE [participants] (
   [game_id] INTEGER NOT NULL,
   [disc_id] INTEGER NOT NULL,
-  [timestamp] INTEGER,
   [doinks] NVARCHAR(10),
   PRIMARY KEY (game_id, disc_id)
 );
 CREATE TABLE [best_stats] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
     [game_id] INTEGER UNIQUE NOT NULL,
-    [int_far] INTEGER,
-    [intfar_reason] NVARCHAR(4),
     [first_blood] INTEGER,
     [kills] INTEGER,
     [kills_id] INTEGER,
@@ -43,8 +47,6 @@ CREATE TABLE [best_stats] (
 CREATE TABLE [worst_stats] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
     [game_id] INTEGER UNIQUE NOT NULL,
-    [int_far] INTEGER,
-    [intfar_reason] NVARCHAR(4),
     [first_blood] INTEGER,
     [kills] INTEGER,
     [kills_id] INTEGER,

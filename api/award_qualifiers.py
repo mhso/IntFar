@@ -192,7 +192,7 @@ def resolve_intfar_ties(intfar_data, max_count, game_data):
     if len(ties) == 1:
         return ties[0], True, "Ties resolved by most amount of deaths."
 
-    sorted_by_kda = sorted(filtered_data, key=lambda x: game_stats.calc_kda(x[1]))
+    sorted_by_kda = sorted(filtered_data, key=lambda x: game_stats.calc_kda(x[1]), reverse=True)
     max_count = game_stats.calc_kda(sorted_by_deaths[0][1])
     ties = []
     for disc_id, stats in sorted_by_kda:
