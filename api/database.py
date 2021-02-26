@@ -231,8 +231,7 @@ class Database:
 
     def get_games_count(self, context=None):
         query_games = """
-        SELECT Count(DISTINCT g.game_id), timestamp FROM games g, participants p
-        WHERE g.game_id = p.game_id
+        SELECT Count(DISTINCT g.game_id), timestamp FROM games g
         """
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_games).fetchone()
@@ -375,7 +374,7 @@ class Database:
             return max_count
 
     def get_current_intfar_streak(self):
-        query = "SELECT intfar_id FROM games ORDER BY id DESC"
+        query = "SELECT intfar_id FROM games ORDER BY game_id DESC"
         with self.get_connection() as db:
             int_fars = self.execute_query(db, query).fetchall()
             prev_intfar = int_fars[0][0]
@@ -404,7 +403,10 @@ class Database:
             return self.execute_query(db, query).fetchone()
 
     def get_intfar_stats(self, disc_id, monthly=False):
-        query_total = "SELECT Count(*) FROM games, participants WHERE disc_id=?"
+        query_total = (
+            "SELECT Count(*) FROM games, participants WHERE disc_id=? " +
+            "AND games.game_id=participants.game_id"
+        )
         query_intfar = (
             "SELECT intfar_reason FROM games g, participants p " +
             "WHERE intfar_id=? AND disc_id=intfar_id AND g.game_id=p.game_id"
