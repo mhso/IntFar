@@ -80,7 +80,7 @@
                 {% endif %}
                 <table class="nice-table{% if active_bets == [] %} empty-list{% endif %}">
                     <tr class="list-first list-entry">
-                        <th></th>
+                        <th class="d-none d-sm-table-cell"></th>
                         <th>By</th>
                         <th style="padding-right: 10px;">Server</th>
                         <th>Event</th>
@@ -101,7 +101,7 @@
                 <h2>Good-Boi Points</h2>
                 <table class="nice-table">
                     <tr class="list-first list-entry">
-                        <th class="d-none d-sm-block"></th>
+                        <th class="d-none d-sm-table-cell"></th>
                         <th>Lad</th>
                         <th>Points</th>
                     </tr>
@@ -112,7 +112,7 @@
                                 <img src="{{ avatar }}" class="discord-avatar">
                             </a>
                         </td>
-                        <td>
+                        <td class="d-none d-sm-table-cell">
                             <a href="{{ url_for('users.user', disc_id=disc_id) }}">
                                 {{ name }}
                             </a>
@@ -128,7 +128,7 @@
                 <h2>All Bets</h2>
                 <table class="nice-table">
                     <tr class="list-first list-entry">
-                        <th class="d-none d-sm-block"></th>
+                        <th class="d-none d-sm-table-cell"></th>
                         <th>By</th>
                         <th>Date</th>
                         <th style="padding-right: 10px;">Server</th>

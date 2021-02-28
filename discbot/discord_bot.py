@@ -155,7 +155,7 @@ CUTE_COMMANDS = {
 }
 
 ADMIN_COMMANDS = [
-    "restart"
+    "restart", "kick"
 ]
 
 def cmd_equals(text, cmd):
@@ -1174,6 +1174,9 @@ class DiscordClient(discord.Client):
             else self.channels_to_write[MY_GUILD_ID]
         )
 
+    async def on_disconnect(self):
+        self.config.log("Client disconnected")
+
     async def on_ready(self):
         if self.initialized:
             self.config.log("Ready was called, but bot was already initialized... Weird stuff.")
@@ -1963,6 +1966,14 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    async def handle_kick_msg(self, message, target_id):
+        target_name = self.get_discord_nick(target_id, message.guild.id)
+        
+        response = f"{target_name} has been kicked from Int-Far for being a bad boi!\n"
+        response += "His data will be wiped and he will forever live in shame {emote_im_nat_kda_player_yo}"
+
+        await message.channel.send(self.insert_emotes(response))
+
     async def send_dm(self, text, disc_id):
         user = self.get_user(disc_id)
         try:
@@ -2243,11 +2254,14 @@ class DiscordClient(discord.Client):
                 await self.handle_flirtation_msg(message, "english")
             elif cmd_equals(first_command, "intpapi"):
                 await self.handle_flirtation_msg(message, "spanish")
+            elif cmd_equals(first_command, "kick"):
+                target_name = self.extract_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_kick_msg, message, target_name)
             elif cmd_equals(first_command, "restart"):
                 response = self.insert_emotes("I will kill myself and come back stronger! {emote_nazi}")
                 await message.channel.send(response)
-                self.main_conn.send("We restarting!")
-                exit(0)
+                #self.main_conn.send("We restarting!")
+                exit(1)
 
     async def send_message_unprompted(self, message, guild_id):
         await self.channels_to_write[int(guild_id)].send(message)

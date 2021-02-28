@@ -60,7 +60,8 @@ class TestMock(DiscordClient):
                 await self.save_stats(filtered, intfar, intfar_reason, doinks, self.guild_to_use)
 
     def get_intfar_and_doinks(self, filtered_stats):
-        final_intfar, final_intfar_data = award_qualifiers.get_intfar(filtered_stats, self.config)
+        (final_intfar, final_intfar_data,
+         ties, tie_desc) = award_qualifiers.get_intfar(filtered_stats, self.config)
 
         doinks = award_qualifiers.get_big_doinks(filtered_stats)[1]
 

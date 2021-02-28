@@ -400,7 +400,7 @@ class BettingHandler:
         return response
 
     def get_bet_error_msg(self, bet_desc, error):
-        return f"Bet was not placed: {bet_desc} - {error}"
+        return f"Bet was not placed: '{bet_desc}' - {error}"
 
     def parse_bet_amount(self, amount_str):
         mult = 1
@@ -496,14 +496,16 @@ class BettingHandler:
                 amount, event_id, game_duration, bet_desc = data
 
                 if (event_id, target) in used_events:
-                    return (False, "Error: Duplicate Event in bet.", None)
+                    err_msg = self.get_bet_error_msg(bet_desc, "Duplicate Event.")
+                    return (False, err_msg, None)
 
                 used_events.add((event_id, target))
 
                 balance -= amount
 
-                bet_value, base_return, time_ratio = self.get_bet_value(amount, event_id,
-                                                                        game_duration, target)
+                bet_value, base_return, time_ratio = self.get_bet_value(
+                    amount, event_id, game_duration, target
+                )
 
                 final_value += bet_value
                 return_readable = round_digits(base_return)

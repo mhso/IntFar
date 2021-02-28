@@ -115,11 +115,10 @@ class Database:
                     ),
                     (discord_id, summ_name, summ_id, secret, 0)
                 )
-                if summ_info is not None: # Only create betting balance table if user is new.
+                if summ_info is None: # Only create betting balance table if user is new.
                     self.execute_query(
                         db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100)
                     )
-                db.commit()
         except sqlite3.IntegrityError:
             return (False, "A user with that summoner name is already registered!")
         return (True, status)
@@ -690,7 +689,7 @@ class Database:
             query = f"UPDATE betting_balance SET tokens=tokens{sign_str}? WHERE disc_id=?"
             self.execute_query(db, query, (amount, disc_id))
 
-    def get_bet_id(self, disc_id, event_id, guild_id, target=None, ticket=None):
+    def get_bet_id(self, disc_id, guild_id, event_id, target=None, ticket=None):
         with self.get_connection() as db:
             query = ""
             if ticket is None:

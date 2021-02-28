@@ -2,13 +2,36 @@
 {% include 'head.html' %}
 {% import "navbar.html" as navbar %}
 <body>
-    <div id="betting-wrapper" class="container-flex">
+    <div id="doinks-wrapper" class="container-flex">
         {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data) }}
         <h1>Doinks</h1>
 
         <div class="row">
-            <div class="col-sm-1 col-md-2 col-lg-1 col-xl-2 col-xxl-3"></div>
-            <div class="doinks-table-wrapper col-12 col-sm-10 mb-sm-4 col-md-8 col-lg-5 col-xl-4 col-xxl-3">
+            <div class="col-sm-1 col-md-2 col-lg-2 d-lg-none d-xxl-block col-xxl-1 order-1"></div>
+            <div class="col-sm-10 col-md-8 col-lg-5 col-xl-5 col-xxl-4 order-2 order-lg-3">
+                <table class="nice-table doinks-main-table">
+                    <tr class="list-first list-entry">
+                        <th></th>
+                        <th class="d-none d-sm-table-cell">Lad</th>
+                        <th>Doinks</th>
+                        <th>Unique Doinks</th>
+                    </tr>
+                    {% for disc_id, name, avatar, doinks, unique in doinks_persons %}
+                    <tr class="list-entry">
+                        <td>
+                            <a href="{{ url_for('users.user', disc_id=disc_id) }}">
+                                <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
+                            </a>
+                        </td>
+                        <td class="d-none d-sm-table-cell"><a href="{{ url_for('users.user', disc_id=disc_id) }}">{{ name }}</a></td>
+                        <td>{{ doinks }}</td>
+                        <td>{{ unique }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <div class="col-1 col-sm-1 col-md-2 col-lg-3 d-lg-none order-3"></div>
+            <div class="doinks-table-wrapper col-12 mb-sm-4 col-md-6 col-lg-4 col-xl-4 col-xxl-3 order-4 order-lg-2">
                 <table class="nice-table">
                     <tr class="list-first list-entry">
                         <th>Reason</th>
@@ -22,30 +45,8 @@
                     {% endfor %}
                 </table>
             </div>
-            <div class="d-block col-sm-1 col-md-2 d-lg-none"></div>
-            <div>
-                <table class="nice-table">
-                    <tr class="list-first list-entry">
-                        <th>Lad</th>
-                        <th>Doinks</th>
-                        <th>Unique Doinks</th>
-                    </tr>
-                    {% for disc_id, name, avatar, doinks, unique in doinks_persons %}
-                    <tr class="list-entry">
-                        <td class="d-none d-sm-table-cell"><a href="{{ url_for('users.user', disc_id=disc_id) }}">{{ name }}</a></td>
-                        <td>
-                            <a href="{{ url_for('users.user', disc_id=disc_id) }}">
-                                <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
-                            </a>
-                        </td>
-                        <td>{{ doinks }}</td>
-                        <td>{{ unique }}</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-            <div class="d-block col-1 col-sm-2 col-md-3 d-lg-none"></div>
-            <div class="doinks-table-wrapper col-10 col-sm-8 col-md-6 col-lg-5 col-xl-4 col-xxl-3">
+            <div class="col-1 col-sm-2 d-md-none order-5"></div>
+            <div id="doinks-table-the-third" class="doinks-table-wrapper col-10 col-sm-8 col-md-6 col-lg-3 col-xl-3 col-xxl-3 order-last order-lg-4">
                 <table class="nice-table multi-doinks-table">
                     <tr class="list-first list-entry">
                         <th>Multi-Doinks</th>
@@ -59,7 +60,6 @@
                     {% endfor %}
                 </table>
             </div>
-            <div class="col-1 col-sm-2 col-md-3 col-lg-1 col-xl-2 col-xxl-3"></div>
         </div>
     </div>
 </body>

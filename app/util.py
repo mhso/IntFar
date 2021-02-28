@@ -11,7 +11,10 @@ def register_discord_connection():
     conn_lock = flask.current_app.config["CONN_LOCK"]
     sess_id = flask.session["user_id"]
 
-    conn_lock.acquire()
+    lock_success = conn_lock.acquire(timeout=5)
+    if not lock_success:
+        exit(1)
+
     new_conn = discord_request("register", None, None, bot_conn)
     conn_lock.release()
 
@@ -69,9 +72,15 @@ def discord_request(command_types, commands, params, pipe=None):
             tuple_params.append(param)
     try:
         pipe.send((sess_id, command_type_list, command_list, tuple_params))
+        conn_received = pipe.poll(5)
+        if not conn_received:
+            conf = flask.current_app.config["APP_CONFIG"]
+            conf.log("Connection to App Listener timed out!", conf.log_warning)
+            raise ConnectionError()
+
         result = pipe.recv()
         return result if any_list else result[0]
-    except (EOFError, BrokenPipeError, ConnectionResetError):
+    except (EOFError, BrokenPipeError, ConnectionError, ConnectionResetError):
         register_discord_connection() # We timed out. Re-establish connection and try again.
         return discord_request(command_types, commands, params, conn_map[sess_id])
 

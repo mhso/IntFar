@@ -506,6 +506,43 @@ class TestWrapper(TestRunner):
         self.assert_false(success, "Bet not placed - Not enough tokens 2.")
 
     @test
+    def test_bet_placed_fail(self, bet_handler, db_client):
+        disc_id = 267401734513491969
+        guild_id = 619073595561213953
+
+        bet_amounts = ["10"]
+        game_timestamp = None
+        bet_strs = ["game_win"]
+        bet_targets = [None]
+        target_names = [None]
+
+        success, response, _ = bet_handler.place_bet(
+            disc_id, guild_id, bet_amounts, game_timestamp,
+            bet_strs, bet_targets, target_names
+        )
+
+        self.assert_true(success, "Bet placed")
+
+        success, response, _ = bet_handler.place_bet(
+            disc_id, guild_id, bet_amounts, game_timestamp,
+            bet_strs, bet_targets, target_names
+        )
+
+        self.assert_false(success, "Duplicate bet placed")
+
+        bet_amounts = ["50", "20", "10"]
+        bet_strs = ["game_win", "no_intfar", "no_intfar"]
+        bet_targets = [None, None, None]
+        target_names = [None, None, None]
+
+        success, response, _ = bet_handler.place_bet(
+            disc_id, guild_id, bet_amounts, game_timestamp,
+            bet_strs, bet_targets, target_names
+        )
+
+        self.assert_false(success, "Duplicate multi-bet placed")
+
+    @test
     def test_misc(self, bet_handler, db_client):
         tokens = [
             6, 100, 1000, 10000, 100000, 1000000000
