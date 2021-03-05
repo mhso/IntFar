@@ -97,6 +97,11 @@ class Database:
         summ_info = self.summoner_from_discord_id(discord_id)
         if summ_info is not None:
             _, summ_names, summ_ids = summ_info
+            if len(summ_names) == 3:
+                return (
+                    False,
+                    "Error: A maximum of three accounts can be registered for one person."
+                )
             summ_names.append(summ_name)
             summ_ids.append(summ_id)
             secret = self.get_client_secret(discord_id)
@@ -119,16 +124,19 @@ class Database:
                     self.execute_query(
                         db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100)
                     )
-        except sqlite3.IntegrityError:
+        except DBException:
             return (False, "A user with that summoner name is already registered!")
         return (True, status)
 
-    def discord_id_from_summoner(self, name):
+    def discord_id_from_summoner(self, name, exact_match=True):
+        matches = []
         for disc_id, summ_names, summ_ids in self.summoners:
             for (summ_name, summ_id) in zip(summ_names, summ_ids):
-                if summ_name.lower() == name:
+                if exact_match and summ_name.lower() == name:
                     return (disc_id, summ_name, summ_id)
-        return None
+                elif not exact_match and name in summ_name.lower():
+                    matches.append((disc_id, summ_name, summ_id))
+        return matches[0] if len(matches) == 1 else None
 
     def summoner_from_discord_id(self, discord_id):
         for disc_id, summ_names, summ_ids in self.summoners:
@@ -312,7 +320,7 @@ class Database:
 
         query_intfars = (
             "SELECT Count(*) as c, intfar_id FROM games g, participants p " +
-            "WHERE intfar_id != 'None' AND g.game_id=p.game_id AND intfar_id=disc_id " +
+            "WHERE intfar_id IS NOT NULL AND g.game_id=p.game_id AND intfar_id=disc_id " +
             "AND " + delim_str + " GROUP BY intfar_id ORDER BY c DESC"
         )
         query_games = (

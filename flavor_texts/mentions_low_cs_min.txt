@@ -1,3 +1,4 @@
-miss-timing a whole bunch of auto-attacks, therefore only getting {value} cs/min
+miss-timing a whole bunch of auto-attacks, only getting {value} cs/min
 forgetting to farm for the entire game, getting only {value} cs/min
 not wanting the filet minion, only getting {value} cs/min
+not wanting to harm the cute minions, only getting {value} cs/min

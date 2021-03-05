@@ -596,7 +596,7 @@ class BettingHandler:
                 return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
 
         try:
-            bet_id = self.database.get_bet_id(disc_id, event_id, guild_id, target_id, ticket)
+            bet_id = self.database.get_bet_id(disc_id, guild_id, event_id, target_id, ticket)
             if bet_id is None:
                 return (
                     False,

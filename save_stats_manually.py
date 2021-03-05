@@ -1,15 +1,14 @@
 import asyncio
 import json
 import argparse
-from sys import argv
 from api import award_qualifiers
 from api.database import Database
 from api.bets import BettingHandler
-from discbot.discord_bot import DiscordClient
+from discbot.discord_bot import DiscordClient, ADMIN_DISC_ID
 from api.config import Config
 from api.riot_api import APIClient
 from api.game_stats import get_filtered_stats
-from api.util import GUILD_IDS
+from api.util import GUILD_IDS, create_predictions_timeline_image
 
 GUILDS = {
     "nibs": GUILD_IDS[0],
@@ -58,6 +57,15 @@ class TestMock(DiscordClient):
 
             if self.task in ("all", "stats"):
                 await self.save_stats(filtered, intfar, intfar_reason, doinks, self.guild_to_use)
+
+        predictions_img = None
+        for disc_id, _, _ in users_in_game:
+            if ADMIN_DISC_ID == disc_id:
+                predictions_img = create_predictions_timeline_image()
+                break
+
+        if predictions_img is not None:
+            await self.send_predictions_timeline_image(predictions_img, self.guild_to_use)
 
     def get_intfar_and_doinks(self, filtered_stats):
         (final_intfar, final_intfar_data,

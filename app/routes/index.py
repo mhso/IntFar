@@ -1,4 +1,7 @@
+import json
 from time import time
+from os import remove
+from os.path import exists
 import flask
 import api.util as api_util
 import app.util as app_util
@@ -239,6 +242,7 @@ def active_game_started():
 
     secret = data.get("secret")
 
+    # Verify that the request contains the Discord App Token (that is only known by us).
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))
 
@@ -258,8 +262,65 @@ def active_game_ended():
 
     secret = data.get("secret")
 
+    # Verify that the request contains the Discord App Token (that is only known by us).
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))
 
     flask.current_app.config["ACTIVE_GAME"][int(data["guild_id"])] = None
+
+    if flask.current_app.config["GAME_PREDICTION"].get(int(data("game_id"))) is not None:
+        remove("predictions_temp.json")
+
+    flask.current_app.config["GAME_PREDICTION"][int(data("game_id"))] = None
+
     return flask.make_response(("Success! Active game ID deleted.", 200))
+
+def save_prediction_to_file(prediction, game_duration):
+    filename = "predictions_temp.json"
+    if exists(filename):
+        snapshot_json = json.load(open(filename, "r", encoding="utf-8"))
+    else:
+        snapshot_json = {"predictions": []}
+
+    snapshot_json["predictions"].append({
+        "timestamp": game_duration,
+        "prediction": prediction
+    })
+
+    json.dump(snapshot_json, open(filename, "w", encoding="utf-8"), indent=4)
+
+@start_page.route("/update_prediction", methods=["POST"])
+def set_prediction():
+    data = flask.request.form
+    conf = flask.current_app.config["APP_CONFIG"]
+
+    secret = data.get("secret")
+
+    # Verify that the request contains the Discord App Token (that is only known by us).
+    if secret != conf.discord_token:
+        return flask.make_response(("Error: Unauthorized access.", 401))
+
+    game_id = int(data["game_id"])
+
+    conf.log(f"Updated game prediction: {data['pct_win']}% chance of winning.")
+
+    save_prediction_to_file(data["pct_win"], int(data["game_duration"]))
+
+    flask.current_app.config["GAME_PREDICTION"][game_id] = data["pct_win"]
+
+    return flask.make_response(("Success! Game prediction updated.", 200))
+
+@start_page.route("/prediction", methods=["GET"])
+def get_prediction():
+    data = flask.request.args
+    game_id = data.get("game_id")
+
+    if game_id is None:
+        return app_util.make_json_response("Error: Missing parameter 'game_id'.", 400)
+
+    pct_win = flask.current_app.config["GAME_PREDICTION"].get(int(game_id))
+
+    if pct_win is None:
+        return app_util.make_json_response("Error: No prediction exists.", 404)
+
+    return app_util.make_json_response(pct_win, 200)

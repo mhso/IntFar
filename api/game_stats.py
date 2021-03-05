@@ -82,14 +82,16 @@ def get_finished_game_summary(data, summ_ids, riot_api):
 
 def get_active_game_summary(data, summ_id, summoners, riot_api):
     champions = {}
+    users_in_game = []
     for participant in data["participants"]:
-        for _, _, summoner_ids in summoners:
+        for disc_id, _, summoner_ids in summoners:
             if participant["summonerId"] in summoner_ids:
                 champ_id = participant["championId"]
                 champ_played = riot_api.get_champ_name(champ_id)
                 if champ_played is None:
                     champ_played = "Unknown Champ (Rito pls)"
                 champions[participant["summonerId"]] = (participant["summonerName"], champ_played)
+                users_in_game.append(disc_id)
 
     game_start = data["gameStartTime"] / 1000
     now = time()
@@ -106,7 +108,7 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
                 name, champ = champions[other_id]
                 response += f"\n - {name} ({champ})"
 
-    return response
+    return response, users_in_game
 
 def are_unfiltered_stats_well_formed(game_info):
     game_keys = [

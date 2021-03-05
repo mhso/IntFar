@@ -1,5 +1,9 @@
 from datetime import tzinfo, timedelta, datetime
+from os.path import exists
+from PIL import Image, ImageDraw, ImageFont
+import numpy as np
 import secrets
+import json
 
 MAIN_GUILD_ID = 619073595561213953
 
@@ -144,3 +148,96 @@ def organize_doinks_stats(doinks_reason_ids):
 
 def get_guild_abbreviation(guild_id):
     return GUILD_ABBREVIATIONS.get(guild_id, "")
+
+def format_timestamp(timestamp):
+    seconds = timestamp
+    minutes = 0
+    if seconds >= 60:
+        minutes = int(seconds / 60)
+        seconds = seconds % 60
+
+    return f"{zero_pad(minutes)}:{zero_pad(seconds)}"
+
+def create_predictions_timeline_image():
+    filename = "predictions_temp.json"
+
+    if not exists(filename):
+        return None
+
+    json_data = json.load(open(filename, "r", encoding="utf-8"))
+
+    if len(json_data["predictions"]) < 2:
+        return None
+
+    img_w = int(len(json_data["predictions"]) * 70)
+    img_h = 420
+    image_shape = (img_h, img_w, 3)
+    arr = np.zeros(image_shape, dtype="uint8")
+    arr[:, :, 0] = 15
+    arr[:, :, 1] = 15
+    arr[:, :, 2] = 15
+    image = Image.fromarray(arr)
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype("consola.ttf", 20)
+
+    line_color = (10, 150, 180)
+
+    pad_x = 20
+    pad_y = 10
+    step_x = (img_w  - (pad_x * 2)) / (len(json_data["predictions"])-1)
+
+    points = []
+
+    for index, datapoint in enumerate(json_data["predictions"][1:]):
+        timestamp = int(datapoint["timestamp"])
+        prediction = float(datapoint["prediction"])
+
+        prev_datapoint = json_data["predictions"][index]
+
+        prev_timestamp = int(prev_datapoint["timestamp"])
+        prev_prediction = float(prev_datapoint["prediction"])
+
+        prev_x = index * step_x + pad_x
+        curr_x = (index + 1) * step_x + pad_x
+
+        prev_y = img_h - ((prev_prediction * 0.01) * (img_h - (pad_y * 2)) + pad_y)
+        curr_y = img_h - ((prediction * 0.01) * (img_h - (pad_y * 2)) + pad_y)
+
+        if index == 0:
+            points.append((prev_x, prev_y, prev_prediction, prev_timestamp))
+        points.append((curr_x, curr_y, prediction, timestamp))
+
+    for index, (x, y, _, _) in enumerate(points[1:]):
+        prev_x, prev_y, _, _ = points[index]
+
+        draw.line((prev_x, prev_y, x, y), fill=line_color, width=3)
+
+    for index, (x, y, prediction, timestamp) in enumerate(points):
+        vert_anchor = "a" if index % 2 == 0 else "d"
+        y_offset = 10 if index % 2 == 0 else -10
+
+        y_1 = y + y_offset
+        y_2 = y + y_offset * 3.6
+
+        hor_anchor = "m"
+        if index == 0:
+            hor_anchor = "l"
+        if index == len(points) - 1:
+            hor_anchor = "r"
+
+        anchor = hor_anchor + vert_anchor
+
+        radius = 5
+        draw.ellipse((x-radius, y-radius, x+radius, y+radius), fill=(255, 0, 0))
+        draw.text(
+            (x, y_1 if index % 2 == 0 else y_2), format_timestamp(timestamp),
+            font=font, fill=(220, 220, 220), anchor=anchor,
+            align="center", stroke_fill=(0, 0, 0), stroke_width=2
+        )
+        draw.text(
+            (x, y_2 if index % 2 == 0 else y_1), f"{prediction}%",
+            font=font, fill=(220, 220, 220), anchor=anchor,
+            align="center", stroke_fill=(0, 0, 0), stroke_width=2
+        )
+
+    return image

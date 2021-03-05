@@ -1,5 +1,6 @@
 import random
 import asyncio
+from io import BytesIO
 from threading import Thread
 from time import time
 from traceback import print_exc
@@ -40,15 +41,23 @@ LOWEST_KP_FLAVORS = load_flavor_texts("lowest_kp")
 
 LOWEST_VISION_FLAVORS = load_flavor_texts("lowest_vision")
 
-MENTIONS_NO_PINKWARDS = load_flavor_texts("mentions_no_vision_ward")
+HONORABLE_MENTIONS = [
+    load_flavor_texts("mentions_no_vision_ward"),
+    load_flavor_texts("mentions_low_damage"),
+    load_flavor_texts("mentions_low_cs_min"),
+    load_flavor_texts("mentions_no_epic_monsters")
+]
 
-MENTIONS_LOW_DAMAGE = load_flavor_texts("mentions_low_damage")
-
-MENTIONS_LOW_CS_MIN = load_flavor_texts("mentions_low_cs_min")
-
-MENTIONS_NO_EPIC_MONSTERS = load_flavor_texts("mentions_no_epic_monsters")
-
-DOINKS_FLAVORS = load_flavor_texts("doinks")
+DOINKS_FLAVORS = [
+    load_flavor_texts("doinks_kda"),
+    load_flavor_texts("doinks_kills"),
+    load_flavor_texts("doinks_damage"),
+    load_flavor_texts("doinks_penta"),
+    load_flavor_texts("doinks_vision_score"),
+    load_flavor_texts("doinks_kp"),
+    load_flavor_texts("doinks_jungle"),
+    load_flavor_texts("doinks_cs")
+]
 
 STREAK_FLAVORS = load_flavor_texts("streak")
 
@@ -139,7 +148,20 @@ VALID_COMMANDS = {
         "Opening this link verifies you on the Int-Far homepage and logs you in permanently."
     ),
     "report": ("[person]", "Report someone, f.x. if they are being a poon."),
-    "reports": ("(person)", "See how many times someone (or yourself) has been reported.")
+    "reports": ("(person)", "See how many times someone (or yourself) has been reported."),
+    # "shop": (
+    #     None,
+    #     "Get a list of totally real items that you can buy with your hard-earned betting tokens!"
+    # ),
+    # "buy": ("[item] (quantity)", "Buy one or more copies of an item from the shop."),
+    # "sell": (
+    #     "[item] [price] (quantity)",
+    #     (
+    #         "Add a listing in the shop for one or more copies of an item that you own. " +
+    #         "Other people can then buy the item at the specified price."
+    #     )
+    # ),
+    # "inventory": ("(person)", "List all the items that your or someone else owns.")
 }
 
 ALIASES = {
@@ -182,20 +204,14 @@ def get_reason_flavor_text(value, reason):
     return flavor_text.replace("{" + reason + "}", value)
 
 def get_honorable_mentions_flavor_text(index, value):
-    flavor_values = []
-    if index == 0:
-        flavor_values = MENTIONS_NO_PINKWARDS
-    elif index == 1:
-        flavor_values = MENTIONS_LOW_DAMAGE
-    elif index == 2:
-        flavor_values = MENTIONS_LOW_CS_MIN
-    elif index == 3:
-        flavor_values = MENTIONS_NO_EPIC_MONSTERS
+    flavor_values = HONORABLE_MENTIONS[index]
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     return flavor_text.replace("{value}", str(value))
 
-def get_redeeming_flavor_text(index, value):
-    flavor_text = DOINKS_FLAVORS[index]
+def get_doinks_flavor_text(index, value):
+    flavor_values = DOINKS_FLAVORS[index]
+
+    flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     if value is None:
         return flavor_text
     return flavor_text.replace("{value}", str(value))
@@ -233,9 +249,17 @@ class DiscordClient(discord.Client):
 
     def send_game_update(self, endpoint, data):
         try:
-            requests.post(f"http://mhooge.com:5000/intfar/{endpoint}", data=data)
+            return requests.post(f"http://mhooge.com:5000/intfar/{endpoint}", data=data)
         except requests.exceptions.RequestException as e:
             self.config.log("Error ignored in online_monitor: " + str(e))
+
+    async def send_predictions_timeline_image(self, image, guild_id):
+        channel = self.channels_to_write[guild_id]
+        with BytesIO() as b_io:
+            image.save(b_io, format="PNG")
+            b_io.seek(0)
+            file = discord.File(b_io, filename="predictions.png")
+            await channel.send("Odds of winning throughout the game.", file=file)
 
     async def poll_for_game_end(self, guild_id):
         """
@@ -362,9 +386,18 @@ class DiscordClient(discord.Client):
                             filtered_stats, intfar, intfar_reason, doinks, guild_id
                         )
 
+                    predictions_img = None
+                    for disc_id, _, _ in users_in_game:
+                        if ADMIN_DISC_ID == disc_id:
+                            predictions_img = api_util.create_predictions_timeline_image()
+                            break
+
+                    if predictions_img is not None:
+                        await self.send_predictions_timeline_image(predictions_img, guild_id)
+
                 req_data = {
                     "secret": self.config.discord_token,
-                    "guild_id": guild_id
+                    "guild_id": guild_id, "game_id": self.active_game[guild_id]["id"]
                 }
                 self.send_game_update("game_ended", req_data)
 
@@ -572,17 +605,19 @@ class DiscordClient(discord.Client):
             avatar_paths.append(path)
         return avatar_paths if discord_id is None else avatar_paths[0]
 
-    def get_discord_id(self, nickname, guild_id=api_util.MAIN_GUILD_ID):
+    def get_discord_id(self, nickname, guild_id=api_util.MAIN_GUILD_ID, exact_match=True):
+        matches = []
         for guild in self.guilds:
             if guild.id == guild_id:
                 for member in guild.members:
-                    if member.nick is not None and member.nick.lower() == nickname:
-                        return member.id
-                    if member.display_name is not None and member.display_name.lower() == nickname:
-                        return member.id
-                    if member.name is not None and member.name.lower() == nickname:
-                        return member.id
-        return None
+                    for attribute in (member.nick, member.display_name, member.name):
+                        if attribute is not None:
+                            if exact_match and attribute.lower() == nickname:
+                                return member.id
+                            elif not exact_match and nickname in attribute.lower():
+                                matches.append(member.id)
+                                break
+        return matches[0] if len(matches) == 1 else None
 
     def get_guilds_for_user(self, disc_id):
         guild_ids = []
@@ -814,7 +849,7 @@ class DiscordClient(discord.Client):
 
             for (count, (stat_index, stat_value)) in enumerate(doinks[disc_id]):
                 prefix = " *and* " if count > 0 else ""
-                user_str += prefix + get_redeeming_flavor_text(stat_index, stat_value)
+                user_str += prefix + get_doinks_flavor_text(stat_index, stat_value)
             mentions_str += user_str
 
             multiplier = 1
@@ -1104,6 +1139,28 @@ class DiscordClient(discord.Client):
             else:
                 self.config.log("Int-Far to add badge to was None!", self.config.log_error)
 
+    async def declare_monthly_intfar(self, monthly_monitor):
+        month = monthly_monitor.time_at_announcement.month
+        prev_month = month - 1 if month != 1 else 12
+        month_name = api_util.MONTH_NAMES[prev_month-1]
+
+        intfar_data = self.database.get_intfars_of_the_month()
+        intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
+                          for (disc_id, games, intfars, ratio) in intfar_data]
+        intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"
+        intro_desc += "***DRUM ROLL***\n"
+        desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
+        desc += ":clap: :clap: :clap: :clap: :clap: \n"
+        desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
+        desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
+        final_msg = intro_desc + self.insert_emotes(desc)
+        await self.channels_to_write[api_util.MAIN_GUILD_ID].send(final_msg)
+
+        # Assign Int-Far of the Month 'badge' (role) to the top Int-Far.
+        current_month = monthly_monitor.time_at_announcement.month
+        winners = [tupl[0] for tupl in intfar_data[:num_winners]]
+        await self.assign_monthly_intfar_role(current_month, winners)
+
     async def sleep_until_monthly_infar(self):
         """
         Sleeps until the first of the next month (run in seperate thread).
@@ -1122,26 +1179,7 @@ class DiscordClient(discord.Client):
         while not monitor.should_announce():
             await asyncio.sleep(time_to_sleep)
 
-        month = monitor.time_at_announcement.month
-        prev_month = month - 1 if month != 1 else 12
-        month_name = api_util.MONTH_NAMES[prev_month-1]
-
-        intfar_data = self.database.get_intfars_of_the_month()
-        intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
-                          for (disc_id, games, intfars, ratio) in intfar_data]
-        intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"
-        intro_desc += "***DRUM ROLL***\n"
-        desc, num_winners = monitor.get_description_and_winners(intfar_details)
-        desc += ":clap: :clap: :clap: :clap: :clap: \n"
-        desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
-        desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
-        final_msg = intro_desc + self.insert_emotes(desc)
-        await self.channels_to_write[MAIN_CHANNEL_ID].send(final_msg)
-
-        # Assign Int-Far of the Month 'badge' (role) to the top Int-Far.
-        current_month = monitor.time_at_announcement.month
-        winners = [tupl[0] for tupl in intfar_data[:num_winners]]
-        await self.assign_monthly_intfar_role(current_month, winners)
+        await self.declare_monthly_intfar(monitor)
 
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
         asyncio.create_task(self.sleep_until_monthly_infar())
@@ -1174,8 +1212,12 @@ class DiscordClient(discord.Client):
             else self.channels_to_write[MY_GUILD_ID]
         )
 
+    async def on_connect(self):
+        self.config.log("Client connected")
+
     async def on_disconnect(self):
-        self.config.log("Client disconnected")
+        self.config.log("Client disconnected, restarting...")
+        exit(1)
 
     async def on_ready(self):
         if self.initialized:
@@ -1356,9 +1398,9 @@ class DiscordClient(discord.Client):
         if name.startswith("<@"):
             start_index = 3 if name[2] == "!" else 2
             return int(name[start_index:-1])
-        user_data = self.database.discord_id_from_summoner(name)
+        user_data = self.database.discord_id_from_summoner(name, exact_match=False)
         if user_data is None: # Summoner name gave no result, try Discord name.
-            return self.get_discord_id(name, guild_id)
+            return self.get_discord_id(name, guild_id, exact_match=False)
         return user_data[0]
 
     async def handle_intfar_msg(self, message, target_id):
@@ -1630,10 +1672,12 @@ class DiscordClient(discord.Client):
 
         if game_data is not None:
             response = f"{target_name} is "
-            response += game_stats.get_active_game_summary(
+            summary, users_in_game = game_stats.get_active_game_summary(
                 game_data, active_summoner,
                 self.database.summoners, self.riot_api
             )
+            response += summary
+
             for guild_id in api_util.GUILD_IDS:
                 active_game = self.active_game.get(guild_id)
                 if active_game is not None:
@@ -1641,6 +1685,20 @@ class DiscordClient(discord.Client):
                         guild_name = self.get_guild_name(guild_id)
                         response += f"\nPlaying in *{guild_name}*"
                         break
+
+            if ADMIN_DISC_ID in users_in_game:
+                predict_url = f"http://mhooge.com:5000/intfar/prediction?game_id={game_data['gameId']}"
+                try:
+                    predict_response = requests.get(predict_url)
+                    if predict_response.ok:
+                        pct_win = predict_response.json()["response"]
+                        response += f"\nPredicted chance of winning: **{pct_win}%**"
+                    else:
+                        error_msg = predict_response.json()["response"]
+                        self.config.log(f"Get game prediction error: {error_msg}")
+
+                except requests.exceptions.RequestException as e:
+                    self.config.log("Exception ignored in !game: " + str(e))
         else:
             response = f"{target_name} is not in a game at the moment "
             response += self.insert_emotes("{emote_simp_but_closeup}")
@@ -1966,6 +2024,15 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
+    async def handle_shop_msg(self, message):
+        pass
+
+    async def handle_buy_msg(self, message, item):
+        pass
+
+    async def handle_inventory_msg(self, message, target_id):
+        pass
+
     async def handle_kick_msg(self, message, target_id):
         target_name = self.get_discord_nick(target_id, message.guild.id)
         
@@ -2247,6 +2314,14 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "report"):
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_report_msg, message, target_name, target_all=False)
+            elif cmd_equals(first_command, "shop"):
+                await self.handle_shop_msg(message)
+            elif cmd_equals(first_command, "buy"):
+                target_item = self.extract_target_name(split, 1)
+                await self.handle_buy_msg(message, target_item)
+            elif cmd_equals(first_command, "inventory"):
+                target_name = self.extract_target_name(split, 1)
+                await self.get_data_and_respond(self.handle_inventory_msg, message, target_name, target_all=False)
             elif cmd_equals(first_command, "reports"):
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_see_reports_msg, message, target_name)

@@ -1,5 +1,6 @@
 auth.json
 venv
+*.ttf
 queries.sql
 .vscode
 __pycache__

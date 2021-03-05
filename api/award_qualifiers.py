@@ -37,7 +37,7 @@ def get_big_doinks(data):
         own_epics = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
         enemy_epics = stats["enemyBaronKills"] + stats["enemyDragonKills"] + stats["enemyHeraldKills"]
         if stats["lane"] == "JUNGLE" and own_epics > 3 and enemy_epics == 0:
-            mention_list.append((6, kp))
+            mention_list.append((6, own_epics))
         cs_per_min = stats["csPerMin"]
         if cs_per_min >= 8:
             mention_list.append((7, api_util.round_digits(cs_per_min)))

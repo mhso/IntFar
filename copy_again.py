@@ -15,6 +15,7 @@ conf_2.database = "copy.db"
 database_client_2 = Database(conf_2)
 
 with database_client_1.get_connection() as db_1:
+    data_games = db_1.cursor().execute("SELECT * FROM games").fetchall()
     data_best = db_1.cursor().execute("SELECT * FROM best_stats").fetchall()
     data_worst = db_1.cursor().execute("SELECT * FROM worst_stats").fetchall()
     participants = db_1.cursor().execute("SELECT * FROM participants").fetchall()
@@ -38,24 +39,18 @@ with database_client_1.get_connection() as db_1:
             disc_id = int(summ[0])
             secret = summ[3]
             db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret, summ[4]))
-        for data in data_best:
-            query = "INSERT INTO games VALUES (?, ?, ?, ?, ?)"
-            db_2.cursor().execute(query, (data[1], 0, data[2], data[3], 619073595561213953))
-        for data in participants:
-            query = "UPDATE games SET timestamp=? WHERE game_id=?"
-            db_2.cursor().execute(query, (data[2], data[0]))
+        query = "INSERT INTO games VALUES (?, ?, ?, ?, ?)"
+        for data in data_games:
+            db_2.cursor().execute(query, data)
         query = query_prefix + "best_stats" + query_cols
         for data in data_best:
-            reshaped_data = data[:2] + data[4:]
-            db_2.cursor().execute(query, reshaped_data)
+            db_2.cursor().execute(query, data)
         query = query_prefix + "worst_stats" + query_cols
         for data in data_worst:
-            reshaped_data = data[:2] + data[4:]
-            db_2.cursor().execute(query, reshaped_data)
+            db_2.cursor().execute(query, data)
         query = "INSERT OR IGNORE INTO participants(game_id, disc_id, doinks) VALUES (?, ?, ?)"
         for data in participants:
-            reshaped = data[:2] + (data[3],)
-            db_2.cursor().execute(query, reshaped)
+            db_2.cursor().execute(query, data)
         query = "INSERT OR IGNORE INTO betting_balance(disc_id, tokens) VALUES (?, ?)"
         for data in balances:
             db_2.cursor().execute(query, data)

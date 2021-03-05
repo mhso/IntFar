@@ -1,3 +1,4 @@
 refusing to hurt any epic monsters, securing {value} barons and dragons
 failing all the smite-fights, securing {value} epic monsters
 being afraid of the scary dragons and barons, securing {value} epic monsters
+trying to preserve the rainforest and all the creatures in it, killing {value} epic monsters

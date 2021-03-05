@@ -1,2 +1,7 @@
-- Add cs/min to stats.
-- Add cs/min retro-actively for all games.
+- Add shop
+- Add real world items with realistic prices (buy a private jet)
+- Add inventory of bought items
+
+!shop - List all items
+!buy [item] - Buy an item
+!inventory (person) - List all bought items

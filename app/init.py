@@ -45,6 +45,7 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     web_app.config["LOGGED_IN_USERS"] = {}
     web_app.config["RIOT_API"] = riot_api
     web_app.config["ACTIVE_GAME"] = {}
+    web_app.config["GAME_PREDICTION"] = {}
     web_app.config["USER_COUNT"] = 0
     web_app.config["CONN_MAP"] = {}
     web_app.config["CONN_LOCK"] = Lock()
