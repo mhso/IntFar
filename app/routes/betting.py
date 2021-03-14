@@ -1,8 +1,8 @@
 from time import time
 import flask
 import app.util as app_util
+import api.util as api_util
 from api.bets import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
-from api.util import format_tokens_amount, get_guild_abbreviation, GUILD_IDS, MAIN_GUILD_ID
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
@@ -21,15 +21,15 @@ def get_bets(database, only_active):
         bets = all_bets[disc_id]
         for bet_ids, guild_id, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
             event_descs = [
-                (i, get_dynamic_bet_desc(e, names_dict.get(t)), format_tokens_amount(a))
+                (i, get_dynamic_bet_desc(e, names_dict.get(t)), api_util.format_tokens_amount(a))
                 for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
             ]
             bet_date = app_util.format_bet_timestamp(timestamp)
-            guild_short = get_guild_abbreviation(guild_id)
+            guild_short = api_util.get_guild_abbreviation(guild_id)
             presentable_data.append(
                 (
                     disc_id, names_dict[disc_id], bet_date, guild_short, str(guild_id), event_descs,
-                    result_or_ticket, format_tokens_amount(payout), avatar_dict[disc_id]
+                    result_or_ticket, api_util.format_tokens_amount(payout), avatar_dict[disc_id]
                 )
             )
     presentable_data.sort(key=lambda x: x[5][0][0], reverse=True)
@@ -54,22 +54,22 @@ def home():
         index = all_ids.index(disc_id)
         name = all_names[index]
         avatar = flask.url_for("static", filename=all_avatars[index].replace("app/static/", ""))
-        all_token_balances.append((disc_id, name, format_tokens_amount(balance), avatar))
+        all_token_balances.append((disc_id, name, api_util.format_tokens_amount(balance), avatar))
 
     user_token_balance = "?"
     if logged_in_user is not None:
-        user_token_balance = format_tokens_amount(database.get_token_balance(logged_in_user))
+        user_token_balance = api_util.format_tokens_amount(database.get_token_balance(logged_in_user))
 
     all_guild_data = []
     if logged_in_user is not None:
         guilds_for_user = app_util.discord_request("func", "get_guilds_for_user", logged_in_user)
-        for guild_id, guild_name in zip(GUILD_IDS, guild_names):
+        for guild_id, guild_name in zip(api_util.GUILD_IDS, guild_names):
             if guild_id in guilds_for_user:
                 all_guild_data.append((guild_id, guild_name))
 
     main_guild_id = flask.request.cookies.get("main_guild_id")
     if main_guild_id is None:
-        main_guild_id = MAIN_GUILD_ID
+        main_guild_id = api_util.MAIN_GUILD_ID
 
     return app_util.make_template_context(
         "betting.html", resolved_bets=resolved_bets,
@@ -105,7 +105,7 @@ def get_payout():
     for event, amount, target in zip(events, amounts, targets):
         target = None if target in ("invalid", "any") else target
         try:
-            amount = betting_handler.parse_bet_amount(amount)
+            amount = api_util.parse_amount_str(amount)
         except ValueError:
             return app_util.make_json_response("Error: Invalid bet amount value.", 400)
 
@@ -118,8 +118,8 @@ def get_payout():
         total_reward += value
 
     return_data = {
-        "cost": format_tokens_amount(sum(int(x) for x in amounts_values)),
-        "payout": format_tokens_amount(int(total_reward * len(amounts_values)))
+        "cost": api_util.format_tokens_amount(sum(int(x) for x in amounts_values)),
+        "payout": api_util.format_tokens_amount(int(total_reward * len(amounts_values)))
     }
     return app_util.make_json_response(return_data, 200)
 
@@ -159,7 +159,7 @@ def create_bet():
     bet_id, ticket = placed_bet_data
     new_balance = database.get_token_balance(disc_id)
 
-    amounts = [betting_handler.parse_bet_amount(amount) for amount in amounts]
+    amounts = [api_util.parse_amount_str(amount) for amount in amounts]
 
     event_descs = [
         [get_dynamic_bet_desc(e, t), a] for (e, t, a) in zip(events, target_names, amounts)
@@ -172,7 +172,7 @@ def create_bet():
         "name": logged_in_name, "events": event_descs,
         "bet_type": "single" if ticket is None else "multi",
         "bet_id": bet_id, "ticket": ticket, "guild_id": guild_id,
-        "guild_name": get_guild_abbreviation(int(guild_id)),
+        "guild_name": api_util.get_guild_abbreviation(int(guild_id)),
         "channel_name": channel_name, "avatar": logged_in_avatar,
         "betting_balance": new_balance
     }
@@ -224,11 +224,18 @@ def delete_bet():
     logged_in_name = app_util.get_user_details()[1]
 
     disc_msg = f"Stealthy! {logged_in_name} just cancelled a bet using the website!\n"
+    refunded_formatted = api_util.format_tokens_amount(amount_refunded)
     if data["betType"] == "single":
-        disc_msg += f"Bet with ID {bet_id} for {format_tokens_amount(amount_refunded)} {tokens_name} successfully cancelled.\n"
+        disc_msg += (
+            f"Bet with ID {bet_id} for {refunded_formatted} "
+            f"{tokens_name} successfully cancelled.\n"
+        )
     else:
-        disc_msg += f"Multi-bet with ticket ID {ticket} for {format_tokens_amount(amount_refunded)} {tokens_name} successfully cancelled.\n"
-    disc_msg += f"Your {tokens_name} balance is now `{format_tokens_amount(new_balance)}`."
+        disc_msg += (
+            f"Multi-bet with ticket ID {ticket} for {refunded_formatted} " +
+            f"{tokens_name} successfully cancelled.\n"
+        )
+    disc_msg += f"Your {tokens_name} balance is now `{api_util.format_tokens_amount(new_balance)}`."
 
     app_util.discord_request("func", "send_message_unprompted", (disc_msg, guild_id))
 

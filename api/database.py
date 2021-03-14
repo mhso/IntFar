@@ -41,20 +41,21 @@ class Database:
         self.persistent_connection.close()
         self.persistent_connection = None
 
-    def execute_query(self, db, query, query_params=None):
+    def execute_query(self, db, query, query_params=None, commit=True):
         try:
             if query_params is None:
                 cursor = db.cursor().execute(query)
             else:
                 cursor = db.cursor().execute(query, query_params)
-            db.commit()
+            if commit:
+                db.commit()
             return cursor
         except (OperationalError, ProgrammingError, DatabaseError) as exc:
             raise DBException(exc.args)
 
     def create_database(self):
         with self.get_connection() as db:
-            with open("schema.sql", "r") as f:
+            with open("resouces/schema.sql", "r") as f:
                 db.cursor().executescript(f.read())
             db.commit()
 
@@ -590,7 +591,7 @@ class Database:
             db.commit()
 
     def create_backup(self):
-        backup_name = "database_backup.db"
+        backup_name = "resources/database_backup.db"
         try:
             os.remove(backup_name)
             copyfile(self.config.database, backup_name)
@@ -792,3 +793,79 @@ class Database:
             query_update = "UPDATE registered_summoners SET reports=reports+1 WHERE disc_id=?"
             self.execute_query(db, query_update, (disc_id,))
             return self.get_reports(disc_id, db)[0][1]
+
+    def add_items_to_shop(self, item_tuples):
+        with self.get_connection() as db:
+            query = "INSERT INTO shop_items(name, price) VALUES (?, ?)"
+            db.executemany(query, item_tuples)
+            db.commit()
+
+    def item_exists(self, item_name):
+        with self.get_connection() as db:
+            query = "SELECT * FROM shop_items WHERE name=?"
+            result = self.execute_query(db, query, (item_name,)).fetchone()
+            return result is not None
+
+    def get_items_for_user(self, disc_id):
+        with self.get_connection() as db:
+            query = "SELECT name, COUNT(*) FROM owned_items WHERE owner_id=? GROUP BY name"
+            return self.execute_query(db, query, (disc_id,)).fetchall()
+
+    def get_items_in_shop(self):
+        with self.get_connection() as db:
+            query = "SELECT name, price, COUNT(*) FROM shop_items GROUP BY name, price ORDER BY price DESC"
+            return self.execute_query(db, query).fetchall()
+
+    def get_items_matching_price(self, item_name, price, quantity):
+        with self.get_connection() as db:
+            if price is None: # Select the 'quantity' amounts of cheapest items.
+                query_price = "SELECT id, price, seller_id FROM shop_items WHERE name=? ORDER BY price ASC LIMIT ?"
+                params = (item_name, quantity)
+            else: # Select the 'quantity' amounts of items matching 'price'.
+                query_price = "SELECT id, price, seller_id FROM shop_items WHERE name=? AND price=? LIMIT ?"
+                params = (item_name, price, quantity)
+
+            return self.execute_query(db, query_price, params).fetchall()
+
+    def buy_item(self, disc_id, item_copies, total_price, item_name):
+        with self.get_connection() as db:
+            for _, price, seller_id in item_copies: # Add items to user's inventory.
+                query_insert = "INSERT INTO owned_items(name, owner_id) VALUES(?, ?)"
+                self.execute_query(db, query_insert, (item_name, disc_id), commit=False)
+                # Add payment of item to seller.
+                query_update = "UPDATE betting_balance SET tokens=tokens+? WHERE disc_id=?"
+                self.execute_query(db, query_update, (price, seller_id), commit=False)
+
+            # Subtract the tokens spent from the user's balance.
+            query_update = "UPDATE betting_balance SET tokens=tokens-? WHERE disc_id=?"
+            self.execute_query(db, query_update, (total_price, disc_id), commit=False)
+
+            for item in item_copies: # Delete from shop.
+                query_delete = "DELETE FROM shop_items WHERE id=?"
+                self.execute_query(db, query_delete, (item[0],), commit=False)
+
+            db.commit()
+
+    def get_matching_items_for_user(self, disc_id, item_name, quantity):
+        with self.get_connection() as db:
+            query_items = "SELECT id FROM owned_items WHERE owner_id=? AND name=? LIMIT ?"
+            return self.execute_query(db, query_items, (disc_id, item_name, quantity)).fetchall()
+
+    def sell_item(self, disc_id, item_copies, item_name, price):
+        with self.get_connection() as db:
+            for _ in item_copies:
+                query_insert = "INSERT INTO shop_items(name, price, seller_id) VALUES (?, ?, ?)"
+                self.execute_query(db, query_insert, (item_name, price, disc_id), commit=False)
+
+            for item_id in item_copies:
+                query_delete = "DELETE FROM owned_items WHERE id=?"
+                self.execute_query(db, query_delete, (item_id[0],), commit=False)
+
+            db.commit()
+
+    def reset_shop(self):
+        with self.get_connection() as db:
+            query_items = "DELETE FROM owned_items"
+            query_balance = "UPDATE betting_balance SET tokens=100"
+            self.execute_query(db, query_items)
+            self.execute_query(db, query_balance)

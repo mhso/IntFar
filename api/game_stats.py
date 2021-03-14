@@ -94,10 +94,13 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
                 users_in_game.append(disc_id)
 
     game_start = data["gameStartTime"] / 1000
-    now = time()
-    dt_1 = datetime.fromtimestamp(game_start)
-    dt_2 = datetime.fromtimestamp(now)
-    fmt_duration = format_duration(dt_1, dt_2)
+    if game_start > 0:
+        now = time()
+        dt_1 = datetime.fromtimestamp(game_start)
+        dt_2 = datetime.fromtimestamp(now)
+        fmt_duration = format_duration(dt_1, dt_2)
+    else:
+        fmt_duration = "Unknown Duration (Rito pls)"
     game_mode = data["gameMode"]
 
     response = f"{fmt_duration} in a {game_mode} game, playing {champions[summ_id][1]}.\n"

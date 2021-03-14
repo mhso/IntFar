@@ -1,11 +1,9 @@
-from sys import argv
 from time import time
 from test.runner import TestRunner, test
-from api import bets, award_qualifiers
+from api import bets
 from api.database import Database
 from api.config import Config
 from api.util import format_tokens_amount
-from api.game_stats import get_filtered_stats
 
 LOUD = False
 

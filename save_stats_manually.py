@@ -58,14 +58,15 @@ class TestMock(DiscordClient):
             if self.task in ("all", "stats"):
                 await self.save_stats(filtered, intfar, intfar_reason, doinks, self.guild_to_use)
 
-        predictions_img = None
-        for disc_id, _, _ in users_in_game:
-            if ADMIN_DISC_ID == disc_id:
-                predictions_img = create_predictions_timeline_image()
-                break
+        if self.config.generate_predictions_img:
+            predictions_img = None
+            for disc_id, _, _ in users_in_game:
+                if ADMIN_DISC_ID == disc_id:
+                    predictions_img = create_predictions_timeline_image()
+                    break
 
-        if predictions_img is not None:
-            await self.send_predictions_timeline_image(predictions_img, self.guild_to_use)
+            if predictions_img is not None:
+                await self.send_predictions_timeline_image(predictions_img, self.guild_to_use)
 
     def get_intfar_and_doinks(self, filtered_stats):
         (final_intfar, final_intfar_data,

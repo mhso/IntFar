@@ -4,4 +4,5 @@
 
 !shop - List all items
 !buy [item] - Buy an item
+!sell [item]
 !inventory (person) - List all bought items

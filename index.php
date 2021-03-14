@@ -10,7 +10,5 @@ else {
     $redir = $url;
 }
 
-file_put_contents("log.txt", print_r($redir, true) . "\n", FILE_APPEND);
-
 header("Location: " . $redir);
 ?>

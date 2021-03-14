@@ -2,7 +2,7 @@ from time import time
 from datetime import datetime
 from traceback import print_exc
 from api.database import DBException
-from api.util import format_duration, round_digits, format_tokens_amount
+from api.util import format_duration, round_digits, format_tokens_amount, parse_amount_str
 from api import game_stats
 
 MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
@@ -402,23 +402,6 @@ class BettingHandler:
     def get_bet_error_msg(self, bet_desc, error):
         return f"Bet was not placed: '{bet_desc}' - {error}"
 
-    def parse_bet_amount(self, amount_str):
-        mult = 1
-        if amount_str[-1].lower() == "t":
-            mult = 1e12
-            amount_str = amount_str[:-1]
-        elif amount_str[-1].lower() == "b":
-            mult = 1e9
-            amount_str = amount_str[:-1]
-        elif amount_str[-1].lower() == "m":
-            mult = 1e6
-            amount_str = amount_str[:-1]
-        elif amount_str[-1].lower() == "k":
-            mult = 1e3
-            amount_str = amount_str[:-1]
-
-        return int(float(amount_str) * mult)
-
     def check_bet_validity(
             self, disc_id, guild_id, bet_amount, game_timestamp,
             bet_str, balance, bet_target, target_name, ticket
@@ -441,7 +424,7 @@ class BettingHandler:
         min_amount = MINIMUM_BETTING_AMOUNT
         amount = 0
         try:
-            amount = balance if bet_amount == "all" else self.parse_bet_amount(bet_amount.strip())
+            amount = balance if bet_amount == "all" else parse_amount_str(bet_amount.strip())
 
             if amount < min_amount: # Bet was for less than the minimum allowed amount.
                 err_msg = self.get_bet_error_msg(
@@ -637,7 +620,7 @@ class BettingHandler:
             return (False, err_msg)
 
         try:
-            amount = balance if amount_str == "all" else self.parse_bet_amount(amount_str)
+            amount = balance if amount_str == "all" else parse_amount_str(amount_str)
         except ValueError:
             err_msg = self.get_gift_err_msg(f"Invalid token amount: '{amount_str}'.")
             return (False, err_msg)

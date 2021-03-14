@@ -126,9 +126,9 @@ def intfar_by_kp(data, config):
     Returns the info of the Int-Far, if this person has very low kill participation.
     This is determined by:
         - Having the lowest KP in the group
-        - KP being less than 25
+        - KP being less than 20
         - Number of kills + assists being less than 10
-        - Turrets + Inhibitors destroyed < 3
+        - Turrets + Inhibitors destroyed < 2
     Returns None if none of these criteria matches a person.
     """
     team_kills = data[0][1]["kills_by_team"]

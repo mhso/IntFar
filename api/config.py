@@ -9,7 +9,8 @@ class Config:
         self.discord_token = ""
         self.env = ""
         self.riot_key = ""
-        self.database = "database.db"
+        self.database = "resources/database.db"
+        self.generate_predictions_img = False
 
         # ===== Active Game Monitoring =====
         self.status_interval_dormant = 60 * 2 # 2 minutes wait time between checking for status.
@@ -22,6 +23,11 @@ class Config:
         self.betting_tokens_for_doinks = 15
         self.clash_multiplier = 5
 
+        # ===== Shop =====
+        self.max_shop_price = int(1e12)
+        self.max_shop_quantity = 1000
+        self.shop_open = True
+
         # ===== Intfar Criterias =====
         self.kda_lower_threshold = 1.3
         self.kda_death_criteria = 2
@@ -29,7 +35,7 @@ class Config:
         self.death_kda_criteria = 2.1
         self.kp_lower_threshold = 20
         self.kp_takedowns_criteria = 10
-        self.kp_structures_criteria = 3
+        self.kp_structures_criteria = 2
         self.vision_score_lower_threshold = 11
         self.vision_kda_criteria = 3.0
 

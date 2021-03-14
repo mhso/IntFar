@@ -1,4 +1,3 @@
-from sqlite3.dbapi2 import ProgrammingError
 from sys import argv
 import sqlite3
 
@@ -7,7 +6,7 @@ if len(argv) == 1:
 
 database = argv[1]
 
-conn = sqlite3.connect(database + ".db")
+conn = sqlite3.connect("resources/" + database + ".db")
 
 if len(argv) > 2:
     filename = argv[2]

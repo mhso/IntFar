@@ -90,13 +90,13 @@ def format_duration(dt_1, dt_2):
     seconds = td.seconds
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    response = f"{zero_pad(hours)}h {zero_pad(minutes)}m {zero_pad(seconds)}s"
+    response = f"{zero_pad(hours)}h, {zero_pad(minutes)}m, {zero_pad(seconds)}s"
     if minutes == 0:
         response = f"{seconds} seconds"
     else:
         response = f"{zero_pad(minutes)} minutes & {zero_pad(seconds)} seconds"
     if hours > 0:
-        response = f"{zero_pad(hours)}h {zero_pad(minutes)}m {zero_pad(seconds)}s "
+        response = f"{zero_pad(hours)}h, {zero_pad(minutes)}m, {zero_pad(seconds)}s"
     if days > 0:
         response = f"{days} days, " + response
     if months > 0:
@@ -121,6 +121,23 @@ def format_tokens_amount(tokens):
         formatted += as_str[reverse_i]
 
     return formatted
+
+def parse_amount_str(amount_str):
+    mult = 1
+    if amount_str[-1].lower() == "t":
+        mult = 1e12
+        amount_str = amount_str[:-1]
+    elif amount_str[-1].lower() == "b":
+        mult = 1e9
+        amount_str = amount_str[:-1]
+    elif amount_str[-1].lower() == "m":
+        mult = 1e6
+        amount_str = amount_str[:-1]
+    elif amount_str[-1].lower() == "k":
+        mult = 1e3
+        amount_str = amount_str[:-1]
+
+    return int(float(amount_str) * mult)
 
 def generate_user_secret():
     return secrets.token_hex(nbytes=32)
@@ -159,7 +176,7 @@ def format_timestamp(timestamp):
     return f"{zero_pad(minutes)}:{zero_pad(seconds)}"
 
 def create_predictions_timeline_image():
-    filename = "predictions_temp.json"
+    filename = "resources/predictions_temp.json"
 
     if not exists(filename):
         return None
@@ -178,12 +195,12 @@ def create_predictions_timeline_image():
     arr[:, :, 2] = 15
     image = Image.fromarray(arr)
     draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype("consola.ttf", 20)
+    font = ImageFont.truetype("resouces/consola.ttf", 20)
 
     line_color = (10, 150, 180)
 
     pad_x = 20
-    pad_y = 10
+    pad_y = 20
     step_x = (img_w  - (pad_x * 2)) / (len(json_data["predictions"])-1)
 
     points = []

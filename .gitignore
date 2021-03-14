@@ -9,9 +9,9 @@ api/champions*.json
 api/maps.json
 debug.log
 app/static/*
+resouces/consola.tff
 vendor
 composer.lock
 all_messages.txt
 fix_payouts.py
-data
 misc

@@ -268,15 +268,15 @@ def active_game_ended():
 
     flask.current_app.config["ACTIVE_GAME"][int(data["guild_id"])] = None
 
-    if flask.current_app.config["GAME_PREDICTION"].get(int(data("game_id"))) is not None:
-        remove("predictions_temp.json")
+    if flask.current_app.config["GAME_PREDICTION"].get(int(data["game_id"])) is not None:
+        remove("resources/predictions_temp.json")
 
-    flask.current_app.config["GAME_PREDICTION"][int(data("game_id"))] = None
+    flask.current_app.config["GAME_PREDICTION"][int(data["game_id"])] = None
 
     return flask.make_response(("Success! Active game ID deleted.", 200))
 
 def save_prediction_to_file(prediction, game_duration):
-    filename = "predictions_temp.json"
+    filename = "resources/predictions_temp.json"
     if exists(filename):
         snapshot_json = json.load(open(filename, "r", encoding="utf-8"))
     else:

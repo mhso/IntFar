@@ -91,3 +91,14 @@ CREATE TABLE [bets] (
     [result] INTEGER(2),
     [payout] INTEGER
 );
+CREATE TABLE [shop_items] (
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [name] NVARCHAR(64) NOT NULL,
+    [price] INTEGER NOT NULL,
+    [seller_id] INTEGER
+);
+CREATE TABLE [owned_items] (
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [name] NVARCHAR(64) NOT NULL,
+    [owner_id] INTEGER NOT NULL
+);

@@ -25,7 +25,7 @@ CHANNEL_IDS = [ # List of channels that Int-Far will write to.
 ]
 
 def load_flavor_texts(filename):
-    path = f"flavor_texts/{filename}.txt"
+    path = f"resources/flavor_texts/{filename}.txt"
     with open(path, "r", encoding="UTF-8") as f:
         return [x.replace("\n", "") for x in f.readlines()]
 
@@ -75,6 +75,7 @@ VALID_COMMANDS = {
     "users": (None, "List all users who are currently signed up for the Int-Far™ Tracker™."),
     "help": (None, "Show the helper text."),
     "commands": (None, "Show this list of commands."),
+    "usage": ("[command]", "Show how to use a given command."),
     "stats": (None, "Show a list of available stat keywords to check"),
     "intfar": (
         "(person)",
@@ -98,13 +99,13 @@ VALID_COMMANDS = {
         "[stat] (person)",
         ("Show how many times you (or someone else) " +
          "were the best in the specific stat. " +
-         "Fx. '!best kda' shows how many times you had the best KDA in a game." +
+         "Fx. '!best kda' shows how many times you had the best KDA in a game. " +
          "'!best [stat] all' shows what the best ever was for that stat, and who got it.")
     ),
     "worst": (
         "[stat] (person)",
         ("Show how many times you (or someone else) " +
-         "were the worst at the specific stat." +
+         "were the worst at the specific stat. " +
          "'!worst [stat] all' shows what the worst ever was for that stat, and who got it.")
     ),
     "uptime": (None, "Show for how long the bot has been up and running."),
@@ -149,19 +150,25 @@ VALID_COMMANDS = {
     ),
     "report": ("[person]", "Report someone, f.x. if they are being a poon."),
     "reports": ("(person)", "See how many times someone (or yourself) has been reported."),
-    # "shop": (
-    #     None,
-    #     "Get a list of totally real items that you can buy with your hard-earned betting tokens!"
-    # ),
-    # "buy": ("[item] (quantity)", "Buy one or more copies of an item from the shop."),
-    # "sell": (
-    #     "[item] [price] (quantity)",
-    #     (
-    #         "Add a listing in the shop for one or more copies of an item that you own. " +
-    #         "Other people can then buy the item at the specified price."
-    #     )
-    # ),
-    # "inventory": ("(person)", "List all the items that your or someone else owns.")
+    "shop": (
+        None,
+        "Get a list of totally real items that you can buy with your hard-earned betting tokens!"
+    ),
+    "buy": (
+        "[quantity] [item] (price)",
+        (
+            "Buy one or more copies of an item from the shop at a " +
+            "given price (or cheapest if price is not given)."
+        )
+    ),
+    "sell": (
+        "[quantity] [item] [price]",
+        (
+            "Add a listing in the shop for one or more copies of an item that you own. " +
+            "Other people can then buy the item at the specified price."
+        )
+    ),
+    "inventory": ("(person)", "List all the items that your or someone else owns.")
 }
 
 ALIASES = {
@@ -221,18 +228,21 @@ def get_streak_flavor_text(nickname, streak):
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 class DiscordClient(discord.Client):
-    def __init__(self, config, database, betting_handler, riot_api, **kwargs):
+    def __init__(self, config, database, betting_handler, riot_api, shop_handler, **kwargs):
         super().__init__(
-            intents=discord.Intents(members=True,
-                                    voice_states=True,
-                                    guilds=True,
-                                    emojis=True,
-                                    guild_messages=True)
+            intents=discord.Intents(
+                members=True,
+                voice_states=True,
+                guilds=True,
+                emojis=True,
+                guild_messages=True
+            )
         )
         self.config = config
         self.database = database
         self.riot_api = riot_api
         self.betting_handler = betting_handler
+        self.shop_handler = shop_handler
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
         self.cached_avatars = {}
@@ -259,7 +269,7 @@ class DiscordClient(discord.Client):
             image.save(b_io, format="PNG")
             b_io.seek(0)
             file = discord.File(b_io, filename="predictions.png")
-            await channel.send("Odds of winning throughout the game.", file=file)
+            await channel.send("Odds of winning throughout the game:", file=file)
 
     async def poll_for_game_end(self, guild_id):
         """
@@ -386,14 +396,15 @@ class DiscordClient(discord.Client):
                             filtered_stats, intfar, intfar_reason, doinks, guild_id
                         )
 
-                    predictions_img = None
-                    for disc_id, _, _ in users_in_game:
-                        if ADMIN_DISC_ID == disc_id:
-                            predictions_img = api_util.create_predictions_timeline_image()
-                            break
+                    if self.config.generate_predictions_img:
+                        predictions_img = None
+                        for disc_id, _, _ in users_in_game:
+                            if ADMIN_DISC_ID == disc_id:
+                                predictions_img = api_util.create_predictions_timeline_image()
+                                break
 
-                    if predictions_img is not None:
-                        await self.send_predictions_timeline_image(predictions_img, guild_id)
+                        if predictions_img is not None:
+                            await self.send_predictions_timeline_image(predictions_img, guild_id)
 
                 req_data = {
                     "secret": self.config.discord_token,
@@ -1175,7 +1186,7 @@ class DiscordClient(discord.Client):
         duration = api_util.format_duration(dt_now, monitor.time_at_announcement)
         self.config.log(f"Time until then: {duration}")
 
-        time_to_sleep = 60
+        time_to_sleep = 30
         while not monitor.should_announce():
             await asyncio.sleep(time_to_sleep)
 
@@ -1217,6 +1228,7 @@ class DiscordClient(discord.Client):
 
     async def on_disconnect(self):
         self.config.log("Client disconnected, restarting...")
+        self.clear()
         exit(1)
 
     async def on_ready(self):
@@ -1250,6 +1262,8 @@ class DiscordClient(discord.Client):
 
         asyncio.create_task(self.sleep_until_monthly_infar())
 
+        self.config.log(f"Websocket is open: {not self.is_closed()}")
+
         if self.flask_conn is not None: # Listen for external commands from web page.
             event_loop = asyncio.get_event_loop()
             Thread(target=listen_for_request, args=(self, event_loop)).start()
@@ -1279,12 +1293,25 @@ class DiscordClient(discord.Client):
             params_str = "`-" if params is None else f"{params}` -"
             commands.append(f"`!{cmd_str} {params_str} {desc}")
 
-        message_1 = response + "\n".join(commands[:14]) + "\n"
-        message_2 = "\n".join(commands[14:])
+        message_1 = response + "\n".join(commands[:17]) + "\n"
+        message_2 = "\n".join(commands[17:])
 
         await message.channel.send(message_1)
         await asyncio.sleep(0.5)
         await message.channel.send(message_2)
+
+    async def handle_usage_msg(self, message, command):
+        if not self.valid_command(message, command, None):
+            await message.channel.send(f"Not a valid command: '{command}'.")
+
+        args, help_msg = VALID_COMMANDS.get(command)
+        response = f"Usage: `!{command}"
+        if args is not None:
+            response += f" {args}"
+        response += "`\n"
+        response += help_msg
+
+        await message.channel.send(response)
 
     async def handle_stats_msg(self, message):
         valid_stats = ", ".join("'" + cmd + "'" for cmd in api_util.STAT_COMMANDS)
@@ -1707,8 +1734,7 @@ class DiscordClient(discord.Client):
 
     async def handle_make_bet_msg(self, message, events, amounts, targets):
         if None in amounts or None in events:
-            msg = "Usage: `!bet [event] [amount] (person)`"
-            await message.channel.send(msg)
+            await self.handle_usage_msg(message, "bet")
             return
 
         target_ids = []
@@ -1742,7 +1768,7 @@ class DiscordClient(discord.Client):
         await message.channel.send(response)
 
     async def handle_cancel_bet_msg(self, message, betting_event, target_id=None):
-        target_name = (None if target_id is None 
+        target_name = (None if target_id is None
                        else self.get_discord_nick(target_id, message.guild.id))
 
         response = self.betting_handler.cancel_bet(
@@ -1985,7 +2011,7 @@ class DiscordClient(discord.Client):
         await message.channel.send(self.insert_emotes(response))
 
     async def handle_intfar_criteria_msg(self, message, criteria):
-        response = ""
+        response = None
         if criteria is None:
             response = "You must specify a criteria. This can be one of:\n"
             response += "'kda', 'deaths', 'kp', 'vision'"
@@ -2020,22 +2046,121 @@ class DiscordClient(discord.Client):
                         f" - Having less than {crit_1} vision score\n"
                         f" - Having less than {crit_2} KDA")
 
-        response += "\nThese criteria must all be met to be Int-Far."
+        if response is not None:
+            response += "\nThese criteria must all be met to be Int-Far."
 
         await message.channel.send(response)
 
-    async def handle_shop_msg(self, message):
-        pass
+    def format_item_list(self, items, headers):
+        strings = []
+        max_len_1 = 0
+        max_len_2 = 0
+        for item_details in items:
+            item_name = item_details[0]
+            quantity = item_details[-1]
+            if len(item_details) > 2:
+                price = item_details[1]
 
-    async def handle_buy_msg(self, message, item):
-        pass
+            name_fmt = f"{item_name}"
+            if len(name_fmt) > max_len_1:
+                max_len_1 = len(name_fmt)
+
+            price_fmt = None
+            if len(item_details) > 2:
+                price_fmt = f"\t{api_util.format_tokens_amount(price)} GBP"
+                if len(price_fmt) > max_len_2:
+                    max_len_2 = len(price_fmt)
+
+            quant_fmt = f"\t{quantity}x"
+            strings.append((name_fmt, price_fmt, quant_fmt))
+
+        h_1 = headers[0]
+        header_len_1 = max_len_1
+        if len(headers) > 2:
+            header_len_1 = int(max_len_1 * 1.5)
+        pad_h_1 = " " * ((header_len_1 - 1) - len(h_1))
+        h_2 = headers[1]
+        pad_h_2 = ""
+        h_3 = ""
+        if len(headers) > 2:
+            pad_h_2 = " " * ((max_len_2 // 2 + 4) - len(h_2))
+            h_3 = headers[2]
+
+        header_str = f"{h_1} {pad_h_1}{h_2} {pad_h_2}{h_3}"
+        list_fmt = header_str + "\n"
+        list_fmt += "-" * len(header_str) + "\n"
+
+        for item_str, price_str, quantity_str in strings:
+            pad_1 = ""
+            pad_2 = ""
+            if len(item_str) < max_len_1:
+                pad_1 = " " * (max_len_1 - len(item_str))
+            if price_str is None:
+                price_str = ""
+            elif len(price_str) < max_len_2:
+                pad_2 = " " * (max_len_2 - len(price_str))
+
+            list_fmt += f"{item_str}{pad_1}{price_str}{pad_2}{quantity_str}\n"
+
+        return list_fmt
+
+    async def handle_shop_msg(self, message):
+        if not self.shop_handler.shop_is_open():
+            response = "Shop is closed! It may open again later, who knows."
+            await message.channel.send(response)
+            return
+
+        items = self.database.get_items_in_shop()
+
+        dt_now = datetime.now()
+        time_to_closing = api_util.format_duration(dt_now, self.shop_handler.shop_closing_dt)
+
+        response = f"Shop closes in {time_to_closing}!\n"
+        response += "Items in the shop:\n```"
+        response += self.format_item_list(items, ("Item Name", "Price", "Quantity"))
+        response += "```"
+
+        await message.channel.send(response)
+
+    async def handle_buy_msg(self, message, item, quantity="1"):
+        if not self.shop_handler.shop_is_open():
+            response = "Shop is closed! Buying stuff is not possible."
+            await message.channel.send(response)
+            return
+
+        response = self.shop_handler.buy_item(
+            message.author.id, item, quantity
+        )[1]
+
+        await message.channel.send(response)
+
+    async def handle_sell_msg(self, message, price, item, quantity="1"):
+        if not self.shop_handler.shop_is_open():
+            response = "Shop is closed! Selling stuff is not possible."
+            await message.channel.send(response)
+            return
+
+        response = self.shop_handler.sell_item(
+            message.author.id, item, price, quantity
+        )[1]
+
+        await message.channel.send(response)
 
     async def handle_inventory_msg(self, message, target_id):
-        pass
+        items = self.database.get_items_for_user(target_id)
+        target_name = self.get_discord_nick(target_id, message.guild.id)
+        if items == []:
+            response = f"{target_name} currently owns no items."
+        else:
+            response = f"Items owned by {target_name}:\n```"
+            response += self.format_item_list(items, ("Item Name", "Quantity"))
+            response += "```"
+
+        await message.channel.send(response)
 
     async def handle_kick_msg(self, message, target_id):
         target_name = self.get_discord_nick(target_id, message.guild.id)
-        
+
         response = f"{target_name} has been kicked from Int-Far for being a bad boi!\n"
         response += "His data will be wiped and he will forever live in shame {emote_im_nat_kda_player_yo}"
 
@@ -2153,7 +2278,7 @@ class DiscordClient(discord.Client):
                 return True
             elif param[0] == "[" and param[-1] == "]":
                 if len(args) <= index:
-                    await message.channel.send(f"Usage: `!{cmd} {params_def}`")
+                    await self.handle_usage_msg(message, cmd)
                     return False
 
         return True
@@ -2238,6 +2363,8 @@ class DiscordClient(discord.Client):
                 await self.handle_helper_msg(message)
             elif cmd_equals(first_command, "commands"):
                 await self.handle_commands_msg(message)
+            elif cmd_equals(first_command, "usage"):
+                await self.handle_usage_msg(message, second_command)
             elif cmd_equals(first_command, "stats"):
                 await self.handle_stats_msg(message)
             elif cmd_equals(first_command, "betting"):
@@ -2317,8 +2444,12 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "shop"):
                 await self.handle_shop_msg(message)
             elif cmd_equals(first_command, "buy"):
-                target_item = self.extract_target_name(split, 1)
-                await self.handle_buy_msg(message, target_item)
+                item_name = self.extract_target_name(split, 2)
+                await self.handle_buy_msg(message, item_name, second_command)
+            elif cmd_equals(first_command, "sell"):
+                item_name = self.extract_target_name(split, 2, len(split)-1, default=None)
+                price_str = split[-1]
+                await self.handle_sell_msg(message, price_str, item_name, second_command)
             elif cmd_equals(first_command, "inventory"):
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_inventory_msg, message, target_name, target_all=False)
@@ -2342,15 +2473,15 @@ class DiscordClient(discord.Client):
         await self.channels_to_write[int(guild_id)].send(message)
 
     async def on_voice_state_update(self, member, before, after):
-        if member.guild.id == api_util.MAIN_GUILD_ID:
+        if member.guild.id in api_util.GUILD_IDS:
             if before.channel is None and after.channel is not None: # User joined.
                 await self.user_joined_voice(member.id, member.guild.id)
             elif before.channel is not None and after.channel is None: # User left.
                 await self.user_left_voice(member.id, member.guild.id)
 
-def run_client(config, database, betting_handler, riot_api, main_pipe, flask_pipe):
+def run_client(config, database, betting_handler, riot_api, shop_handler, main_pipe, flask_pipe):
     client = DiscordClient(
-        config, database, betting_handler, riot_api,
+        config, database, betting_handler, riot_api, shop_handler,
         main_pipe=main_pipe, flask_pipe=flask_pipe
     )
     client.run(config.discord_token)

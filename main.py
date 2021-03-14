@@ -4,17 +4,18 @@ from multiprocessing import Process, Pipe
 import run_flask
 from api.database import Database
 from api.bets import BettingHandler
+from api.shop import ShopHandler
 from api.config import Config
 from api.riot_api import APIClient
 from discbot.discord_bot import run_client
 
-def start_discord_process(config, database, betting_handler, riot_api, bot_end_flask):
+def start_discord_process(config, database, betting_handler, riot_api, shop_handler, bot_end_flask):
     our_end, bot_end_us = Pipe()
     bot_process = Process(
         name="Discord Bot",
         target=run_client,
         args=(
-            config, database, betting_handler, riot_api, bot_end_us, bot_end_flask
+            config, database, betting_handler, riot_api, shop_handler, bot_end_us, bot_end_flask
         )
     )
     bot_process.start()
@@ -46,6 +47,7 @@ if __name__ == "__main__":
     conf.log("Initializing database...")
     database_client = Database(conf)
     betting_handler = BettingHandler(conf, database_client)
+    shop_handler = ShopHandler(conf, database_client)
 
     riot_api = APIClient(conf)
 
@@ -59,7 +61,7 @@ if __name__ == "__main__":
 
     bot_process, our_end_bot = start_discord_process(
         conf, database_client, betting_handler,
-        riot_api, bot_end_flask
+        riot_api, shop_handler, bot_end_flask
     )
 
     while True:
@@ -73,12 +75,12 @@ if __name__ == "__main__":
                 bot_process.kill()
                 bot_process, our_end_bot = start_discord_process(
                     conf, database_client, betting_handler,
-                    riot_api, bot_end_flask
+                    riot_api, shop_handler, bot_end_flask
                 )
             if bot_process.exitcode == 1:
                 bot_process, our_end_bot = start_discord_process(
                     conf, database_client, betting_handler,
-                    riot_api, bot_end_flask
+                    riot_api, shop_handler, bot_end_flask
                 )
         except BrokenPipeError:
             print("Stopping bot...", flush=True)
