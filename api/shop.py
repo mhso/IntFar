@@ -2,7 +2,13 @@ from datetime import datetime
 from api.util import parse_amount_str, format_tokens_amount, format_duration
 
 def get_shop_error_msg(msg, event):
-    event_desc = "Listing" if event == "sell" else "Purchase"
+    if event == "sell":
+        event_desc = "Listing"
+    elif event == "buy":
+        event_desc = "Purchase"
+    else:
+        event_desc = "Cancelling listing"
+
     return f"{event_desc} of item failed: {msg}"
 
 class ShopHandler:
@@ -26,24 +32,51 @@ class ShopHandler:
 
         return self.config.shop_open
 
-    def buy_item(self, disc_id, item_name, quantity_str="1"):
-        item_split = item_name.split(" ")
-        price = None
-        try:
-            price = parse_amount_str(item_split[-1])
-            item_name = " ".join(item_split[:-1])
-        except ValueError:
-            pass
+    def parse_input(self, item_str, quantity_str, price_str=None, event=None):
+        parse_buy = price_str is None
+
+        if parse_buy:
+            item_split = item_str.split(" ")
+            try:
+                price = parse_amount_str(item_split[-1])
+                item_str = " ".join(item_split[:-1])
+            except ValueError:
+                price = None
+        else:
+            price = parse_amount_str(price_str)
+
+        if price is not None and (price < 1 or price > self.config.max_shop_price):
+            fmt_max_price = format_tokens_amount(self.config.max_shop_price)
+            err_msg = get_shop_error_msg(
+                f"Invalid price (must be above 0 and below {fmt_max_price}).", event
+            )
+            raise ValueError(err_msg)
 
         try:
             quantity = int(quantity_str)
         except ValueError:
-            err_msg = get_shop_error_msg(f"Invalid quantity: '{quantity_str}'.", "buy")
+            err_msg = get_shop_error_msg(f"Invalid quantity: '{quantity_str}'.", event)
+            raise ValueError(err_msg)
+
+        item_names = self.database.get_item_by_name(item_str)
+
+        if item_names == []:
+            err_msg = f"No item named **{item_str}** exists in the shop."
             return (False, err_msg)
 
-        if not self.database.item_exists(item_name):
-            err_msg = f"No item named **{item_name}** exists in the shop."
-            return (False, err_msg)
+        if len(item_names) > 1:
+            err_msg = f"More than one item similar to **{item_str}** exists in the shop."
+            raise ValueError(err_msg)
+
+        return item_names[0][0], price, quantity
+
+    def buy_item(self, disc_id, item_str, quantity_str="1"):
+        try:
+            parsed_data = self.parse_input(item_str, quantity_str, event="buy")
+        except ValueError as exc:
+            return (False, exc.args)
+
+        item_name, price, quantity = parsed_data
 
         items = self.database.get_items_matching_price(item_name, price, quantity)
 
@@ -82,28 +115,16 @@ class ShopHandler:
 
         return (True, status_msg)
 
-    def sell_item(self, disc_id, item_name, price_str, quantity_str="1"):
+    def sell_item(self, disc_id, item_str, price_str, quantity_str="1"):
         try:
-            price = None if price_str is None else parse_amount_str(price_str)
-        except ValueError:
-            err_msg = get_shop_error_msg(f"Invalid token amount: '{price_str}'.", "sell")
-            return (False, err_msg)
+            parsed_data = self.parse_input(item_str, quantity_str, price_str, event="sell")
+        except ValueError as exc:
+            return (False, exc.args)
 
-        if price < 1 or price > self.config.max_shop_price:
-            fmt_max_price = format_tokens_amount(self.config.max_shop_price)
-            err_msg = get_shop_error_msg(
-                f"Invalid price (must be above 0 and below {fmt_max_price}).", "sell"
-            )
-            return (False, err_msg)
-
-        try:
-            quantity = int(quantity_str)
-        except ValueError:
-            err_msg = get_shop_error_msg(f"Invalid quantity: '{quantity_str}'.", "sell")
-            return (False, err_msg)
+        item_name, price, quantity = parsed_data
 
         if quantity < 1:
-            err_msg = get_shop_error_msg("Quantity to sell must be more than zero", "sell")
+            err_msg = get_shop_error_msg("Quantity to sell must be more than zero.", "sell")
             return (False, err_msg)
 
         items = self.database.get_matching_items_for_user(disc_id, item_name, quantity)
@@ -132,5 +153,46 @@ class ShopHandler:
         if quantity > 1:
             status_msg += " each"
         status_msg += "!"
+
+        return (True, status_msg)
+
+    def cancel_listing(self, disc_id, item_str, price_str, quantity_str):
+        try:
+            parsed_data = self.parse_input(item_str, quantity_str, price_str, event="cancel")
+        except ValueError as exc:
+            return (False, exc.args)
+
+        item_name, price, quantity = parsed_data
+
+        # Get items in the shop matching price and quantity, and sold by person with 'disc_id'.
+        items = self.database.get_items_matching_price(item_name, price, quantity, disc_id)
+
+        if len(items) < quantity: # Not enough copies in the shop.
+            if items == []:
+                quantity_desc = "No"
+            else:
+                quantity_desc = f"Only {len(items)}"
+            err_msg = f"You don't have {quantity_desc} copies of **{item_name}** "
+            if price is not None:
+                err_msg += f"matching a price of {price} GBP "
+            err_msg += "listed in the shop."
+
+            return (False, err_msg)
+
+        total_price = 0 # Sum up the total price of all copies of 'item_name'.
+        item_ids = []
+        for item_id, price, _ in items:
+            total_price += price
+            item_ids.append(item_id)
+
+        self.database.cancel_listings(item_ids, item_name, disc_id, total_price)
+
+        copy_identifier = "listing" if quantity == 1 else "listings"
+        tokens_name = self.config.betting_tokens
+        status_msg = (
+            f"You just cancelled {quantity} {copy_identifier} "
+            f"of **{item_name}**. You have been refunded "
+            f"{format_tokens_amount(total_price)} {tokens_name}."
+        )
 
         return (True, status_msg)

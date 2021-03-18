@@ -117,6 +117,7 @@ VALID_COMMANDS = {
     "game": (
         "[person]", "See details about the league match the given person is in, if any."
     ),
+    "betting": (None, "Show information about betting, as well as list of possible events to bet on."),
     "bet": (
         "[event] [amount] (person)",
         ("Bet a specific amount of credits on one or more events happening " +
@@ -133,7 +134,6 @@ VALID_COMMANDS = {
         "[amount] [person]",
         "Give good-boi points to someone."
     ),
-    "betting": (None, "Show information about betting, as well as list of possible events to bet on."),
     "active_bets": ("(person)", "See a list of your (or someone else's) active bets."),
     "bets": ("(person)", "See a list of all your (or someone else's) lifetime bets."),
     "betting_tokens" : ("(person)", "See how many betting tokens you (or someone else) has."),
@@ -167,6 +167,10 @@ VALID_COMMANDS = {
             "Add a listing in the shop for one or more copies of an item that you own. " +
             "Other people can then buy the item at the specified price."
         )
+    ),
+    "cancel_sell": (
+        "[quantity] [item] [price]",
+        "Cancel a listing in the shop that you made for the given number of items at the given price"
     ),
     "inventory": ("(person)", "List all the items that your or someone else owns.")
 }
@@ -1293,8 +1297,8 @@ class DiscordClient(discord.Client):
             params_str = "`-" if params is None else f"{params}` -"
             commands.append(f"`!{cmd_str} {params_str} {desc}")
 
-        message_1 = response + "\n".join(commands[:17]) + "\n"
-        message_2 = "\n".join(commands[17:])
+        message_1 = response + "\n".join(commands[:18]) + "\n"
+        message_2 = "\n".join(commands[18:])
 
         await message.channel.send(message_1)
         await asyncio.sleep(0.5)
@@ -2134,13 +2138,25 @@ class DiscordClient(discord.Client):
 
         await message.channel.send(response)
 
-    async def handle_sell_msg(self, message, price, item, quantity="1"):
+    async def handle_sell_msg(self, message, price, item, quantity):
         if not self.shop_handler.shop_is_open():
             response = "Shop is closed! Selling stuff is not possible."
             await message.channel.send(response)
             return
 
         response = self.shop_handler.sell_item(
+            message.author.id, item, price, quantity
+        )[1]
+
+        await message.channel.send(response)
+
+    async def handle_cancel_sell_msg(self, message, price, item, quantity):
+        if not self.shop_handler.shop_is_open():
+            response = "Shop is closed! Cancelling a listing is not possible."
+            await message.channel.send(response)
+            return
+
+        response = self.shop_handler.cancel_listing(
             message.author.id, item, price, quantity
         )[1]
 
@@ -2450,6 +2466,10 @@ class DiscordClient(discord.Client):
                 item_name = self.extract_target_name(split, 2, len(split)-1, default=None)
                 price_str = split[-1]
                 await self.handle_sell_msg(message, price_str, item_name, second_command)
+            elif cmd_equals(first_command, "cancel_sell"):
+                item_name = self.extract_target_name(split, 2, len(split)-1, default=None)
+                price_str = split[-1]
+                await self.handle_cancel_sell_msg(message, price_str, item_name, second_command)
             elif cmd_equals(first_command, "inventory"):
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(self.handle_inventory_msg, message, target_name, target_all=False)

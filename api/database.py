@@ -46,7 +46,10 @@ class Database:
             if query_params is None:
                 cursor = db.cursor().execute(query)
             else:
-                cursor = db.cursor().execute(query, query_params)
+                if isinstance(query_params, list):
+                    cursor = db.cursor().executemany(query, query_params)
+                else:
+                    cursor = db.cursor().execute(query, query_params)
             if commit:
                 db.commit()
             return cursor
@@ -800,11 +803,11 @@ class Database:
             db.executemany(query, item_tuples)
             db.commit()
 
-    def item_exists(self, item_name):
+    def get_item_by_name(self, item_name):
+        fmt_name = f"%{item_name.lower()}%"
         with self.get_connection() as db:
-            query = "SELECT * FROM shop_items WHERE name=?"
-            result = self.execute_query(db, query, (item_name,)).fetchone()
-            return result is not None
+            query = "SELECT DISTINCT(name) FROM shop_items WHERE name LIKE ?"
+            return self.execute_query(db, query, (fmt_name,)).fetchall()
 
     def get_items_for_user(self, disc_id):
         with self.get_connection() as db:
@@ -816,16 +819,23 @@ class Database:
             query = "SELECT name, price, COUNT(*) FROM shop_items GROUP BY name, price ORDER BY price DESC"
             return self.execute_query(db, query).fetchall()
 
-    def get_items_matching_price(self, item_name, price, quantity):
+    def get_items_matching_price(self, item_name, price, quantity, seller_id=None):
         with self.get_connection() as db:
             if price is None: # Select the 'quantity' amounts of cheapest items.
-                query_price = "SELECT id, price, seller_id FROM shop_items WHERE name=? ORDER BY price ASC LIMIT ?"
-                params = (item_name, quantity)
+                query_price = "SELECT id, price, seller_id FROM shop_items WHERE name=? "
+                params = [item_name]
             else: # Select the 'quantity' amounts of items matching 'price'.
-                query_price = "SELECT id, price, seller_id FROM shop_items WHERE name=? AND price=? LIMIT ?"
-                params = (item_name, price, quantity)
+                query_price = "SELECT id, price, seller_id FROM shop_items WHERE name=? AND price=? "
+                params = [item_name, price]
 
-            return self.execute_query(db, query_price, params).fetchall()
+            if seller_id is not None:
+                query_price += "AND seller_id=? "
+                params.append(seller_id)
+
+            query_price += "ORDER BY price ASC LIMIT ?"
+            params.append(quantity)
+
+            return self.execute_query(db, query_price, tuple(params)).fetchall()
 
     def buy_item(self, disc_id, item_copies, total_price, item_name):
         with self.get_connection() as db:
@@ -853,13 +863,29 @@ class Database:
 
     def sell_item(self, disc_id, item_copies, item_name, price):
         with self.get_connection() as db:
-            for _ in item_copies:
-                query_insert = "INSERT INTO shop_items(name, price, seller_id) VALUES (?, ?, ?)"
-                self.execute_query(db, query_insert, (item_name, price, disc_id), commit=False)
+            query_insert = "INSERT INTO shop_items(name, price, seller_id) VALUES (?, ?, ?)"
+            params_insert = [(item_name, price, disc_id) for _ in item_copies]
+            self.execute_query(db, query_insert, params_insert)
 
-            for item_id in item_copies:
-                query_delete = "DELETE FROM owned_items WHERE id=?"
-                self.execute_query(db, query_delete, (item_id[0],), commit=False)
+            query_delete = "DELETE FROM owned_items WHERE id=?"
+            params_delete = [(item_data[0],) for item_data in item_copies]
+            self.execute_query(db, query_delete, params_delete)
+
+            db.commit()
+
+    def cancel_listings(self, item_ids, item_name, disc_id, total_price):
+        with self.get_connection() as db:
+            query_insert = "INSERT INTO owned_items(name, owner_id) VALUES (?, ?)"
+            params_insert = [(item_name, disc_id) for _ in item_ids]
+            self.execute_query(db, query_insert, params_insert)
+
+            query_delete = "DELETE FROM shop_items WHERE id=?"
+            params_delete = [(item_id,) for item_id in item_ids]
+            self.execute_query(db, query_delete, params_delete)
+
+            # Refund the tokens to the user's balance.
+            query_update = "UPDATE betting_balance SET tokens=tokens+? WHERE disc_id=?"
+            self.execute_query(db, query_update, (total_price, disc_id), commit=False)
 
             db.commit()
 

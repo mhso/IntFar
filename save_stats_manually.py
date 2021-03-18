@@ -4,6 +4,7 @@ import argparse
 from api import award_qualifiers
 from api.database import Database
 from api.bets import BettingHandler
+from api.shop import ShopHandler
 from discbot.discord_bot import DiscordClient, ADMIN_DISC_ID
 from api.config import Config
 from api.riot_api import APIClient
@@ -21,8 +22,8 @@ class MockChannel:
         await asyncio.sleep(0.1)
 
 class TestMock(DiscordClient):
-    def __init__(self, args, config, database, betting_handler, riot_api):
-        super().__init__(config, database, betting_handler, riot_api)
+    def __init__(self, args, config, database, betting_handler, riot_api, shop_handler):
+        super().__init__(config, database, betting_handler, riot_api, shop_handler)
         self.game_id = args.game_id
         self.guild_to_use = GUILDS[args.guild_name]
         self.task = args.task
@@ -111,7 +112,8 @@ database_client = Database(conf)
 conf.log("Starting Discord Client...")
 
 bet_client = BettingHandler(conf, database_client)
+shop_client = ShopHandler(conf, database_client)
 
-client = TestMock(args, conf, database_client, bet_client, riot_api)
+client = TestMock(args, conf, database_client, bet_client, riot_api, shop_client)
 
 client.run(conf.discord_token)
