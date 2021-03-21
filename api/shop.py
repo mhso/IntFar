@@ -32,7 +32,7 @@ class ShopHandler:
 
         return self.config.shop_open
 
-    def parse_input(self, item_str, quantity_str, price_str=None, event=None):
+    def parse_input(self, item_str, quantity_str, price_str=None, event="buy"):
         parse_buy = price_str is None
 
         if parse_buy:
@@ -58,14 +58,24 @@ class ShopHandler:
             err_msg = get_shop_error_msg(f"Invalid quantity: '{quantity_str}'.", event)
             raise ValueError(err_msg)
 
-        item_names = self.database.get_item_by_name(item_str)
+        item_names = self.database.get_item_by_name(item_str, event)
+
+        container = "your inventory" if event == "sell" else "the shop"
 
         if item_names == []:
-            err_msg = f"No item named **{item_str}** exists in the shop."
-            return (False, err_msg)
+            err_msg = f"No item named **{item_str}** exists in {container}."
+            raise ValueError(err_msg)
 
-        if len(item_names) > 1:
-            err_msg = f"More than one item similar to **{item_str}** exists in the shop."
+        item_name = None
+        for name in item_names:
+            if name[0].lower() == item_str:
+                item_name = name[0]
+                break
+
+        if item_name is None and len(item_names) == 1:
+            item_name = item_names[0][0]
+        elif item_names is None:
+            err_msg = f"More than one item similar to **{item_str}** exists in {container}."
             raise ValueError(err_msg)
 
         return item_names[0][0], price, quantity
@@ -74,7 +84,7 @@ class ShopHandler:
         try:
             parsed_data = self.parse_input(item_str, quantity_str, event="buy")
         except ValueError as exc:
-            return (False, exc.args)
+            return (False, exc.args[0])
 
         item_name, price, quantity = parsed_data
 
@@ -119,7 +129,7 @@ class ShopHandler:
         try:
             parsed_data = self.parse_input(item_str, quantity_str, price_str, event="sell")
         except ValueError as exc:
-            return (False, exc.args)
+            return (False, exc.args[0])
 
         item_name, price, quantity = parsed_data
 
@@ -160,7 +170,7 @@ class ShopHandler:
         try:
             parsed_data = self.parse_input(item_str, quantity_str, price_str, event="cancel")
         except ValueError as exc:
-            return (False, exc.args)
+            return (False, exc.args[0])
 
         item_name, price, quantity = parsed_data
 
@@ -179,20 +189,15 @@ class ShopHandler:
 
             return (False, err_msg)
 
-        total_price = 0 # Sum up the total price of all copies of 'item_name'.
         item_ids = []
-        for item_id, price, _ in items:
-            total_price += price
-            item_ids.append(item_id)
+        for item_data in items:
+            item_ids.append(item_data[0])
 
-        self.database.cancel_listings(item_ids, item_name, disc_id, total_price)
+        self.database.cancel_listings(item_ids, item_name, disc_id)
 
         copy_identifier = "listing" if quantity == 1 else "listings"
-        tokens_name = self.config.betting_tokens
         status_msg = (
-            f"You just cancelled {quantity} {copy_identifier} "
-            f"of **{item_name}**. You have been refunded "
-            f"{format_tokens_amount(total_price)} {tokens_name}."
+            f"You just cancelled {quantity} {copy_identifier} of **{item_name}**."
         )
 
         return (True, status_msg)

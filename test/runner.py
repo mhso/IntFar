@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import traceback
 import inspect
 
 COL_HEADER = '\033[95m'
@@ -76,6 +77,10 @@ class TestRunner:
             self.failed += 1
             self.print_failed(name, f"Failed! Expected: {expected}, actual: {value}.")
 
+    def fail(self, name):
+        self.failed += 1
+        self.print_failed(name, "Failed!")
+
     def assert_exception(self, expr, exc_class, name):
         try:
             expr()
@@ -88,6 +93,16 @@ class TestRunner:
             else:
                 self.failed += 1
                 self.print_failed(name, f"Failed! Expected exception: {exc_class}, actual: {exc}.")
+
+    def assert_no_exception(self, expr, name):
+        try:
+            expr()
+            self.passed += 1
+            self.print_passed(name, "Passed. No exception was raised.")
+        except Exception as exc:
+            self.failed += 1
+            self.print_failed(name, f"Failed! Exception {repr(type(exc))}: \"{exc}\" was raised.")
+            print(traceback.format_exc())
 
     def print_test_summary(self):
         self.current_test = None

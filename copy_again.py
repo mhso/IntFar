@@ -23,6 +23,8 @@ with database_client_1.get_connection() as db_1:
     balances = db_1.cursor().execute("SELECT * FROM betting_balance").fetchall()
     events = db_1.cursor().execute("SELECT * FROM betting_events").fetchall()
     bets = db_1.cursor().execute("SELECT * FROM bets").fetchall()
+    shop_items = db_1.cursor().execute("SELECT * FROM shop_items").fetchall()
+    owned_items = db_1.cursor().execute("SELECT * FROM owned_items").fetchall()
 
     query_prefix = "INSERT INTO "
     query_cols = (
@@ -38,7 +40,7 @@ with database_client_1.get_connection() as db_1:
         for summ in summoners:
             disc_id = int(summ[0])
             secret = summ[3]
-            db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret, summ[4]))
+            db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret, summ[4], 1))
         query = "INSERT INTO games VALUES (?, ?, ?, ?, ?)"
         for data in data_games:
             db_2.cursor().execute(query, data)
@@ -63,5 +65,11 @@ with database_client_1.get_connection() as db_1:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         for data in bets:
+            db_2.cursor().execute(query, data)
+        query = "INSERT OR IGNORE INTO shop_items VALUES (?, ?, ?, ?)"
+        for data in shop_items:
+            db_2.cursor().execute(query, data)
+        query = "INSERT OR IGNORE INTO owned_items VALUES (?, ?, ?)"
+        for data in owned_items:
             db_2.cursor().execute(query, data)
         db_2.commit()

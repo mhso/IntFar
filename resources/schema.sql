@@ -4,6 +4,7 @@ CREATE TABLE [registered_summoners] (
     [summ_id] NVARCHAR(64) NOT NULL,
     [secret] NVARCHAR(32) NOT NULL,
     [reports] INTEGER,
+    [active] INTEGER DEFAULT(1),
     PRIMARY KEY (disc_id, summ_id)
 );
 CREATE TABLE [games] (

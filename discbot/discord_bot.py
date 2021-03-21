@@ -69,110 +69,146 @@ FLIRT_MESSAGES = {
 VALID_COMMANDS = {
     "register": (
         "[summoner_name]",
-        ("Sign up for the Int-Far™ Tracker™ " +
-         "by providing your summoner name (fx. '!register imaqtpie').")
+        (
+            "Sign up for the Int-Far™ Tracker™ " +
+            "by providing your summoner name (fx. '!register imaqtpie')."
+        ),
+        None
     ),
-    "users": (None, "List all users who are currently signed up for the Int-Far™ Tracker™."),
-    "help": (None, "Show the helper text."),
-    "commands": (None, "Show this list of commands."),
-    "usage": ("[command]", "Show how to use a given command."),
-    "stats": (None, "Show a list of available stat keywords to check"),
+    "unregister": (
+        None,
+        (
+            "Leave the Int-Far™ Tracker™. You can re-join later with !register, " +
+            "and your data will not be deleted"
+        ),
+        "all"
+    ),
+    "users": (None, "List all users who are currently signed up for the Int-Far™ Tracker™.", None),
+    "help": (None, "Show the helper text.", None),
+    "commands": (None, "Show this list of commands.", None),
+    "usage": ("[command]", "Show how to use a given command.", None),
+    "stats": (None, "Show a list of available stat keywords to check", None),
     "intfar": (
         "(person)",
-        ("Show how many times you (if no summoner name is included), " +
-         "or someone else, has been the Int-Far. '!intfar all' lists Int-Far stats for all users.")
+        ("Show how many times you (or someone else) has been the Int-Far. " +
+         "'!intfar all' lists Int-Far stats for all users."),
+        "self"
     ),
-    "intfar_relations": ("(person)", "Show who you (or someone else) int the most games with."),
+    "intfar_relations": ("(person)", "Show who you (or someone else) int the most games with.", "self"),
     "intfar_criteria": (
         "[criteria]",
         ("List the things that need to happen for a person to get " +
-         "Int-Far because of a specific criteria. Fx. '!intfar_criteria kda'.")
+         "Int-Far because of a specific criteria. Fx. '!intfar_criteria kda'."),
+        None
     ),
     "doinks": (
         "(person)",
         ("Show big doinks plays you (or someone else) did! " +
-         "'!doinks all' lists all doinks stats for all users.")
+         "'!doinks all' lists all doinks stats for all users."),
+        "self"
     ),
-    "doinks_relations": ("(person)", "Show who you (or someone else) get Big Doinks the most with."),
-    "doinks_criteria": (None, "Show the different criterias needed for acquiring a doink."),
+    "doinks_relations": ("(person)", "Show who you (or someone else) get Big Doinks the most with.", "self"),
+    "doinks_criteria": (None, "Show the different criterias needed for acquiring a doink.", None),
     "best": (
         "[stat] (person)",
         ("Show how many times you (or someone else) " +
          "were the best in the specific stat. " +
          "Fx. '!best kda' shows how many times you had the best KDA in a game. " +
-         "'!best [stat] all' shows what the best ever was for that stat, and who got it.")
+         "'!best [stat] all' shows what the best ever was for that stat, and who got it."),
+        "self"
     ),
     "worst": (
         "[stat] (person)",
         ("Show how many times you (or someone else) " +
          "were the worst at the specific stat. " +
-         "'!worst [stat] all' shows what the worst ever was for that stat, and who got it.")
+         "'!worst [stat] all' shows what the worst ever was for that stat, and who got it."),
+        "self"
     ),
-    "uptime": (None, "Show for how long the bot has been up and running."),
+    "uptime": (None, "Show for how long the bot has been up and running.", None),
     "status": (
         None,
         ("Show overall stats about how many games have been played, " +
-         "how many people were Int-Far, etc.")
+         "how many people were Int-Far, etc."),
+        None
     ),
     "game": (
-        "[person]", "See details about the league match the given person is in, if any."
+        "[person]", "See details about the league match the given person is in, if any.", None
     ),
-    "betting": (None, "Show information about betting, as well as list of possible events to bet on."),
+    "betting": (
+        None, "Show information about betting, as well as list of possible events to bet on.", None
+    ),
     "bet": (
         "[event] [amount] (person)",
         ("Bet a specific amount of credits on one or more events happening " +
          "in the current or next game. Fx. '!bet game_win 100', '!bet intfar all slurp' " +
-         "or '!bet game_win 20 & no_intfar 30' (bet on game win *AND* no Int-Far).")
+         "or '!bet game_win 20 & no_intfar 30' (bet on game win *AND* no Int-Far)."),
+        "all"
     ),
     "cancel_bet": (
         "[event/ticket] (person)",
         ("Cancel a previously placed bet with the given parameters. " +
          "To cancel a multi-bet, provide the ticket generated for that bet. " +
-         "A bet can not be cancelled when the game has started.")
+         "A bet can't be cancelled when a game has started."),
+        "all"
     ),
     "give_tokens": (
         "[amount] [person]",
-        "Give good-boi points to someone."
+        "Give good-boi points to someone.",
+        "all"
     ),
-    "active_bets": ("(person)", "See a list of your (or someone else's) active bets."),
-    "bets": ("(person)", "See a list of all your (or someone else's) lifetime bets."),
-    "betting_tokens" : ("(person)", "See how many betting tokens you (or someone else) has."),
+    "active_bets": (
+        "(person)", "See a list of your (or someone else's) active bets.", "self"
+    ),
+    "bets": (
+        "(person)", "See a description your (or someone else's) lifetime bets.", "self"
+    ),
+    "betting_tokens" : (
+        "(person)", "See how many betting tokens you (or someone else) has.", "self"
+    ),
     "bet_return": (
         "[event] (person)",
-        "See the return award of a specific betting event (targetting 'person', if given)."
+        "See the return award of a specific betting event (targetting 'person', if given).",
+        "all"
     ),
-    "website": (None, "See information about the Int-Far website."),
-    "website_profile": ("(person)", "Get a link to your (or someone else's) Int-Far profile."),
+    "website": (None, "See information about the Int-Far website.", None),
+    "website_profile": ("(person)", "Get a link to your (or someone else's) Int-Far profile.", "self"),
     "website_verify": (
         None,
-        "Running this command will cause the bot to send you a secret link. " +
-        "Opening this link verifies you on the Int-Far homepage and logs you in permanently."
+        "Get a secret link that when opened will verify and log you in on the Int-Far website.",
+        "all"
     ),
-    "report": ("[person]", "Report someone, f.x. if they are being a poon."),
-    "reports": ("(person)", "See how many times someone (or yourself) has been reported."),
+    "report": ("[person]", "Report someone, f.x. if they are being a poon.", "all"),
+    "reports": ("(person)", "See how many times someone (or yourself) has been reported.", "self"),
     "shop": (
         None,
-        "Get a list of totally real items that you can buy with your hard-earned betting tokens!"
+        "Get a list of totally real items that you can buy with your hard-earned betting tokens!",
+        None
     ),
     "buy": (
         "[quantity] [item] (price)",
         (
             "Buy one or more copies of an item from the shop at a " +
-            "given price (or cheapest if price is not given)."
-        )
+            "given price (or cheapest if no price is given)."
+        ),
+        "all"
     ),
     "sell": (
         "[quantity] [item] [price]",
         (
             "Add a listing in the shop for one or more copies of an item that you own. " +
             "Other people can then buy the item at the specified price."
-        )
+        ),
+        "all"
     ),
     "cancel_sell": (
         "[quantity] [item] [price]",
-        "Cancel a listing in the shop that you made for the given number of items at the given price"
+        (
+            "Cancel a listing in the shop that you made for " +
+            "the given number of items at the given price"
+        ),
+        "all"
     ),
-    "inventory": ("(person)", "List all the items that your or someone else owns.")
+    "inventory": ("(person)", "List all the items that your or someone else owns.", "self")
 }
 
 ALIASES = {
@@ -1266,11 +1302,19 @@ class DiscordClient(discord.Client):
 
         asyncio.create_task(self.sleep_until_monthly_infar())
 
-        self.config.log(f"Websocket is open: {not self.is_closed()}")
-
         if self.flask_conn is not None: # Listen for external commands from web page.
             event_loop = asyncio.get_event_loop()
             Thread(target=listen_for_request, args=(self, event_loop)).start()
+
+    async def handle_unregister_msg(self, message):
+        self.database.remove_user(message.author.id)
+
+        response = (
+            "You are no longer registered to the Int-Far™ Tracker™ {emote_sadge} " +
+            "Your games are no longer being tracked and your stats will not be shown. " +
+            "However, your data has not been deleted and you can register again at any time."
+        )
+        await message.channel.send(self.insert_emotes(response))
 
     async def handle_helper_msg(self, message):
         """
@@ -1293,7 +1337,7 @@ class DiscordClient(discord.Client):
             cmd_str = cmd
             for alias in ALIASES.get(cmd, []):
                 cmd_str += f"/!{alias}"
-            params, desc = desc_tupl
+            params, desc, _ = desc_tupl
             params_str = "`-" if params is None else f"{params}` -"
             commands.append(f"`!{cmd_str} {params_str} {desc}")
 
@@ -1308,12 +1352,21 @@ class DiscordClient(discord.Client):
         if not self.valid_command(message, command, None):
             await message.channel.send(f"Not a valid command: '{command}'.")
 
-        args, help_msg = VALID_COMMANDS.get(command)
+        args, help_msg, access_level = VALID_COMMANDS.get(command)
         response = f"Usage: `!{command}"
         if args is not None:
             response += f" {args}"
         response += "`\n"
         response += help_msg
+
+        if access_level is not None:
+            response += "\n*Note: This command requires you to be registered"
+
+            if access_level == "self":
+                response += ", if targetted at yourself."
+            elif access_level == "all":
+                response += "."
+            response += "*"
 
         await message.channel.send(response)
 
@@ -2245,14 +2298,35 @@ class DiscordClient(discord.Client):
             targets.append(target)
         return amounts, events, targets
 
-    async def get_data_and_respond(self, handler, message, target_name=None, target_all=True, args=None):
+    async def get_data_and_respond(
+            self, handler, message, target_name=None,
+            target_all=True, access_level=None, args=None
+    ):
         try:
             handler_args = [message]
             if args is not None:
                 handler_args.extend(args)
 
             if target_name is not None:
-                target_id = self.get_target_id(message.author.id, message.guild.id, target_name, target_all)
+                target_id = self.get_target_id(
+                    message.author.id, message.guild.id, target_name, target_all
+                )
+                user_is_registered = self.database.user_exists(message.author.id)
+                if not user_is_registered:
+                    if access_level == "all":
+                        await message.channel.send(
+                            "You must be registered to Int-Far:tm: to use this command."
+                        )
+                        return
+                    elif access_level == "self" and target_id == message.author.id:
+                        await message.channel.send(
+                            (
+                                "You must be registered to Int-Far:tm: " +
+                                "to target yourself with this command."
+                            )
+                        )
+                        return
+
                 handler_args.append(target_id)
             await handler(*handler_args)
         except InvalidArgument as arg_exception:
@@ -2333,6 +2407,9 @@ class DiscordClient(discord.Client):
                 return
 
             self.timeout_length[message.author.id] = 0 # Reset timeout length.
+            access_level = VALID_COMMANDS.get(first_command)
+            if access_level is not None:
+                access_level = access_level[2]
 
             second_command = None if len(split) < 2 else split[1].lower()
             if cmd_equals(first_command, "register"): # Register the user who sent the command.
@@ -2343,6 +2420,11 @@ class DiscordClient(discord.Client):
                 else:
                     response = "You must supply a summoner name {emote_angry_gual}"
                     await message.channel.send(self.insert_emotes(response))
+            elif cmd_equals(first_command, "unregister"): # Unregister user.
+                await self.get_data_and_respond(
+                    self.handle_unregister_msg, message,
+                    target_all=False, access_level=access_level
+                )
             elif cmd_equals(first_command, "users"): # List all registered users.
                 response = ""
                 for disc_id, summ_name, _ in self.database.summoners:
@@ -2355,23 +2437,28 @@ class DiscordClient(discord.Client):
                 else:
                     response = "**--- Registered bois ---**\n" + response
                 await message.channel.send(self.insert_emotes(response))
-            elif cmd_equals(first_command, "intfar"): # Lookup how many intfar 'awards' the given user has.
+            elif cmd_equals(first_command, "intfar"):
+                # Lookup how many intfar 'awards' the given user has.
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(
-                    self.handle_intfar_msg, message, target_name
+                    self.handle_intfar_msg, message, target_name, access_level=access_level
                 )
             elif cmd_equals(first_command, "intfar_relations"):
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(
-                    self.handle_intfar_relations_msg, message, target_name, target_all=False
+                    self.handle_intfar_relations_msg, message,
+                    target_name, target_all=False, access_level=access_level
                 )
             elif cmd_equals(first_command, "doinks"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_doinks_msg, message, target_name)
+                await self.get_data_and_respond(
+                    self.handle_doinks_msg, message, target_name, access_level=access_level
+                )
             elif cmd_equals(first_command, "doinks_relations"):
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(
-                    self.handle_doinks_relations_msg, message, target_name, target_all=False
+                    self.handle_doinks_relations_msg, message, target_name,
+                    target_all=False, access_level=access_level
                 )
             elif cmd_equals(first_command, "doinks_criteria"):
                 await self.handle_doinks_criteria_msg(message)
@@ -2399,6 +2486,7 @@ class DiscordClient(discord.Client):
                 target_name = self.extract_target_name(split, 2)
                 await self.get_data_and_respond(
                     self.handle_stat_msg, message, target_name,
+                    access_level=access_level,
                     args=(first_command, second_command)
                 )
             elif cmd_equals(first_command, "intfar_criteria"):
@@ -2407,7 +2495,8 @@ class DiscordClient(discord.Client):
             elif cmd_equals(first_command, "game"):
                 target_name = self.extract_target_name(split, 1)
                 await self.get_data_and_respond(
-                    self.handle_game_msg, message, target_name, target_all=False
+                    self.handle_game_msg, message, target_name,
+                    target_all=False, access_level=access_level
                 )
             elif cmd_equals(first_command, "bet"):
                 try:
@@ -2419,34 +2508,48 @@ class DiscordClient(discord.Client):
                 target_name = self.extract_target_name(split, 2, default=None)
                 await self.get_data_and_respond(
                     self.handle_cancel_bet_msg, message, target_name,
-                    target_all=False, args=(second_command,)
+                    target_all=False, access_level=access_level,
+                    args=(second_command,)
                 )
             elif cmd_equals(first_command, "give_tokens"):
                 target_name = self.extract_target_name(split, 2)
                 await self.get_data_and_respond(
                     self.handle_give_tokens_msg, message, target_name,
-                    target_all=False, args=(second_command,)
+                    target_all=False, access_level=access_level,
+                    args=(second_command,)
                 )
             elif cmd_equals(first_command, "active_bets"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_active_bets_msg, message, target_name)
+                await self.get_data_and_respond(
+                    self.handle_active_bets_msg, message,
+                    target_name, access_level=access_level
+                )
             elif cmd_equals(first_command, "bets"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_all_bets_msg, message, target_name, target_all=False)
+                await self.get_data_and_respond(
+                    self.handle_all_bets_msg, message, target_name,
+                    target_all=False, access_level=access_level
+                )
             elif cmd_equals(first_command, "bet_return") and len(split) > 1:
                 target_name = self.extract_target_name(split, 2, default=None)
                 await self.get_data_and_respond(
                     self.handle_bet_return_msg, message, target_name,
-                    target_all=False, args=(second_command,)
+                    target_all=False, access_level=access_level,
+                    args=(second_command,)
                 )
             elif cmd_equals(first_command, "betting_tokens"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_token_balance_msg, message, target_name)
+                await self.get_data_and_respond(
+                    self.handle_token_balance_msg, message, target_name, access_level=access_level
+                )
             elif cmd_equals(first_command, "website"):
-                await self.get_data_and_respond(self.handle_website_msg, message)
+                await self.get_data_and_respond(self.handle_website_msg, message, access_level=access_level)
             elif cmd_equals(first_command, "website_profile"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_profile_msg, message, target_name, target_all=False)
+                await self.get_data_and_respond(
+                    self.handle_profile_msg, message, target_name,
+                    target_all=False, access_level=access_level
+                )
             elif cmd_equals(first_command, "website_verify"):
                 response = await self.handle_verify_msg(message)
                 dm_sent = await self.send_dm(response, message.author.id)
@@ -2456,7 +2559,10 @@ class DiscordClient(discord.Client):
                     )
             elif cmd_equals(first_command, "report"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_report_msg, message, target_name, target_all=False)
+                await self.get_data_and_respond(
+                    self.handle_report_msg, message, target_name,
+                    target_all=False, access_level=access_level
+                )
             elif cmd_equals(first_command, "shop"):
                 await self.handle_shop_msg(message)
             elif cmd_equals(first_command, "buy"):
@@ -2472,17 +2578,26 @@ class DiscordClient(discord.Client):
                 await self.handle_cancel_sell_msg(message, price_str, item_name, second_command)
             elif cmd_equals(first_command, "inventory"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_inventory_msg, message, target_name, target_all=False)
+                await self.get_data_and_respond(
+                    self.handle_inventory_msg, message, target_name,
+                    target_all=False, access_level=access_level
+                )
             elif cmd_equals(first_command, "reports"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_see_reports_msg, message, target_name)
+                await self.get_data_and_respond(
+                    self.handle_see_reports_msg, message,
+                    target_name, access_level=access_level
+                )
             elif cmd_equals(first_command, "intdaddy"):
                 await self.handle_flirtation_msg(message, "english")
             elif cmd_equals(first_command, "intpapi"):
                 await self.handle_flirtation_msg(message, "spanish")
             elif cmd_equals(first_command, "kick"):
                 target_name = self.extract_target_name(split, 1)
-                await self.get_data_and_respond(self.handle_kick_msg, message, target_name)
+                await self.get_data_and_respond(
+                    self.handle_kick_msg, message,
+                    target_name, access_level=access_level
+                )
             elif cmd_equals(first_command, "restart"):
                 response = self.insert_emotes("I will kill myself and come back stronger! {emote_nazi}")
                 await message.channel.send(response)
