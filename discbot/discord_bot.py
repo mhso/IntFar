@@ -285,6 +285,7 @@ class DiscordClient(discord.Client):
         self.shop_handler = shop_handler
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
+        self.lan_db = kwargs.get("lan_database")
         self.cached_avatars = {}
         self.users_in_game = {}
         self.active_game = {}
@@ -1307,13 +1308,27 @@ class DiscordClient(discord.Client):
             Thread(target=listen_for_request, args=(self, event_loop)).start()
 
     async def handle_unregister_msg(self, message):
-        self.database.remove_user(message.author.id)
+        user_in_game = False
+        for guild_id in api_util.GUILD_IDS:
+            for disc_id, _, _ in self.users_in_game.get(guild_id, []):
+                # If user is in game, unregistration is not allowed.
+                if disc_id == message.author.id:
+                    user_in_game = True
+                    break
 
-        response = (
-            "You are no longer registered to the Int-Far™ Tracker™ {emote_sadge} " +
-            "Your games are no longer being tracked and your stats will not be shown. " +
-            "However, your data has not been deleted and you can register again at any time."
-        )
+        if user_in_game:
+            response = (
+                "You can't unregister in the middle of a game " +
+                "(that would be cheating {emote_im_nat_kda_player_yo})"
+            )
+        else:
+            self.database.remove_user(message.author.id)
+            response = (
+                "You are no longer registered to the Int-Far™ Tracker™ {emote_sadge} " +
+                "Your games are no longer being tracked and your stats will not be shown. " +
+                "However, your data has not been deleted and you can register again at any time."
+            )
+
         await message.channel.send(self.insert_emotes(response))
 
     async def handle_helper_msg(self, message):
@@ -1409,11 +1424,11 @@ class DiscordClient(discord.Client):
         response = f"**Uptime:** {self.get_uptime(self.time_initialized)}\n"
 
         (games, earliest_game, users, intfars,
-         doinks, games_ratios, intfar_ratios,
+         doinks, unique_doinks, games_ratios, intfar_ratios,
          intfar_multi_ratios) = self.database.get_meta_stats()
 
         pct_intfar = int((intfars / games) * 100)
-        pct_doinks = int((doinks / games) * 100)
+        pct_doinks = int((unique_doinks / games) * 100)
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         doinks_emote = self.insert_emotes("{emote_Doinks}")
         all_bets = self.database.get_bets(False)
@@ -2068,11 +2083,8 @@ class DiscordClient(discord.Client):
         await message.channel.send(self.insert_emotes(response))
 
     async def handle_intfar_criteria_msg(self, message, criteria):
-        response = None
-        if criteria is None:
-            response = "You must specify a criteria. This can be one of:\n"
-            response += "'kda', 'deaths', 'kp', 'vision'"
-        elif criteria == "kda":
+        valid_criteria = True
+        if criteria == "kda":
             crit_1 = self.config.kda_lower_threshold
             crit_2 = self.config.kda_death_criteria
             response = ("Criteria for being Int-Far by low KDA:\n" +
@@ -2102,8 +2114,12 @@ class DiscordClient(discord.Client):
                         " - Having the lowest vision score of the people playing\n" +
                         f" - Having less than {crit_1} vision score\n"
                         f" - Having less than {crit_2} KDA")
+        else:
+            response = "You must specify a valid criteria. This can be one of:\n"
+            response += "'kda', 'deaths', 'kp', 'vision'"
+            valid_criteria = False
 
-        if response is not None:
+        if valid_criteria:
             response += "\nThese criteria must all be met to be Int-Far."
 
         await message.channel.send(response)

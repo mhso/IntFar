@@ -12,9 +12,16 @@ if len(argv) > 2:
     filename = argv[2]
     with open(filename + ".sql", "r") as fp:
         result = conn.cursor().execute(fp.read())
+        rows_returned = 0
         for row in result:
             print(row)
+            rows_returned += 1
         conn.commit()
+        rows_affected = conn.cursor().execute("SELECT changes()").fetchone()[0]
+        if rows_affected > 0:
+            print(f"Rows affected: {rows_affected}")
+        else:
+            print(f"Rows returned: {rows_returned}")
     exit(0)
 
 try:

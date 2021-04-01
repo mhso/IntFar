@@ -225,24 +225,25 @@ class Database:
 
             if stat == "first_blood":
                 query = (
-                    f"SELECT Count(*) FROM {table}, registered_summoners as rs " +
-                    "WHERE first_blood=? AND rs.disc_id=first_blood AND rs.active=1"
+                    f"SELECT Count(DISTINCT game_id) FROM {table} JOIN registered_summoners rs ON " +
+                    "rs.disc_id=first_blood WHERE first_blood=? AND rs.active=1"
                 )
                 result = self.execute_query(db, query, (disc_id,)).fetchone()
                 return result[0], None, None
 
             query = (
-                f"SELECT Count(*), {aggregator}({stat}), game_id " +
-                f"FROM {table}, registered_summoners as rs WHERE " +
-                f"{stat}_id=? AND rs.disc_id={stat}_id AND rs.active=1"
+                f"SELECT Count(DISTINCT game_id), {aggregator}({stat}), game_id " +
+                f"FROM {table} JOIN registered_summoners rs ON " +
+                f"rs.disc_id={stat}_id WHERE {stat}_id=? AND rs.active=1"
             )
 
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
     def get_doinks_count(self, context=None):
         query_doinks = (
-            "SELECT Count(*) FROM participants as p, registered_summoners as rs " +
-            "WHERE doinks IS NOT NULL AND rs.disc_id=p.disc_id AND rs.active=1"
+            "SELECT Count(*), COUNT (DISTINCT game_id) FROM participants as p, " +
+            "registered_summoners as rs WHERE doinks IS NOT NULL " +
+            "AND rs.disc_id=p.disc_id AND rs.active=1"
         )
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_doinks).fetchone()
@@ -283,9 +284,9 @@ class Database:
         with (self.get_connection()) as db:
             query = (
                 "SELECT g.game_id, timestamp, p.disc_id, doinks, intfar_id, "
-                "intfar_reason FROM participants AS p, games "
-                "AS g, registered_summoners as rs WHERE p.game_id = g.game_id " +
-                "AND rs.disc_id=p.disc_id AND rs.active=1 ORDER BY timestamp ASC"
+                "intfar_reason FROM participants AS p LEFT JOIN games g ON "
+                "p.game_id = g.game_id LEFT JOIN registered_summoners rs ON " +
+                "p.disc_id=rs.disc_id WHERE rs.active=1 GROUP BY p.game_id, p.disc_id ORDER BY timestamp ASC"
             )
             return self.execute_query(db, query).fetchall()
 
@@ -298,18 +299,19 @@ class Database:
 
     def get_intfar_count(self, context=None):
         query_intfars = (
-            "SELECT Count(intfar_id) FROM games, registered_summoners as rs " +
-            "WHERE intfar_id IS NOT NULL AND rs.disc_id=intfar_id AND rs.active=1"
+            "SELECT intfar_id FROM games LEFT JOIN registered_summoners rs " +
+            "ON rs.disc_id=intfar_id WHERE intfar_id IS NOT NULL AND " +
+            "rs.active=1 GROUP BY game_id"
         )
         with (self.get_connection() if context is None else context) as db:
-            return self.execute_query(db, query_intfars).fetchone()
+            return len(self.execute_query(db, query_intfars).fetchall())
 
     def get_intfar_reason_counts(self, context=None):
         query_intfar_multis = (
-            "SELECT intfar_reason FROM games, registered_summoners as rs " +
-            "WHERE intfar_reason IS NOT NULL AND rs.disc_id=intfar_id AND rs.active=1"
+            "SELECT intfar_reason FROM games LEFT JOIN registered_summoners rs " +
+            "ON rs.disc_id=intfar_id WHERE intfar_id IS NOT NULL AND " +
+            "rs.active=1 GROUP BY game_id"
         )
-
         with (self.get_connection() if context is None else context) as db:
             intfar_multis_data = self.execute_query(db, query_intfar_multis).fetchall()
 
@@ -409,8 +411,8 @@ class Database:
 
     def get_longest_intfar_streak(self, disc_id):
         query = (
-            "SELECT intfar_id FROM games, registered_summoners as rs " +
-            "WHERE intfar_id=rs.disc_id AND rs.active=1 ORDER BY game_id"
+            "SELECT intfar_id FROM games LEFT JOIN registered_summoners rs " +
+            "ON intfar_id=rs.disc_id GROUP BY game_id ORDER BY game_id"
         )
         with self.get_connection() as db:
             int_fars = self.execute_query(db, query).fetchall()
@@ -426,10 +428,12 @@ class Database:
             return max_count
 
     def get_longest_no_intfar_streak(self, disc_id):
+        if not self.user_exists(disc_id):
+            return 0
+
         query = """
-        SELECT intfar_id FROM games g, participants p, registered_summoners as rs
-        WHERE g.game_id = p.game_id AND intfar_id=rs.disc_id AND rs.active=1 
-        AND p.disc_id=? ORDER BY g.game_id
+        SELECT intfar_id FROM participants p LEFT JOIN games g ON g.game_id=p.game_id
+        WHERE p.disc_id=? ORDER BY g.game_id
         """
         with self.get_connection() as db:
             int_fars = self.execute_query(db, query, (disc_id,)).fetchall()
@@ -446,8 +450,8 @@ class Database:
 
     def get_current_intfar_streak(self):
         query = (
-            "SELECT intfar_id FROM games, registered_summoners as rs " +
-            "WHERE intfar_id=rs.disc_id AND rs.active=1 ORDER BY game_id DESC"
+            "SELECT intfar_id FROM games LEFT JOIN registered_summoners rs " +
+            "ON intfar_id=rs.disc_id GROUP BY game_id ORDER BY game_id DESC"
         )
         with self.get_connection() as db:
             int_fars = self.execute_query(db, query).fetchall()
@@ -520,13 +524,15 @@ class Database:
 
     def get_doinks_stats(self, disc_id=None):
         query = (
-            "SELECT doinks FROM participants AS p, registered_summoners as rs " +
-            "WHERE doinks IS NOT NULL AND rs.disc_id=p.disc_id AND rs.active=1"
+            "SELECT doinks FROM participants AS p LEFT JOIN registered_summoners rs " +
+            "ON rs.disc_id=p.disc_id WHERE doinks IS NOT NULL AND rs.active=1"
         )
         param = None
         if disc_id is not None:
             query += " AND p.disc_id=?"
             param = (disc_id,)
+
+        query += " GROUP BY game_id"
 
         with self.get_connection() as db:
             return self.execute_query(db, query, param).fetchall()
@@ -685,7 +691,10 @@ class Database:
             )
             if not only_active:
                 query += ", result, payout"
-            query += " FROM bets, registered_summoners AS rs WHERE "
+            query += (
+                " FROM bets LEFT JOIN registered_summoners rs " +
+                "ON rs.disc_id=better_id WHERE "
+            )
             if not only_active:
                 query += "result != 0"
             else:
@@ -699,7 +708,7 @@ class Database:
                 query += " AND guild_id=?"
                 params = params + (guild_id,) if params is not None else (guild_id,)
 
-            query += " AND rs.disc_id=better_id AND rs.active=1 ORDER by id"
+            query += " AND rs.active=1 GROUP BY id ORDER by id"
 
             data = self.execute_query(db, query, params).fetchall()
             data_for_person = {}

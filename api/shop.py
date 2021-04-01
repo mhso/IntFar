@@ -43,7 +43,13 @@ class ShopHandler:
             except ValueError:
                 price = None
         else:
-            price = parse_amount_str(price_str)
+            try:
+                price = parse_amount_str(price_str)
+            except ValueError:
+                err_msg = get_shop_error_msg(
+                    f"Invalid price formatting: {price_str}.", event
+                )
+                raise ValueError(err_msg)
 
         if price is not None and (price < 1 or price > self.config.max_shop_price):
             fmt_max_price = format_tokens_amount(self.config.max_shop_price)
