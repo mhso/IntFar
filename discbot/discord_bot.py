@@ -1268,9 +1268,7 @@ class DiscordClient(discord.Client):
         self.config.log("Client connected")
 
     async def on_disconnect(self):
-        self.config.log("Client disconnected, restarting...")
-        self.clear()
-        exit(1)
+        self.config.log("Client disconnected...")
 
     async def on_ready(self):
         if self.initialized:
@@ -1423,8 +1421,8 @@ class DiscordClient(discord.Client):
         """
         response = f"**Uptime:** {self.get_uptime(self.time_initialized)}\n"
 
-        (games, earliest_game, users, intfars,
-         doinks, unique_doinks, games_ratios, intfar_ratios,
+        (games, earliest_game, users, doinks,
+         unique_doinks, intfars, games_ratios, intfar_ratios,
          intfar_multi_ratios) = self.database.get_meta_stats()
 
         pct_intfar = int((intfars / games) * 100)

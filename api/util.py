@@ -21,7 +21,7 @@ INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
     "KDA larger than or equal to 10", "20 kills or more", "Half of the teams damage",
-    "Getting a pentakill", "Vision score larger than 80", "Kill participation over 80%",
+    "Getting a pentakill", "Vision score larger than 100", "Kill participation over 80%",
     "Securing all epic monsters (and more than 3)", "More than 8 cs/min"
 ]
 

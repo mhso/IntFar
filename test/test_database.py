@@ -102,6 +102,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_doinks_queries(self, database):
+        print(database.get_doinks_count())
         self.assert_no_exception(database.get_doinks_count, "Get doinks counts.")
 
         self.assert_no_exception(database.get_max_doinks_details, "Get max doinks details.")

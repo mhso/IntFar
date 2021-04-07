@@ -10,7 +10,7 @@ def get_big_doinks(data):
         - Getting 20 kills or more
         - Doing more damage than the rest of the team combined
         - Getting a penta-kill
-        - Having a vision score of 80+
+        - Having a vision score of 100+
         - Having a kill-participation of 80%+
         - Securing all epic monsters
         - Getting more than 8 cs/min
@@ -25,11 +25,11 @@ def get_big_doinks(data):
         if stats["kills"] >= 20:
             mention_list.append((1, stats["kills"]))
         damage_dealt = stats["totalDamageDealtToChampions"]
-        if damage_dealt > stats["damage_by_team"]:
+        if damage_dealt > stats["damage_by_team"] - damage_dealt:
             mention_list.append((2, damage_dealt))
         if stats["pentaKills"] > 0:
             mention_list.append((3, None))
-        if stats["visionScore"] > 80:
+        if stats["visionScore"] > 100:
             mention_list.append((4, stats["visionScore"]))
         kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
         if kp > 80:

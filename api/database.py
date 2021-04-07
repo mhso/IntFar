@@ -241,9 +241,10 @@ class Database:
 
     def get_doinks_count(self, context=None):
         query_doinks = (
-            "SELECT Count(*), COUNT (DISTINCT game_id) FROM participants as p, " +
-            "registered_summoners as rs WHERE doinks IS NOT NULL " +
-            "AND rs.disc_id=p.disc_id AND rs.active=1"
+            "SELECT Count(sub.game_id), COUNT (DISTINCT sub.game_id) FROM ( " +
+            "SELECT game_id FROM participants as p JOIN registered_summoners rs " +
+            "ON rs.disc_id=p.disc_id WHERE doinks IS NOT NULL AND rs.active=1 " +
+            "GROUP BY game_id, p.disc_id) sub"
         )
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_doinks).fetchone()
@@ -351,11 +352,13 @@ class Database:
             games_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
 
             intfar_counts, intfar_multis_counts = self.get_intfar_reason_counts(db)
-            intfar_ratios = [int((count / intfar_data[0]) * 100) for count in intfar_counts]
-            intfar_multis_ratios = [int((count / intfar_data[0]) * 100) for count in intfar_multis_counts]
+            intfar_ratios = [int((count / intfar_data) * 100) for count in intfar_counts]
+            intfar_multis_ratios = [int((count / intfar_data) * 100) for count in intfar_multis_counts]
 
-            return (game_data + users + intfar_data + doinks_data +
-                    (games_ratios, intfar_ratios, intfar_multis_ratios))
+            return (
+                game_data + users + doinks_data +
+                (intfar_data, games_ratios, intfar_ratios, intfar_multis_ratios)
+            )
 
     def get_monthly_delimiter(self):
         tz_cph = TimeZone()
