@@ -212,7 +212,7 @@ class BettingHandler:
     def get_intfar_return(self, target, is_intfar):
         if target is None or not is_intfar:
             games_total = self.database.get_games_count()[0]
-            intfars_total = self.database.get_intfar_count()[0]
+            intfars_total = self.database.get_intfar_count()
             intfar_count = intfars_total if is_intfar else games_total - intfars_total
             return intfar_count, games_total
 

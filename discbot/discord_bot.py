@@ -357,14 +357,6 @@ class DiscordClient(discord.Client):
                     )
                     raise ValueError("Game info is None!")
 
-                missing_stats = game_stats.are_unfiltered_stats_well_formed(game_info)
-                if missing_stats != []:
-                    self.config.log(
-                        f"The following unfiltered stats are missing: {missing_stats}",
-                        self.config.log_error
-                    )
-                    raise ValueError("Unfiltered stats are not well formed!")
-
                 if self.database.game_exists(game_info["gameId"]):
                     self.config.log(
                         "We triggered end of game stuff again... Strange!",
@@ -398,10 +390,18 @@ class DiscordClient(discord.Client):
                     await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
                 else:
+                    missing_stats = game_stats.are_unfiltered_stats_well_formed(game_info)
+                    if missing_stats != []:
+                        self.config.log(
+                            f"The following unfiltered stats are missing: {missing_stats}",
+                            self.config.log_error
+                        )
+                        raise ValueError("Unfiltered stats are not well formed!")
+
                     self.config.log(f"Users in game before: {self.users_in_game.get(guild_id)}")
                     try:
                         filtered_stats, users_in_game = game_stats.get_filtered_stats(
-                            self.database, self.users_in_game.get(guild_id), game_info
+                            self.database.summoners, self.users_in_game.get(guild_id), game_info
                         )
                     except ValueError as exc:
                         self.config.log(
@@ -1949,36 +1949,40 @@ class DiscordClient(discord.Client):
         winnings = 0
         event_counts = {x: 0 for x in bets.BETTING_DESC}
 
-        for _, _, _, amounts, events, targets, game_time, result, payout in all_bets:
-            for amount, event_id, target in zip(amounts, events, targets):
-                spent += amount
-                event_counts[event_id] += 1
-                if event_counts[event_id] > max_event_count:
-                    max_event_count = event_counts[event_id]
-                    most_often_event = event_id
-                if target is not None:
-                    had_target += 1
-            if result == 1:
-                bets_won += 1
-                winnings += payout if payout is not None else 0
-            if game_time > 0:
-                during_game += 1
-
-        average_amount = int(spent / len(all_bets))
-        pct_won = int((bets_won / len(all_bets)) * 100)
-        pct_target = int((had_target / len(all_bets)) * 100)
-        pct_during = int((during_game / len(all_bets)) * 100)
-        event_desc = bets.BETTING_DESC[most_often_event]
-
         target_name = self.get_discord_nick(target_id, message.guild.id)
-        response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
-        response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
-        response += f"- Average amount of {tokens_name} wagered: **{api_util.format_tokens_amount(average_amount)}**\n"
-        response += f"- Total {tokens_name} wagered: **{api_util.format_tokens_amount(spent)}**\n"
-        response += f"- Total {tokens_name} won: **{api_util.format_tokens_amount(winnings)}**\n"
-        response += f"- Bet made the most often: `{event_desc}` (made **{max_event_count}** times)\n"
-        response += f"- Bets that targeted a person: **{had_target} ({pct_target}%)**\n"
-        response += f"- Bets made during a game: **{during_game} ({pct_during}%)**"
+
+        if all_bets is None:
+            response = f"{target_name} has not won or lost any bets yet!"
+        else:
+            for _, _, _, amounts, events, targets, game_time, result, payout in all_bets:
+                for amount, event_id, target in zip(amounts, events, targets):
+                    spent += amount
+                    event_counts[event_id] += 1
+                    if event_counts[event_id] > max_event_count:
+                        max_event_count = event_counts[event_id]
+                        most_often_event = event_id
+                    if target is not None:
+                        had_target += 1
+                if result == 1:
+                    bets_won += 1
+                    winnings += payout if payout is not None else 0
+                if game_time > 0:
+                    during_game += 1
+
+            average_amount = int(spent / len(all_bets))
+            pct_won = int((bets_won / len(all_bets)) * 100)
+            pct_target = int((had_target / len(all_bets)) * 100)
+            pct_during = int((during_game / len(all_bets)) * 100)
+            event_desc = bets.BETTING_DESC[most_often_event]
+
+            response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
+            response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
+            response += f"- Average amount of {tokens_name} wagered: **{api_util.format_tokens_amount(average_amount)}**\n"
+            response += f"- Total {tokens_name} wagered: **{api_util.format_tokens_amount(spent)}**\n"
+            response += f"- Total {tokens_name} won: **{api_util.format_tokens_amount(winnings)}**\n"
+            response += f"- Bet made the most often: `{event_desc}` (made **{max_event_count}** times)\n"
+            response += f"- Bets that targeted a person: **{had_target} ({pct_target}%)**\n"
+            response += f"- Bets made during a game: **{during_game} ({pct_during}%)**"
 
         await message.channel.send(response)
 

@@ -204,7 +204,7 @@ class Database:
             if stat == "first_blood":
                 query = (
                     f"SELECT sub.first_blood, {aggregator}(sub.c) FROM " +
-                    f"(SELECT first_blood, Count(*) AS c FROM {table}, " +
+                    f"(SELECT first_blood, Count(DISTINCT game_id) AS c FROM {table}, " +
                     "registered_summoners as rs WHERE rs.disc_id=first_blood AND rs.active=1 " +
                     "GROUP BY first_blood HAVING first_blood IS NOT NULL) sub"
                     ""
@@ -384,32 +384,42 @@ class Database:
         delim_str = self.get_monthly_delimiter()
 
         query_intfars = (
-            "SELECT Count(*) as c, intfar_id FROM games g, participants p, " +
-            "registered_summoners as rs WHERE intfar_id IS NOT NULL AND " +
-            "g.game_id=p.game_id AND intfar_id=p.disc_id AND " + delim_str +
-            " AND rs.disc_id=p.disc_id AND rs.active=1 GROUP BY intfar_id ORDER BY c DESC"
+            "SELECT intfar_id FROM games g " +
+            "LEFT JOIN registered_summoners rs ON rs.disc_id=intfar_id WHERE  " +
+            "intfar_id IS NOT NULL AND " + delim_str + " AND rs.active=1 GROUP BY g.game_id"
         )
         query_games = (
-            "SELECT Count(*) as c, p.disc_id FROM games g, participants p, " +
-            "registered_summoners as rs WHERE g.game_id=p.game_id " +
-            "AND " + delim_str + " AND rs.disc_id=p.disc_id AND rs.active=1 GROUP BY p.disc_id"
+            "SELECT p.disc_id FROM games g, participants p LEFT JOIN " +
+            "registered_summoners rs ON rs.disc_id=p.disc_id WHERE " +
+            "g.game_id=p.game_id AND " + delim_str + " AND rs.active=1 GROUP BY g.game_id, p.disc_id"
         )
         with self.get_connection() as db:
             games_per_person = self.execute_query(db, query_games).fetchall()
             intfars_per_person = self.execute_query(db, query_intfars).fetchall()
             pct_intfars = []
-            for intfars, intfar_id in intfars_per_person:
-                total_games = 0
-                for games_played, disc_id in games_per_person:
-                    if disc_id == intfar_id:
-                        total_games = games_played
-                        break
+            intfar_dict = {}
+            games_dict = {}
+            for intfar_id in intfars_per_person:
+                intfars = intfar_dict.get(intfar_id[0], 0)
+                intfar_dict[intfar_id[0]] = intfars + 1
+
+            for disc_id in games_per_person:
+                games = games_dict.get(disc_id[0], 0)
+                games_dict[disc_id[0]] = games + 1
+
+            for disc_id in games_dict:
+                total_games = games_dict[disc_id]
+
                 if total_games < self.config.ifotm_min_games:
                     # Disqualify people with less than 5 games played this month.
                     continue
+
+                intfars = intfar_dict.get(disc_id, 0)
+
                 pct_intfars.append(
-                    (intfar_id, total_games, intfars, int((intfars / total_games) * 100))
+                    (disc_id, total_games, intfars, int((intfars / total_games) * 100))
                 )
+
             return sorted(pct_intfars, key=lambda x: (x[3], x[2]), reverse=True)
 
     def get_longest_intfar_streak(self, disc_id):

@@ -102,7 +102,6 @@ class TestWrapper(TestRunner):
 
     @test
     def test_doinks_queries(self, database):
-        print(database.get_doinks_count())
         self.assert_no_exception(database.get_doinks_count, "Get doinks counts.")
 
         self.assert_no_exception(database.get_max_doinks_details, "Get max doinks details.")
@@ -146,7 +145,7 @@ class TestWrapper(TestRunner):
 
         def get_intfar_stats_func():
             database.get_intfar_stats(MY_DISC_ID)
-            database.get_intfar_stats(MY_DISC_ID, monthly=True)
+            database.get_intfar_stats(331082926475182081, monthly=True)
         self.assert_no_exception(get_intfar_stats_func, "Get intfar stats.")
 
         def get_intfar_relations_func():

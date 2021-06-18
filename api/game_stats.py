@@ -149,7 +149,11 @@ def are_unfiltered_stats_well_formed(game_info):
         for dict_key in dict_keys:
             if container is None:
                 break
-            container = container[dict_key]
+            try:
+                container = container[dict_key]
+            except KeyError:
+                keys_not_present.append((key_type, dict_key))
+                break
 
         for key in keys:
             if container is None or not key in container:
@@ -164,7 +168,7 @@ def are_filtered_stats_well_formed(filtered_info):
     # for disc_id, stats in game_info:
     #     pass
 
-def get_filtered_stats(database, users_in_game, game_info):
+def get_filtered_stats(all_users, users_in_game, game_info):
     """
     Get relevant stats from the given game data and filter the data
     that is relevant for the Discord users that participated in the game.
@@ -179,7 +183,7 @@ def get_filtered_stats(database, users_in_game, game_info):
             if part_info["participantId"] == participant["participantId"]:
                 kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
                 damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
-                for disc_id, _, summ_ids in database.summoners:
+                for disc_id, _, summ_ids in all_users:
                     if part_info["player"]["summonerId"] in summ_ids:
                         our_team = participant["teamId"]
                         combined_stats = participant["stats"]

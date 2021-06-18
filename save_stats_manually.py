@@ -37,7 +37,7 @@ class TestMock(DiscordClient):
         self.active_game[self.guild_to_use]["queue_id"] = game_info["queueId"]
 
         filtered, users_in_game = get_filtered_stats(
-            self.database, [], game_info
+            self.database.summoners, [], game_info
         )
 
         self.users_in_game[self.guild_to_use] = users_in_game
