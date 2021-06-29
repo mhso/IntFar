@@ -455,7 +455,7 @@ class DiscordClient(discord.Client):
 
                 self.active_game[guild_id] = None
                 self.game_start[guild_id] = None
-                self.users_in_game[guild_id] = None # Reset the list of users who are in a game.
+                del self.users_in_game[guild_id] # Reset the list of users who are in a game.
                 asyncio.create_task(self.poll_for_game_start(guild_id))
             except Exception as e:
                 self.config.log("Exception after game was over!!!", self.config.log_error)
@@ -800,7 +800,7 @@ class DiscordClient(discord.Client):
         any_bets = False # Bool to indicate whether any bets were made.
         for disc_id, _, _ in self.database.summoners:
             user_in_game = False # See if the user corresponding to 'disc_id' was in-game.
-            for in_game_id, _, _ in self.users_in_game[guild_id]:
+            for in_game_id, _, _ in self.users_in_game.get(guild_id, []):
                 if disc_id == in_game_id:
                     user_in_game = True
                     break
@@ -943,7 +943,7 @@ class DiscordClient(discord.Client):
         prev_mention = self.get_mention_str(prev_intfar, guild_id)
         if intfar_id is None:
             if intfar_streak > 1: # No one was Int-Far this game, but a streak was active.
-                for disc_id, _, _ in self.users_in_game[guild_id]:
+                for disc_id, _, _ in self.users_in_game.get(guild_id, []):
                     if disc_id == prev_intfar:
                         return (f"{prev_mention} has redeemed himself! " +
                                 f"His Int-Far streak of {intfar_streak} has been broken. " +
@@ -1094,7 +1094,7 @@ class DiscordClient(discord.Client):
             try: # Save stats.
                 self.database.record_stats(intfar_id, intfar_reason, doinks,
                                            self.active_game[guild_id]["id"], filtered_stats,
-                                           self.users_in_game[guild_id], guild_id)
+                                           self.users_in_game.get(guild_id), guild_id)
                 self.database.create_backup()
             except DBException as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)

@@ -51,9 +51,6 @@ if __name__ == "__main__":
 
     riot_api = APIClient(conf)
 
-    data = riot_api.get_game_details(5326028025)
-
-
     conf.log("Starting Flask web app...")
     flask_process, bot_end_flask = start_flask_process(
         database_client, betting_handler,

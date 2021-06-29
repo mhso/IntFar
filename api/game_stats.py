@@ -12,40 +12,29 @@ def calc_kill_participation(stats, total_kills):
         return 100
     return int((float(stats["kills"] + stats["assists"]) / float(total_kills)) * 100.0)
 
-def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):
-    sorted_data = None
+def outlier_func(x, key, total_kills):
     if key == "kda":
-        sorted_data = sorted(data, key=lambda x: calc_kda(x[1]), reverse=not asc)
-        if include_ties:
-            outlier = calc_kda(sorted_data[0][1])
-            ties = []
-            index = 0
-            while index < len(sorted_data) and calc_kda(sorted_data[index][1]) == outlier:
-                ties.append(sorted_data[index][0])
-                index += 1
-            return ties, sorted_data[0][1]
-    elif key == "kp":
-        sorted_data = sorted(data, key=lambda x: calc_kill_participation(x[1], total_kills),
-                             reverse=not asc)
-        if include_ties:
-            outlier = calc_kill_participation(sorted_data[0][1], total_kills)
-            ties = []
-            index = 0
-            while (index < len(sorted_data)
-                   and calc_kill_participation(sorted_data[index][1], total_kills) == outlier):
-                ties.append(sorted_data[index][0])
-                index += 1
-            return ties, sorted_data[0][1]
-    else:
-        sorted_data = sorted(data, key=lambda entry: entry[1][key], reverse=not asc)
-        if include_ties:
-            outlier = sorted_data[0][1][key]
-            ties = []
-            index = 0
-            while index < len(sorted_data) and sorted_data[index][1][key] == outlier:
-                ties.append(sorted_data[index][0])
-                index += 1
-            return ties, sorted_data[0][1]
+        return calc_kda(x)
+    if key == "kp":
+        return calc_kill_participation(x, total_kills)
+    return x[key]
+
+def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):
+    def outlier_func_short(x):
+        return outlier_func(x[1], key, total_kills)
+
+    sorted_data = sorted(data, key=outlier_func_short, reverse=not asc)
+
+    if include_ties:
+        outlier = outlier_func_short(sorted_data[0])
+        ties_ids = []
+        ties_data = []
+        index = 0
+        while index < len(sorted_data) and outlier_func_short(sorted_data[index]) == outlier:
+            ties_ids.append(sorted_data[index][0])
+            ties_data.append(sorted_data[index][1])
+            index += 1
+        return ties_ids, ties_data
 
     return sorted_data[0]
 

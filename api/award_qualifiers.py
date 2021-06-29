@@ -94,14 +94,22 @@ def intfar_by_kda(data, config):
         - Number of deaths being more than 2.
     Returns None if none of these criteria matches a person.
     """
-    tied_intfars, stats = game_stats.get_outlier(data, "kda", include_ties=True)
-    lowest_kda = game_stats.calc_kda(stats)
-    deaths = stats["deaths"]
+    tied_intfars, tied_stats = game_stats.get_outlier(data, "kda", include_ties=True)
+    lowest_kda = game_stats.calc_kda(tied_stats[0])
     kda_criteria = config.kda_lower_threshold
     death_criteria = config.kda_death_criteria
-    if lowest_kda < kda_criteria and deaths > death_criteria:
-        return (tied_intfars, lowest_kda)
-    return (None, None)
+
+    potential_intfars = []
+    for intfar, stats in zip(tied_intfars, tied_stats):
+        deaths = stats["deaths"]
+
+        if lowest_kda < kda_criteria and deaths > death_criteria:
+            potential_intfars.append(intfar)
+
+    if potential_intfars == []:
+        return (None, None)
+
+    return (potential_intfars, lowest_kda)
 
 def intfar_by_deaths(data, config):
     """
@@ -112,14 +120,24 @@ def intfar_by_deaths(data, config):
         - KDA being less than 2.1
     Returns None if none of these criteria matches a person.
     """
-    tied_intfars, stats = game_stats.get_outlier(data, "deaths", asc=False, include_ties=True)
-    highest_deaths = stats["deaths"]
-    kda = game_stats.calc_kda(stats)
+    tied_intfars, tied_stats = game_stats.get_outlier(
+        data, "deaths", asc=False, include_ties=True
+    )
+    highest_deaths = tied_stats[0]["deaths"]
     death_criteria = config.death_lower_threshold
     kda_criteria = config.death_kda_criteria
-    if highest_deaths > death_criteria and kda < kda_criteria:
-        return (tied_intfars, highest_deaths)
-    return (None, None)
+
+    potential_intfars = []
+    for intfar, stats in zip(tied_intfars, tied_stats):
+        kda = game_stats.calc_kda(stats)
+
+        if highest_deaths > death_criteria and kda < kda_criteria:
+            potential_intfars.append(intfar)
+
+    if potential_intfars == []:
+        return (None, None)
+
+    return (potential_intfars, highest_deaths)
 
 def intfar_by_kp(data, config):
     """
@@ -132,18 +150,26 @@ def intfar_by_kp(data, config):
     Returns None if none of these criteria matches a person.
     """
     team_kills = data[0][1]["kills_by_team"]
-    tied_intfars, stats = game_stats.get_outlier(data, "kp", total_kills=team_kills, include_ties=True)
-    lowest_kp = game_stats.calc_kill_participation(stats, team_kills)
-    kills = stats["kills"]
-    assists = stats["assists"]
-    structures_destroyed = stats["turretKills"] + stats["inhibitorKills"]
+    tied_intfars, tied_stats = game_stats.get_outlier(data, "kp", total_kills=team_kills, include_ties=True)
+    lowest_kp = game_stats.calc_kill_participation(tied_stats[0], team_kills)
     kp_criteria = config.kp_lower_threshold
     takedowns_criteria = config.kp_takedowns_criteria
     structures_criteria = config.kp_structures_criteria
-    if (lowest_kp < kp_criteria and kills + assists < takedowns_criteria
-            and structures_destroyed < structures_criteria):
-        return (tied_intfars, lowest_kp)
-    return (None, None)
+
+    potential_intfars = []
+    for intfar, stats in zip(tied_intfars, tied_stats):
+        structures_destroyed = stats["turretKills"] + stats["inhibitorKills"]
+        kills = stats["kills"]
+        assists = stats["assists"]
+
+        if (lowest_kp < kp_criteria and kills + assists < takedowns_criteria
+                and structures_destroyed < structures_criteria):
+            potential_intfars.append(intfar)
+
+    if potential_intfars == []:
+        return (None, None)
+
+    return (potential_intfars, lowest_kp)
 
 def intfar_by_vision_score(data, config):
     """
@@ -154,14 +180,22 @@ def intfar_by_vision_score(data, config):
         - KDA being less than 3
     Returns None if none of these criteria matches a person.
     """
-    tied_intfars, stats = game_stats.get_outlier(data, "visionScore", include_ties=True)
-    lowest_score = stats["visionScore"]
-    kda = game_stats.calc_kda(stats)
+    tied_intfars, tied_stats = game_stats.get_outlier(data, "visionScore", include_ties=True)
+    lowest_score = tied_stats[0]["visionScore"]
     vision_criteria = config.vision_score_lower_threshold
     kda_criteria = config.vision_kda_criteria
-    if lowest_score < vision_criteria and kda < kda_criteria:
-        return (tied_intfars, lowest_score)
-    return (None, None)
+
+    potential_intfars = []
+    for intfar, stats in zip(tied_intfars, tied_stats):
+        kda = game_stats.calc_kda(stats)
+
+        if lowest_score < vision_criteria and kda < kda_criteria:
+            potential_intfars.append(intfar)
+
+    if potential_intfars == []:
+        return (None, None)
+
+    return (potential_intfars, lowest_score)
 
 def resolve_intfar_ties(intfar_data, max_count, game_data):
     """
@@ -252,6 +286,8 @@ def get_intfar_qualifiers(intfar_details):
 
 def get_intfar(filtered_stats, config):
     intfar_details = get_intfar_details(filtered_stats, config)
+    print(intfar_details)
+    exit(0)
 
     (intfar_data,
      max_count_intfar,
