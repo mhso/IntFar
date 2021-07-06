@@ -1,8 +1,3 @@
-- Add shop
-- Add real world items with realistic prices (buy a private jet)
-- Add inventory of bought items
-
-!shop - List all items
-!buy [item] - Buy an item
-!sell [item]
-!inventory (person) - List all bought items
+- Implement !play [sound]
+- Ideas for sounds:
+"blblbl", "how_lovely", "anivia", "outta_my_face", "kda", "kvinder", "naiv", "yeah", "wargh", "easy_money", "steel_beams"

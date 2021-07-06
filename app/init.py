@@ -24,7 +24,7 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     root = "/intfar/"
 
     # Set up the blueprints for all the pages/routes.
-    from app.routes import index, users, verify, betting, doinks, stats, errors
+    from app.routes import index, users, verify, betting, doinks, stats, errors, soundboard
     from app.util import create_session_id
     web_app.register_blueprint(index.start_page, url_prefix=root)
     web_app.register_blueprint(users.user_page, url_prefix=root + "user/")
@@ -32,6 +32,7 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     web_app.register_blueprint(betting.betting_page, url_prefix=root + "betting/")
     web_app.register_blueprint(doinks.doinks_page, url_prefix=root + "doinks/")
     web_app.register_blueprint(stats.stats_page, url_prefix=root + "stats/")
+    web_app.register_blueprint(soundboard.soundboard_page, url_prefix=root + "soundboard/")
     web_app.before_request(create_session_id)
     web_app.register_error_handler(500, errors.handle_internal_error)
     web_app.register_error_handler(404, errors.handle_missing_page_error)
@@ -49,6 +50,7 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     web_app.config["USER_COUNT"] = 0
     web_app.config["CONN_MAP"] = {}
     web_app.config["CONN_LOCK"] = Lock()
+    web_app.config["MAX_CONTENT_LENGTH"] = 1024 * 256 # 250 KB
 
     web_app.secret_key = open("app/static/secret.txt").readline()
 

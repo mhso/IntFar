@@ -177,6 +177,6 @@ def get_persistent_data():
 
     return data
 
-def make_template_context(template, **variables):
+def make_template_context(template, status=200, **variables):
     variables.update(get_persistent_data())
-    return flask.render_template(template, **variables)
+    return flask.render_template(template, **variables), status

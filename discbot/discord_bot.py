@@ -10,7 +10,7 @@ import discord
 from discord.errors import InvalidArgument, NotFound, DiscordException, HTTPException, Forbidden
 from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
-from api import game_stats, bets, award_qualifiers
+from api import game_stats, bets, award_qualifiers, audio_handler
 from api.database import DBException
 import api.util as api_util
 
@@ -127,8 +127,7 @@ VALID_COMMANDS = {
     "uptime": (None, "Show for how long the bot has been up and running.", None),
     "status": (
         None,
-        ("Show overall stats about how many games have been played, " +
-         "how many people were Int-Far, etc."),
+        ("Show overall stats about Int-Far"),
         None
     ),
     "game": (
@@ -151,7 +150,7 @@ VALID_COMMANDS = {
          "A bet can't be cancelled when a game has started."),
         "all"
     ),
-    "give_tokens": (
+    "give": (
         "[amount] [person]",
         "Give good-boi points to someone.",
         "all"
@@ -195,8 +194,7 @@ VALID_COMMANDS = {
     "sell": (
         "[quantity] [item] [price]",
         (
-            "Add a listing in the shop for one or more copies of an item that you own. " +
-            "Other people can then buy the item at the specified price."
+            "Add a listing in the shop for one or more copies of an item that you own."
         ),
         "all"
     ),
@@ -208,11 +206,16 @@ VALID_COMMANDS = {
         ),
         "all"
     ),
-    "inventory": ("(person)", "List all the items that your or someone else owns.", "self")
+    "inventory": ("(person)", "List all the items that your or someone else owns.", "self"),
+    "play": (
+        "[sound]", "Play a sound! (See !sounds for a list of them).", None
+    ),
+    "sounds": (
+        None, "See a list of all possible sounds to play.", None
+    )
 }
 
 ALIASES = {
-    "give_tokens": ["give"],
     "betting_tokens": ["gbp"],
     "best": ["most", "highest"],
     "worst": ["least", "lowest", "fewest"]
@@ -285,7 +288,6 @@ class DiscordClient(discord.Client):
         self.shop_handler = shop_handler
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
-        self.lan_db = kwargs.get("lan_database")
         self.cached_avatars = {}
         self.users_in_game = {}
         self.active_game = {}
@@ -295,7 +297,11 @@ class DiscordClient(discord.Client):
         self.test_guild = None
         self.initialized = False
         self.last_message_time = {}
-        self.timeout_length = {}
+        self.last_command_time = {}
+        self.command_timeout_lengths = {
+            "play": 6
+        }
+        self.user_timeout_length = {}
         self.time_initialized = datetime.now()
 
     def send_game_update(self, endpoint, data):
@@ -1344,22 +1350,25 @@ class DiscordClient(discord.Client):
         await message.channel.send(self.insert_emotes(response))
 
     async def handle_commands_msg(self, message):
-        response = "**--- Valid commands, and their usages, are listed below ---**\n"
-        commands = []
+        response = "**--- Valid commands, and their usages, are listed below ---**"
+        messages = []
         for cmd, desc_tupl in VALID_COMMANDS.items():
             cmd_str = cmd
             for alias in ALIASES.get(cmd, []):
                 cmd_str += f"/!{alias}"
             params, desc, _ = desc_tupl
             params_str = "`-" if params is None else f"{params}` -"
-            commands.append(f"`!{cmd_str} {params_str} {desc}")
+            command_str = f"`!{cmd_str} {params_str} {desc}"
 
-        message_1 = response + "\n".join(commands[:18]) + "\n"
-        message_2 = "\n".join(commands[18:])
+            if len(response + "\n" + command_str) < 2000:
+                response += "\n" + command_str
+            else:
+                messages.append(response)
+                response = "\n" + command_str
 
-        await message.channel.send(message_1)
-        await asyncio.sleep(0.5)
-        await message.channel.send(message_2)
+        for cmd_msg in messages:
+            await message.channel.send(cmd_msg)
+            await asyncio.sleep(0.5)
 
     async def handle_usage_msg(self, message, command):
         if not self.valid_command(message, command, None):
@@ -2410,21 +2419,29 @@ class DiscordClient(discord.Client):
             # The following lines are spam protection.
             time_from_last_msg = time() - self.last_message_time.get(message.author.id, 0)
             self.last_message_time[message.author.id] = time()
-            curr_timeout = self.timeout_length.get(message.author.id, 0)
+            curr_timeout = self.user_timeout_length.get(message.author.id, 0)
             if time_from_last_msg < curr_timeout: # User has already received a penalty for spam.
                 if curr_timeout < 10:
                     curr_timeout *= 2 # Increase penalty...
                     if curr_timeout > 10: # ... Up to 10 secs. max.
                         curr_timeout = 10
-                    self.timeout_length[message.author.id] = curr_timeout
+                    self.user_timeout_length[message.author.id] = curr_timeout
                 return
             if time_from_last_msg < self.config.message_timeout:
                 # Some guy is sending messages too fast!
-                self.timeout_length[message.author.id] = self.config.message_timeout
+                self.user_timeout_length[message.author.id] = self.config.message_timeout
                 await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
                 return
 
-            self.timeout_length[message.author.id] = 0 # Reset timeout length.
+            self.user_timeout_length[message.author.id] = 0 # Reset user timeout length.
+
+            timeout_length = self.command_timeout_lengths.get(first_command, 1)
+            time_since_last_command = time() - self.last_command_time.get(first_command, 0)
+            if time_since_last_command < timeout_length:
+                return
+
+            self.last_command_time[first_command] = time()
+
             access_level = VALID_COMMANDS.get(first_command)
             if access_level is not None:
                 access_level = access_level[2]
@@ -2606,6 +2623,10 @@ class DiscordClient(discord.Client):
                     self.handle_see_reports_msg, message,
                     target_name, access_level=access_level
                 )
+            elif cmd_equals(first_command, "play"):
+                await audio_handler.play_sound(self, message, second_command)
+            elif cmd_equals(first_command, "sounds"):
+                await audio_handler.handle_sounds_msg(message)
             elif cmd_equals(first_command, "intdaddy"):
                 await self.handle_flirtation_msg(message, "english")
             elif cmd_equals(first_command, "intpapi"):

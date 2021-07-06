@@ -1,0 +1,41 @@
+<html>
+{% include 'head.html' %}
+{% import "navbar.html" as navbar %}
+<body>
+    <div id="soundboard-wrapper" class="container-flex">
+        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data) }}
+        <h1>Soundboard</h1>
+
+        <div id="soundboard-inner-wrapper">
+            <h2>All Sounds</h2>
+            <div class="all-sounds-wrapper">
+                {% for sound_file in sounds %}
+                <div class="audio-player-wrapper">
+                    <h3>{{ sound_file }}</h3>
+                    <audio controls>
+                        <source src="{{ url_for('static', filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
+                    </audio> 
+                </div>
+                {% endfor %}
+            </div>
+    
+            <h2>Upload Sound File</h2>
+            <div>
+                <form id="upload-sound-form" method="POST" enctype=multipart/form-data>
+                    <input type="file" name="file">
+                    <br>
+                    <input type="submit" value="Upload">
+                </form>
+    
+                <div id="upload-sound-status">
+                    {% if status_msg %}
+                        <p class="{% if upload_success %}upload-success{% else %}upload-failed{% endif %}">
+                            {% if upload_success %}Big nice! {% else %}Error: {% endif %}{{ status_msg }}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

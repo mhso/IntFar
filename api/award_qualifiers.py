@@ -286,8 +286,6 @@ def get_intfar_qualifiers(intfar_details):
 
 def get_intfar(filtered_stats, config):
     intfar_details = get_intfar_details(filtered_stats, config)
-    print(intfar_details)
-    exit(0)
 
     (intfar_data,
      max_count_intfar,
