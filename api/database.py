@@ -5,7 +5,7 @@ import sqlite3
 from sqlite3 import DatabaseError, OperationalError, ProgrammingError
 from contextlib import closing
 from api import game_stats
-from api.util import TimeZone, generate_user_secret, DOINKS_REASONS
+from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, STAT_COMMANDS
 
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
@@ -573,33 +573,25 @@ class Database:
                     games_with_person[part_id] = games
             return games_with_person, doinks_with_person
 
+    def get_stat_data(self, stat_key, stat_name, data, reverse_order=False, total_kills=0):
+        (min_stat_id, min_stat,
+         max_stat_id, max_stat) = game_stats.get_outlier_stat(
+             stat_key, data, reverse_order=reverse_order, total_kills=total_kills
+        )
+
+        best_ever = self.get_most_extreme_stat(stat_name, True, stat_name != "deaths")[1]
+        worst_ever = self.get_most_extreme_stat(stat_name, False, stat_name == "deaths")[1]
+
+        print(stat_name, best_ever, max_stat)
+
+        best_beaten = max_stat > best_ever if stat_name != "deaths" else max_stat < best_ever
+        worst_beaten = min_stat < worst_ever if stat_name != "deaths" else min_stat > worst_ever
+
+        return min_stat_id, min_stat, max_stat_id, max_stat, best_beaten, worst_beaten
+
     def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game, guild_id):
         kills_by_our_team = data[0][1]["kills_by_team"]
         timestamp = data[0][1]["timestamp"] // 1000
-        (min_kills_id, min_kills,
-         max_kills_id, max_kills) = game_stats.get_outlier_stat("kills", data)
-        (min_deaths_id, min_deaths,
-         max_deaths_id, max_deaths) = game_stats.get_outlier_stat("deaths", data)
-        max_kda_id, stats = game_stats.get_outlier(data, "kda", asc=False)
-        max_kda = game_stats.calc_kda(stats)
-        min_kda_id, stats = game_stats.get_outlier(data, "kda", asc=True)
-        min_kda = game_stats.calc_kda(stats)
-        (min_damage_id, min_damage,
-         max_damage_id, max_damage) = game_stats.get_outlier_stat("totalDamageDealtToChampions", data)
-        (min_cs_id, min_cs,
-         max_cs_id, max_cs) = game_stats.get_outlier_stat("totalCs", data)
-        (min_cs_per_min_id, min_cs_per_min,
-         max_cs_per_min_id, max_cs_per_min) = game_stats.get_outlier_stat("csPerMin", data)
-        (min_gold_id, min_gold,
-         max_gold_id, max_gold) = game_stats.get_outlier_stat("goldEarned", data)
-        max_kp_id, stats = game_stats.get_outlier(data, "kp", asc=False, total_kills=kills_by_our_team)
-        max_kp = game_stats.calc_kill_participation(stats, kills_by_our_team)
-        min_kp_id, stats = game_stats.get_outlier(data, "kp", asc=True, total_kills=kills_by_our_team)
-        min_kp = game_stats.calc_kill_participation(stats, kills_by_our_team)
-        (min_wards_id, min_wards,
-         max_wards_id, max_wards) = game_stats.get_outlier_stat("visionWardsBoughtInGame", data)
-        (min_vision_id, min_vision,
-         max_vision_id, max_vision) = game_stats.get_outlier_stat("visionScore", data)
 
         first_blood_id = None
         for disc_id, stats in data:
@@ -607,40 +599,35 @@ class Database:
                 first_blood_id = disc_id
                 break
 
-        self.config.log(
-            "Saving best stats:\n"+
-            f"{game_id}, {intfar_id}, {intfar_reason}, {first_blood_id}, " +
-            f"({max_kills_id} - {max_kills}), ({min_deaths_id} - {min_deaths}), " +
-            f"({max_kda_id} - {max_kda}), ({max_damage_id} - {max_damage}), " +
-            f"({max_cs_id} - {max_cs}), ({max_cs_per_min_id} - {max_cs_per_min}), " +
-            f"({max_gold_id} - {max_gold}), ({max_kp_id} - {max_kp}), " +
-            f"({max_wards_id} - {max_wards}), ({max_vision_id} - {max_vision})"
-        )
-        self.config.log(
-            "Saving worst stats:\n"+
-            f"{game_id}, {intfar_id}, {intfar_reason}, {first_blood_id}, " +
-            f"({min_kills_id} - {min_kills}), ({max_deaths_id} - {max_deaths}), " +
-            f"({min_kda_id} - {min_kda}), ({min_damage_id} - {min_damage}), " +
-            f"({min_cs_id} - {min_cs}), ({min_cs_per_min_id} - {min_cs_per_min}), " +
-            f"({min_gold_id} - {min_gold}), ({min_kp_id} - {min_kp}), " +
-            f"({min_wards_id} - {min_wards}), ({min_vision_id} - {min_vision})"
-        )
-        self.config.log(
-            "Saving participants:\n"+
-            f"{game_id}, {users_in_game}, {timestamp}, {doinks}"
-        )
+        keys = [
+            "kills", "deaths", "kda", "totalDamageDealtToChampions",
+            "totalCs", "csPerMin", "goldEarned", "kp",
+            "visionWardsBoughtInGame", "visionScore"
+        ]
 
-        query_prefix = "INSERT INTO "
-        query_cols = (
-            """
-            (game_id, first_blood, kills, kills_id, deaths,
-            deaths_id, kda, kda_id, damage, damage_id, cs, cs_id, cs_per_min, cs_per_min_id,
-            gold, gold_id, kp, kp_id, vision_wards, vision_wards_id, vision_score, vision_score_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
-        )
-        query_best = query_prefix + " best_stats" + query_cols
-        query_worst = query_prefix + " worst_stats " + query_cols
+        stats_query = "first_blood"
+        for stat_name in STAT_COMMANDS[1:]:
+            stats_query += f", {stat_name}, {stat_name}_id"
+        question_marks = ", ".join("?" * len(STAT_COMMANDS) * 2)
+        query_cols = f"(game_id, {stats_query}) VALUES ({question_marks})"
+
+        beaten_records_best = []
+        beaten_records_worst = []
+
+        best_values = [game_id, first_blood_id]
+        worst_values = [game_id, first_blood_id]
+        for key, stat in zip(keys, STAT_COMMANDS[1:]):
+            reverse_order = key == "deaths"
+            (
+                min_id, min_value, max_id, max_value,
+                best_record, worst_record
+            ) = self.get_stat_data(key, stat, data, reverse_order, kills_by_our_team)
+            best_values.extend([min_value, min_id])
+            worst_values.extend([max_value, max_id])
+            if best_record:
+                beaten_records_best.append((stat, max_value, max_id))
+            if worst_record:
+                beaten_records_worst.append((stat, min_value, min_id))
 
         with self.get_connection() as db:
             query_game = (
@@ -652,33 +639,33 @@ class Database:
                 db, query_game, (game_id, timestamp, intfar_id, intfar_reason, guild_id)
             )
 
-            self.execute_query(
-                db, query_best,
-                (
-                    game_id, first_blood_id, max_kills,
-                    max_kills_id, min_deaths, min_deaths_id, max_kda,
-                    max_kda_id, max_damage, max_damage_id,
-                    max_cs, max_cs_id, max_cs_per_min, max_cs_per_min_id,
-                    max_gold, max_gold_id, max_kp, max_kp_id, max_wards,
-                    max_wards_id, max_vision, max_vision_id
+            for table in ("best", "worst"):
+                value_list = best_values if table == "best" else worst_values
+                print_str = (f"{x} - {y}" for (x, y) in zip(value_list[1::2], value_list[::2]))
+                print_str = "), (".join(print_str)
+
+                self.config.log(
+                    f"Saving {table} stats:\n" +
+                    f"{game_id}, {intfar_id}, {intfar_reason}, " +
+                    f"{first_blood_id}, ({print_str})"
                 )
+
+                query = f"INSERT INTO {table}_stats {query_cols}"
+
+                self.execute_query(db, query, tuple(value_list))
+
+            self.config.log(
+                "Saving participants:\n"+
+                f"{game_id}, {users_in_game}, {timestamp}, {doinks}"
             )
-            self.execute_query(
-                db, query_worst,
-                (
-                    game_id, first_blood_id, min_kills,
-                    min_kills_id, max_deaths, max_deaths_id, min_kda,
-                    min_kda_id, min_damage, min_damage_id,
-                    min_cs, min_cs_id, min_cs_per_min, min_cs_per_min_id,
-                    min_gold, min_gold_id, min_kp, min_kp_id, min_wards,
-                    min_wards_id, min_vision, min_vision_id
-                )
-            )
+
             query = "INSERT INTO participants(game_id, disc_id, doinks) VALUES (?, ?, ?)"
             for disc_id, _, _ in users_in_game:
                 doink = doinks.get(disc_id, None)
                 self.execute_query(db, query, (game_id, disc_id, doink))
             db.commit()
+
+        return beaten_records_best, beaten_records_worst
 
     def create_backup(self):
         backup_name = "resources/database_backup.db"

@@ -251,7 +251,7 @@ def get_reason_flavor_text(value, reason):
     elif reason == "visionScore":
         flavor_values = LOWEST_VISION_FLAVORS
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
-    return flavor_text.replace("{" + reason + "}", value)
+    return flavor_text.replace("{" + reason + "}", f"**{value}**")
 
 def get_honorable_mentions_flavor_text(index, value):
     flavor_values = HONORABLE_MENTIONS[index]
@@ -264,7 +264,7 @@ def get_doinks_flavor_text(index, value):
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     if value is None:
         return flavor_text
-    return flavor_text.replace("{value}", str(value))
+    return flavor_text.replace("{value}", f"**{value}**")
 
 def get_streak_flavor_text(nickname, streak):
     index = streak - 2 if streak - 2 < len(STREAK_FLAVORS) else len(STREAK_FLAVORS) - 1
@@ -299,7 +299,7 @@ class DiscordClient(discord.Client):
         self.last_message_time = {}
         self.last_command_time = {}
         self.command_timeout_lengths = {
-            "play": 6
+            "play": 5
         }
         self.user_timeout_length = {}
         self.time_initialized = datetime.now()
@@ -322,7 +322,7 @@ class DiscordClient(discord.Client):
         """
         This method is called periodically when a game is active.
         When this method detects that the game is no longer active,
-        it calls the 'declare_intfar' method, which determines who is the Int-Far.
+        it calls the 'get_intfar' method, which determines who is the Int-Far.
         """
         self.config.log("Polling for game end...")
         time_slept = 0
@@ -431,17 +431,34 @@ class DiscordClient(discord.Client):
                             f"{multiplier} TIMES AS MUCH!!! <<<<<**"
                         )
 
-                    betting_data = await self.declare_intfar(filtered_stats, guild_id)
+                    intfar, intfar_reason, response = self.get_intfar_data(filtered_stats, guild_id)
+                    doinks, doinks_response = self.get_doinks_data(filtered_stats, guild_id)
 
-                    if betting_data is not None:
-                        intfar, intfar_reason, doinks = betting_data
-                        await asyncio.sleep(1)
-                        await self.resolve_bets(
-                            filtered_stats, intfar, intfar_reason, doinks, guild_id
+                    if doinks_response is not None:
+                        response += "\n" + doinks_response
+
+                    await self.channels_to_write[guild_id].send(response)
+
+                    await asyncio.sleep(1)
+                    response, max_tokens_id, new_max_tokens_id = self.resolve_bets(
+                        filtered_stats, intfar, intfar_reason, doinks, guild_id
+                    )
+
+                    if max_tokens_id != new_max_tokens_id and guild_id == api_util.MAIN_GUILD_ID:
+                        # "Goodest Boi" role only available in main guild.
+                        await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
+
+                    best_records, worst_records = self.save_stats(
+                        filtered_stats, intfar, intfar_reason, doinks, guild_id
+                    )
+
+                    if best_records != [] or worst_records != []:
+                        records_response = self.get_beaten_records_msg(
+                            best_records, worst_records, guild_id
                         )
-                        await self.save_stats(
-                            filtered_stats, intfar, intfar_reason, doinks, guild_id
-                        )
+                        response = records_response + response
+
+                    await self.channels_to_write[guild_id].send(response)
 
                     if self.config.generate_predictions_img:
                         predictions_img = None
@@ -785,7 +802,7 @@ class DiscordClient(discord.Client):
         new_head_honcho = nibs_guild.get_member(new_holder)
         await new_head_honcho.add_roles(role)
 
-    async def resolve_bets(self, game_info, intfar, intfar_reason, doinks, guild_id):
+    def resolve_bets(self, game_info, intfar, intfar_reason, doinks, guild_id):
         game_won = game_info[0][1]["gameWon"]
         tokens_name = self.config.betting_tokens
         tokens_gained = (self.config.betting_tokens_for_win
@@ -799,7 +816,10 @@ class DiscordClient(discord.Client):
             tokens_gained *= clash_multiplier
 
         game_desc = "Game won!" if game_won else "Game lost."
-        response = f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
+        response = (
+            "\n=======================================" +
+            f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
+        )
         response_bets = "\n**--- Results of bets made that game ---**\n"
         max_tokens_holder = self.database.get_max_tokens_details()[1]
 
@@ -885,13 +905,28 @@ class DiscordClient(discord.Client):
             # This person now has the most tokens of all users!
             response_bets += f"{max_tokens_name} now has the most {tokens_name} of everyone! "
             response_bets += "***HAIL TO THE KING!!!***\n"
-            if guild_id == api_util.MAIN_GUILD_ID: # "Goodest Boi" role only available in main guild.
-                await self.assign_top_tokens_role(max_tokens_holder, new_max_tokens_holder)
 
         if any_bets:
             response += response_bets
 
-        await self.channels_to_write[guild_id].send(response)
+        return response, max_tokens_holder, new_max_tokens_holder
+
+    def get_beaten_records_msg(self, best_records, worst_records, guild_id):
+        response = "\n======================================="
+        for index, record_list in enumerate((best_records, worst_records)):
+            best = index == 0
+            for stat, value, disc_id in record_list:
+                stat_index = api_util.STAT_COMMANDS.index(stat)
+                stat_fmt = api_util.round_digits(value)
+                stat_name_fmt = stat.replace('_', ' ')
+                readable_stat = f"{api_util.STAT_QUANTITY_DESC[stat_index][index]} {stat_name_fmt}"
+                name = self.get_mention_str(disc_id, guild_id)
+                emote = "poggers" if best else "im_nat_kda_player_yo"
+                response += (
+                    f"\n{name} got the {readable_stat} EVER " +
+                    f"with **{stat_fmt}** {stat_name_fmt}!!!" + " {emote_" + emote + "}"
+                )
+        return self.insert_emotes(response)
 
     def get_big_doinks_msg(self, doinks, guild_id):
         mentions_str = ""
@@ -899,10 +934,9 @@ class DiscordClient(discord.Client):
         for disc_id in doinks:
             user_str = ""
             if doinks[disc_id] != []:
-                prefix = "\n" if any_mentions else ""
-                user_str = f"{prefix} {self.get_mention_str(disc_id, guild_id)} was insane that game! "
-                intfars_removed = len(doinks[disc_id])
-                user_str += f"He is awarded {intfars_removed} " + "{emote_Doinks} for "
+                prefix = "\n " if any_mentions else ""
+                user_str = f"{prefix}{self.get_mention_str(disc_id, guild_id)} was insane that game! "
+                user_str += f"He is awarded {len(doinks[disc_id])} " + "{emote_Doinks} for "
                 any_mentions = True
 
             for (count, (stat_index, stat_value)) in enumerate(doinks[disc_id]):
@@ -915,7 +949,7 @@ class DiscordClient(discord.Client):
                 multiplier = self.config.clash_multiplier
             points = self.config.betting_tokens_for_doinks * len(doinks[disc_id]) * multiplier
             tokens_name = self.config.betting_tokens
-            mentions_str += f"\nHe is also given {points} bonus {tokens_name} "
+            mentions_str += f"\nHe is also given **{points}** bonus {tokens_name} "
             mentions_str += "for being great {emote_swell}"
 
         return None if not any_mentions else mentions_str
@@ -1000,7 +1034,7 @@ class DiscordClient(discord.Client):
             return message
         return None
 
-    async def send_intfar_message(self, disc_id, guild_id, reason, ties_msg, intfar_streak, prev_intfar):
+    def get_intfar_message(self, disc_id, guild_id, reason, ties_msg, intfar_streak, prev_intfar):
         """
         Send Int-Far message to the appropriate Discord channel.
         """
@@ -1025,12 +1059,9 @@ class DiscordClient(discord.Client):
         if ifotm_lead_msg is not None:
             message += "\n" + ifotm_lead_msg
 
-        message += "\n==============================================="
+        return self.insert_emotes(message)
 
-        message = self.insert_emotes(message)
-        await self.channels_to_write[guild_id].send(message)
-
-    async def declare_intfar(self, filtered_stats, guild_id):
+    def get_intfar_data(self, filtered_stats, guild_id):
         """
         Called when the currently active game is over.
         Determines if an Int-Far should be crowned and for what,
@@ -1039,9 +1070,6 @@ class DiscordClient(discord.Client):
         """
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
         reason_ids = ["0", "0", "0", "0"]
-
-        doinks_mentions, doinks = award_qualifiers.get_big_doinks(filtered_stats)
-        redeemed_text = self.get_big_doinks_msg(doinks_mentions, guild_id)
 
         (final_intfar,
          final_intfar_data,
@@ -1066,10 +1094,7 @@ class DiscordClient(discord.Client):
                 self.config.log(ties_msg)
                 full_ties_msg = "There are Int-Far ties! " + ties_msg + "\n"
 
-            if redeemed_text is not None:
-                reason += "\n" + redeemed_text
-
-            await self.send_intfar_message(
+            response = self.get_intfar_message(
                 final_intfar, guild_id, reason, full_ties_msg, intfar_streak, prev_intfar
             )
         else: # No one was bad enough to be Int-Far.
@@ -1079,35 +1104,40 @@ class DiscordClient(discord.Client):
             honorable_mention_text = self.get_honorable_mentions_msg(honorable_mentions, guild_id)
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
-            if redeemed_text is not None:
-                response += "\n" + redeemed_text
 
             streak_msg = self.get_streak_msg(None, guild_id, intfar_streak, prev_intfar)
             if streak_msg is not None:
                 response += "\n" + streak_msg
 
-            response += "\n==============================================="
-            await self.channels_to_write[guild_id].send(self.insert_emotes(response))
+            response = self.insert_emotes(response)
 
         reasons_str = "".join(reason_ids)
         if reasons_str == "0000":
             reasons_str = None
 
-        return final_intfar, reasons_str, doinks
+        return final_intfar, reasons_str, response
 
-    async def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks, guild_id):
+    def get_doinks_data(self, filtered_stats, guild_id):
+        doinks_mentions, doinks = award_qualifiers.get_big_doinks(filtered_stats)
+        redeemed_text = self.get_big_doinks_msg(doinks_mentions, guild_id)
+
+        return doinks, redeemed_text
+
+    def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks, guild_id):
         if not self.config.testing:
             try: # Save stats.
-                self.database.record_stats(intfar_id, intfar_reason, doinks,
-                                           self.active_game[guild_id]["id"], filtered_stats,
-                                           self.users_in_game.get(guild_id), guild_id)
+                best_records, worst_records = self.database.record_stats(
+                    intfar_id, intfar_reason, doinks,
+                    self.active_game[guild_id]["id"], filtered_stats,
+                    self.users_in_game.get(guild_id), guild_id
+                )
                 self.database.create_backup()
+                self.config.log("Game over! Stats were saved succesfully.")
+                return best_records, worst_records
             except DBException as exception:
                 self.config.log("Game stats could not be saved!", self.config.log_error)
                 self.config.log(exception)
                 raise exception
-
-            self.config.log("Game over! Stats were saved succesfully.")
 
     async def user_joined_voice(self, disc_id, guild_id, poll_immediately=False):
         guild_name = self.get_guild_name(guild_id)
@@ -2438,6 +2468,10 @@ class DiscordClient(discord.Client):
             timeout_length = self.command_timeout_lengths.get(first_command, 1)
             time_since_last_command = time() - self.last_command_time.get(first_command, 0)
             if time_since_last_command < timeout_length:
+                time_left = timeout_length - time_since_last_command
+                await message.channel.send(
+                    f"Hold your horses! This command is on cooldown for {time_left:.1f} seconds."
+                )
                 return
 
             self.last_command_time[first_command] = time()

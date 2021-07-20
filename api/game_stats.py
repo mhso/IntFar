@@ -38,11 +38,11 @@ def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):
 
     return sorted_data[0]
 
-def get_outlier_stat(stat, data):
-    most_id, stats = get_outlier(data, stat, asc=True)
-    most = stats[stat]
-    least_id, stats = get_outlier(data, stat, asc=False)
-    least = stats[stat]
+def get_outlier_stat(stat, data, reverse_order=False, total_kills=0):
+    most_id, stats = get_outlier(data, stat, asc=not reverse_order, total_kills=total_kills)
+    most = outlier_func(stats, stat, total_kills)
+    least_id, stats = get_outlier(data, stat, asc=reverse_order, total_kills=total_kills)
+    least = outlier_func(stats, stat, total_kills)
     return most_id, most, least_id, least
 
 def get_finished_game_summary(data, summ_ids, riot_api):

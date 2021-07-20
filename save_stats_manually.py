@@ -43,7 +43,7 @@ class TestMock(DiscordClient):
         self.users_in_game[self.guild_to_use] = users_in_game
 
         if self.loud:
-            betting_data = await self.declare_intfar(filtered, self.guild_to_use)
+            betting_data = await self.get_intfar_data(filtered, self.guild_to_use)
         else:
             betting_data = self.get_intfar_and_doinks(filtered)
 

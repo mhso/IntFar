@@ -76,11 +76,13 @@ def get_stat_desc(game_data, best_stats, worst_stats):
         for stat, person_id, stat_value, stat_game_id in stat_list:
             if stat_game_id == game_id and person_id == disc_id: # Best/worst stat was beaten.
                 stat_index = api_util.STAT_COMMANDS.index(stat)
-                readable_stat = api_util.STAT_QUANTITY_DESC[stat_index][i] + " " + stat
+                stat_fmt = api_util.round_digits(stat_value)
+                stat_name_fmt = stat.replace("_", " ")
+                readable_stat = api_util.STAT_QUANTITY_DESC[stat_index][i] + " " + stat_name_fmt
                 name = app_util.discord_request("func", "get_discord_nick", disc_id)
                 response_list = [
                     ("name", name), ("regular", "got the"), ("feed-award", readable_stat),
-                    ("regular", "ever with"), ("bold", f"{stat_value} {stat}")
+                    ("regular", "ever with"), ("bold", f"{stat_fmt} {stat_name_fmt}")
                 ]
                 responses.append(response_list)
     return responses

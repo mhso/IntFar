@@ -32,6 +32,7 @@ test = makeRegisteringDecorator(test)
 
 class TestRunner:
     def __init__(self):
+        self.tests_run = 0
         self.passed = 0
         self.failed = 0
         self.current_test = None
@@ -43,6 +44,10 @@ class TestRunner:
 
     @abstractmethod
     def before_test(self):
+        pass
+
+    @abstractmethod
+    def after_test(self):
         pass
 
     def print_passed(self, name, desc):
@@ -107,7 +112,7 @@ class TestRunner:
     def print_test_summary(self):
         self.current_test = None
         print("============================================================")
-        print(f"{self.passed + self.failed} tests run.")
+        print(f"{self.tests_run} tests run.")
         self.print_passed("", f"{self.passed} passed.")
         self.print_failed("", f"{self.failed} failed.")
 
@@ -127,5 +132,12 @@ class TestRunner:
             if tests_to_run is None or test_name in tests_to_run:
                 self.current_test = test_name
                 self.before_test()
-                test_func(*self.test_args)
+                try:
+                    test_func(*self.test_args)
+                except Exception as e:
+                    print(f"Exception during '{test_name}':")
+                    print(traceback.format_exc())
+                finally:
+                    self.tests_run += 1
+                    self.after_test()
         self.print_test_summary()

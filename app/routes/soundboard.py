@@ -49,7 +49,7 @@ def home():
                 False, f"Filename too long (max {FILENAME_MAX_LENGTH} characters)."
             )
 
-        secure_name = secure_filename(file.filename.replace(" ", "_".lower()))
+        secure_name = secure_filename(file.filename.replace(" ", "_").lower())
         path = os.path.join(UPLOAD_FOLDER, secure_name)
         if os.path.exists(path):
             return soundboard_template(

@@ -26,8 +26,8 @@ DOINKS_REASONS = [
 ]
 
 STAT_COMMANDS = [
-    "kills", "deaths", "kda", "damage", "cs", "cs_per_min",
-    "gold", "kp", "vision_wards", "vision_score", "first_blood"
+    "first_blood", "kills", "deaths", "kda", "damage", "cs",
+    "cs_per_min", "gold", "kp", "vision_wards", "vision_score"
 ]
 
 STAT_QUANTITY_DESC = [
