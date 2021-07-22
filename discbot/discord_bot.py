@@ -1121,7 +1121,7 @@ class DiscordClient(discord.Client):
         doinks_mentions, doinks = award_qualifiers.get_big_doinks(filtered_stats)
         redeemed_text = self.get_big_doinks_msg(doinks_mentions, guild_id)
 
-        return doinks, redeemed_text
+        return doinks, self.insert_emotes(redeemed_text)
 
     def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks, guild_id):
         if not self.config.testing:
