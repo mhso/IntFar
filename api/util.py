@@ -122,22 +122,31 @@ def format_tokens_amount(tokens):
 
     return formatted
 
-def parse_amount_str(amount_str):
+def parse_amount_str(amount_str, balance=None):
     mult = 1
-    if amount_str[-1].lower() == "t":
-        mult = 1e12
-        amount_str = amount_str[:-1]
-    elif amount_str[-1].lower() == "b":
-        mult = 1e9
-        amount_str = amount_str[:-1]
-    elif amount_str[-1].lower() == "m":
-        mult = 1e6
-        amount_str = amount_str[:-1]
-    elif amount_str[-1].lower() == "k":
-        mult = 1e3
-        amount_str = amount_str[:-1]
+    multiplier_values = [("t", 1e12), ("b", 1e9), ("m", 1e6), ("k", 1e3)]
+    for identifier, mult_val in multiplier_values:
+        if amount_str[-1].lower() == identifier:
+            mult = mult_val
+            amount_str = amount_str[:-1]
+            break
 
-    return int(float(amount_str) * mult)
+    try:
+        return int(float(amount_str) * mult)
+    except ValueError as e:
+        if balance is not None:
+            if amount_str[-1] == "%":
+                return int(float(amount_str[:-1]) * 0.01 * balance)
+
+            if amount_str == "all":
+                return balance
+            if amount_str == "half":
+                return balance // 2
+            if amount_str == "third":
+                return balance // 3
+            if amount_str == "quarter":
+                return balance // 4
+        raise e
 
 def generate_user_secret():
     return secrets.token_hex(nbytes=32)

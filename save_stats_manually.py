@@ -43,21 +43,41 @@ class TestMock(DiscordClient):
         self.users_in_game[self.guild_to_use] = users_in_game
 
         if self.loud:
-            betting_data = await self.get_intfar_data(filtered, self.guild_to_use)
+            intfar, intfar_reason, response = self.get_intfar_data(filtered, self.guild_to_use)
         else:
-            betting_data = self.get_intfar_and_doinks(filtered)
+            intfar, intfar_reason, response = self.get_intfar_and_doinks(filtered)
 
-        if betting_data is not None:
-            intfar, intfar_reason, doinks = betting_data
-            await asyncio.sleep(1)
-            if self.task in ("all", "bets"):
-                if not self.loud:
-                    self.channels_to_write[self.guild_to_use] = MockChannel()
+        doinks, doinks_response = self.get_doinks_data(filtered, self.guild_to_use)
+        if doinks_response is not None:
+            response += "\n" + self.insert_emotes(doinks_response)
 
-                await self.resolve_bets(filtered, intfar, intfar_reason, doinks, self.guild_to_use)
+        await self.channels_to_write[self.guild_to_use].send(response)
+
+        await asyncio.sleep(1)
+
+        if self.task in ("all", "bets"):
+            if not self.loud:
+                self.channels_to_write[self.guild_to_use] = MockChannel()
+
+            response, max_tokens_id, new_max_tokens_id = self.resolve_bets(
+                filtered, intfar, intfar_reason, doinks, self.guild_to_use
+            )
+            if max_tokens_id != new_max_tokens_id and self.guild_to_use == self.guilds["nibs"]:
+                # "Goodest Boi" role only available in main guild.
+                await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
 
             if self.task in ("all", "stats"):
-                await self.save_stats(filtered, intfar, intfar_reason, doinks, self.guild_to_use)
+                best_records, worst_records = self.save_stats(
+                    filtered, intfar, intfar_reason, doinks, self.guild_to_use
+                )
+
+                if best_records != [] or worst_records != []:
+                    records_response = self.get_beaten_records_msg(
+                        best_records, worst_records, self.guild_to_use
+                    )
+                    response = records_response + response
+
+            await self.channels_to_write[self.guild_to_use].send(response)
 
         if self.config.generate_predictions_img:
             predictions_img = None

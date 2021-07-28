@@ -256,7 +256,7 @@ def get_reason_flavor_text(value, reason):
 def get_honorable_mentions_flavor_text(index, value):
     flavor_values = HONORABLE_MENTIONS[index]
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
-    return flavor_text.replace("{value}", str(value))
+    return flavor_text.replace("{value}", f"**{value}**")
 
 def get_doinks_flavor_text(index, value):
     flavor_values = DOINKS_FLAVORS[index]
@@ -435,7 +435,7 @@ class DiscordClient(discord.Client):
                     doinks, doinks_response = self.get_doinks_data(filtered_stats, guild_id)
 
                     if doinks_response is not None:
-                        response += "\n" + doinks_response
+                        response += "\n" + self.insert_emotes(doinks_response)
 
                     await self.channels_to_write[guild_id].send(response)
 
@@ -818,7 +818,7 @@ class DiscordClient(discord.Client):
         game_desc = "Game won!" if game_won else "Game lost."
         response = (
             "\n=======================================" +
-            f"\n{game_desc} Everybody gains {tokens_gained} {tokens_name}."
+            f"\n{game_desc} Everybody gains **{tokens_gained}** {tokens_name}."
         )
         response_bets = "\n**--- Results of bets made that game ---**\n"
         max_tokens_holder = self.database.get_max_tokens_details()[1]
@@ -1121,7 +1121,7 @@ class DiscordClient(discord.Client):
         doinks_mentions, doinks = award_qualifiers.get_big_doinks(filtered_stats)
         redeemed_text = self.get_big_doinks_msg(doinks_mentions, guild_id)
 
-        return doinks, self.insert_emotes(redeemed_text)
+        return doinks, redeemed_text
 
     def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks, guild_id):
         if not self.config.testing:
@@ -1401,7 +1401,7 @@ class DiscordClient(discord.Client):
             await asyncio.sleep(0.5)
 
     async def handle_usage_msg(self, message, command):
-        if not self.valid_command(message, command, None):
+        if not await self.valid_command(message, command, None):
             await message.channel.send(f"Not a valid command: '{command}'.")
 
         args, help_msg, access_level = VALID_COMMANDS.get(command)
@@ -1412,7 +1412,7 @@ class DiscordClient(discord.Client):
         response += help_msg
 
         if access_level is not None:
-            response += "\n*Note: This command requires you to be registered"
+            response += "\n*Note: This command requires you to be registered to Int-Far"
 
             if access_level == "self":
                 response += ", if targetted at yourself."
@@ -1898,8 +1898,9 @@ class DiscordClient(discord.Client):
 
         max_tokens_before, max_tokens_holder = self.database.get_max_tokens_details()
 
-        response = self.betting_handler.give_tokens(message.author.id, amount,
-                                                    target_id, target_name)[1]
+        response = self.betting_handler.give_tokens(
+            message.author.id, amount, target_id, target_name
+        )[1]
 
         balance_after = self.database.get_token_balance(target_id)
 
@@ -2580,7 +2581,7 @@ class DiscordClient(discord.Client):
                     target_all=False, access_level=access_level,
                     args=(second_command,)
                 )
-            elif cmd_equals(first_command, "give_tokens"):
+            elif cmd_equals(first_command, "give"):
                 target_name = self.extract_target_name(split, 2)
                 await self.get_data_and_respond(
                     self.handle_give_tokens_msg, message, target_name,

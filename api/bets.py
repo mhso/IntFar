@@ -424,7 +424,7 @@ class BettingHandler:
         min_amount = MINIMUM_BETTING_AMOUNT
         amount = 0
         try:
-            amount = balance if bet_amount == "all" else parse_amount_str(bet_amount.strip())
+            amount = parse_amount_str(bet_amount.strip(), balance)
 
             if amount < min_amount: # Bet was for less than the minimum allowed amount.
                 err_msg = self.get_bet_error_msg(
@@ -620,7 +620,7 @@ class BettingHandler:
             return (False, err_msg)
 
         try:
-            amount = balance if amount_str == "all" else parse_amount_str(amount_str)
+            amount = parse_amount_str(amount_str.strip(), balance)
         except ValueError:
             err_msg = self.get_gift_err_msg(f"Invalid token amount: '{amount_str}'.")
             return (False, err_msg)
