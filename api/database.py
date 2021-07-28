@@ -606,7 +606,7 @@ class Database:
         ]
 
         stats_query = "first_blood"
-        for stat_name in STAT_COMMANDS[1:]:
+        for stat_name in STAT_COMMANDS[:-1]:
             stats_query += f", {stat_name}, {stat_name}_id"
         question_marks = ", ".join("?" * len(STAT_COMMANDS) * 2)
         query_cols = f"(game_id, {stats_query}) VALUES ({question_marks})"
@@ -616,7 +616,7 @@ class Database:
 
         best_values = [game_id, first_blood_id]
         worst_values = [game_id, first_blood_id]
-        for key, stat in zip(keys, STAT_COMMANDS[1:]):
+        for key, stat in zip(keys, STAT_COMMANDS[:-1]):
             reverse_order = key == "deaths"
             (
                 min_id, min_value, max_id, max_value,

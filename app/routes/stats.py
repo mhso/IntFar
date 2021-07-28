@@ -1,5 +1,5 @@
-from app.routes.users import user
 import flask
+
 from app.util import make_template_context, discord_request
 import api.util as api_util
 
