@@ -3,16 +3,21 @@ import asyncio
 from io import BytesIO
 from threading import Thread
 from time import time
+from math import ceil
 from traceback import print_exc
 from datetime import datetime
+
 import requests
 import discord
 from discord.errors import InvalidArgument, NotFound, DiscordException, HTTPException, Forbidden
+
 from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
 from api import game_stats, bets, award_qualifiers, audio_handler
 from api.database import DBException
 import api.util as api_util
+from ai.data import shape_predict_data
+from ai.train import train_online
 
 MY_GUILD_ID = 512363920044982272
 MAIN_CHANNEL_ID = 730744358751567902
@@ -178,6 +183,12 @@ VALID_COMMANDS = {
     ),
     "report": ("[person]", "Report someone, f.x. if they are being a poon.", "all"),
     "reports": ("(person)", "See how many times someone (or yourself) has been reported.", "self"),
+    "doinks_sound": (
+        "(sound)", "Set a sound to trigger when you are awarded Doinks.", "all"
+    ),
+    "intfar_sound": (
+        "(sound)", "Set a sound to trigger when you are the Int-Far.", "all"
+    ),
     "shop": (
         None,
         "Get a list of totally real items that you can buy with your hard-earned betting tokens!",
@@ -271,13 +282,14 @@ def get_streak_flavor_text(nickname, streak):
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 class DiscordClient(discord.Client):
-    def __init__(self, config, database, betting_handler, riot_api, shop_handler, **kwargs):
+    def __init__(self, config, database, betting_handler, riot_api, audio_handler, shop_handler, **kwargs):
         super().__init__(
             intents=discord.Intents(
                 members=True,
                 voice_states=True,
                 guilds=True,
                 emojis=True,
+                reactions=True,
                 guild_messages=True
             )
         )
@@ -285,9 +297,12 @@ class DiscordClient(discord.Client):
         self.database = database
         self.riot_api = riot_api
         self.betting_handler = betting_handler
+        self.audio_handler = audio_handler
         self.shop_handler = shop_handler
+        self.ai_model = kwargs.get("ai_model")
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
+        self.pagination_data = {}
         self.cached_avatars = {}
         self.users_in_game = {}
         self.active_game = {}
@@ -396,79 +411,7 @@ class DiscordClient(discord.Client):
                     await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
                 else:
-                    missing_stats = game_stats.are_unfiltered_stats_well_formed(game_info)
-                    if missing_stats != []:
-                        self.config.log(
-                            f"The following unfiltered stats are missing: {missing_stats}",
-                            self.config.log_error
-                        )
-                        raise ValueError("Unfiltered stats are not well formed!")
-
-                    self.config.log(f"Users in game before: {self.users_in_game.get(guild_id)}")
-                    try:
-                        filtered_stats, users_in_game = game_stats.get_filtered_stats(
-                            self.database.summoners, self.users_in_game.get(guild_id), game_info
-                        )
-                    except ValueError as exc:
-                        self.config.log(
-                            "Game data is not well formed! Exception: " + str(exc),
-                            self.config.log_error
-                        )
-                        await self.send_error_msg(guild_id)
-                        with open("errorlog.txt", "a", encoding="utf-8") as fp:
-                            print_exc(file=fp)
-                        raise exc
-
-                    self.users_in_game[guild_id] = users_in_game
-                    self.config.log(f"Users in game after: {users_in_game}")
-
-                    self.active_game[guild_id]["queue_id"] = game_info["queueId"]
-
-                    if self.riot_api.is_clash(self.active_game[guild_id]["queue_id"]):
-                        multiplier = self.config.clash_multiplier
-                        await self.channels_to_write[guild_id].send(
-                            "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
-                            f"{multiplier} TIMES AS MUCH!!! <<<<<**"
-                        )
-
-                    intfar, intfar_reason, response = self.get_intfar_data(filtered_stats, guild_id)
-                    doinks, doinks_response = self.get_doinks_data(filtered_stats, guild_id)
-
-                    if doinks_response is not None:
-                        response += "\n" + self.insert_emotes(doinks_response)
-
-                    await self.channels_to_write[guild_id].send(response)
-
-                    await asyncio.sleep(1)
-                    response, max_tokens_id, new_max_tokens_id = self.resolve_bets(
-                        filtered_stats, intfar, intfar_reason, doinks, guild_id
-                    )
-
-                    if max_tokens_id != new_max_tokens_id and guild_id == api_util.MAIN_GUILD_ID:
-                        # "Goodest Boi" role only available in main guild.
-                        await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
-
-                    best_records, worst_records = self.save_stats(
-                        filtered_stats, intfar, intfar_reason, doinks, guild_id
-                    )
-
-                    if best_records != [] or worst_records != []:
-                        records_response = self.get_beaten_records_msg(
-                            best_records, worst_records, guild_id
-                        )
-                        response = records_response + response
-
-                    await self.channels_to_write[guild_id].send(response)
-
-                    if self.config.generate_predictions_img:
-                        predictions_img = None
-                        for disc_id, _, _ in users_in_game:
-                            if ADMIN_DISC_ID == disc_id:
-                                predictions_img = api_util.create_predictions_timeline_image()
-                                break
-
-                        if predictions_img is not None:
-                            await self.send_predictions_timeline_image(predictions_img, guild_id)
+                    self.game_over(game_info, guild_id)
 
                 req_data = {
                     "secret": self.config.discord_token,
@@ -488,6 +431,91 @@ class DiscordClient(discord.Client):
                 raise e
         elif game_status == 0:
             await self.poll_for_game_end(guild_id)
+
+    async def game_over(self, game_info, guild_id):
+        missing_stats = game_stats.are_unfiltered_stats_well_formed(game_info)
+        if missing_stats != []:
+            self.config.log(
+                f"The following unfiltered stats are missing: {missing_stats}",
+                self.config.log_error
+            )
+            raise ValueError("Unfiltered stats are not well formed!")
+
+        self.config.log(f"Users in game before: {self.users_in_game.get(guild_id)}")
+        try:
+            filtered_stats, users_in_game = game_stats.get_filtered_stats(
+                self.database.summoners, self.users_in_game.get(guild_id), game_info
+            )
+        except ValueError as exc:
+            self.config.log(
+                "Game data is not well formed! Exception: " + str(exc),
+                self.config.log_error
+            )
+            await self.send_error_msg(guild_id)
+            with open("errorlog.txt", "a", encoding="utf-8") as fp:
+                print_exc(file=fp)
+            raise exc
+
+        self.users_in_game[guild_id] = users_in_game
+        self.config.log(f"Users in game after: {users_in_game}")
+
+        self.active_game[guild_id]["queue_id"] = game_info["queueId"]
+
+        if self.riot_api.is_clash(self.active_game[guild_id]["queue_id"]):
+            multiplier = self.config.clash_multiplier
+            await self.channels_to_write[guild_id].send(
+                "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
+                f"{multiplier} TIMES AS MUCH!!! <<<<<**"
+            )
+
+        intfar, intfar_reason, response = self.get_intfar_data(filtered_stats, guild_id)
+        doinks, doinks_response = self.get_doinks_data(filtered_stats, guild_id)
+
+        if doinks_response is not None:
+            response += "\n" + self.insert_emotes(doinks_response)
+
+        await self.channels_to_write[guild_id].send(response)
+
+        await asyncio.sleep(1)
+        response, max_tokens_id, new_max_tokens_id = self.resolve_bets(
+            filtered_stats, intfar, intfar_reason, doinks, guild_id
+        )
+
+        if max_tokens_id != new_max_tokens_id:
+            await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
+
+        best_records, worst_records = self.save_stats(
+            filtered_stats, intfar, intfar_reason, doinks, guild_id
+        )
+
+        if best_records != [] or worst_records != []:
+            records_response = self.get_beaten_records_msg(
+                best_records, worst_records, guild_id
+            )
+            response = records_response + response
+
+        await self.channels_to_write[guild_id].send(response)
+
+        await self.play_event_sounds(guild_id, intfar, doinks)
+
+        if self.ai_model is not None:
+            self.config.log("Training AI Model with new game data.")
+            train_data = shape_predict_data(
+                self.database, self.riot_api, self.config, users_in_game
+            )
+            train_online(
+                self.ai_model, train_data, filtered_stats[0][1]["gameWon"]
+            )
+
+        if self.config.generate_predictions_img:
+            predictions_img = None
+            for disc_id, _, _, _ in users_in_game:
+                if ADMIN_DISC_ID == disc_id:
+                    predictions_img = api_util.create_predictions_timeline_image()
+                    break
+
+            if predictions_img is not None:
+                await self.send_predictions_timeline_image(predictions_img, guild_id)
 
     async def poll_for_game_start(self, guild_id, immediately=False):
         guild_name = self.get_guild_name(guild_id)
@@ -559,10 +587,14 @@ class DiscordClient(discord.Client):
             else self.users_in_game[guild_id]
         )
         users_in_current_game = []
-        for disc_id, summ_names, summ_ids in user_list:
+        for user_data in user_list:
+            disc_id = user_data[0]
+            summ_names = user_data[1]
+            summ_ids = user_data[2]
             game_for_summoner = None
             active_name = None
             active_id = None
+            champ_id = None
             # Check if any of the summ_names/summ_ids for a given player is in a game.
             for summ_name, summ_id in zip(summ_names, summ_ids):
                 game_data = self.riot_api.get_active_game(summ_id)
@@ -575,7 +607,8 @@ class DiscordClient(discord.Client):
                     break
             if game_for_summoner is not None:
                 game_ids.add(game_for_summoner["gameId"])
-                users_in_current_game.append((disc_id, [active_name], [active_id]))
+                champ_id = game_stats.get_player_stats(game_for_summoner, summ_ids)[1]
+                users_in_current_game.append((disc_id, [active_name], [active_id], champ_id))
                 active_game = game_for_summoner
 
         if len(game_ids) > 1: # People are in different games.
@@ -826,8 +859,8 @@ class DiscordClient(discord.Client):
         any_bets = False # Bool to indicate whether any bets were made.
         for disc_id, _, _ in self.database.summoners:
             user_in_game = False # See if the user corresponding to 'disc_id' was in-game.
-            for in_game_id, _, _ in self.users_in_game.get(guild_id, []):
-                if disc_id == in_game_id:
+            for user_data in self.users_in_game.get(guild_id, []):
+                if disc_id == user_data[0]:
                     user_in_game = True
                     break
 
@@ -911,6 +944,37 @@ class DiscordClient(discord.Client):
 
         return response, max_tokens_holder, new_max_tokens_holder
 
+    async def play_event_sounds(self, guild_id, intfar, doinks):
+        users_in_voice = self.get_users_in_voice()
+        voice_state = None
+        # Check if any users from the game are in a voice channel.
+        for user_data in self.users_in_game[guild_id]:
+            for voice_user_data in users_in_voice[guild_id]:
+                if user_data[0] == voice_user_data[0]:
+                    # Get voice state for member in voice chat.
+                    member = self.get_member_safe(user_data[0], guild_id)
+                    if member is None:
+                        continue
+
+                    voice_state = member.voice
+                    break
+
+        if voice_state is not None:
+            sounds_to_play = []
+
+            # Add Int-Far sound first (if it exists).
+            intfar_sound = self.database.get_event_sound(intfar, "intfar")
+            if intfar_sound is not None:
+                sounds_to_play.append(intfar_sound)
+
+            # Add each doinks sound if any exist.
+            for disc_id in doinks:
+                doinks_sound = self.database.get_event_sound(disc_id, "doinks")
+                if doinks_sound is not None:
+                    sounds_to_play.append(doinks_sound)
+
+            await self.audio_handler.play_sound(voice_state, sounds_to_play)
+
     def get_beaten_records_msg(self, best_records, worst_records, guild_id):
         response = "\n======================================="
         for index, record_list in enumerate((best_records, worst_records)):
@@ -983,8 +1047,8 @@ class DiscordClient(discord.Client):
         prev_mention = self.get_mention_str(prev_intfar, guild_id)
         if intfar_id is None:
             if intfar_streak > 1: # No one was Int-Far this game, but a streak was active.
-                for disc_id, _, _ in self.users_in_game.get(guild_id, []):
-                    if disc_id == prev_intfar:
+                for user_data in self.users_in_game.get(guild_id, []):
+                    if user_data[0] == prev_intfar:
                         return (f"{prev_mention} has redeemed himself! " +
                                 f"His Int-Far streak of {intfar_streak} has been broken. " +
                                 "Well done, my son {emote_uwu}")
@@ -1341,12 +1405,68 @@ class DiscordClient(discord.Client):
             event_loop = asyncio.get_event_loop()
             Thread(target=listen_for_request, args=(self, event_loop)).start()
 
+    async def paginate(self, channel, data, chunk, lines_per_page, header=None, footer=None, message=None):
+        chunk_start = chunk * lines_per_page
+        first_chunk = chunk_start == 0
+
+        chunk_end = (chunk + 1) * lines_per_page
+        last_chunk = chunk_end >= len(data)
+        if last_chunk:
+            chunk_end = len(data)
+
+        text = ""
+        if header is not None:
+            text = header + "\n"
+        text += "\n".join(data[chunk_start:chunk_end])
+        if footer is not None:
+            text += "\n" + footer
+        text += f"\n**Page {chunk+1}/{ceil(len(data) / lines_per_page)}**"
+
+        if message is None:
+            message = await channel.send(text)
+        else:
+            await message.clear_reactions()
+            await message.edit(content=text)
+
+        self.pagination_data[message.id] = {
+            "message": message, "data": data, "header": header,
+            "footer": footer, "chunk": chunk, "lines": lines_per_page
+        }
+
+        if not first_chunk:
+            await message.add_reaction("◀")
+        if not last_chunk:
+            await message.add_reaction("▶")
+
+    async def on_raw_reaction_add(self, react_info):
+        seconds_max = 60 * 60 * 12
+        # Clean up old messages.
+        for message_id in self.pagination_data:
+            created_at = self.pagination_data[message_id]["message"].created_at
+            if time() - created_at.timestamp() > seconds_max:
+                del self.pagination_data[message_id]
+
+        message_id = react_info.message_id
+        if (react_info.event_type == "REACTION_ADD"
+                and react_info.member != self.user
+                and message_id in self.pagination_data 
+                and react_info.emoji.name in ("▶", "◀")
+                and self.pagination_data[message_id]["message"].created_at):
+            message_data = self.pagination_data[message_id]
+            reaction_next = react_info.emoji.name == "▶"
+            new_chunk = message_data["chunk"] + 1 if reaction_next else message_data["chunk"] - 1
+            await self.paginate(
+                message_data["message"].channel, message_data["data"],
+                new_chunk, message_data["lines"], message_data["header"],
+                message_data["footer"], message_data["message"]
+            )
+
     async def handle_unregister_msg(self, message):
         user_in_game = False
         for guild_id in api_util.GUILD_IDS:
-            for disc_id, _, _ in self.users_in_game.get(guild_id, []):
+            for user_data in self.users_in_game.get(guild_id, []):
                 # If user is in game, unregistration is not allowed.
-                if disc_id == message.author.id:
+                if user_data[0] == message.author.id:
                     user_in_game = True
                     break
 
@@ -1380,8 +1500,8 @@ class DiscordClient(discord.Client):
         await message.channel.send(self.insert_emotes(response))
 
     async def handle_commands_msg(self, message):
-        response = "**--- Valid commands, and their usages, are listed below ---**"
-        messages = []
+        header = "**--- Valid commands, and their usages, are listed below ---**"
+        lines = []
         for cmd, desc_tupl in VALID_COMMANDS.items():
             cmd_str = cmd
             for alias in ALIASES.get(cmd, []):
@@ -1390,15 +1510,9 @@ class DiscordClient(discord.Client):
             params_str = "`-" if params is None else f"{params}` -"
             command_str = f"`!{cmd_str} {params_str} {desc}"
 
-            if len(response + "\n" + command_str) < 2000:
-                response += "\n" + command_str
-            else:
-                messages.append(response)
-                response = "\n" + command_str
+            lines.append(command_str)
 
-        for cmd_msg in messages:
-            await message.channel.send(cmd_msg)
-            await asyncio.sleep(0.5)
+        await self.paginate(message.channel, lines, 0, 8, header)
 
     async def handle_usage_msg(self, message, command):
         if not await self.valid_command(message, command, None):
@@ -1622,13 +1736,12 @@ class DiscordClient(discord.Client):
 
     def get_intfar_relation_stats(self, target_id):
         data = []
-        total_intfars = len(self.database.get_intfar_stats(target_id)[1])
         games_relations, intfars_relations = self.database.get_intfar_relations(target_id)
         for disc_id, total_games in games_relations.items():
             intfars = intfars_relations.get(disc_id, 0)
             data.append(
                 (
-                    disc_id, total_games, intfars, int((intfars / total_intfars) * 100),
+                    disc_id, total_games, intfars, int((intfars / total_games) * 100),
                     int((intfars / total_games) * 100)
                 )
             )
@@ -1654,8 +1767,11 @@ class DiscordClient(discord.Client):
             person_to_check = self.get_discord_nick(disc_id, message.guild.id)
             doinks_reason_ids = self.database.get_doinks_stats(disc_id)
             doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
-            msg = f"{person_to_check} has earned {len(doinks_reason_ids)} "
-            msg += self.insert_emotes("{emote_Doinks}")
+            champ_id, champ_count = self.database.get_champ_with_most_doinks(disc_id)
+            champ_name = self.riot_api.get_champ_name(champ_id)
+            msg = f"{person_to_check} has earned {len(doinks_reason_ids)} " + "{emote_Doinks}\n"
+            msg += "He has earned the most {emote_Doinks} " 
+            msg += f"when playing **{champ_name}** (**{champ_count}** times)"
             if expanded and len(doinks_reason_ids) > 0:
                 reason_desc = "\n" + "Big doinks awarded so far:"
                 for reason_id, reason in enumerate(api_util.DOINKS_REASONS):
@@ -1663,7 +1779,7 @@ class DiscordClient(discord.Client):
 
                 msg += reason_desc
 
-            return msg, len(doinks_reason_ids)
+            return self.insert_emotes(msg), len(doinks_reason_ids)
 
         response = ""
         if target_id is None: # Check doinks for everyone.
@@ -1711,7 +1827,7 @@ class DiscordClient(discord.Client):
     async def handle_stat_msg(self, message, first_cmd, second_cmd, target_id):
         """
         Get the value of the requested stat for the requested player.
-        F.x. '!best damage dumbledonger'.
+        F.x. '!best damage Obama'.
         """
         if second_cmd in api_util.STAT_COMMANDS: # Check if the requested stat is a valid stat.
             stat = second_cmd
@@ -1767,19 +1883,27 @@ class DiscordClient(discord.Client):
                 if stat == "first_blood":
                     quant = "most" if best else "least"
                     response = f"The person who has gotten first blood the {quant} "
-                    response += f"is {recepient} with {min_or_max_value} games "
+                    response += f"is {recepient} with **{min_or_max_value}** games "
                     response += self.insert_emotes(emote_to_use)
                 else:
-                    response = f"The {readable_stat} ever in a game was {min_or_max_value} "
+                    response = f"The {readable_stat} ever in a game was **{min_or_max_value}** "
                     response += f"by {recepient} " + self.insert_emotes(emote_to_use) + "\n"
                     response += f"He got this as {game_summary}"
             else:
-                response = (f"{recepient} has gotten {readable_stat} in a game " +
-                            f"{stat_count} times " + self.insert_emotes(emote_to_use) + "\n")
+                champ_id, champ_count = self.database.get_champ_count_for_stat(
+                    stat, best, target_id, maximize
+                )
+                champ_name = self.riot_api.get_champ_name(champ_id)
+                response = (
+                    f"{recepient} has gotten {readable_stat} in a game " +
+                    f"**{stat_count}** times " + self.insert_emotes(emote_to_use) + "\n"
+                    f"The champion he most often gets {readable_stat} with is "
+                    f"**{champ_name}** (**{champ_count}** games).\n"
+                )
                 if min_or_max_value is not None:
                     # The target user has gotten most/fewest of 'stat' in at least one game.
                     response += f"His {readable_stat} ever was "
-                    response += f"{min_or_max_value} as {game_summary}"
+                    response += f"**{min_or_max_value}** as {game_summary}"
 
             await message.channel.send(response)
         else:
@@ -1828,6 +1952,12 @@ class DiscordClient(discord.Client):
                     predict_response = requests.get(predict_url)
                     if predict_response.ok:
                         pct_win = predict_response.json()["response"]
+                        response += f"\nPredicted chance of winning: **{pct_win}%**"
+                    elif self.ai_model is not None:
+                        input_data = shape_predict_data(
+                            self.database, self.riot_api, self.config, self.users_in_game
+                        )
+                        pct_win = int(self.ai_model.predict(input_data) * 100)
                         response += f"\nPredicted chance of winning: **{pct_win}%**"
                     else:
                         error_msg = predict_response.json()["response"]
@@ -2165,6 +2295,51 @@ class DiscordClient(discord.Client):
             response += "\nThese criteria must all be met to be Int-Far."
 
         await message.channel.send(response)
+
+    async def handle_play_sound_msg(self, message, sound):
+        voice_state = message.author.voice
+        success, status = await self.audio_handler.play_sound(voice_state, sound)
+
+        if not success:
+            await message.channel.send(self.insert_emotes(status))
+
+    async def handle_sounds_msg(self, message):
+        sounds_list = self.audio_handler.get_sounds()
+        header = "Available sounds:"
+        footer = "Upload your own at `https://mhooge.com/intfar/soundboard`!"
+        await self.paginate(message.channel, sounds_list, 0, 10, header, footer)
+
+    async def handle_set_event_sound(self, message, sound, event):
+        response = ""
+        event_fmt = "Int-Far" if event == "intfar" else "{emote_Doinks}"
+        if sound is None: # Get current set sound for event.
+            current_sound = self.database.get_event_sound(message.author.id, event)
+            example_cmd = f"!{event}_sound"
+            if current_sound is None:
+                response = (
+                    f"You have not yet set a sound that triggers when getting {event_fmt}. " +
+                    f"Do so by writing `{example_cmd} [sound]`" + " {emote_uwucat}\n" +
+                    "See a list of available sounds with `!sounds`"
+                )
+            else:
+                response = (
+                    f"You currently have `{current_sound}` as the sound that triggers " +
+                    f"when getting {event_fmt} " + "{emote_Bitcoinect}\n" +
+                    f"Use `{example_cmd} remove` to remove this sound."
+                )
+        elif sound == "remove":
+            self.database.remove_event_sound(message.author.id, event)
+            response = f"Removed sound from triggering when getting {event_fmt}."
+        elif sound not in audio_handler.get_available_sounds():
+            response = f"Invalid sound: `{sound}`. See `!sounds` for a list of valid sounds."
+        else:
+            self.database.set_event_sound(message.author.id, sound, event)
+            response = (
+                f"The sound `{sound}` will now play when you get {event_fmt} " +
+                "{emote_poggers}"
+            )
+
+        await message.channel.send(self.insert_emotes(response))
 
     def format_item_list(self, items, headers):
         strings = []
@@ -2633,6 +2808,13 @@ class DiscordClient(discord.Client):
                     self.handle_report_msg, message, target_name,
                     target_all=False, access_level=access_level
                 )
+            elif cmd_equals(first_command, "doinks_sound") or cmd_equals(first_command, "intfar_sound"):
+                sound_name = self.extract_target_name(split, 1, default=None)
+                event =  "doinks" if cmd_equals(first_command, "doinks_sound") else "intfar"
+                await self.get_data_and_respond(
+                    self.handle_set_event_sound, message,
+                    access_level=access_level, args=(sound_name, event)
+                )
             elif cmd_equals(first_command, "shop"):
                 await self.handle_shop_msg(message)
             elif cmd_equals(first_command, "buy"):
@@ -2659,9 +2841,9 @@ class DiscordClient(discord.Client):
                     target_name, access_level=access_level
                 )
             elif cmd_equals(first_command, "play"):
-                await audio_handler.play_sound(self, message, second_command)
+                await self.handle_play_sound_msg(message, second_command)
             elif cmd_equals(first_command, "sounds"):
-                await audio_handler.handle_sounds_msg(message)
+                await self.handle_sounds_msg(message)
             elif cmd_equals(first_command, "intdaddy"):
                 await self.handle_flirtation_msg(message, "english")
             elif cmd_equals(first_command, "intpapi"):
@@ -2688,9 +2870,9 @@ class DiscordClient(discord.Client):
             elif before.channel is not None and after.channel is None: # User left.
                 await self.user_left_voice(member.id, member.guild.id)
 
-def run_client(config, database, betting_handler, riot_api, shop_handler, main_pipe, flask_pipe):
+def run_client(config, database, betting_handler, riot_api, audio_handler, shop_handler, ai_model, main_pipe, flask_pipe):
     client = DiscordClient(
-        config, database, betting_handler, riot_api, shop_handler,
-        main_pipe=main_pipe, flask_pipe=flask_pipe
+        config, database, betting_handler, riot_api, audio_handler,
+        shop_handler, ai_model=ai_model, main_pipe=main_pipe, flask_pipe=flask_pipe
     )
     client.run(config.discord_token)

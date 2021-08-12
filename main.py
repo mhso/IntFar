@@ -1,21 +1,24 @@
 import json
 from time import sleep
 from multiprocessing import Process, Pipe
+
 import run_flask
-from api.database import Database
+from api.audio_handler import AudioHandler
 from api.bets import BettingHandler
-from api.shop import ShopHandler
 from api.config import Config
+from api.database import Database
+from api.shop import ShopHandler
 from api.riot_api import APIClient
+from ai.model import Model
 from discbot.discord_bot import run_client
 
-def start_discord_process(config, database, betting_handler, riot_api, shop_handler, bot_end_flask):
+def start_discord_process(config, database, betting_handler, riot_api, audio_handler, shop_handler, ai_model, bot_end_flask):
     our_end, bot_end_us = Pipe()
     bot_process = Process(
         name="Discord Bot",
         target=run_client,
         args=(
-            config, database, betting_handler, riot_api, shop_handler, bot_end_us, bot_end_flask
+            config, database, betting_handler, riot_api, audio_handler, shop_handler, ai_model, bot_end_us, bot_end_flask
         )
     )
     bot_process.start()
@@ -48,8 +51,10 @@ if __name__ == "__main__":
     database_client = Database(conf)
     betting_handler = BettingHandler(conf, database_client)
     shop_handler = ShopHandler(conf, database_client)
-
+    audio_handler = AudioHandler(conf)
     riot_api = APIClient(conf)
+    ai_model = Model(conf)
+    ai_model.load()
 
     conf.log("Starting Flask web app...")
     flask_process, bot_end_flask = start_flask_process(
@@ -60,8 +65,8 @@ if __name__ == "__main__":
     conf.log("Starting Discord Client...")
 
     bot_process, our_end_bot = start_discord_process(
-        conf, database_client, betting_handler,
-        riot_api, shop_handler, bot_end_flask
+        conf, database_client, betting_handler, riot_api,
+        audio_handler, shop_handler, ai_model, bot_end_flask
     )
 
     while True:
@@ -74,13 +79,13 @@ if __name__ == "__main__":
                 )
                 bot_process.kill()
                 bot_process, our_end_bot = start_discord_process(
-                    conf, database_client, betting_handler,
-                    riot_api, shop_handler, bot_end_flask
+                    conf, database_client, betting_handler, riot_api,
+                    audio_handler, shop_handler, ai_model, bot_end_flask
                 )
             if bot_process.exitcode == 1:
                 bot_process, our_end_bot = start_discord_process(
-                    conf, database_client, betting_handler,
-                    riot_api, shop_handler, bot_end_flask
+                    conf, database_client, betting_handler, riot_api,
+                    audio_handler, shop_handler, ai_model, bot_end_flask
                 )
         except BrokenPipeError:
             print("Stopping bot...", flush=True)

@@ -239,6 +239,21 @@ class Database:
 
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
+    def get_champ_count_for_stat(self, stat, best, disc_id, maximize):
+        aggregator = "MAX" if maximize else "MIN"
+        table = "best_stats" if best else "worst_stats"
+        query = (
+            f"SELECT sub.champ_id, {aggregator}(sub.c) FROM ( " +
+            f"   SELECT COUNT(DISTINCT st.game_id) AS c, champ_id FROM {table} st" +
+            f"   JOIN registered_summoners rs ON rs.disc_id=st.{stat}_id" +
+            "   JOIN participants p ON p.game_id = st.game_id" +
+            f"   WHERE st.{stat}_id=? AND p.disc_id=rs.disc_id AND rs.active=1" +
+            "   GROUP BY champ_id" +
+            ") sub"
+        )
+        with self.get_connection() as db:
+            return self.execute_query(db, query, (disc_id,)).fetchone()
+
     def get_doinks_count(self, context=None):
         query_doinks = (
             "SELECT Count(sub.game_id), COUNT (DISTINCT sub.game_id) FROM ( " +
@@ -248,6 +263,18 @@ class Database:
         )
         with (self.get_connection() if context is None else context) as db:
             return self.execute_query(db, query_doinks).fetchone()
+
+    def get_champ_with_most_doinks(self, disc_id):
+        with self.get_connection() as db:
+            query = (
+                "SELECT sub.champ_id, MAX(sub.c) FROM ( " +
+                f"   SELECT COUNT(DISTINCT p.game_id) AS c, champ_id FROM participants p" +
+                f"   JOIN registered_summoners rs ON rs.disc_id=p.disc_id" +
+                f"   WHERE p.disc_id=? AND p.doinks IS NOT NULL AND rs.active=1" +
+                "   GROUP BY champ_id" +
+                ") sub"
+            )
+            return self.execute_query(db, query, (disc_id,)).fetchone()
 
     def get_max_doinks_details(self):
         with self.get_connection() as db:
@@ -582,8 +609,6 @@ class Database:
         best_ever = self.get_most_extreme_stat(stat_name, True, stat_name != "deaths")[1]
         worst_ever = self.get_most_extreme_stat(stat_name, False, stat_name == "deaths")[1]
 
-        print(stat_name, best_ever, max_stat)
-
         best_beaten = max_stat > best_ever if stat_name != "deaths" else max_stat < best_ever
         worst_beaten = min_stat < worst_ever if stat_name != "deaths" else min_stat > worst_ever
 
@@ -659,10 +684,13 @@ class Database:
                 f"{game_id}, {users_in_game}, {timestamp}, {doinks}"
             )
 
-            query = "INSERT INTO participants(game_id, disc_id, doinks) VALUES (?, ?, ?)"
-            for disc_id, _, _ in users_in_game:
+            query = "INSERT INTO participants(game_id, disc_id, champ_id, doinks) VALUES (?, ?, ?, ?)"
+            for user_data in users_in_game:
+                print(user_data)
+                disc_id = user_data[0]
+                champ_id = user_data[-1]
                 doink = doinks.get(disc_id, None)
-                self.execute_query(db, query, (game_id, disc_id, doink))
+                self.execute_query(db, query, (game_id, disc_id, champ_id, doink))
             db.commit()
 
         return beaten_records_best, beaten_records_worst
@@ -983,3 +1011,19 @@ class Database:
             query_balance = "UPDATE betting_balance SET tokens=100"
             self.execute_query(db, query_items)
             self.execute_query(db, query_balance)
+
+    def get_event_sound(self, disc_id, event):
+        with self.get_connection() as db:
+            query = "SELECT sound FROM event_sounds WHERE disc_id=? AND event=?"
+            result = self.execute_query(db, query, (disc_id, event)).fetchone()
+            return result[0] if result is not None else None
+
+    def set_event_sound(self, disc_id, sound, event):
+        with self.get_connection() as db:
+            query = "REPLACE INTO event_sounds(disc_id, sound, event) VALUES (?, ?, ?)"
+            self.execute_query(db, query, (disc_id, sound, event))
+
+    def remove_event_sound(self, disc_id, event):
+        with self.get_connection() as db:
+            query = "DELETE FROM event_sounds WHERE disc_id=? AND event=?"
+            self.execute_query(db, query, (disc_id, event))

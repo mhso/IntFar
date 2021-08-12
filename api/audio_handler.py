@@ -2,6 +2,8 @@ from glob import glob
 import asyncio
 import os
 
+from numpy.lib.arraysetops import isin
+
 from discord import PCMVolumeTransformer
 from discord.player import FFmpegPCMAudio
 
@@ -13,43 +15,73 @@ def get_available_sounds():
         for x in glob(f"{SOUNDS_PATH}/*.mp3")
     ])
 
-async def play_sound(client, message, sound):
-    voice_state = message.author.voice
-    if sound not in get_available_sounds(): # Check if 'sound' refers to a valid mp3 sound snippet.
-        await message.channel.send(
-            f"Invalid name of sound: '{sound}'. Use !sounds for a list of available sounds."
-        )
-    elif voice_state is None: # Check if user is in a voice channel.
-        response = client.insert_emotes(
-            "You must be in a voice channel to play sounds {emote_simp_but_closeup}"
-        )
-        await message.channel.send(response)
-    else:
-        voice_channel = voice_state.channel
+class AudioHandler: # Keep track of connection to voice channel.
+    def __init__(self, config):
+        self.config = config
+        self.voice_stream = None # Keep track of connection to voice.
+        self.sound_queue = []
 
-        if client.config.env == "dev":
+    async def play_loop(self):
+        if self.config.env == "dev":
             ffmpeg_exe = "ffmpeg"
         else:
             ffmpeg_exe = os.path.abspath("resources/ffmpeg-4.1.6/ffmpeg")
 
-        # Create voice channel stream for the channel the user is in.
-        player = PCMVolumeTransformer(
-            FFmpegPCMAudio(f"{SOUNDS_PATH}/{sound}.mp3", executable=ffmpeg_exe)
-        )
-        vc_stream = await voice_channel.connect()
-        # Create FFMPEG MP3 audio player.
+        while self.sound_queue != []:
+            sound = self.sound_queue.pop(0)
 
-        # Start the player and wait until it is done.
-        vc_stream.play(player)
-        while vc_stream.is_playing():
+            # Create volume controlled FFMPEG player from sound file.
+            player = PCMVolumeTransformer(
+                FFmpegPCMAudio(f"{SOUNDS_PATH}/{sound}.mp3", executable=ffmpeg_exe)
+            )
+
+            # Start the player and wait until it is done.
+            self.voice_stream.play(player)
+            while self.voice_stream.is_playing():
+                await asyncio.sleep(0.5)
+
             await asyncio.sleep(0.5)
-        vc_stream.stop()
+            self.voice_stream.stop()
 
         # Disconnect from voice channel.
-        await vc_stream.disconnect()
+        await self.voice_stream.disconnect()
 
-async def handle_sounds_msg(message):
-    response = "Available sounds:"
-    for sound in get_available_sounds():
-        response += f"\n- `{sound}`"
-    await message.channel.send(response)
+        self.voice_stream = None
+
+    async def play_sound(self, voice_state, sounds):
+        if not isinstance(sounds, list):
+            sounds = [sounds]
+
+        for sound in sounds:
+            # Check if 'sound' refers to a valid mp3 sound snippet.
+            if sound not in get_available_sounds():
+                err_msg = (
+                    f"Invalid name of sound: '{sound}'. " +
+                    "Use !sounds for a list of available sounds."
+                )
+                return False, err_msg
+
+        if voice_state is None: # Check if user is in a voice channel.
+            err_msg = (
+                "You must be in a voice channel to play sounds {emote_simp_but_closeup}"
+            )
+            return False, err_msg
+        elif sounds != []:
+            voice_channel = voice_state.channel
+
+            # Add sound to queue.
+            self.sound_queue.extend(sounds)
+
+            if self.voice_stream is None:
+                # If no voice connection exists, make a new one.
+                self.voice_stream = await voice_channel.connect()
+
+                await self.play_loop() # Play sounds in the queue.
+
+            return True, None
+
+    def get_sounds(self):
+        sounds = []
+        for sound in get_available_sounds():
+            sounds.append(f"- `{sound}`")
+        return sounds

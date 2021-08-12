@@ -1,5 +1,4 @@
 import json
-from contextlib import closing
 from api.database import Database
 from api.config import Config
 
@@ -10,7 +9,7 @@ conf_1 = Config()
 database_client_1 = Database(conf_1)
 
 conf_2 = Config()
-conf_2.database = "copy.db"
+conf_2.database = "resources/copy.db"
 
 database_client_2 = Database(conf_2)
 
@@ -25,6 +24,7 @@ with database_client_1.get_connection() as db_1:
     bets = db_1.cursor().execute("SELECT * FROM bets").fetchall()
     shop_items = db_1.cursor().execute("SELECT * FROM shop_items").fetchall()
     owned_items = db_1.cursor().execute("SELECT * FROM owned_items").fetchall()
+    event_sounds = db_1.cursor().execute("SELECT * FROM event_sounds").fetchall()
 
     query_prefix = "INSERT INTO "
     query_cols = (
@@ -40,7 +40,7 @@ with database_client_1.get_connection() as db_1:
         for summ in summoners:
             disc_id = int(summ[0])
             secret = summ[3]
-            db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret, summ[4], 1))
+            db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret, summ[4], summ[5]))
         query = "INSERT INTO games VALUES (?, ?, ?, ?, ?)"
         for data in data_games:
             db_2.cursor().execute(query, data)
@@ -50,7 +50,7 @@ with database_client_1.get_connection() as db_1:
         query = query_prefix + "worst_stats" + query_cols
         for data in data_worst:
             db_2.cursor().execute(query, data)
-        query = "INSERT OR IGNORE INTO participants(game_id, disc_id, doinks) VALUES (?, ?, ?)"
+        query = "INSERT INTO participants(game_id, disc_id, champ_id, doinks) VALUES (?, ?, 0, ?)"
         for data in participants:
             db_2.cursor().execute(query, data)
         query = "INSERT OR IGNORE INTO betting_balance(disc_id, tokens) VALUES (?, ?)"
@@ -72,4 +72,8 @@ with database_client_1.get_connection() as db_1:
         query = "INSERT OR IGNORE INTO owned_items VALUES (?, ?, ?)"
         for data in owned_items:
             db_2.cursor().execute(query, data)
+        query = "INSERT OR IGNORE INTO event_sounds(disc_id, sound, event) VALUES (?, ?, ?)"
+        for data in event_sounds:
+            db_2.cursor().execute(query, data)
+
         db_2.commit()

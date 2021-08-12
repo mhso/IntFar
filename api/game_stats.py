@@ -45,17 +45,27 @@ def get_outlier_stat(stat, data, reverse_order=False, total_kills=0):
     least = outlier_func(stats, stat, total_kills)
     return most_id, most, least_id, least
 
-def get_finished_game_summary(data, summ_ids, riot_api):
+def get_player_stats(data, summ_ids):
     stats = None
     champ_id = 0
-    for part_info in data["participantIdentities"]:
-        if part_info["player"]["summonerId"] in summ_ids:
-            for participant in data["participants"]:
-                if part_info["participantId"] == participant["participantId"]:
-                    stats = participant["stats"]
-                    champ_id = participant["championId"]
-                    break
-            break
+    if "participantIdentities" in data:
+        for part_info in data["participantIdentities"]:
+            if part_info["player"]["summonerId"] in summ_ids:
+                for participant in data["participants"]:
+                    if part_info["participantId"] == participant["participantId"]:
+                        stats = participant["stats"]
+                        champ_id = participant["championId"]
+                        break
+                break
+    else:
+        for participant in data["participants"]:
+            if participant["summonerId"] in summ_ids:
+                champ_id = participant["championId"]
+                break
+    return stats, champ_id
+
+def get_finished_game_summary(data, summ_ids, riot_api):
+    stats, champ_id = get_player_stats(data, summ_ids)
 
     champ_played = riot_api.get_champ_name(champ_id)
     if champ_played is None:
@@ -172,6 +182,7 @@ def get_filtered_stats(all_users, users_in_game, game_info):
             if part_info["participantId"] == participant["participantId"]:
                 kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
                 damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
+                
                 for disc_id, _, summ_ids in all_users:
                     if part_info["player"]["summonerId"] in summ_ids:
                         our_team = participant["teamId"]
@@ -187,13 +198,15 @@ def get_filtered_stats(all_users, users_in_game, game_info):
 
                         if users_in_game is not None:
                             user_in_list = False
-                            for user_disc_id, _, _ in users_in_game:
-                                if user_disc_id == disc_id:
+                            for user_data in users_in_game:
+                                if user_data[0] == disc_id:
                                     user_in_list = True
                                     break
                             if not user_in_list:
-                                summ_data = (disc_id, part_info["player"]["summonerName"],
-                                             part_info["player"]["summonerId"])
+                                summ_data = (
+                                    disc_id, part_info["player"]["summonerName"],
+                                    part_info["player"]["summonerId"], participant["championId"]
+                                )
                                 active_users.append(summ_data)
 
     for _, stats in filtered_stats:

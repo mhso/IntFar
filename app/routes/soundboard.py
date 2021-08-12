@@ -10,11 +10,15 @@ import app.util as app_util
 soundboard_page = flask.Blueprint("soundboard", __name__, template_folder="templates")
 
 VALID_FILE_TYPES = set(["mp3"])
-FILENAME_MAX_LENGTH = 20
+INVALID_FILE_NAMES = set(["remove"])
+FILENAME_MAX_LENGTH = 24
 UPLOAD_FOLDER = os.path.abspath(SOUNDS_PATH)
 
 def valid_filetype(filename):
     return "." in filename and filename.split(".")[1] in VALID_FILE_TYPES
+
+def valid_filename(filename):
+    return filename.replace("\\", "/").split("/")[-1].split(".")[0] not in INVALID_FILE_NAMES
 
 def soundboard_template(success=False, status_msg=None):
     available_sounds = get_available_sounds()
@@ -50,6 +54,11 @@ def home():
             )
 
         secure_name = secure_filename(file.filename.replace(" ", "_").lower())
+        if not valid_filename(secure_name):
+            return soundboard_template(
+                False, f"Invalid filename '{secure_name}' Name is reserved."
+            )
+
         path = os.path.join(UPLOAD_FOLDER, secure_name)
         if os.path.exists(path):
             return soundboard_template(

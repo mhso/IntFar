@@ -14,6 +14,21 @@ class APIClient:
         if not exists(self.get_champions_file()):
             self.get_latest_champions_file()
 
+        self.champ_names = {}
+        self.get_all_champs_names()
+
+    def get_all_champs_names(self):
+        champions_file = self.get_champions_file()
+        if champions_file is None:
+            return
+
+        with open(champions_file, encoding="utf-8") as fp:
+            champion_data = json.load(fp)
+            for champ_name in champion_data["data"]:
+                data_for_champ = champion_data["data"][champ_name]
+                self.champ_names[int(data_for_champ["key"])] = data_for_champ["name"]
+        return None
+
     def get_champions_file(self):
         return f"api/champions-{self.latest_patch}.json"
 
@@ -75,19 +90,10 @@ class APIClient:
         return response.json()
 
     def get_champ_name(self, champ_id):
-        champions_file = self.get_champions_file()
-        if champions_file is None:
-            return None
-
-        with open(champions_file, encoding="UTF-8") as fp:
-            champion_data = json.load(fp)
-            for champ_name in champion_data["data"]:
-                if int(champion_data["data"][champ_name]["key"]) == champ_id:
-                    return champion_data["data"][champ_name]["name"]
-        return None
+        return self.champ_names.get(champ_id)
 
     def get_map_name(self, map_id):
-        with open("api/maps.json", encoding="UTF-8") as fp:
+        with open("api/maps.json", encoding="utf-8") as fp:
             map_data = json.load(fp)
             for map_info in map_data:
                 if map_info["mapId"] == map_id:
@@ -95,7 +101,7 @@ class APIClient:
         return None
 
     def map_is_sr(self, map_id):
-        with open("api/maps.json", encoding="UTF-8") as fp:
+        with open("api/maps.json", encoding="utf-8") as fp:
             map_data = json.load(fp)
             for map_info in map_data:
                 if map_info["mapId"] == map_id:

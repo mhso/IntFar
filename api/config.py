@@ -40,13 +40,28 @@ class Config:
         self.vision_kda_criteria = 3.0
 
         # ===== Int-Far of the Month =====
-        self.ifotm_min_games = 5
+        self.ifotm_min_games = 10
         self.hour_of_ifotm_announce = 12 # Hour of the day on which to announce IFOTM.
 
         # ===== Logging & Messaging =====
         self.log_warning = 1
         self.log_error = 2
         self.message_timeout = 1.5
+
+        # ===== ML Classifier =====
+        self.ai_input_dim = (25, 170)
+        self.ai_conv_filters = 64
+        self.ai_conv_kernel = 2
+        self.ai_conv_stride = 2
+        self.ai_hidden_dim = 512
+        self.ai_output_dim = 1
+        self.ai_dropout = 0.5
+        self.ai_validation_split = 0.8
+        self.ai_batch_size = 64
+        self.ai_learning_rate = 0.02
+        self.ai_weight_decay = 0e-4
+        self.ai_epochs = 100
+        self.ai_init_range = 0.005
 
     def log(self, data, severity=0, end="\n"):
         curr_time = datetime.now()

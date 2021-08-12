@@ -5,11 +5,13 @@ queries.sql
 .vscode
 __pycache__
 *.db
+*.pt
 api/champions*.json
 api/maps.json
 debug.log
 app/static/*
 resouces/consola.tff
+resources/data
 vendor
 composer.lock
 all_messages.txt

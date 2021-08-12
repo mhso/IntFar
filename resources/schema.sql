@@ -17,6 +17,7 @@ CREATE TABLE [games] (
 CREATE TABLE [participants] (
   [game_id] INTEGER NOT NULL,
   [disc_id] INTEGER NOT NULL,
+  [champ_id] INTEGER NOT NULL,
   [doinks] NVARCHAR(10),
   PRIMARY KEY (game_id, disc_id)
 );
@@ -91,6 +92,12 @@ CREATE TABLE [bets] (
     [ticket] INTEGER,
     [result] INTEGER(2),
     [payout] INTEGER
+);
+CREATE TABLE [event_sounds] (
+    [disc_id] INTEGER NOT NULL,
+    [sound] NVARCHAR(24) NOT NULL,
+    [event] NVARCHAR(6) NOT NULL,
+    PRIMARY KEY (disc_id, event)
 );
 CREATE TABLE [shop_items] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
