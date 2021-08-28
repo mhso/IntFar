@@ -1,5 +1,23 @@
 from ai import data
 
+# Dave (Senna), Murt (Viego), Thomas (Lillia), Me (Yasuo), Mads (Maokai)
+GAME_DATA_4 = [
+    (115142485579137029, None, None, 235),
+    (172757468814770176, None, None, 234),
+    (219497453374668815, None, None, 876),
+    (267401734513491969, None, None, 157),
+    (331082926475182081, None, None, 57)
+]
+
+# Dave (Senna), Murt (Viego), Thomas (Lillia), Me (Yasuo), Mads (Maokai)
+GAME_DATA_5 = [
+    (115142485579137029, None, None, 235),
+    (172757468814770176, None, None, 234),
+    (219497453374668815, None, None, 876),
+    (267401734513491969, None, None, 157),
+    (331082926475182081, None, None, 57)
+]
+
 # Dave (Senna), Murt (Viego), Thomas (Lillia), Me (Yasuo), Mads (Xerath)
 GAME_DATA_6 = [
     (115142485579137029, None, None, 235),
@@ -47,7 +65,8 @@ GAME_DATA_10 = [
 
 # Game data ranked from theoretical worst to best
 ALL_TEST_EXAMPLES = [
-    GAME_DATA_7, GAME_DATA_8, GAME_DATA_9, GAME_DATA_10
+    GAME_DATA_4, GAME_DATA_5,
+    GAME_DATA_6, GAME_DATA_7, GAME_DATA_8, GAME_DATA_9, GAME_DATA_10
 ]
 
 def validate(model, database, riot_api, config):

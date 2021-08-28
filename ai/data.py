@@ -24,9 +24,9 @@ def shape_predict_data(database, riot_api, config, users_in_game):
     champs_map = {champ_id: index for (index, champ_id) in enumerate(riot_api.champ_names)}
     data_vector = np.zeros(config.ai_input_dim)
 
-    for disc_id, _, _, champ_id in users_in_game:
-        user_index = users_map[disc_id]
-        champ_index = champs_map[champ_id]
+    for user_data in users_in_game:
+        user_index = users_map[user_data[0]]
+        champ_index = champs_map[user_data[-1]]
         data_vector[user_index][champ_index] = 1
 
     return np.array(data_vector)
@@ -62,10 +62,8 @@ def load_train_data(database, riot_api, input_dim):
 
     return np.array(data_x), np.array(data_y)
 
-def shuffle_and_split_data(data, labels, validation_split):
+def shuffle_and_split_data(data, labels, validation_split, seed):
     split_point = int(len(data) * validation_split)
-
-    seed = 2132412
 
     rng = np.random.default_rng(seed)
     rng.shuffle(data)

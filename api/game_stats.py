@@ -90,7 +90,7 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
                 if champ_played is None:
                     champ_played = "Unknown Champ (Rito pls)"
                 champions[participant["summonerId"]] = (participant["summonerName"], champ_played)
-                users_in_game.append(disc_id)
+                users_in_game.append((disc_id, champ_id))
 
     game_start = data["gameStartTime"] / 1000
     if game_start > 0:

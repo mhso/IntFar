@@ -647,8 +647,8 @@ class Database:
                 min_id, min_value, max_id, max_value,
                 best_record, worst_record
             ) = self.get_stat_data(key, stat, data, reverse_order, kills_by_our_team)
-            best_values.extend([min_value, min_id])
-            worst_values.extend([max_value, max_id])
+            best_values.extend([max_value, max_id])
+            worst_values.extend([min_value, min_id])
             if best_record:
                 beaten_records_best.append((stat, max_value, max_id))
             if worst_record:

@@ -8,8 +8,20 @@ from api.config import Config
 from api.riot_api import APIClient
 from api.database import Database
 
+SEED = 2132412
+
+def set_global_seed(seed, set_cuda_deterministic=False):
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        if set_cuda_deterministic:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
 def main():
     auth = json.load(open("discbot/auth.json"))
+
+    set_global_seed(SEED)
 
     config = Config()
     config.env = auth["env"]
@@ -23,7 +35,7 @@ def main():
 
     game_data, labels = data.load_train_data(database_client, riot_api, config.ai_input_dim)
 
-    train_x, train_y, val_x, val_y = data.shuffle_and_split_data(game_data, labels, config.ai_validation_split)
+    train_x, train_y, val_x, val_y = data.shuffle_and_split_data(game_data, labels, config.ai_validation_split, SEED)
 
     print(f"Loaded {len(train_x)} training examples & {len(val_x)} validation examples.")
 

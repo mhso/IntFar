@@ -24,14 +24,15 @@ class Model(torch.nn.Module):
 
         self.pool_2 = torch.nn.AvgPool1d(2, 2)
 
-        use_pool = False
+        use_pool = True
         divisor = 16 if use_pool else 4
 
         cls_in = (config.ai_input_dim[1] // divisor) * (config.ai_conv_filters * 2)
 
         self.classifier = torch.nn.Sequential(
-            torch.nn.Linear(cls_in, config.ai_hidden_dim),
             torch.nn.Dropout(config.ai_dropout),
+            torch.nn.Linear(cls_in, config.ai_hidden_dim),
+            torch.nn.Dropout(config.ai_dropout * 0.5),
             torch.nn.Linear(config.ai_hidden_dim, config.ai_output_dim)
         )
 
@@ -40,11 +41,11 @@ class Model(torch.nn.Module):
     def forward(self, x):
         x = self.conv_1(x)
         x = self.batch_norm_1(x)
-        #x = self.pool_1(x)
+        x = self.pool_1(x)
 
         x = self.conv_2(x)
         x = self.batch_norm_2(x)
-        #x = self.pool_2(x)
+        x = self.pool_2(x)
 
         x = x.reshape(x.shape[0], -1)
 

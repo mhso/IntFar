@@ -50,18 +50,18 @@ class Config:
 
         # ===== ML Classifier =====
         self.ai_input_dim = (25, 170)
-        self.ai_conv_filters = 64
+        self.ai_conv_filters = 128
         self.ai_conv_kernel = 2
         self.ai_conv_stride = 2
-        self.ai_hidden_dim = 512
+        self.ai_hidden_dim = 256
         self.ai_output_dim = 1
         self.ai_dropout = 0.5
-        self.ai_validation_split = 0.8
-        self.ai_batch_size = 64
-        self.ai_learning_rate = 0.02
-        self.ai_weight_decay = 0e-4
+        self.ai_validation_split = 0.75
+        self.ai_batch_size = 32
+        self.ai_learning_rate = 0.005
+        self.ai_weight_decay = 0e-5
         self.ai_epochs = 100
-        self.ai_init_range = 0.005
+        self.ai_init_range = 0.001
 
     def log(self, data, severity=0, end="\n"):
         curr_time = datetime.now()

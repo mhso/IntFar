@@ -411,7 +411,7 @@ class DiscordClient(discord.Client):
                     await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
                 else:
-                    self.game_over(game_info, guild_id)
+                    await self.game_over(game_info, guild_id)
 
                 req_data = {
                     "secret": self.config.discord_token,
@@ -498,14 +498,16 @@ class DiscordClient(discord.Client):
 
         await self.play_event_sounds(guild_id, intfar, doinks)
 
-        if self.ai_model is not None:
-            self.config.log("Training AI Model with new game data.")
-            train_data = shape_predict_data(
-                self.database, self.riot_api, self.config, users_in_game
-            )
-            train_online(
-                self.ai_model, train_data, filtered_stats[0][1]["gameWon"]
-            )
+        # if self.ai_model is not None:
+        #     self.config.log("Training AI Model with new game data.")
+        #     train_data = shape_predict_data(
+        #         self.database, self.riot_api, self.config, users_in_game
+        #     )
+        #     loss = train_online(
+        #         self.ai_model, train_data, filtered_stats[0][1]["gameWon"]
+        #     )[0]
+        #     self.ai_model.save()
+        #     self.config.log(f"Loss: {loss}")
 
         if self.config.generate_predictions_img:
             predictions_img = None
@@ -1946,19 +1948,19 @@ class DiscordClient(discord.Client):
                         response += f"\nPlaying in *{guild_name}*"
                         break
 
-            if ADMIN_DISC_ID in users_in_game:
+            if ADMIN_DISC_ID in [x[0] for x in users_in_game]:
                 predict_url = f"http://mhooge.com:5000/intfar/prediction?game_id={game_data['gameId']}"
                 try:
                     predict_response = requests.get(predict_url)
                     if predict_response.ok:
                         pct_win = predict_response.json()["response"]
                         response += f"\nPredicted chance of winning: **{pct_win}%**"
-                    elif self.ai_model is not None:
-                        input_data = shape_predict_data(
-                            self.database, self.riot_api, self.config, self.users_in_game
-                        )
-                        pct_win = int(self.ai_model.predict(input_data) * 100)
-                        response += f"\nPredicted chance of winning: **{pct_win}%**"
+                    # elif self.ai_model is not None:
+                    #     input_data = shape_predict_data(
+                    #         self.database, self.riot_api, self.config, users_in_game
+                    #     )
+                    #     pct_win = int(self.ai_model.predict(input_data) * 100)
+                    #     response += f"\nPredicted chance of winning: **{pct_win}%**"
                     else:
                         error_msg = predict_response.json()["response"]
                         self.config.log(f"Get game prediction error: {error_msg}")

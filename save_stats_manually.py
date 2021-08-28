@@ -13,6 +13,7 @@ from api.game_stats import get_filtered_stats
 from api.util import GUILD_IDS, create_predictions_timeline_image
 from ai.data import shape_predict_data
 from ai.train import train_online
+from ai.model import Model
 
 GUILDS = {
     "nibs": GUILD_IDS[0],
@@ -25,8 +26,8 @@ class MockChannel:
         await asyncio.sleep(0.1)
 
 class TestMock(DiscordClient):
-    def __init__(self, args, config, database, betting_handler, riot_api, audio_handler, shop_handler):
-        super().__init__(config, database, betting_handler, riot_api, audio_handler, shop_handler)
+    def __init__(self, args, config, database, betting_handler, riot_api, audio_handler, shop_handler, **kwargs):
+        super().__init__(config, database, betting_handler, riot_api, audio_handler, shop_handler, **kwargs)
         self.game_id = args.game_id
         self.guild_to_use = GUILDS[args.guild_name]
         self.task = args.task
@@ -89,14 +90,16 @@ class TestMock(DiscordClient):
         if self.play_sound:
             await self.play_event_sounds(self.guild_to_use, intfar, doinks)
 
-        if self.ai_model is not None:
+        if self.ai_model is not None and self.task in ("all", "train"):
             self.config.log("Training AI Model with new game data.")
             train_data = shape_predict_data(
                 self.database, self.riot_api, self.config, users_in_game
             )
-            train_online(
+            loss = train_online(
                 self.ai_model, train_data, filtered[0][1]["gameWon"]
-            )
+            )[0]
+            self.ai_model.save()
+            self.config.log(f"Loss: {loss}")
 
         if self.config.generate_predictions_img:
             predictions_img = None
@@ -129,7 +132,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("game_id", type=int)
 parser.add_argument("guild_name", type=str, choices=GUILDS)
-parser.add_argument("task", type=str, choices=("all", "bets", "stats"))
+parser.add_argument("task", type=str, choices=("all", "bets", "stats", "train"))
 parser.add_argument("-s", "--silent", action="store_true")
 parser.add_argument("-p", "--play", action="store_true")
 
@@ -154,7 +157,9 @@ conf.log("Starting Discord Client...")
 bet_client = BettingHandler(conf, database_client)
 audio_client = AudioHandler(conf)
 shop_client = ShopHandler(conf, database_client)
+ai_model = Model(conf)
+ai_model.load()
 
-client = TestMock(args, conf, database_client, bet_client, riot_api, audio_client, shop_client)
+client = TestMock(args, conf, database_client, bet_client, riot_api, audio_client, shop_client, ai_model=ai_model)
 
 client.run(conf.discord_token)
