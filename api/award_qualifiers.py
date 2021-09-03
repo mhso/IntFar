@@ -175,11 +175,18 @@ def intfar_by_vision_score(data, config):
     """
     Returns the info of the Int-Far, if this person has very low kill vision score.
     This is determined by:
+        - Game being longer than 20 mins
         - Having the lowest vision score in the group
         - Vision score being less than 9
         - KDA being less than 3
     Returns None if none of these criteria matches a person.
     """
+    time_criteria = config.vision_secs_lower_threshold
+
+    if data[0][1]["gameDuration"] < time_criteria:
+        # If game is less than 20 minutes, we don't give out Int-Far for vision score.
+        return (None, None)
+
     tied_intfars, tied_stats = game_stats.get_outlier(data, "visionScore", include_ties=True)
     lowest_score = tied_stats[0]["visionScore"]
     vision_criteria = config.vision_score_lower_threshold

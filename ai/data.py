@@ -19,9 +19,14 @@ class GameData(Dataset):
     def __getitem__(self, idx):
         return self.data[idx], self.labels[idx]
 
-def shape_predict_data(database, riot_api, config, users_in_game):
+def create_input_mappings(database, riot_api):
     users_map = {user[0]: index for (index, user) in enumerate(database.summoners)}
-    champs_map = {champ_id: index for (index, champ_id) in enumerate(riot_api.champ_names)}
+    champs_map = riot_api.champ_ids
+
+    return users_map, champs_map
+
+def shape_predict_data(database, riot_api, config, users_in_game):
+    users_map, champs_map = create_input_mappings(database, riot_api)
     data_vector = np.zeros(config.ai_input_dim)
 
     for user_data in users_in_game:
@@ -34,8 +39,7 @@ def shape_predict_data(database, riot_api, config, users_in_game):
 def load_train_data(database, riot_api, input_dim):
     data_folder = "resources/data"
 
-    users_map = {user[0]: index for (index, user) in enumerate(database.summoners)}
-    champs_map = {champ_id: index for (index, champ_id) in enumerate(riot_api.champ_names)}
+    users_map, champs_map = create_input_mappings(database, riot_api)
 
     data_x = []
     data_y = []

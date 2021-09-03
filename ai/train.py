@@ -22,7 +22,7 @@ def train_step(x, y, model, criterion, optim, device, phase):
     total_loss = loss.item() * examples
     total_acc = torch.sum(preds == y).item()
 
-    return total_loss, total_acc
+    return total_loss, out_prob, total_acc
 
 def train_loop(model, criterion, optim, dataloaders, device, epochs):
     val_accuracy = 0
@@ -40,7 +40,7 @@ def train_loop(model, criterion, optim, dataloaders, device, epochs):
             for x, y in dataloaders[phase]:
                 examples = len(x)
 
-                loss, acc = train_step(x, y, model, criterion, optim, device, phase)
+                loss, _, acc = train_step(x, y, model, criterion, optim, device, phase)
 
                 if phase == "train":
                     running_loss += loss

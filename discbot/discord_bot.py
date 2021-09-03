@@ -299,7 +299,7 @@ class DiscordClient(discord.Client):
         self.betting_handler = betting_handler
         self.audio_handler = audio_handler
         self.shop_handler = shop_handler
-        self.ai_model = kwargs.get("ai_model")
+        self.ai_conn = kwargs.get("ai_pipe")
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
         self.pagination_data = {}
@@ -498,16 +498,18 @@ class DiscordClient(discord.Client):
 
         await self.play_event_sounds(guild_id, intfar, doinks)
 
-        # if self.ai_model is not None:
-        #     self.config.log("Training AI Model with new game data.")
-        #     train_data = shape_predict_data(
-        #         self.database, self.riot_api, self.config, users_in_game
-        #     )
-        #     loss = train_online(
-        #         self.ai_model, train_data, filtered_stats[0][1]["gameWon"]
-        #     )[0]
-        #     self.ai_model.save()
-        #     self.config.log(f"Loss: {loss}")
+        if self.ai_conn is not None:
+            self.config.log("Training AI Model with new game data.")
+            train_data = shape_predict_data(
+                self.database, self.riot_api, self.config, users_in_game
+            )
+            self.ai_conn.send(
+                ("train", [train_data, filtered_stats[0][1]["gameWon"]])
+            )
+            loss, probability = self.ai_conn.recv()
+            pct_win = int(probability * 100)
+            self.config.log(f"We had a {pct_win}% chance of winning.")
+            self.config.log(f"Training Loss: {loss}.")
 
         if self.config.generate_predictions_img:
             predictions_img = None
@@ -696,7 +698,7 @@ class DiscordClient(discord.Client):
         for disc_id in users_to_search:
             member = self.get_member_safe(disc_id)
             if member is None:
-                return default_avatar
+                avatar_paths.append(default_avatar)
 
             key = f"{member.id}_{size}"
 
@@ -710,7 +712,7 @@ class DiscordClient(discord.Client):
                     self.cached_avatars[key] = time_now
                 except (DiscordException, HTTPException, NotFound) as exc:
                     print(exc)
-                    return default_avatar
+                    path = default_avatar
 
             avatar_paths.append(path)
         return avatar_paths if discord_id is None else avatar_paths[0]
@@ -1955,12 +1957,14 @@ class DiscordClient(discord.Client):
                     if predict_response.ok:
                         pct_win = predict_response.json()["response"]
                         response += f"\nPredicted chance of winning: **{pct_win}%**"
-                    # elif self.ai_model is not None:
-                    #     input_data = shape_predict_data(
-                    #         self.database, self.riot_api, self.config, users_in_game
-                    #     )
-                    #     pct_win = int(self.ai_model.predict(input_data) * 100)
-                    #     response += f"\nPredicted chance of winning: **{pct_win}%**"
+                    elif self.ai_conn is not None:
+                        input_data = shape_predict_data(
+                            self.database, self.riot_api, self.config, users_in_game
+                        )
+                        self.ai_conn.send(("predict", [input_data]))
+                        ratio_win = self.ai_conn.recv()
+                        pct_win = int(ratio_win * 100)
+                        response += f"\nPredicted chance of winning: **{pct_win}%**"
                     else:
                         error_msg = predict_response.json()["response"]
                         self.config.log(f"Get game prediction error: {error_msg}")
@@ -2284,10 +2288,13 @@ class DiscordClient(discord.Client):
         elif criteria == "vision":
             crit_1 = self.config.vision_score_lower_threshold
             crit_2 = self.config.vision_kda_criteria
-            response = ("Criteria for being Int-Far by low vision score:\n" +
-                        " - Having the lowest vision score of the people playing\n" +
-                        f" - Having less than {crit_1} vision score\n"
-                        f" - Having less than {crit_2} KDA")
+            response = (
+                "Criteria for being Int-Far by low vision score:\n" +
+                " - Having the lowest vision score of the people playing\n" +
+                f" - Having less than {crit_1} vision score\n" +
+                f" - Having less than {crit_2} KDA" +
+                " - The game being longer than 20 minutes"
+            )
         else:
             response = "You must specify a valid criteria. This can be one of:\n"
             response += "'kda', 'deaths', 'kp', 'vision'"
@@ -2465,8 +2472,9 @@ class DiscordClient(discord.Client):
     async def handle_kick_msg(self, message, target_id):
         target_name = self.get_discord_nick(target_id, message.guild.id)
 
-        response = f"{target_name} has been kicked from Int-Far for being a bad boi!\n"
-        response += "His data will be wiped and he will forever live in shame {emote_im_nat_kda_player_yo}"
+        response = f"{target_name} has been kicked from Int-Far "
+        response += "for being a bad boi!\nHis data will be WIPED "
+        response += "and he will forever live in shame {emote_im_nat_kda_player_yo}"
 
         await message.channel.send(self.insert_emotes(response))
 
@@ -2602,7 +2610,7 @@ class DiscordClient(discord.Client):
             if param is None or (param[0] == "(" and param[-1] == ")"):
                 return True
             elif param[0] == "[" and param[-1] == "]":
-                if len(args) <= index:
+                if args is None or len(args) <= index:
                     await self.handle_usage_msg(message, cmd)
                     return False
 
@@ -2872,9 +2880,9 @@ class DiscordClient(discord.Client):
             elif before.channel is not None and after.channel is None: # User left.
                 await self.user_left_voice(member.id, member.guild.id)
 
-def run_client(config, database, betting_handler, riot_api, audio_handler, shop_handler, ai_model, main_pipe, flask_pipe):
+def run_client(config, database, betting_handler, riot_api, audio_handler, shop_handler, ai_pipe, main_pipe, flask_pipe):
     client = DiscordClient(
         config, database, betting_handler, riot_api, audio_handler,
-        shop_handler, ai_model=ai_model, main_pipe=main_pipe, flask_pipe=flask_pipe
+        shop_handler, ai_pipe=ai_pipe, main_pipe=main_pipe, flask_pipe=flask_pipe
     )
     client.run(config.discord_token)

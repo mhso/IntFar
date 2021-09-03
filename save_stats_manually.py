@@ -33,6 +33,7 @@ class TestMock(DiscordClient):
         self.task = args.task
         self.loud = not args.silent
         self.play_sound = args.play
+        self.ai_model = kwargs.get("ai_model")
 
     async def on_ready(self):
         await super(TestMock, self).on_ready()
@@ -97,7 +98,7 @@ class TestMock(DiscordClient):
             )
             loss = train_online(
                 self.ai_model, train_data, filtered[0][1]["gameWon"]
-            )[0]
+            )
             self.ai_model.save()
             self.config.log(f"Loss: {loss}")
 

@@ -38,6 +38,7 @@ class Config:
         self.kp_structures_criteria = 2
         self.vision_score_lower_threshold = 11
         self.vision_kda_criteria = 3.0
+        self.vision_secs_lower_threshold = 1200
 
         # ===== Int-Far of the Month =====
         self.ifotm_min_games = 10
@@ -55,11 +56,11 @@ class Config:
         self.ai_conv_stride = 2
         self.ai_hidden_dim = 256
         self.ai_output_dim = 1
-        self.ai_dropout = 0.5
+        self.ai_dropout = 0.3
         self.ai_validation_split = 0.75
         self.ai_batch_size = 32
-        self.ai_learning_rate = 0.005
-        self.ai_weight_decay = 0e-5
+        self.ai_learning_rate = 0.001
+        self.ai_weight_decay = 0e-4
         self.ai_epochs = 100
         self.ai_init_range = 0.001
 

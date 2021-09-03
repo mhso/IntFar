@@ -29,6 +29,8 @@ class Database:
         for k, v in user_entries.items():
             self.summoners.append((k, v[0], v[1]))
 
+        self.summoners.sort(key=lambda x: x[0])
+
     def get_connection(self):
         if self.persistent_connection is not None:
             return self.persistent_connection

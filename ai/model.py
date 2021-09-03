@@ -1,5 +1,7 @@
 import torch
 
+from ai.train import train_online
+
 MODEL_SAVE_PATH = "resources/ai_model.pt"
 
 class Model(torch.nn.Module):
@@ -52,11 +54,19 @@ class Model(torch.nn.Module):
         return self.classifier(x)
 
     def predict(self, data):
+        self.eval()
+        torch.set_grad_enabled(False)
+
         x = torch.tensor(data).float().unsqueeze(0)
+
+        device_name = "cpu" if self.config.env == "production" else "cuda"
+        device = torch.device(device_name)
+
+        x = x.to(device)
 
         out_prob = self(x).squeeze()
 
-        return torch.sigmoid(out_prob)
+        return out_prob
 
     def init_weights(self):
         init_range = self.config.ai_init_range
@@ -85,3 +95,20 @@ class Model(torch.nn.Module):
         location = torch.device("cpu") if self.config.env == "production" else None
         self.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=location))
         self.eval()
+        self.config.log("Prediction Classifier Loaded")
+
+def run_loop(config, bot_pipe):
+    ai_model = Model(config)
+    ai_model.load()
+    try:
+        while True:
+            action, data = bot_pipe.recv()
+            if action == "predict":
+                output = ai_model.predict(data[0])
+                bot_pipe.send(output)
+            elif action == "train":
+                loss, probability, _ = train_online(ai_model, data[0], data[1])
+                ai_model.save()
+                bot_pipe.send((loss, probability.squeeze().item()))
+    except (BrokenPipeError, KeyboardInterrupt):
+        pass

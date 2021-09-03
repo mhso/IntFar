@@ -15,9 +15,10 @@ class APIClient:
             self.get_latest_champions_file()
 
         self.champ_names = {}
-        self.get_all_champs_names()
+        self.champ_ids = {}
+        self.initialize_champ_dicts()
 
-    def get_all_champs_names(self):
+    def initialize_champ_dicts(self):
         champions_file = self.get_champions_file()
         if champions_file is None:
             return
@@ -27,7 +28,9 @@ class APIClient:
             for champ_name in champion_data["data"]:
                 data_for_champ = champion_data["data"][champ_name]
                 self.champ_names[int(data_for_champ["key"])] = data_for_champ["name"]
-        return None
+
+        name_order_champs = sorted(list(self.champ_names.items()), key=lambda x: x[1])
+        self.champ_ids = {kv[0]: index for index, kv in enumerate(name_order_champs)}
 
     def get_champions_file(self):
         return f"api/champions-{self.latest_patch}.json"

@@ -57,9 +57,8 @@ def main():
         pass
     finally:
         model.save()
-        model.to(torch.device("cpu"))
 
-        validate_classifier.validate(model, database_client, riot_api, config)
+        validate_classifier.validate(model, game_data, labels, database_client, riot_api, config)
 
 if __name__ == "__main__":
     main()
