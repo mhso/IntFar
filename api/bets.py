@@ -288,7 +288,6 @@ class BettingHandler:
                     target, event_id - BETTING_TYPES_INDICES["stats"]
                 )
 
-
             if num_games == 0: # No games has been played for given target, ratio is 0.
                 return self.database.get_base_bet_return(event_id)
             if count == 0: # Event never happened, set ratio to amount of games played.
@@ -375,7 +374,7 @@ class BettingHandler:
             for amount, _, _, base_return, bet_desc in data:
                 response += f"\n - `{bet_desc}` for **{format_tokens_amount(amount)}** {tokens_name} "
                 response += f"(**{base_return}x** return)."
-            response += f"\nThis bet uses the following ticket ID: {ticket}. "
+            response += f"\nThis bet uses the following ticket ID: **{ticket}**. "
             response += "You will need this ticket to cancel the bet.\n"
         else:
             amount, _, _, base_return, bet_desc = data[0]
@@ -403,7 +402,7 @@ class BettingHandler:
 
     def check_bet_validity(
             self, disc_id, guild_id, bet_amount, game_timestamp,
-            bet_str, balance, bet_target, target_name, ticket
+            bet_str, balance, running_cost, bet_target, target_name, ticket
     ):
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
@@ -446,7 +445,7 @@ class BettingHandler:
         if self.database.get_bet_id(disc_id, guild_id, event_id, bet_target, ticket) is not None:
             err_msg = self.get_bet_error_msg(bet_desc, "Such a bet has already been made!")
             return (False, err_msg)
-        if balance < amount:
+        if running_cost + amount > balance:
             err_msg = self.get_bet_error_msg(bet_desc, f"You do not have enough {tokens_name}.")
             return (False, err_msg)
         return (True, (amount, event_id, duration, bet_desc))
@@ -466,10 +465,11 @@ class BettingHandler:
 
         try:
             balance = self.database.get_token_balance(disc_id)
+            running_cost = 0
             for bet_amount, event, target, target_name in zip(amounts, events, targets, target_names):
                 valid, data = self.check_bet_validity(
                     disc_id, guild_id, bet_amount, game_timestamp, event,
-                    balance, target, target_name, ticket
+                    balance, running_cost, target, target_name, ticket
                 )
 
                 if not valid:
@@ -483,7 +483,7 @@ class BettingHandler:
 
                 used_events.add((event_id, target))
 
-                balance -= amount
+                running_cost += amount
 
                 bet_value, base_return, time_ratio = self.get_bet_value(
                     amount, event_id, game_duration, target
@@ -545,7 +545,7 @@ class BettingHandler:
 
         response = self.get_bet_placed_text(bet_data, bet_all, game_duration, ticket)
 
-        balance_resp = f"\nYour {tokens_name} balance is now `{format_tokens_amount(balance)}`."
+        balance_resp = f"\nYour {tokens_name} balance is now `{format_tokens_amount(balance - running_cost)}`."
 
         bet_id = None if len(amounts) > 1 else bet_id
 
@@ -597,7 +597,7 @@ class BettingHandler:
                     f"{tokens_name} successfully cancelled.\n"
                 )
             else:
-                response = f"Multi-bet with ticket ID {ticket} successfully cancelled.\n"
+                response = f"Multi-bet with ticket ID **{ticket}** successfully cancelled.\n"
             response += f"Your {tokens_name} balance is now `{format_tokens_amount(new_balance)}`."
             return (True, response)
         except DBException:

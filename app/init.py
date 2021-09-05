@@ -24,7 +24,7 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     root = "/intfar/"
 
     # Set up the blueprints for all the pages/routes.
-    from app.routes import index, users, verify, betting, doinks, stats, errors, soundboard
+    from app.routes import index, users, verify, betting, doinks, stats, errors, soundboard, lists
     from app.util import create_session_id
     web_app.register_blueprint(index.start_page, url_prefix=root)
     web_app.register_blueprint(users.user_page, url_prefix=root + "user/")
@@ -33,6 +33,7 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     web_app.register_blueprint(doinks.doinks_page, url_prefix=root + "doinks/")
     web_app.register_blueprint(stats.stats_page, url_prefix=root + "stats/")
     web_app.register_blueprint(soundboard.soundboard_page, url_prefix=root + "soundboard/")
+    web_app.register_blueprint(lists.lists_page, url_prefix=root + "lists/")
     web_app.before_request(create_session_id)
     web_app.register_error_handler(500, errors.handle_internal_error)
     web_app.register_error_handler(404, errors.handle_missing_page_error)

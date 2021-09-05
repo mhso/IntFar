@@ -1,3 +1,3 @@
-- Implement !play [sound]
-- Ideas for sounds:
-"blblbl", "how_lovely", "anivia", "outta_my_face", "kda", "kvinder", "naiv", "yeah", "wargh", "easy_money", "steel_beams"
+Implement !random_champ (list)
+Make it possible to create/edit lists of champions on the website.
+Lists start out as midlane/toplane/adc/etc. (as defined by what?)

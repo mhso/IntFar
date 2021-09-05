@@ -92,8 +92,7 @@ class Model(torch.nn.Module):
         torch.save(self.state_dict(), MODEL_SAVE_PATH)
 
     def load(self):
-        location = torch.device("cpu") if self.config.env == "production" else None
-        self.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=location))
+        self.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=torch.device("cpu")))
         self.eval()
         self.config.log("Prediction Classifier Loaded")
 

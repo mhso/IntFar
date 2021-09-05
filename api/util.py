@@ -60,6 +60,11 @@ class TimeZone(tzinfo):
             return timedelta(0, 0, 0, 0, 0, 0, 0)
         return timedelta(0, 0, 0, 0, 0, 1, 0)
 
+def load_flavor_texts(filename):
+    path = f"resources/flavor_texts/{filename}.txt"
+    with open(path, "r", encoding="utf-8") as f:
+        return [x.replace("\n", "") for x in f.readlines()]
+
 def current_month():
     return MONTH_NAMES[datetime.now().month-1]
 

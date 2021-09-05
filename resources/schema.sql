@@ -110,3 +110,13 @@ CREATE TABLE [owned_items] (
     [name] NVARCHAR(64) NOT NULL,
     [owner_id] INTEGER NOT NULL
 );
+CREATE TABLE [champ_lists] (
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [name] NVARCHAR(32) NOT NULL,
+    [owner_id] INTEGER NOT NULL
+);
+CREATE TABLE [list_items] (
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [content] NVARCHAR(32) NOT NULL,
+    [list_id] INTEGER NOT NULL
+);

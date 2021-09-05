@@ -99,8 +99,10 @@ def validate(model, data_x, data_y, database, riot_api, config):
         for user_info in user_data:
             avg_ratio += get_win_ratio(user_info, data_x, data_y, users_map, champs_map)
 
+        avg_ratio = avg_ratio / 5
+
         total_deviation += abs(win_probability - avg_ratio)
 
-        print(f"Example #{index+1} - Probability: {win_probability:.4f} - Avg Ratio: {(avg_ratio / 5):.4f}")
+        print(f"Example #{index+1} - Probability: {win_probability:.4f} - Avg Ratio: {avg_ratio:.4f}")
 
     print(f"Average Deviation: {total_deviation / len(ALL_TEST_EXAMPLES):.4f}")

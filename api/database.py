@@ -1029,3 +1029,19 @@ class Database:
         with self.get_connection() as db:
             query = "DELETE FROM event_sounds WHERE disc_id=? AND event=?"
             self.execute_query(db, query, (disc_id, event))
+
+    def create_list(self, disc_id, name):
+        with self.get_connection() as db:
+            query = "INSERT INTO lists(name, owner_id) VALUES (?, ?)"
+            self.execute_query(db, query, name, disc_id)
+            return self.execute_query(db, "SELECT last_insert_rowid()").fetchone()[0]
+
+    def get_list_data(self, list_id):
+        with self.get_connection() as db:
+            query = "SELECT name, owner_id FROM lists WHERE id=?"
+            return self.execute_query(db, query, list_id).fetchone()
+
+    def get_list_items(self, list_id):
+        with self.get_connection() as db:
+            query = "SELECT id, content FROM list_items WHERE list_id=?"
+            return self.execute_query(db, query, list_id).fetchall()
