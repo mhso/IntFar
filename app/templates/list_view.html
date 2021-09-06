@@ -1,14 +1,68 @@
+<html>
+{% include 'head.html' %}
+{% import "navbar.html" as navbar %}
 <body>
     <div id="lists-wrapper" class="container-flex">
         {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data) }}
-        <h1>Champion Lists</h1>
-        <br>
-        <h2>
-            <input type="text" value="{{ list_name }}" onchange="updateList({{ list_id }}, this)">
-        </h2>
+        <a class="undecorated-link" href="{{ url_for('lists.home') }}">
+            <h1>Champion Lists</h1>
+        </a>
+
+        <div id="list-view-header">
+            <input id="list-view-name" type="text" value="{{ list_name }}" disabled>
+            {% if user_owns_list %}
+            <button id="edit-list-name-btn" onclick="editListTitle({{ list_id }}, this)">
+                <img id="edit-name-img" src="{{ url_for('static', filename='img/edit.png') }}">
+                <img id="accept-edit-img" src="{{ url_for('static', filename='img/success.png') }}">
+                <div id="lists-load-icon" class="loading-icon"></div>
+                <img id="edit-success-img" src="{{ url_for('static', filename='img/success_green.png') }}">
+            </button>
+            {% endif %}
+        </div>
 
         <div class="row">
-            
+            <div class="col-lg-1"></div>
+            <div class="col-lg-10">
+                <div id="no-items-placeholder" class="{% if list_items %}d-none{% else %}d-block{% endif %}">
+                    No champions in this list yet! Add some below!
+                </div>
+                {% if list_items %}
+                <div id="list-items-wrapper">
+                    {% for item_id, champ_name in list_items %}
+                    <div class="list-items-entry">
+                        {{ champ_name }}
+                        {% if user_owns_list %}
+                        <button class="delete-item-btn lists-delete-btn" onclick="deleteItem({{ item_id }}, this)">
+                            <img src="{{ url_for('static', filename='img/trash.png') }}">
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <br>
+                {% endif %}
+                
+                {% if user_owns_list %}
+                <button class="show-form-btn" onclick="toggleView('add-item-wrapper', true);">Add Champion</button>
+                <div id="add-item-wrapper">
+                    <form id="add-item-form" method="POST" enctype="multipart/form-data" action="{{ url_for('lists.add_item', list_id=list_id) }}">
+                        <select class="form-select" id="champs-select" name="champion">
+                            {% for champ_id, champ_name in champions %}
+                            <option value="{{ champ_id }}">{{ champ_name }}</option>
+                            {% endfor %}
+                        </select>
+                        <br>
+                        <input class="form-btn form-submit" type="submit" value="Add">
+                        <button class="form-btn form-abort" type="button" onclick="toggleView('add-item-wrapper', false);">Cancel</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <div class="list-error-wrapper">
+                    {% if error %}{{ error }}{% endif %}
+                </div>
+            </div>
+            <div class="col-lg-1"></div>
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/lists.js') }}"></script>

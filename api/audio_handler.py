@@ -2,8 +2,6 @@ from glob import glob
 import asyncio
 import os
 
-from numpy.lib.arraysetops import isin
-
 from discord import PCMVolumeTransformer
 from discord.player import FFmpegPCMAudio
 

@@ -19,7 +19,7 @@ async def handle_betting_msg(client, message):
 
     await message.channel.send(response)
 
-def get_bet_params(args):
+def get_bet_params(client, args):
     amounts = []
     events = []
     targets = []
@@ -42,7 +42,7 @@ def get_bet_params(args):
         amounts.append(amount)
         events.append(event)
         targets.append(target)
-    return amounts, events, targets
+    return [amounts, events, targets]
 
 async def handle_make_bet_msg(client, message, amounts, events, targets):
     if events == [] or amounts == [] or None in amounts or None in events:

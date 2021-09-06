@@ -2,6 +2,7 @@ from discbot.commands.admin import *
 from discbot.commands.bets import *
 from discbot.commands.doinks import *
 from discbot.commands.intfar import *
+from discbot.commands.lists import *
 from discbot.commands.meta import *
 from discbot.commands.misc import *
 from discbot.commands.shop import *
@@ -84,7 +85,7 @@ class Command:
             return None
 
         if self.parser is not None: # Use custom parser, if given (for '!bet' fx.).
-            return self.parser(args)
+            return self.parser(client, args)
 
         parsed_args = []
         for index, param in enumerate(self.mandatory_params + self.optional_params):
@@ -119,7 +120,7 @@ class Command:
             await self.handler(*handler_args) # Execute command using handler.
 
         except ValueError as arg_exception:
-            await message.channel.send(arg_exception.args[0])
+            await message.channel.send(client.insert_emotes(arg_exception.args[0]))
             client.config.log(arg_exception, client.config.log_error)
 
         except DBException as db_exception:
@@ -541,6 +542,75 @@ def initialize_commands():
     register_command(
         inventory_name, inventory_desc, handle_inventory_msg, access_level="self",
         optional_params=[TargetParam("person")]
+    )
+
+    # random champ command
+    random_champ_name = "random_champ"
+    random_champ_desc = (
+        "Pick a random champion. If a list is given, only champs from this list is used. " +
+        "Champion lists can be created at https://mhooge.com/intfar/lists/"
+    )
+    register_command(
+        random_champ_name, random_champ_desc, handle_random_champ_msg,
+        optional_params=[RegularParam("list")]
+    )
+
+    # champ lists command
+    champ_lists_name = "champ_lists"
+    champ_lists_desc = (
+        "See a list of all champion lists, or those created by a specific person."
+    )
+    register_command(
+        champ_lists_name, champ_lists_desc, handle_champ_lists_msg, True, "self",
+        optional_params=[TargetParam("person", None)]
+    )
+
+    # champs command
+    champs_name = "champs"
+    champs_desc = "See what champs are in a given champion list."
+    register_command(
+        champs_name, champs_desc, handle_champs_msg,
+        mandatory_params=[RegularParam("list")]
+    )
+
+    # create list command
+    create_list_name = "create_list"
+    create_list_desc = "Create a list of champions."
+    register_command(
+        create_list_name, create_list_desc, handle_create_list_msg, access_level="all",
+        mandatory_params=[RegularParam("name")]
+    )
+
+    # add champ command
+    add_champ_name = "add_champ"
+    add_champ_desc = (
+        "Add champion(s) to given list. Add more than one champ at once " +
+        "with comma-separated list. Fx. `!add_champ some_list aatrox, ahri, akali`"
+    )
+    register_command(
+        add_champ_name, add_champ_desc, handle_add_champs, access_level="all",
+        mandatory_params=[RegularParam("list"), RegularParam("champion(s)")],
+        parser=parse_champs_params
+    )
+
+    # delete list command
+    delete_list_name = "delete_list"
+    delete_list_desc = "Delete a champion list that you own."
+    register_command(
+        delete_list_name, delete_list_desc, handle_delete_list, access_level="all",
+        mandatory_params=[RegularParam("list")]
+    )
+
+    # add champ command
+    remove_champ_name = "remove_champ"
+    remove_champ_desc = (
+        "Remove champion(s) from given list. Remove more than one champ at once " +
+        "with comma-separated list. Fx. `!remove_champ some_list aatrox, ahri, akali`"
+    )
+    register_command(
+        remove_champ_name, remove_champ_desc, handle_remove_champ, access_level="all",
+        mandatory_params=[RegularParam("list"), RegularParam("champion(s)")],
+        parser=parse_champs_params
     )
 
     # ===== CUTE COMMANDS =====

@@ -1032,16 +1032,100 @@ class Database:
 
     def create_list(self, disc_id, name):
         with self.get_connection() as db:
-            query = "INSERT INTO lists(name, owner_id) VALUES (?, ?)"
-            self.execute_query(db, query, name, disc_id)
-            return self.execute_query(db, "SELECT last_insert_rowid()").fetchone()[0]
+            query = "INSERT INTO champ_lists(name, owner_id) VALUES (?, ?)"
+            try:
+                self.execute_query(db, query, (name, disc_id))
+                return True, self.execute_query(db, "SELECT last_insert_rowid()").fetchone()[0]
+            except DatabaseError: # Duplicate champion inserted.
+                return False, None
+
+    def rename_list(self, list_id, new_name):
+        with self.get_connection() as db:
+            query = "UPDATE champ_lists SET name=? WHERE id=?"
+            self.execute_query(db, query, (new_name, list_id))
+
+    def delete_list(self, list_id):
+        with self.get_connection() as db:
+            query = "DELETE FROM list_items WHERE list_id=?"
+            self.execute_query(db, query, (list_id,))
+            query = "DELETE FROM champ_lists WHERE id=?"
+            self.execute_query(db, query, (list_id,))
+
+    def get_lists(self, disc_id=None):
+        with self.get_connection() as db:
+            query = (
+                "SELECT champ_lists.id, champ_lists.owner_id, name, COUNT(list_items.id) " +
+                "FROM champ_lists LEFT JOIN list_items ON champ_lists.id=list_id "
+            )
+            params = None
+            if disc_id is not None:
+                query += "WHERE owner_id=? "
+                params = (disc_id,)
+
+            query += "GROUP BY champ_lists.id"
+
+            return self.execute_query(db, query, params).fetchall()
+
+    def get_list_by_name(self, name):
+        with self.get_connection() as db:
+            query = "SELECT id FROM champ_lists WHERE LOWER(name)=?"
+            result = self.execute_query(db, query, (name.lower(),)).fetchone()
+            if result is None:
+                return None, None
+
+            list_id = result[0]
+
+            return list_id, self.get_list_items(list_id)
 
     def get_list_data(self, list_id):
         with self.get_connection() as db:
-            query = "SELECT name, owner_id FROM lists WHERE id=?"
-            return self.execute_query(db, query, list_id).fetchone()
+            query = "SELECT name, owner_id FROM champ_lists WHERE id=?"
+            return self.execute_query(db, query, (list_id,)).fetchone()
+
+    def get_list_from_item_id(self, item_id):
+        with self.get_connection() as db:
+            query = "SELECT list_id FROM list_items WHERE id=?"
+            list_id = self.execute_query(db, query, (item_id,)).fetchone()
+            if list_id is None:
+                return None
+
+            list_data = self.get_list_data(list_id[0])
+            if list_data is None:
+                return None
+
+            return list_id + list_data
+
+    def add_item_to_list(self, champ_id, list_id):
+        with self.get_connection() as db:
+            query = "INSERT INTO list_items(champ_id, list_id) VALUES (?, ?)"
+            try:
+                self.execute_query(db, query, (champ_id, list_id))
+                return True
+            except DatabaseError: # Duplicate champion inserted.
+                return False
+
+    def add_items_to_list(self, items):
+        with self.get_connection() as db:
+            query = "INSERT INTO list_items(champ_id, list_id) VALUES (?, ?)"
+            try:
+                db.cursor().executemany(query, items)
+                db.commit()
+                return True
+            except DatabaseError: # Duplicate champion inserted.
+                return False
 
     def get_list_items(self, list_id):
         with self.get_connection() as db:
-            query = "SELECT id, content FROM list_items WHERE list_id=?"
-            return self.execute_query(db, query, list_id).fetchall()
+            query = "SELECT id, champ_id FROM list_items WHERE list_id=?"
+            return self.execute_query(db, query, (list_id,)).fetchall()
+
+    def delete_item_from_list(self, item_id):
+        with self.get_connection() as db:
+            query = "DELETE FROM list_items WHERE id=?"
+            self.execute_query(db, query, (item_id,))
+
+    def delete_items_from_list(self, item_ids):
+        with self.get_connection() as db:
+            query = "DELETE FROM list_items WHERE id=?"
+            db.cursor().executemany(query, item_ids)
+            db.commit()
