@@ -11,6 +11,7 @@ class Config:
         self.riot_key = ""
         self.database = "resources/database.db"
         self.generate_predictions_img = False
+        self.min_game_minutes = 5 # Minimum amount of minutes for a game to be valid.
 
         # ===== Active Game Monitoring =====
         self.status_interval_dormant = 60 * 2 # 2 minutes wait time between checking for status.
@@ -43,6 +44,9 @@ class Config:
         # ===== Int-Far of the Month =====
         self.ifotm_min_games = 10
         self.hour_of_ifotm_announce = 12 # Hour of the day on which to announce IFOTM.
+
+        # ===== Noteworthy end-of-game stats =====
+        self.stats_min_cc = 60
 
         # ===== Logging & Messaging =====
         self.log_warning = 1

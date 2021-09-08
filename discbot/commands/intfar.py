@@ -84,11 +84,12 @@ async def handle_intfar_msg(client, message, target_id):
 def get_intfar_relation_stats(client, target_id):
     data = []
     games_relations, intfars_relations = client.database.get_intfar_relations(target_id)
+    total_intfars = len(client.database.get_intfar_stats(target_id)[1])
     for disc_id, total_games in games_relations.items():
         intfars = intfars_relations.get(disc_id, 0)
         data.append(
             (
-                disc_id, total_games, intfars, int((intfars / total_games) * 100),
+                disc_id, total_games, intfars, int((intfars / total_intfars) * 100),
                 int((intfars / total_games) * 100)
             )
         )
@@ -96,7 +97,7 @@ def get_intfar_relation_stats(client, target_id):
     return sorted(data, key=lambda x: x[2], reverse=True)
 
 async def handle_intfar_relations_msg(client, message, target_id):
-    data = client.get_intfar_relation_stats(target_id)
+    data = get_intfar_relation_stats(client, target_id)
 
     response = (
         f"Breakdown of players {client.get_discord_nick(target_id, message.guild.id)} " +

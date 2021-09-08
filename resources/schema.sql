@@ -117,6 +117,7 @@ CREATE TABLE [champ_lists] (
 );
 CREATE TABLE [list_items] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
-    [champ_id] INTEGER NOT NULL UNIQUE,
-    [list_id] INTEGER NOT NULL
+    [champ_id] INTEGER NOT NULL,
+    [list_id] INTEGER NOT NULL,
+    UNIQUE(champ_id, list_id)
 );

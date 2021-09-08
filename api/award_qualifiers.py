@@ -36,7 +36,7 @@ def get_big_doinks(data):
             mention_list.append((5, kp))
         own_epics = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
         enemy_epics = stats["enemyBaronKills"] + stats["enemyDragonKills"] + stats["enemyHeraldKills"]
-        if stats["lane"] == "JUNGLE" and own_epics > 3 and enemy_epics == 0:
+        if stats["lane"] == "JUNGLE" and stats["role"] == "NONE" and own_epics > 3 and enemy_epics == 0:
             mention_list.append((6, own_epics))
         cs_per_min = stats["csPerMin"]
         if cs_per_min >= 8:
@@ -74,16 +74,26 @@ def get_honorable_mentions(data):
         if stats["mapId"] != 21 and stats["visionWardsBoughtInGame"] == 0:
             mentions[disc_id].append((0, stats["visionWardsBoughtInGame"]))
         damage_dealt = stats["totalDamageDealtToChampions"]
-        if stats["role"] != "DUO_SUPPORT" and damage_dealt < 8000:
+        if stats["role"] != "SUPPORT" and damage_dealt < 8000:
             mentions[disc_id].append((1, damage_dealt))
         cs_per_min = stats["csPerMin"]
-        if stats["role"] != "DUO_SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
+        if stats["role"] != "SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
             mentions[disc_id].append((2, api_util.round_digits(cs_per_min)))
         epic_monsters_secured = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
-        if stats["lane"] == "JUNGLE" and epic_monsters_secured == 0:
+        if stats["lane"] == "JUNGLE" and stats["role"] == "NONE" and epic_monsters_secured == 0:
             mentions[disc_id].append((3, epic_monsters_secured))
 
     return mentions
+
+def get_cool_stats(data, config):
+    max_time_ccing_id = None
+    max_time_ccing = 0
+    for disc_id, stats in data:
+        if stats["timeCCingOthers"] > max_time_ccing:
+            max_time_ccing = stats["timeCCingOthers"]
+            max_time_ccing_id = disc_id
+
+    
 
 def intfar_by_kda(data, config):
     """

@@ -220,7 +220,8 @@ class DiscordClient(discord.Client):
                     response += "and no stats will be saved."
                     await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
-                elif game_info["gameDuration"] < 5 * 60: # Game was less than 5 mins long.
+                # Game was too short to count. Probably a remake.
+                elif game_info["gameDuration"] < self.config.min_game_minutes * 60 * 1000:
                     response = (
                         "That game lasted less than 5 minutes " +
                         "{emote_zinking} assuming it was a remake. " +
@@ -251,13 +252,13 @@ class DiscordClient(discord.Client):
             await self.poll_for_game_end(guild_id)
 
     async def game_over(self, game_info, guild_id):
-        missing_stats = game_stats.are_unfiltered_stats_well_formed(game_info)
-        if missing_stats != []:
-            self.config.log(
-                f"The following unfiltered stats are missing: {missing_stats}",
-                self.config.log_error
-            )
-            raise ValueError("Unfiltered stats are not well formed!")
+        # missing_stats = game_stats.are_unfiltered_stats_well_formed(game_info)
+        # if missing_stats != []:
+        #     self.config.log(
+        #         f"The following unfiltered stats are missing: {missing_stats}",
+        #         self.config.log_error
+        #     )
+        #     raise ValueError("Unfiltered stats are not well formed!")
 
         self.config.log(f"Users in game before: {self.users_in_game.get(guild_id)}")
         try:
@@ -429,7 +430,7 @@ class DiscordClient(discord.Client):
                     break
             if game_for_summoner is not None:
                 game_ids.add(game_for_summoner["gameId"])
-                champ_id = game_stats.get_player_stats(game_for_summoner, summ_ids)[1]
+                champ_id = game_stats.get_player_stats(game_for_summoner, summ_ids)["championId"]
                 users_in_current_game.append((disc_id, [active_name], [active_id], champ_id))
                 active_game = game_for_summoner
 

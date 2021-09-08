@@ -46,38 +46,37 @@ def get_outlier_stat(stat, data, reverse_order=False, total_kills=0):
     return most_id, most, least_id, least
 
 def get_player_stats(data, summ_ids):
-    stats = None
-    champ_id = 0
+    # We have to do this to handle /match/v4 stuff...
     if "participantIdentities" in data:
         for part_info in data["participantIdentities"]:
             if part_info["player"]["summonerId"] in summ_ids:
                 for participant in data["participants"]:
                     if part_info["participantId"] == participant["participantId"]:
                         stats = participant["stats"]
-                        champ_id = participant["championId"]
-                        break
-                break
+                        stats["championId"] = participant["championId"]
+                        return stats
     else:
-        for participant in data["participants"]:
-            if participant["summonerId"] in summ_ids:
-                champ_id = participant["championId"]
-                break
-    return stats, champ_id
+        for participant_data in data["participants"]:
+            if participant_data["summonerId"] in summ_ids:
+                return participant_data
+    return None
 
 def get_finished_game_summary(data, summ_ids, riot_api):
-    stats, champ_id = get_player_stats(data, summ_ids)
+    stats = get_player_stats(data, summ_ids)
 
-    champ_played = riot_api.get_champ_name(champ_id)
+    champ_played = riot_api.get_champ_name(stats["championId"])
     if champ_played is None:
         champ_played = "Unknown Champ (Rito pls)"
     date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
-    duration = data["gameDuration"]
+    duration = data["gameDuration"] / 1000
     dt_1 = datetime.fromtimestamp(time())
     dt_2 = datetime.fromtimestamp(time() + duration)
     fmt_duration = format_duration(dt_1, dt_2)
 
-    return (f"{champ_played} with a score of {stats['kills']}/" +
-            f"{stats['deaths']}/{stats['assists']} on {date} in a {fmt_duration} long game")
+    return (
+        f"{champ_played} with a score of {stats['kills']}/" +
+        f"{stats['deaths']}/{stats['assists']} on {date} in a {fmt_duration} long game"
+    )
 
 def get_active_game_summary(data, summ_id, summoners, riot_api):
     champions = {}
@@ -177,50 +176,48 @@ def get_filtered_stats(all_users, users_in_game, game_info):
     our_team = 100
     filtered_stats = []
     active_users = users_in_game
-    for part_info in game_info["participantIdentities"]:
-        for participant in game_info["participants"]:
-            if part_info["participantId"] == participant["participantId"]:
-                kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
-                damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
-                
-                for disc_id, _, summ_ids in all_users:
-                    if part_info["player"]["summonerId"] in summ_ids:
-                        our_team = participant["teamId"]
-                        combined_stats = participant["stats"]
-                        combined_stats["championId"] = participant["championId"]
-                        combined_stats["timestamp"] = game_info["gameCreation"]
-                        combined_stats["mapId"] = game_info["mapId"]
-                        combined_stats["gameDuration"] = int(game_info["gameDuration"])
-                        combined_stats["totalCs"] = combined_stats["neutralMinionsKilled"] + combined_stats["totalMinionsKilled"]
-                        combined_stats["csPerMin"] = (combined_stats["totalCs"] / game_info["gameDuration"]) * 60
-                        combined_stats.update(participant["timeline"])
-                        filtered_stats.append((disc_id, combined_stats))
+    for participant_data in game_info["participants"]:
+        kills_per_team[participant_data["teamId"]] += participant_data["kills"]
+        damage_per_team[participant_data["teamId"]] += participant_data["totalDamageDealtToChampions"]
 
-                        if users_in_game is not None:
-                            user_in_list = False
-                            for user_data in users_in_game:
-                                if user_data[0] == disc_id:
-                                    user_in_list = True
-                                    break
-                            if not user_in_list:
-                                summ_data = (
-                                    disc_id, part_info["player"]["summonerName"],
-                                    part_info["player"]["summonerId"], participant["championId"]
-                                )
-                                active_users.append(summ_data)
+        for disc_id, _, summ_ids in all_users:
+            if participant_data["summonerId"] in summ_ids:
+                our_team = participant_data["teamId"]
+                combined_stats = participant_data
+                combined_stats["championId"] = participant_data["championId"]
+                combined_stats["timestamp"] = game_info["gameCreation"]
+                combined_stats["mapId"] = game_info["mapId"]
+                combined_stats["gameDuration"] = int(game_info["gameDuration"] / 1000)
+                combined_stats["totalCs"] = combined_stats["neutralMinionsKilled"] + combined_stats["totalMinionsKilled"]
+                combined_stats["csPerMin"] = (combined_stats["totalCs"] / combined_stats["gameDuration"]) * 60
+                filtered_stats.append((disc_id, combined_stats))
+
+                if users_in_game is not None:
+                    user_in_list = False
+                    for user_data in users_in_game:
+                        if user_data[0] == disc_id:
+                            user_in_list = True
+                            break
+                    if not user_in_list:
+                        summ_data = (
+                            disc_id, participant_data["summonerName"],
+                            participant_data["summonerId"], participant_data["championId"]
+                        )
+                        active_users.append(summ_data)
 
     for _, stats in filtered_stats:
         stats["kills_by_team"] = kills_per_team[our_team]
         stats["damage_by_team"] = damage_per_team[our_team]
         for team in game_info["teams"]:
+            objectives = team["objectives"]
             if team["teamId"] == our_team:
-                stats["baronKills"] = team["baronKills"]
-                stats["dragonKills"] = team["dragonKills"]
-                stats["heraldKills"] = team["riftHeraldKills"]
+                stats["baronKills"] = objectives["baron"]["kills"]
+                stats["dragonKills"] = objectives["dragon"]["kills"]
+                stats["heraldKills"] = objectives["riftHerald"]["kills"]
                 stats["gameWon"] = team["win"] == "Win"
             else:
-                stats["enemyBaronKills"] = team["baronKills"]
-                stats["enemyDragonKills"] = team["dragonKills"]
-                stats["enemyHeraldKills"] = team["riftHeraldKills"]
+                stats["enemyBaronKills"] = objectives["baron"]["kills"]
+                stats["enemyDragonKills"] = objectives["dragon"]["kills"]
+                stats["enemyHeraldKills"] = objectives["riftHerald"]["kills"]
 
     return filtered_stats, active_users

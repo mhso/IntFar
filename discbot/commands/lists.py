@@ -82,7 +82,8 @@ async def handle_create_list_msg(client, message, list_name):
 
     if success:
         response = f"Champion list `{list_name}` has been created " + "{emote_poggers}"
-        response += "\nUse `!add_champ [champ1], [champ2], ...` to add champions to the list."
+        response += f"\nUse `!add_champ {list_name} [champ1], [champ2], ...` "
+        response += "to add champions to the list."
     else:
         response = f"Could not create list: {response}."
 

@@ -1,3 +1,6 @@
-Implement !random_champ (list)
-Make it possible to create/edit lists of champions on the website.
-Lists start out as midlane/toplane/adc/etc. (as defined by what?)
+Make an "interesting stats" feature at the end of the game.
+Ideas for data to use from games:
+- TimeSpentDead
+- TimeSpentCCed [not gonna work]
+- TimeCCingOThers
+- ObjectivesStolen

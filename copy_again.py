@@ -25,6 +25,8 @@ with database_client_1.get_connection() as db_1:
     shop_items = db_1.cursor().execute("SELECT * FROM shop_items").fetchall()
     owned_items = db_1.cursor().execute("SELECT * FROM owned_items").fetchall()
     event_sounds = db_1.cursor().execute("SELECT * FROM event_sounds").fetchall()
+    champ_lists = db_1.cursor().execute("SELECT * FROM champ_lists").fetchall()
+    list_items = db_1.cursor().execute("SELECT * FROM list_items").fetchall()
 
     query_prefix = "INSERT INTO "
     query_cols = (
@@ -50,7 +52,7 @@ with database_client_1.get_connection() as db_1:
         query = query_prefix + "worst_stats" + query_cols
         for data in data_worst:
             db_2.cursor().execute(query, data)
-        query = "INSERT INTO participants(game_id, disc_id, champ_id, doinks) VALUES (?, ?, 0, ?)"
+        query = "INSERT INTO participants(game_id, disc_id, champ_id, doinks) VALUES (?, ?, ?, ?)"
         for data in participants:
             db_2.cursor().execute(query, data)
         query = "INSERT OR IGNORE INTO betting_balance(disc_id, tokens) VALUES (?, ?)"
@@ -66,14 +68,20 @@ with database_client_1.get_connection() as db_1:
         )
         for data in bets:
             db_2.cursor().execute(query, data)
-        query = "INSERT OR IGNORE INTO shop_items VALUES (?, ?, ?, ?)"
+        query = "INSERT INTO shop_items VALUES (?, ?, ?, ?)"
         for data in shop_items:
             db_2.cursor().execute(query, data)
-        query = "INSERT OR IGNORE INTO owned_items VALUES (?, ?, ?)"
+        query = "INSERT INTO owned_items VALUES (?, ?, ?)"
         for data in owned_items:
             db_2.cursor().execute(query, data)
-        query = "INSERT OR IGNORE INTO event_sounds(disc_id, sound, event) VALUES (?, ?, ?)"
+        query = "INSERT INTO event_sounds(disc_id, sound, event) VALUES (?, ?, ?)"
         for data in event_sounds:
+            db_2.cursor().execute(query, data)
+        query = "INSERT INTO champ_lists(id, name, owner_id) VALUES (?, ?, ?)"
+        for data in champ_lists:
+            db_2.cursor().execute(query, data)
+        query = "INSERT INTO list_items(id, champ_id, list_id) VALUES (?, ?, ?)"
+        for data in list_items:
             db_2.cursor().execute(query, data)
 
         db_2.commit()

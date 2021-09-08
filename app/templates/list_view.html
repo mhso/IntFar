@@ -33,7 +33,7 @@
                         {{ champ_name }}
                         {% if user_owns_list %}
                         <button class="delete-item-btn lists-delete-btn" onclick="deleteItem({{ item_id }}, this)">
-                            <img src="{{ url_for('static', filename='img/trash.png') }}">
+                            &times;
                         </button>
                         {% endif %}
                     </div>

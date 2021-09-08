@@ -7,7 +7,8 @@ from api.bets import BettingHandler
 from api.config import Config
 from api.database import Database
 from api.shop import ShopHandler
-from discbot.discord_bot import DiscordClient, ADMIN_DISC_ID
+from discbot.discord_bot import DiscordClient
+from discbot.commands.util import ADMIN_DISC_ID
 from api.riot_api import APIClient
 from api.game_stats import get_filtered_stats
 from api.util import GUILD_IDS, create_predictions_timeline_image

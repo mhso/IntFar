@@ -33,7 +33,7 @@ def create():
     if not success:
         return home(f"List could not be created: {response}.", 400)
 
-    return home()
+    return flask.redirect(flask.url_for("lists.home"))
 
 def order_list_items(items): # Sort items alphabetically.
     items.sort(key=lambda x: x[1])

@@ -49,7 +49,7 @@ def get_doinks_relation_stats(client, target_id):
     return sorted(data, key=lambda x: x[2], reverse=True)
 
 async def handle_doinks_relations_msg(client, message, target_id):
-    data = client.get_doinks_relation_stats(target_id)
+    data = get_doinks_relation_stats(client, target_id)
 
     response = (
         f"Breakdown of who {client.get_discord_nick(target_id, message.guild.id)} " +
