@@ -214,7 +214,7 @@ def get_filtered_stats(all_users, users_in_game, game_info):
                 stats["baronKills"] = objectives["baron"]["kills"]
                 stats["dragonKills"] = objectives["dragon"]["kills"]
                 stats["heraldKills"] = objectives["riftHerald"]["kills"]
-                stats["gameWon"] = team["win"] == "Win"
+                stats["gameWon"] = team["win"]
             else:
                 stats["enemyBaronKills"] = objectives["baron"]["kills"]
                 stats["enemyDragonKills"] = objectives["dragon"]["kills"]

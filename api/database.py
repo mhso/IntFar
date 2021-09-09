@@ -638,6 +638,8 @@ class Database:
         question_marks = ", ".join("?" * len(STAT_COMMANDS) * 2)
         query_cols = f"(game_id, {stats_query}) VALUES ({question_marks})"
 
+        self.config.log(f"Did we win? {data[0][1]['gameWon']}")
+
         beaten_records_best = []
         beaten_records_worst = []
 

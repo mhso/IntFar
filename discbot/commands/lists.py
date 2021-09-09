@@ -91,15 +91,18 @@ async def handle_create_list_msg(client, message, list_name):
 
 def try_find_champ(name, riot_api):
     search_name = name.strip().lower()
+    candidates = []
     for champ_id in riot_api.champ_names:
         lowered = riot_api.champ_names[champ_id].lower()
-        if lowered == search_name:
-            return champ_id
+        if search_name in lowered:
+            candidates.append(champ_id)
+            break
 
-        # Remove apostrophe from name.
-        if lowered.replace("'", "") == search_name:
-            return champ_id
-    return None
+        # Remove apostrophe and period from name.
+        if search_name in lowered.replace("'", "").replace(".", ""):
+            candidates.append(champ_id)
+
+    return candidates[0] if len(candidates) == 1 else None
 
 def parse_champs_params(client, args):
     list_name = args[0]

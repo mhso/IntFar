@@ -22,9 +22,7 @@
                         <div class="list-entry-name">{{ list_name }}</div>
                         <div class="list-entry-author">
                             <span style="margin-right: 5px">By</span>
-                            <a class="undecorated-link" href="{{ url_for('users.user', disc_id=owner_id) }}">
-                                <img class="discord-avatar" src="{{ owner_avatar }}" alt="{{ owner_name }}'s Avatar">
-                            </a>
+                            <img class="discord-avatar" src="{{ owner_avatar }}" alt="{{ owner_name }}'s Avatar">
                             <a class="list-entry-author-name undecorated-link" href="{{ url_for('users.user', disc_id=owner_id) }}">{{ owner_name }}</a>
                         </div>
                         <div class="list-entry-count">Contains {{ count }}</div>

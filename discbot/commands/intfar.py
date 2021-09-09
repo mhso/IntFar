@@ -142,7 +142,7 @@ async def handle_intfar_criteria_msg(client, message, criteria=None):
             "Criteria for being Int-Far by low vision score:\n" +
             " - Having the lowest vision score of the people playing\n" +
             f" - Having less than {crit_1} vision score\n" +
-            f" - Having less than {crit_2} KDA" +
+            f" - Having less than {crit_2} KDA\n" +
             " - The game being longer than 20 minutes"
         )
     else:

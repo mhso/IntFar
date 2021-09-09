@@ -17,7 +17,9 @@ class APIClient:
 
         self.champ_names = {}
         self.champ_ids = {}
+        self.champ_portraits_path = "app/static/img/champions"
         self.initialize_champ_dicts()
+        self.get_champion_portraits()
 
     def initialize_champ_dicts(self):
         champions_file = self.get_champions_file()
@@ -61,6 +63,30 @@ class APIClient:
             self.config.log("Exception when getting newest champions.json file!")
             self.config.log(exc)
 
+    def get_champion_portraits(self):
+        base_url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/img/champion"
+        with open(self.get_champions_file(), encoding="utf-8") as fp:
+            champion_data = json.load(fp)
+            for champ_name in champion_data["data"]:
+                champ_id = int(champion_data["data"][champ_name]["key"])
+                filename = self.get_champ_portrait_path(champ_id)
+                if exists(filename):
+                    continue
+
+                url = f"{base_url}/{champ_name}.png"
+                self.config.log(f"Downloading champion portrait for '{champ_name}'")
+
+                try:
+                    data = requests.get(url, stream=True)
+                    with open(filename, "wb") as fp:
+                        for chunk in data.iter_content(chunk_size=128):
+                            fp.write(chunk)
+                except requests.exceptions.RequestException as exc:
+                    self.config.log(f"Exception when getting champion portrait for {champ_name}!")
+                    self.config.log(exc)
+
+                sleep(1)
+
     def make_request(self, endpoint, api_route, *params):
         req_string = endpoint
         for index, param in enumerate(params):
@@ -100,6 +126,9 @@ class APIClient:
 
     def get_champ_name(self, champ_id):
         return self.champ_names.get(champ_id)
+
+    def get_champ_portrait_path(self, champ_id):
+        return f"{self.champ_portraits_path}/{champ_id}.png" 
 
     def get_map_name(self, map_id):
         with open("api/maps.json", encoding="utf-8") as fp:

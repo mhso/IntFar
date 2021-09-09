@@ -58,21 +58,26 @@ def list_view(list_id, error_msg=None, status=200):
     list_owner = int(list_data[1])
     list_items = database.get_list_items(list_id)
     list_items = [
-        (item_id, riot_api.champ_names[champ_id])
-        for item_id, champ_id in list_items
+        (
+            item_id, riot_api.get_champ_name(champ_id),
+            flask.url_for(
+                "static",
+                filename=riot_api.get_champ_portrait_path(champ_id).replace("app/static/", "")
+            )
+        ) for item_id, champ_id in list_items
     ]
     user_owns_list = logged_in_user == list_owner
 
     order_list_items(list_items)
 
     # Load champions that can be added to the list.
-    champions = list(riot_api.champ_names.items())
-    champions.sort(key= lambda x: x[1])
+    all_champions = list(riot_api.champ_names.items())
+    all_champions.sort(key= lambda x: x[1])
 
     return make_template_context(
         "list_view.html", status, list_items=list_items, list_id=list_id,
         list_name=list_name, user_owns_list=user_owns_list,
-        champions=champions, error=error_msg
+        champions=all_champions, error=error_msg
     )
 
 def make_text_response(text, status_code):

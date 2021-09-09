@@ -28,8 +28,9 @@
                 </div>
                 {% if list_items %}
                 <div id="list-items-wrapper">
-                    {% for item_id, champ_name in list_items %}
+                    {% for item_id, champ_name, champ_avatar in list_items %}
                     <div class="list-items-entry">
+                        <img src="{{ champ_avatar }}" class="champ-portrait">
                         {{ champ_name }}
                         {% if user_owns_list %}
                         <button class="delete-item-btn lists-delete-btn" onclick="deleteItem({{ item_id }}, this)">
@@ -41,9 +42,11 @@
                 </div>
                 <br>
                 {% endif %}
-                
+
+                <button id="random-champ-btn" class="show-form-btn list-view-btn" onclick="highlightRandomChamp();">Random Champ</button>
+                <br>
                 {% if user_owns_list %}
-                <button class="show-form-btn" onclick="toggleView('add-item-wrapper', true);">Add Champion</button>
+                <button class="show-form-btn list-view-btn" onclick="toggleView('add-item-wrapper', true);">Add Champion</button>
                 <div id="add-item-wrapper">
                     <form id="add-item-form" method="POST" enctype="multipart/form-data" action="{{ url_for('lists.add_item', list_id=list_id) }}">
                         <select class="form-select" id="champs-select" name="champion">
