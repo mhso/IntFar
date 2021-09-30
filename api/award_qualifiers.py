@@ -58,7 +58,7 @@ def get_big_doinks(data):
 
     return mentions, formatted_mentions
 
-def get_honorable_mentions(data):
+def get_honorable_mentions(data, config):
     """
     Returns a string describing honorable mentions (questionable stats),
     that wasn't quite bad enough to be named Int-Far for.
@@ -71,29 +71,49 @@ def get_honorable_mentions(data):
     mentions = {} # List of mentioned users for the different criteria.
     for disc_id, stats in data:
         mentions[disc_id] = []
-        if stats["mapId"] != 21 and stats["visionWardsBoughtInGame"] == 0:
+
+        if stats["mapId"] != 21 and stats["visionWardsBoughtInGame"] == config.mentions_vision_wards:
             mentions[disc_id].append((0, stats["visionWardsBoughtInGame"]))
+
         damage_dealt = stats["totalDamageDealtToChampions"]
-        if stats["role"] != "SUPPORT" and damage_dealt < 8000:
+        if stats["role"] != "SUPPORT" and damage_dealt < config.mentions_max_damage:
             mentions[disc_id].append((1, damage_dealt))
+
         cs_per_min = stats["csPerMin"]
-        if stats["role"] != "SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < 5.0:
+        if stats["role"] != "SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < config.mentions_max_cs_per_min:
             mentions[disc_id].append((2, api_util.round_digits(cs_per_min)))
+
         epic_monsters_secured = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
-        if stats["lane"] == "JUNGLE" and stats["role"] == "NONE" and epic_monsters_secured == 0:
+        if stats["lane"] == "JUNGLE" and stats["role"] == "NONE" and epic_monsters_secured == config.mentions_epic_monsters:
             mentions[disc_id].append((3, epic_monsters_secured))
 
     return mentions
 
 def get_cool_stats(data, config):
-    max_time_ccing_id = None
-    max_time_ccing = 0
-    for disc_id, stats in data:
-        if stats["timeCCingOthers"] > max_time_ccing:
-            max_time_ccing = stats["timeCCingOthers"]
-            max_time_ccing_id = disc_id
+    cool_stats = {}
 
-    
+    for disc_id, stats in data:
+        cool_stats[disc_id] = []
+
+        time_dead = 0#stats["totalTimeSpentDead"]
+        if time_dead >= config.stats_min_time_dead:
+            time_dead_mins = time_dead // 60
+            time_dead_secs = time_dead % 60
+            fmt_str = f"{time_dead_mins} mins"
+            if time_dead_secs > 0:
+                fmt_str += f" and {time_dead_secs} secs"
+
+            cool_stats[disc_id].append((0, fmt_str))
+
+        objectives_stolen = 0#stats["objectivesStolen"]
+        if objectives_stolen >= config.stats_min_objectives_stolen:
+            cool_stats[disc_id].append((1, objectives_stolen))
+
+        turrets_killed = stats["turretKills"]
+        if turrets_killed >= config.stats_min_turrets_killed:
+            cool_stats[disc_id].append((2, turrets_killed))
+
+    return cool_stats
 
 def intfar_by_kda(data, config):
     """

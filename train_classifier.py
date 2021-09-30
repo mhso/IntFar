@@ -48,17 +48,18 @@ def main():
 
     model = Model(config)
     model.to(device)
+    model.load()
     criterion = model.get_criterion()
     optimizer = model.get_optimizer()
 
-    try:
-        train.train_loop(model, criterion, optimizer, dataloader_dict, device, config.ai_epochs)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        model.save()
+    # try:
+    #     train.train_loop(model, criterion, optimizer, dataloader_dict, device, config.ai_epochs)
+    # except KeyboardInterrupt:
+    #     pass
+    # finally:
+    #     model.save()
 
-        validate_classifier.validate(model, game_data, labels, database_client, riot_api, config)
+    validate_classifier.validate(model, game_data, labels, database_client, riot_api, config)
 
 if __name__ == "__main__":
     main()

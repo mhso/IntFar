@@ -64,7 +64,7 @@ class Model(torch.nn.Module):
 
         x = x.to(device)
 
-        out_prob = self(x).squeeze()
+        out_prob = torch.sigmoid(self(x).squeeze())
 
         return out_prob
 

@@ -107,12 +107,16 @@ async def handle_status_msg(client, message):
     """
     response = f"**Uptime:** {get_uptime(client.time_initialized)}\n"
 
-    (games, earliest_game, users, doinks,
-        unique_doinks, intfars, games_ratios, intfar_ratios,
-        intfar_multi_ratios) = client.database.get_meta_stats()
+    (
+        games, earliest_game, games_won, users, doinks_games,
+        total_doinks, intfars, games_ratios, intfar_ratios,
+        intfar_multi_ratios
+    ) = client.database.get_meta_stats()
+
+    pct_games_won = (games_won / games) * 100
 
     pct_intfar = int((intfars / games) * 100)
-    pct_doinks = int((unique_doinks / games) * 100)
+    pct_doinks = int((doinks_games / games) * 100)
     earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
     doinks_emote = client.insert_emotes("{emote_Doinks}")
     all_bets = client.database.get_bets(False)
@@ -145,15 +149,15 @@ async def handle_status_msg(client, message):
             if result == 1:
                 bets_won += 1
 
-    pct_won = int((bets_won / total_bets) * 100)
+    pct_bets_won = int((bets_won / total_bets) * 100)
     highest_payout_name = client.get_discord_nick(highest_payout_user, message.guild.id)
 
     response += f"--- Since {earliest_time} ---\n"
-    response += f"- **{games}** games have been played\n"
+    response += f"- **{games}** games have been played (**{pct_games_won:.1f}%** was won)\n"
     response += f"- **{users}** users have signed up\n"
     response += f"- **{intfars}** Int-Far awards have been given\n"
-    response += f"- **{doinks}** {doinks_emote} have been earned\n"
-    response += f"- **{total_bets}** bets have been made (**{pct_won}%** was won)\n"
+    response += f"- **{total_doinks}** {doinks_emote} have been earned\n"
+    response += f"- **{total_bets}** bets have been made (**{pct_bets_won}%** was won)\n"
     response += f"- Bets were made in **{len(unique_guilds)}** different servers\n"
     response += f"- **{api_util.format_tokens_amount(total_amount)}** {tokens_name} have been spent on bets\n"
     response += f"- **{api_util.format_tokens_amount(total_payout)}** {tokens_name} have been won from bets\n"

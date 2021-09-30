@@ -237,13 +237,13 @@ class BettingHandler:
     def get_doinks_return(self, target):
         if target is None:
             games_total = self.database.get_games_count()[0]
-            doinks_total = self.database.get_doinks_count()[0]
-            return doinks_total, games_total
+            doinks_count = self.database.get_doinks_count()[0]
+            return doinks_count, games_total
 
         games_played = self.database.get_intfar_stats(target)[0]
-        doinks_reason_ids = self.database.get_doinks_stats(target)
+        doinks_count = self.database.get_doinks_count(target)[0]
 
-        return len(doinks_reason_ids), games_played
+        return doinks_count, games_played
 
     def get_doinks_reason_return(self, target, reason):
         reason_count = 0

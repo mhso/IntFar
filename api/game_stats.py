@@ -68,7 +68,9 @@ def get_finished_game_summary(data, summ_ids, riot_api):
     if champ_played is None:
         champ_played = "Unknown Champ (Rito pls)"
     date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
-    duration = data["gameDuration"] / 1000
+    duration = data["gameDuration"]
+    if "participantIdentities" not in data:
+        duration = duration / 1000
     dt_1 = datetime.fromtimestamp(time())
     dt_2 = datetime.fromtimestamp(time() + duration)
     fmt_duration = format_duration(dt_1, dt_2)
@@ -166,11 +168,73 @@ def are_filtered_stats_well_formed(filtered_info):
     # for disc_id, stats in game_info:
     #     pass
 
+def get_filtered_stats_v4(all_users, users_in_game, game_info):
+    """
+    Get relevant stats from the given game data and filter the data
+    that is relevant for the Discord users that participated in the game.
+    """
+    kills_per_team = {100: 0, 200: 0}
+    damage_per_team = {100: 0, 200: 0}
+    our_team = 100
+    filtered_stats = []
+    active_users = users_in_game
+    for part_info in game_info["participantIdentities"]:
+        for participant in game_info["participants"]:
+            if part_info["participantId"] == participant["participantId"]:
+                kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
+                damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
+
+                for disc_id, _, summ_ids in all_users:
+                    if part_info["player"]["summonerId"] in summ_ids:
+                        our_team = participant["teamId"]
+                        combined_stats = participant["stats"]
+                        combined_stats["championId"] = participant["championId"]
+                        combined_stats["timestamp"] = game_info["gameCreation"]
+                        combined_stats["mapId"] = game_info["mapId"]
+                        combined_stats["gameDuration"] = int(game_info["gameDuration"])
+                        combined_stats["totalCs"] = combined_stats["neutralMinionsKilled"] + combined_stats["totalMinionsKilled"]
+                        combined_stats["csPerMin"] = (combined_stats["totalCs"] / game_info["gameDuration"]) * 60
+                        combined_stats.update(participant["timeline"])
+                        filtered_stats.append((disc_id, combined_stats))
+
+                        if users_in_game is not None:
+                            user_in_list = False
+                            for user_data in users_in_game:
+                                if user_data[0] == disc_id:
+                                    user_in_list = True
+                                    break
+                            if not user_in_list:
+                                summ_data = (
+                                    disc_id, part_info["player"]["summonerName"],
+                                    part_info["player"]["summonerId"], participant["championId"]
+                                )
+                                active_users.append(summ_data)
+
+    for _, stats in filtered_stats:
+        stats["kills_by_team"] = kills_per_team[our_team]
+        stats["damage_by_team"] = damage_per_team[our_team]
+        for team in game_info["teams"]:
+            if team["teamId"] == our_team:
+                stats["baronKills"] = team["baronKills"]
+                stats["dragonKills"] = team["dragonKills"]
+                stats["heraldKills"] = team["riftHeraldKills"]
+                stats["gameWon"] = team["win"] == "Win"
+                stats["teamId"] = team["teamId"]
+            else:
+                stats["enemyBaronKills"] = team["baronKills"]
+                stats["enemyDragonKills"] = team["dragonKills"]
+                stats["enemyHeraldKills"] = team["riftHeraldKills"]
+
+    return filtered_stats, active_users
+
 def get_filtered_stats(all_users, users_in_game, game_info):
     """
     Get relevant stats from the given game data and filter the data
     that is relevant for the Discord users that participated in the game.
     """
+    if "participantIdentities" in game_info: # Old match v4 data.
+        return get_filtered_stats_v4(all_users, users_in_game, game_info)
+
     kills_per_team = {100: 0, 200: 0}
     damage_per_team = {100: 0, 200: 0}
     our_team = 100
@@ -215,6 +279,7 @@ def get_filtered_stats(all_users, users_in_game, game_info):
                 stats["dragonKills"] = objectives["dragon"]["kills"]
                 stats["heraldKills"] = objectives["riftHerald"]["kills"]
                 stats["gameWon"] = team["win"]
+                stats["teamId"] = team["teamId"]
             else:
                 stats["enemyBaronKills"] = objectives["baron"]["kills"]
                 stats["enemyDragonKills"] = objectives["dragon"]["kills"]

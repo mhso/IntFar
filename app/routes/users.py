@@ -100,6 +100,7 @@ def get_doinks_relations_data(disc_id, database):
 
 def get_doinks_data(disc_id, database):
     doinks_reason_ids = database.get_doinks_stats(disc_id)
+    total_doinks = database.get_doinks_count(disc_id)[1]
     doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
     criteria_stats = []
     for reason_id, reason in enumerate(api_util.DOINKS_REASONS):
@@ -108,7 +109,7 @@ def get_doinks_data(disc_id, database):
     max_doinks_id = database.get_max_doinks_details()[1]
 
     return {
-        "doinks": len(doinks_reason_ids), "doinks_criteria_data": criteria_stats,
+        "doinks": total_doinks, "doinks_criteria_data": criteria_stats,
         "most_doinks": max_doinks_id == disc_id
     }
 

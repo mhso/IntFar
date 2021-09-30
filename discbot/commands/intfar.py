@@ -18,6 +18,8 @@ async def handle_intfar_msg(client, message, target_id):
         games_played, intfars, intfar_counts, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
         intfars_of_the_month = client.database.get_intfars_of_the_month()
         user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
+        champ_id, champ_count = client.database.get_champ_with_most_intfars(disc_id)
+        champ_name = client.riot_api.get_champ_name(champ_id)
 
         msg = f"{person_to_check} has been Int-Far **{intfars}** times "
         msg += "{emote_unlimited_chins}"
@@ -25,7 +27,8 @@ async def handle_intfar_msg(client, message, target_id):
             monthly_games, monthly_infar_ids = client.database.get_intfar_stats(disc_id, True)
             monthly_games, monthly_intfars, _, pct_monthly = api_util.organize_intfar_stats(monthly_games, monthly_infar_ids)
 
-            ratio_desc = "\n" + f"In total, he was Int-Far in **{pct_intfar}%** of his "
+            ratio_desc = f"\nHe has inted the most when playing **{champ_name}** (**{champ_count}** times)"
+            ratio_desc += "\n" + f"In total, he was Int-Far in **{pct_intfar}%** of his "
             ratio_desc += f"{games_played} games played.\n"
             ratio_desc += f"In {current_month}, he was Int-Far in **{monthly_intfars}** "
             ratio_desc += f"of his {monthly_games} games played (**{pct_monthly}%**)\n"

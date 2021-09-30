@@ -256,23 +256,31 @@ class Database:
         with self.get_connection() as db:
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
-    def get_doinks_count(self, context=None):
+    def get_doinks_count(self, disc_id=None, context=None):
+        delimiter = "" if disc_id is None else" AND p.disc_id=?"
         query_doinks = (
-            "SELECT Count(sub.game_id), COUNT (DISTINCT sub.game_id) FROM ( " +
-            "SELECT game_id FROM participants as p JOIN registered_summoners rs " +
-            "ON rs.disc_id=p.disc_id WHERE doinks IS NOT NULL AND rs.active=1 " +
-            "GROUP BY game_id, p.disc_id) sub"
+            "SELECT SUM(sub.doinks_games), SUM(sub.doinks_total) FROM\n" +
+            "(\n" +
+            "   SELECT COUNT(*) AS doinks_games, SUM(LENGTH(REPLACE(sub_2.doinks, '0', ''))) AS doinks_total FROM"
+            "   (\n" +
+            "       SELECT DISTINCT p.game_id, p.disc_id, doinks FROM participants AS p\n" +
+            "       LEFT JOIN registered_summoners rs ON rs.disc_id=p.disc_id\n" +
+            f"      WHERE doinks IS NOT NULL AND rs.active=1{delimiter}\n" +
+            "   ) sub_2\n" +
+            "   GROUP BY sub_2.disc_id\n" +
+            ") sub"
         )
+        params = None if disc_id is None else (disc_id,)
         with (self.get_connection() if context is None else context) as db:
-            return self.execute_query(db, query_doinks).fetchone()
+            doinks_games, doinks_total = self.execute_query(db, query_doinks, params).fetchone()
+            return doinks_games or 0, doinks_total or 0
 
     def get_champ_with_most_doinks(self, disc_id):
         with self.get_connection() as db:
             query = (
                 "SELECT sub.champ_id, MAX(sub.c) FROM ( " +
                 f"   SELECT COUNT(DISTINCT p.game_id) AS c, champ_id FROM participants p" +
-                f"   JOIN registered_summoners rs ON rs.disc_id=p.disc_id" +
-                f"   WHERE p.disc_id=? AND p.doinks IS NOT NULL AND rs.active=1" +
+                f"   WHERE p.disc_id=? AND p.doinks IS NOT NULL" +
                 "   GROUP BY champ_id" +
                 ") sub"
             )
@@ -322,10 +330,32 @@ class Database:
 
     def get_games_count(self, context=None):
         query_games = """
-        SELECT Count(DISTINCT g.game_id), timestamp FROM games g
+        SELECT Count(game_id), timestamp FROM games
+        """
+        query_wins = """
+        SELECT COUNT(game_id) FROM games WHERE win=1
         """
         with (self.get_connection() if context is None else context) as db:
-            return self.execute_query(db, query_games).fetchone()
+            all_games = self.execute_query(db, query_games).fetchone()
+            won_games = self.execute_query(db, query_wins).fetchone()
+            return all_games + won_games
+
+    def get_champs_played(self, disc_id):
+        with self.get_connection() as db:
+            query = "SELECT COUNT(DISTINCT champ_id) FROM participants WHERE disc_id=?"
+            return self.execute_query(db, query, (disc_id,)).fetchone()[0]
+
+    def get_champ_with_most_intfars(self, disc_id):
+        with self.get_connection() as db:
+            query = (
+                "SELECT sub.champ_id, MAX(sub.c) FROM ( " +
+                f"  SELECT COUNT(DISTINCT p.game_id) AS c, champ_id FROM games g"
+                "   JOIN participants p ON p.game_id=g.game_id AND g.intfar_id=p.disc_id" +
+                f"  WHERE g.intfar_id=? AND g.intfar_id IS NOT NULL" +
+                "   GROUP BY champ_id" +
+                ") sub"
+            )
+            return self.execute_query(db, query, (disc_id,)).fetchone()
 
     def get_intfar_count(self, context=None):
         query_intfars = (
@@ -362,14 +392,91 @@ class Database:
 
             return intfar_counts, intfar_multis
 
+    def get_total_winrate(self, disc_id):
+        query = (
+            "SELECT (wins.c / played.c) * 100 FROM ( " +
+            "   SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c FROM games AS g " +
+            "   LEFT JOIN participants p on g.game_id=p.game_id " +
+            "   WHERE disc_id=? AND win=1" +
+            ") wins," +
+            "(" +
+            "   SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c FROM games AS g " +
+            "   LEFT JOIN participants p on g.game_id=p.game_id " +
+            "   WHERE disc_id=?" +
+            ") played "
+        )
+        with self.get_connection() as db:
+            return self.execute_query(db, query, (disc_id, disc_id)).fetchone()[0]
+
+    def get_champ_winrate(self, disc_id, best, min_games=10):
+        aggregate = "MAX" if best else "MIN"
+        query = (
+            f"SELECT {aggregate}(sub.wr), CAST(sub.gs as integer), sub.champ FROM ( " +
+            "   SELECT (wins.c / played.c) * 100 AS wr, played.c AS gs, played.champ_id as champ FROM ( " +
+            "       SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c, champ_id FROM games AS g " +
+            "       LEFT JOIN participants p on g.game_id=p.game_id " +
+            "       WHERE disc_id=? AND win=1 GROUP BY champ_id ORDER BY champ_id" +
+            "   ) wins," +
+            "   (" +
+            "       SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c, champ_id FROM games AS g " +
+            "       LEFT JOIN participants p on g.game_id=p.game_id " +
+            "       WHERE disc_id=? GROUP BY champ_id ORDER BY champ_id" +
+            "   ) played " +
+            f"   WHERE wins.champ_id = played.champ_id AND played.c > {min_games}" +
+            ") sub"
+        )
+        with self.get_connection() as db:
+            result = self.execute_query(db, query, (disc_id, disc_id)).fetchone()
+            if result is None and min_games == 10:
+                return self.get_champ_winrate(disc_id, best, min_games=5)
+
+            return result
+
+    def get_winrate_relation(self, disc_id, best, min_games=10):
+        query_games = """
+        SELECT p2.disc_id, Count(*) as c FROM participants p1, participants p2
+        WHERE p1.disc_id != p2.disc_id AND p1.game_id = p2.game_id AND p1.disc_id=?
+        GROUP BY p1.disc_id, p2.disc_id ORDER BY c DESC;
+        """
+        query_wins = """
+        SELECT p2.disc_id, Count(*) as c FROM games g, participants p1, participants p2
+        WHERE p1.disc_id != p2.disc_id AND g.game_id = p1.game_id AND g.game_id = p2.game_id
+        AND p1.game_id = p2.game_id AND p1.disc_id=? AND win=1
+        GROUP BY p1.disc_id, p2.disc_id ORDER BY c DESC;
+        """
+        with self.get_connection() as db:
+            games_with_person = {}
+            wins_with_person = {}
+            for part_id, wins in self.execute_query(db, query_wins, (disc_id,)):
+                if disc_id == part_id or not self.user_exists(part_id):
+                    continue
+                wins_with_person[part_id] = wins
+            for part_id, games in db.cursor().execute(query_games, (disc_id,)):
+                if self.user_exists(part_id):
+                    games_with_person[part_id] = games
+
+            winrate_with_person = [
+                (x, games_with_person[x], (wins_with_person[x] / games_with_person[x]) * 100)
+                for x in games_with_person if games_with_person[x] > min_games
+            ]
+
+            if winrate_with_person == []:
+                if min_games == 10:
+                    return self.get_winrate_relation(disc_id, best, min_games=5)
+                return None, None, None
+
+            func = max if best else min
+
+            return func(winrate_with_person, key=lambda x: x[2])
+
     def get_meta_stats(self):
         query_persons = "SELECT Count(*) FROM participants as p GROUP BY game_id"
 
         users = (len(self.summoners),)
         with self.get_connection() as db:
-            game_data = self.get_games_count(db)
-            intfar_data = self.get_intfar_count(db)
-            doinks_data = self.get_doinks_count(db)
+            game_data = self.get_games_count(context=db)
+            intfar_data = self.get_intfar_count(context=db)
+            doinks_data = self.get_doinks_count(context=db)
             persons_counts = self.execute_query(db, query_persons)
             persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
             for persons in persons_counts:
@@ -566,8 +673,9 @@ class Database:
 
     def get_doinks_stats(self, disc_id=None):
         query = (
-            "SELECT doinks FROM participants AS p LEFT JOIN registered_summoners rs " +
-            "ON rs.disc_id=p.disc_id WHERE doinks IS NOT NULL AND rs.active=1"
+            "SELECT doinks FROM participants AS p " +
+            "LEFT JOIN registered_summoners rs ON rs.disc_id=p.disc_id " +
+            "WHERE doinks IS NOT NULL AND rs.active=1"
         )
         param = None
         if disc_id is not None:
@@ -602,19 +710,79 @@ class Database:
                     games_with_person[part_id] = games
             return games_with_person, doinks_with_person
 
+    def get_performance_score(self, disc_id=None):
+        intfar_weight = 1
+        doinks_weight = 1
+        winrate_weight = 2
+        total = 4
+        performance_range = 10
+        equation = (
+            f"(((1 - intfars.c / played.c) * {intfar_weight} + " +
+            f"(doinks.c / played.c) * {doinks_weight} + " +
+            f"(wins.c / played.c) * {winrate_weight}) / {total}) * {performance_range}"
+        )
+
+        query_outer = "SELECT sub.user, sub.score FROM\n("
+
+        query_select = f"   SELECT played.disc_id AS user, {equation} AS score FROM "
+
+        query_subs = """
+            (
+                SELECT CAST(COUNT(DISTINCT g.game_id) AS real) AS c, disc_id FROM games g
+                JOIN participants p ON g.game_id = p.game_id
+                GROUP BY disc_id
+            ) played,
+            (
+                SELECT CAST(COUNT(DISTINCT g.game_id) AS real) AS c, disc_id FROM games g
+                JOIN participants p ON g.game_id = p.game_id
+                WHERE win=1 GROUP BY disc_id
+            ) wins,
+            (
+                SELECT CAST(COUNT(*) AS real) AS c, intfar_id FROM games
+                GROUP BY intfar_id
+            ) intfars,
+            (
+                SELECT CAST(SUM(LENGTH(REPLACE(doinks_sub.doinks, '0', ''))) AS real) AS c, doinks_sub.disc_id FROM
+                (
+                    SELECT DISTINCT game_id, doinks, disc_id FROM participants
+                    WHERE doinks IS NOT NULL
+                ) doinks_sub
+                GROUP BY doinks_sub.disc_id
+            ) doinks
+            WHERE played.disc_id = wins.disc_id AND played.disc_id = intfars.intfar_id AND played.disc_id = doinks.disc_id
+            AND wins.disc_id = intfars.intfar_id AND wins.disc_id = doinks.disc_id AND intfars.intfar_id = doinks.disc_id
+        ) sub
+        LEFT JOIN registered_summoners rs ON sub.user = rs.disc_id WHERE active=1
+        GROUP BY sub.user ORDER BY sub.score DESC
+        """
+
+        query_full = query_outer + query_select + query_subs
+
+        with self.get_connection() as db:
+            performance_scores = self.execute_query(db, query_full).fetchall()
+            if disc_id is None:
+                return performance_scores
+            
+            rank = 0
+            score = 0
+            for index, (score_id, score_value) in enumerate(performance_scores):
+                if score_id == disc_id:
+                    rank = index
+                    score = score_value
+                    break
+
+            return score, rank+1, len(performance_scores)
+
     def get_stat_data(self, stat_key, stat_name, data, reverse_order=False, total_kills=0):
         (min_stat_id, min_stat,
          max_stat_id, max_stat) = game_stats.get_outlier_stat(
              stat_key, data, reverse_order=reverse_order, total_kills=total_kills
         )
 
-        best_ever = self.get_most_extreme_stat(stat_name, True, stat_name != "deaths")[1]
-        worst_ever = self.get_most_extreme_stat(stat_name, False, stat_name == "deaths")[1]
+        (best_ever_id, best_ever, _) = self.get_most_extreme_stat(stat_name, True, stat_name != "deaths")
+        (worst_ever_id, worst_ever, _) = self.get_most_extreme_stat(stat_name, False, stat_name == "deaths")
 
-        best_beaten = max_stat > best_ever if stat_name != "deaths" else max_stat < best_ever
-        worst_beaten = min_stat < worst_ever if stat_name != "deaths" else min_stat > worst_ever
-
-        return min_stat_id, min_stat, max_stat_id, max_stat, best_beaten, worst_beaten
+        return min_stat_id, min_stat, max_stat_id, max_stat, best_ever, best_ever_id, worst_ever, worst_ever_id
 
     def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game, guild_id):
         kills_by_our_team = data[0][1]["kills_by_team"]
@@ -638,8 +806,6 @@ class Database:
         question_marks = ", ".join("?" * len(STAT_COMMANDS) * 2)
         query_cols = f"(game_id, {stats_query}) VALUES ({question_marks})"
 
-        self.config.log(f"Did we win? {data[0][1]['gameWon']}")
-
         beaten_records_best = []
         beaten_records_worst = []
 
@@ -649,23 +815,32 @@ class Database:
             reverse_order = key == "deaths"
             (
                 min_id, min_value, max_id, max_value,
-                best_record, worst_record
+                prev_best, prev_best_id, prev_worst, prev_worst_id
             ) = self.get_stat_data(key, stat, data, reverse_order, kills_by_our_team)
+
             best_values.extend([max_value, max_id])
             worst_values.extend([min_value, min_id])
-            if best_record:
-                beaten_records_best.append((stat, max_value, max_id))
-            if worst_record:
-                beaten_records_worst.append((stat, min_value, min_id))
+
+            if reverse_order: # Stat is 'deaths'.
+                if min_value < prev_best: # Fewest deaths ever has been reached.
+                    beaten_records_best.append((stat, min_value, min_id, prev_best, prev_best_id))
+                elif max_value > prev_worst: # Most deaths ever has been reached.
+                    beaten_records_worst.append((stat, max_value, max_id, prev_worst, prev_worst_id))
+            else: # Stat is any other stat.
+                if max_value > prev_best: # A new best has been set for a stat.
+                    beaten_records_best.append((stat, max_value, max_id, prev_best, prev_best_id))
+                elif min_value < prev_worst: # A new worst has been set for a stat.
+                    beaten_records_worst.append((stat, min_value, min_id, prev_worst, prev_worst_id))
 
         with self.get_connection() as db:
             query_game = (
                 "INSERT INTO games(game_id, timestamp, intfar_id, " +
-                "intfar_reason, guild_id) VALUES (?, ?, ?, ?, ?)"
+                "intfar_reason, win, guild_id) VALUES (?, ?, ?, ?, ?, ?)"
             )
 
+            win = 1 if data[0][1]["gameWon"] else 0
             self.execute_query(
-                db, query_game, (game_id, timestamp, intfar_id, intfar_reason, guild_id)
+                db, query_game, (game_id, timestamp, intfar_id, intfar_reason, win, guild_id)
             )
 
             for table in ("best", "worst"):

@@ -40,9 +40,11 @@ async def handle_stat_msg(client, message, best, stat, target_id):
         check_all = target_id is None
 
         if check_all: # Get best/worst ever stat of everyone.
-            (target_id,
+            (
+                target_id,
                 min_or_max_value,
-                game_id) = client.database.get_most_extreme_stat(stat, best, maximize)
+                game_id
+            ) = client.database.get_most_extreme_stat(stat, best, maximize)
             recepient = client.get_discord_nick(target_id, message.guild.id)
         else:
             (stat_count, # <- How many times the stat has occured.

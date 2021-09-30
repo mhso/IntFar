@@ -613,6 +613,26 @@ def initialize_commands():
         parser=parse_champs_params
     )
 
+    # summary command
+    summary_name = "summary"
+    summary_desc = (
+        "Show a summary of you or someone else's stats across all recorded games."
+    )
+    register_command(
+        summary_name, summary_desc, handle_summary_msg, access_level="self",
+        optional_params=[TargetParam("person")]
+    )
+
+    # performance command
+    performance_name = "performance"
+    performance_desc = (
+        "Show you or someone else's Personally Evaluated Normalized Int Score."
+    )
+    register_command(
+        performance_name, performance_desc, handle_performance_msg, True, "self",
+        optional_params=[TargetParam("person")]
+    )
+ 
     # ===== CUTE COMMANDS =====
 
     # intdaddy command

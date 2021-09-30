@@ -43,7 +43,7 @@ with database_client_1.get_connection() as db_1:
             disc_id = int(summ[0])
             secret = summ[3]
             db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret, summ[4], summ[5]))
-        query = "INSERT INTO games VALUES (?, ?, ?, ?, ?)"
+        query = "INSERT INTO games VALUES (?, ?, ?, ?, 0, ?)"
         for data in data_games:
             db_2.cursor().execute(query, data)
         query = query_prefix + "best_stats" + query_cols

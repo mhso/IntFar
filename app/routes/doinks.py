@@ -21,9 +21,10 @@ def get_doinks_awards(database):
     )
 
     for i, user_details in enumerate(database.summoners):
-        doinks = database.get_doinks_stats(user_details[0])
+        doinks_reasons = database.get_doinks_stats(user_details[0])
+        total_doinks = database.get_doinks_count(user_details[0])[1]
         unique_doinks = set()
-        for doinks_str in doinks:
+        for doinks_str in doinks_reasons:
             doinks_indices = list(
                 filter(
                     lambda z: z is not None, map(
@@ -37,7 +38,7 @@ def get_doinks_awards(database):
             doinks_counts[len(doinks_indices)-1] += 1
 
         doinks_for_person.append((
-            user_details[0], nicknames[i], avatars[i], len(doinks), len(unique_doinks)
+            user_details[0], nicknames[i], avatars[i], total_doinks, len(unique_doinks)
         ))
 
     doinks_for_person.sort(key=lambda x: x[3], reverse=True)

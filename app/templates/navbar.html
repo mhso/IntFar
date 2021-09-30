@@ -1,6 +1,6 @@
 {% macro navbar(discord_id, name, avatar, active_game_data) -%}
 <div class="intfar-navbar row">
-    <div class="navbar-menu order-1 order-lg-1 col-10 col-sm-9 col-lg-4 col-xl-3">
+    <div class="navbar-menu order-1 order-lg-1 col-10 col-sm-9 col-lg-4 col-xl-4">
         <a href="{{ url_for('index.index') }}">
             Home
         </a><span class="menu-separator">|</span><a href="{{ url_for('betting.home') }}">
@@ -15,7 +15,7 @@
             Lists
         </a>
     </div>
-    <div class="navbar-active-game-wrapper order-3 order-lg-2 col-12 col-lg-6">
+    <div class="navbar-active-game-wrapper order-3 order-lg-2 col-12 col-lg-6 col-xl-5">
         {% for game_data in active_game_data %}
         <div class="navbar-active-game">
             Active game: <span class="active-game-mode">{{ game_data[1] }}</span> in <span class="emph">{{ game_data[2] }}</span><br>

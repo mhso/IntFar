@@ -103,3 +103,88 @@ async def handle_flirtation_msg(client, message, language):
     flirt_msg = client.insert_emotes(messages[random.randint(0, len(messages)-1)])
     mention = client.get_mention_str(message.author.id, message.guild.id)
     await message.channel.send(f"{mention} {flirt_msg}")
+
+async def handle_summary_msg(client, message, target_id):
+    # Shows an infographic about various stats a person has accrued.
+    nickname = client.get_discord_nick(target_id, message.guild.id)
+    games_played = client.database.get_intfar_stats(target_id)[0]
+    champs_played = client.database.get_champs_played(target_id)
+
+    total_winrate = client.database.get_total_winrate(target_id)
+    total_champs = len(client.riot_api.champ_ids)
+
+    best_champ_wr, best_champ_games, best_champ_id = client.database.get_champ_winrate(target_id, True)
+    worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_champ_winrate(target_id, False)
+
+    if best_champ_id == worst_champ_id:
+        # Person has not played 10 games with any champ. Try to get stats with 5 minimum games.
+        worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_champ_winrate(
+            target_id, False, min_games=5
+        )
+
+    response = (
+        f"{nickname} has played a total of **{games_played}** games " +
+        f"(**{total_winrate:.1f}%** was won).\n" +
+        f"He has played **{champs_played}**/**{total_champs}** different champions.\n"
+    )
+    # If person has not played a minimum of 5 games with any champions, skip champ winrate stats.
+    if best_champ_wr is not None and worst_champ_wr is not None and best_champ_id != worst_champ_id:
+        best_champ_name = client.riot_api.get_champ_name(best_champ_id)
+        worst_champ_name = client.riot_api.get_champ_name(worst_champ_id)
+        response += (
+            f"He performs best on **{best_champ_name}** (won " +
+            f"**{best_champ_wr:.1f}%** of **{best_champ_games}** games).\n" +
+            f"He performs worst on **{worst_champ_name}** (won " +
+            f"**{worst_champ_wr:.1f}%** of **{worst_champ_games}** games).\n"
+        )
+
+    best_person_id, best_person_games, best_person_wr = client.database.get_winrate_relation(target_id, True)
+    worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(target_id, False)
+
+    if best_person_id == worst_person_id:
+        worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(target_id, False, min_games=5)
+
+    # If person has not played a minimum of 5 games with any person, skip person winrate stats.
+    if best_person_wr is not None and worst_person_wr is not None and best_person_id != worst_person_id:
+        best_person_name = client.get_discord_nick(best_person_id, message.guild.id)
+        worst_person_name = client.get_discord_nick(worst_person_id, message.guild.id)
+        response += (
+            f"He performs best when playing with **{best_person_name}** (won " +
+            f"**{best_person_wr:.1f}%** of **{best_person_games}** games).\n" +
+            f"He performs worst when playing with **{worst_person_name}** (won " +
+            f"**{worst_person_wr:.1f}%** of **{worst_person_games}** games).\n"
+        )
+
+    # Get performance score for person.
+    score, rank, num_scores = client.database.get_performance_score(target_id)
+
+    response += (
+        f"The *Personally Evaluated Normalized Int-Far Score* for {nickname} is " +
+        f"**{score:.2f}**/**10**\nThis ranks him at **{rank}**/**{num_scores}**."
+    )
+
+    await message.channel.send(response)
+
+async def handle_performance_msg(client, message, target_id=None):
+    performance_data = client.database.get_performance_score(target_id)
+    if target_id is None:
+        response = "*Personally Evaluated Normalized Int-Far Scores* for all users:"
+        for score_id, score_value in performance_data:
+            name = client.get_discord_nick(score_id, message.guild.id)
+            response += f"\n- {name}: {score_value:.2f}"
+    else:
+        name = client.get_discord_nick(target_id, message.guild.id)
+        score, rank, num_scores = performance_data
+
+        response = (
+            f"The *Personally Evaluated Normalized Int-Far Score* for {name} is " +
+            f"**{score:.2f}**/**10**. This ranks him at **{rank}**/**{num_scores}**."
+        )
+
+    score_fmt = "These scores are" if target_id is None else "This score is"
+    response += (
+        f"\n{score_fmt} calculated using the percentage of " +
+        "games being Int-Far, getting doinks, or winning."
+    )
+
+    await message.channel.send(response)

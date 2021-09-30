@@ -49,6 +49,12 @@ HONORABLE_MENTIONS = [
     api_util.load_flavor_texts("mentions_no_epic_monsters")
 ]
 
+COOL_STATS = [
+    api_util.load_flavor_texts("stats_time_spent_dead"),
+    api_util.load_flavor_texts("stats_objectives_stolen"),
+    api_util.load_flavor_texts("stats_turrets_killed")
+]
+
 DOINKS_FLAVORS = [
     api_util.load_flavor_texts("doinks_kda"),
     api_util.load_flavor_texts("doinks_kills"),
@@ -84,6 +90,11 @@ def get_reason_flavor_text(value, reason):
 
 def get_honorable_mentions_flavor_text(index, value):
     flavor_values = HONORABLE_MENTIONS[index]
+    flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
+    return flavor_text.replace("{value}", f"**{value}**")
+
+def get_cool_stat_flavor_text(index, value):
+    flavor_values = COOL_STATS[index]
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     return flavor_text.replace("{value}", f"**{value}**")
 
@@ -155,7 +166,8 @@ class DiscordClient(discord.Client):
         """
         This method is called periodically when a game is active.
         When this method detects that the game is no longer active,
-        it calls the 'get_intfar' method, which determines who is the Int-Far.
+        it calls the 'game_over' method, which determines who is the Int-Far,
+        who to give doinks to, etc.
         """
         self.config.log("Polling for game end...")
         time_slept = 0
@@ -207,13 +219,13 @@ class DiscordClient(discord.Client):
                     response += "no Int-Far will be crowned "
                     response += "and no stats will be saved."
                     await self.channels_to_write[guild_id].send(response)
-
+                # Gamemode was URF. Don't save stats then.
                 elif self.riot_api.is_urf(game_info["gameMode"]):
                     response = "That was an URF game {emote_poggers} "
                     response += "no Int-Far will be crowned "
                     response += "and no stats will be saved."
                     await self.channels_to_write[guild_id].send(self.insert_emotes(response))
-
+                # Game is not on summoners rift. Same deal.
                 elif not self.riot_api.map_is_sr(game_info["mapId"]):
                     response = "That game was not on Summoner's Rift "
                     response += "{emote_woahpikachu} no Int-Far will be crowned "
@@ -252,20 +264,14 @@ class DiscordClient(discord.Client):
             await self.poll_for_game_end(guild_id)
 
     async def game_over(self, game_info, guild_id):
-        # missing_stats = game_stats.are_unfiltered_stats_well_formed(game_info)
-        # if missing_stats != []:
-        #     self.config.log(
-        #         f"The following unfiltered stats are missing: {missing_stats}",
-        #         self.config.log_error
-        #     )
-        #     raise ValueError("Unfiltered stats are not well formed!")
-
+        # Print who was in the game, for sanity checks.
         self.config.log(f"Users in game before: {self.users_in_game.get(guild_id)}")
-        try:
+        try: # Get formatted stats that are relevant for the players in the game.
             filtered_stats, users_in_game = game_stats.get_filtered_stats(
                 self.database.summoners, self.users_in_game.get(guild_id), game_info
             )
         except ValueError as exc:
+            # Game data was not formatted correctly for some reason (Rito pls).
             self.config.log(
                 "Game data is not well formed! Exception: " + str(exc),
                 self.config.log_error
@@ -303,6 +309,10 @@ class DiscordClient(discord.Client):
         if max_tokens_id != new_max_tokens_id:
             await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
 
+        cool_stats_response = self.get_cool_stats_data(filtered_stats, guild_id)
+        if cool_stats_response is not None:
+            response = cool_stats_response + "\n" + response
+
         best_records, worst_records = self.save_stats(
             filtered_stats, intfar, intfar_reason, doinks, guild_id
         )
@@ -311,7 +321,7 @@ class DiscordClient(discord.Client):
             records_response = self.get_beaten_records_msg(
                 best_records, worst_records, guild_id
             )
-            response = records_response + response
+            response = records_response + "\n" + response
 
         await self.channels_to_write[guild_id].send(response)
 
@@ -682,10 +692,10 @@ class DiscordClient(discord.Client):
 
         game_desc = "Game won!" if game_won else "Game lost."
         response = (
-            "\n=======================================" +
+            "======================================" +
             f"\n{game_desc} Everybody gains **{tokens_gained}** {tokens_name}."
         )
-        response_bets = "\n**--- Results of bets made that game ---**\n"
+        response_bets = "**--- Results of bets made that game ---**\n"
         max_tokens_holder = self.database.get_max_tokens_details()[1]
 
         any_bets = False # Bool to indicate whether any bets were made.
@@ -753,6 +763,7 @@ class DiscordClient(discord.Client):
                         response_bets += f": Bet was **lost**! It cost **{api_util.format_tokens_amount(total_cost)}** {tokens_name}!\n"
                         tokens_lost += total_cost
 
+                balance_before += tokens_lost
                 if tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved.
                     quant_desc = "half"
                     if tokens_lost == balance_before: # Current bet cost ALL the user's tokens.
@@ -808,19 +819,24 @@ class DiscordClient(discord.Client):
             await self.audio_handler.play_sound(voice_state, sounds_to_play)
 
     def get_beaten_records_msg(self, best_records, worst_records, guild_id):
-        response = "\n======================================="
+        response = "======================================"
         for index, record_list in enumerate((best_records, worst_records)):
             best = index == 0
-            for stat, value, disc_id in record_list:
+            for stat, value, disc_id, prev_value, prev_id in record_list:
                 stat_index = api_util.STAT_COMMANDS.index(stat)
                 stat_fmt = api_util.round_digits(value)
                 stat_name_fmt = stat.replace('_', ' ')
                 readable_stat = f"{api_util.STAT_QUANTITY_DESC[stat_index][index]} {stat_name_fmt}"
                 name = self.get_mention_str(disc_id, guild_id)
+                prev_name = self.get_discord_nick(prev_id, guild_id)
                 emote = "poggers" if best else "im_nat_kda_player_yo"
+                best_fmt = "best" if best else "worst"
+                by_fmt = "also by" if disc_id == prev_id else "by"
                 response += (
                     f"\n{name} got the {readable_stat} EVER " +
-                    f"with **{stat_fmt}** {stat_name_fmt}!!!" + " {emote_" + emote + "}"
+                    f"with **{stat_fmt}** {stat_name_fmt}!!!" + " {emote_" + emote + "} " +
+                    f"Prev {best_fmt} was **{api_util.round_digits(prev_value)}** " +
+                    f"{by_fmt} {prev_name}"
                 )
         return self.insert_emotes(response)
 
@@ -866,6 +882,23 @@ class DiscordClient(discord.Client):
             mentions_str += user_str
 
         return None if not any_mentions else mentions_str
+
+    def get_cool_stats_msg(self, cool_stats, guild_id):
+        stats_str = "======================================\n"
+        any_stats = False
+        for disc_id in cool_stats:
+            user_str = ""
+            if cool_stats[disc_id] != []:
+                prefix = "\n" if any_stats else ""
+                user_str = f"{prefix}{self.get_mention_str(disc_id, guild_id)} "
+                any_stats = True
+
+            for (count, (stat_index, stat_value)) in enumerate(cool_stats[disc_id]):
+                prefix = " **and** " if count > 0 else ""
+                user_str += prefix + get_cool_stat_flavor_text(stat_index, stat_value)
+            stats_str += user_str
+
+        return None if not any_stats else self.insert_emotes(stats_str)
 
     def get_streak_msg(self, intfar_id, guild_id, intfar_streak, prev_intfar):
         """
@@ -996,7 +1029,7 @@ class DiscordClient(discord.Client):
         else: # No one was bad enough to be Int-Far.
             self.config.log("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
-            honorable_mentions = award_qualifiers.get_honorable_mentions(filtered_stats)
+            honorable_mentions = award_qualifiers.get_honorable_mentions(filtered_stats, self.config)
             honorable_mention_text = self.get_honorable_mentions_msg(honorable_mentions, guild_id)
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
@@ -1018,6 +1051,12 @@ class DiscordClient(discord.Client):
         redeemed_text = self.get_big_doinks_msg(doinks_mentions, guild_id)
 
         return doinks, redeemed_text
+
+    def get_cool_stats_data(self, filtered_stats, guild_id):
+        stat_mentions = award_qualifiers.get_cool_stats(filtered_stats, self.config)
+        redeemed_text = self.get_cool_stats_msg(stat_mentions, guild_id)
+
+        return redeemed_text
 
     def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks, guild_id):
         if not self.config.testing:
@@ -1315,7 +1354,7 @@ class DiscordClient(discord.Client):
 
         msg = message.content.strip()
         if msg.startswith("!"):
-            split = msg.split(" ")
+            split = msg.split(None)
             command = split[0][1:].lower()
 
             valid_cmd, show_usage = commands_util.valid_command(message, command, split[1:])

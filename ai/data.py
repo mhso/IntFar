@@ -49,7 +49,10 @@ def load_train_data(database, riot_api, input_dim):
         with open(game_file, "r", encoding="utf-8") as fp:
             game_data = json.load(fp)
 
-        filtered_data = game_stats.get_filtered_stats(
+        if game_data is None:
+            continue
+
+        filtered_data = game_stats.get_filtered_stats_v4(
             database.summoners, database.summoners, game_data
         )[0]
 

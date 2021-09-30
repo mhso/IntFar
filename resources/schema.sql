@@ -12,6 +12,7 @@ CREATE TABLE [games] (
   [timestamp] INTEGER,
   [intfar_id] INTEGER,
   [intfar_reason] NVARCHAR(4),
+  [win] INTEGER(1),
   [guild_id] INTEGER
 );
 CREATE TABLE [participants] (

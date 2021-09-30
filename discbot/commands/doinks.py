@@ -4,11 +4,12 @@ async def handle_doinks_msg(client, message, target_id):
     def get_doinks_stats(disc_id, expanded=True):
         person_to_check = client.get_discord_nick(disc_id, message.guild.id)
         doinks_reason_ids = client.database.get_doinks_stats(disc_id)
+        total_doinks = client.database.get_doinks_count(disc_id)[1]
         doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
         champ_id, champ_count = client.database.get_champ_with_most_doinks(disc_id)
         champ_name = client.riot_api.get_champ_name(champ_id)
-        msg = f"{person_to_check} has earned {len(doinks_reason_ids)} " + "{emote_Doinks}"
-        if expanded and len(doinks_reason_ids) > 0:
+        msg = f"{person_to_check} has earned {total_doinks} " + "{emote_Doinks}"
+        if expanded and total_doinks > 0:
             msg += "\nHe has earned the most {emote_Doinks} " 
             msg += f"when playing **{champ_name}** (**{champ_count}** times)"
             reason_desc = "\n" + "Big doinks awarded so far:"
@@ -17,7 +18,7 @@ async def handle_doinks_msg(client, message, target_id):
 
             msg += reason_desc
 
-        return client.insert_emotes(msg), len(doinks_reason_ids)
+        return client.insert_emotes(msg), total_doinks
 
     response = ""
     if target_id is None: # Check doinks for everyone.
@@ -36,12 +37,12 @@ async def handle_doinks_msg(client, message, target_id):
 def get_doinks_relation_stats(client, target_id):
     data = []
     games_relations, doinks_relations = client.database.get_doinks_relations(target_id)
-    total_doinks = len(client.database.get_doinks_stats(target_id))
+    doinks_games = client.database.get_doinks_count(target_id)[0]
     for disc_id, total_games in games_relations.items():
         doinks = doinks_relations.get(disc_id, 0)
         data.append(
             (
-                disc_id, total_games, doinks, int((doinks / total_doinks) * 100),
+                disc_id, total_games, doinks, int((doinks / doinks_games) * 100),
                 int((doinks / total_games) * 100)
             )
         )

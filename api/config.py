@@ -41,12 +41,21 @@ class Config:
         self.vision_kda_criteria = 3.0
         self.vision_secs_lower_threshold = 1200
 
+        # ===== Honorable Mentions Criterias =====
+        self.mentions_vision_wards = 0
+        self.mentions_max_damage = 8000
+        self.mentions_max_cs_per_min = 5.0
+        self.mentions_epic_monsters = 0
+
+        # ===== Noteworthy End-of-game Stats Criterias =====
+        self.stats_min_time_dead = 60 * 10
+        self.stats_min_objectives_stolen = 1
+        self.stats_min_turrets_killed = 7
+
         # ===== Int-Far of the Month =====
         self.ifotm_min_games = 10
         self.hour_of_ifotm_announce = 12 # Hour of the day on which to announce IFOTM.
 
-        # ===== Noteworthy end-of-game stats =====
-        self.stats_min_cc = 60
 
         # ===== Logging & Messaging =====
         self.log_warning = 1
