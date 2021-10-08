@@ -408,7 +408,27 @@ class Database:
         with self.get_connection() as db:
             return self.execute_query(db, query, (disc_id, disc_id)).fetchone()[0]
 
-    def get_champ_winrate(self, disc_id, best, min_games=10):
+    def get_champ_winrate(self, disc_id, champ_id):
+        query = (
+            "SELECT (wins.c / played.c) * 100 AS wr, played.c AS gs FROM (" +
+            "SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c, champ_id FROM games AS g " +
+            "       LEFT JOIN participants p on g.game_id=p.game_id " +
+            "       WHERE disc_id=? AND champ_id =? AND win=1 GROUP BY champ_id ORDER BY champ_id" +
+            "   ) wins," +
+            "   (" +
+            "       SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c, champ_id FROM games AS g " +
+            "       LEFT JOIN participants p on g.game_id=p.game_id " +
+            "       WHERE disc_id=? AND champ_id=? GROUP BY champ_id ORDER BY champ_id" +
+            "   ) played " +
+            f"   WHERE wins.champ_id = played.champ_id"
+        )
+
+        with self.get_connection() as db:
+            result = self.execute_query(db, query, (disc_id, champ_id, disc_id, champ_id)).fetchone()
+
+            return result
+
+    def get_min_or_max_winrate_champ(self, disc_id, best, min_games=10):
         aggregate = "MAX" if best else "MIN"
         query = (
             f"SELECT {aggregate}(sub.wr), CAST(sub.gs as integer), sub.champ FROM ( " +
@@ -469,6 +489,11 @@ class Database:
 
             return func(winrate_with_person, key=lambda x: x[2])
 
+    def get_played_champs(self, disc_id):
+        with self.get_connection() as db:
+            query = "SELECT DISTINCT champ_id FROM participants WHERE disc_id=?"
+            return self.execute_query(db, query, (disc_id,)).fetchall()
+
     def get_meta_stats(self):
         query_persons = "SELECT Count(*) FROM participants as p GROUP BY game_id"
 
@@ -500,8 +525,7 @@ class Database:
         tz_cph = TimeZone()
         curr_time = datetime.now(tz_cph)
         current_month = curr_time.month
-        min_timestamp = ModuleNotFoundError
-        if curr_time.day > 1 or curr_time.hour > self.config.hour_of_ifotm_announce:
+        if curr_time.day > 1 or curr_time.hour >= self.config.hour_of_ifotm_announce:
             # Get Int-Far stats for current month.
             start_of_month = curr_time.replace(day=1, hour=0, minute=0, second=0)
             min_timestamp = int(start_of_month.timestamp())
@@ -553,7 +577,7 @@ class Database:
                 intfars = intfar_dict.get(disc_id, 0)
 
                 pct_intfars.append(
-                    (disc_id, total_games, intfars, int((intfars / total_games) * 100))
+                    (disc_id, total_games, intfars, (intfars / total_games) * 100)
                 )
 
             return sorted(pct_intfars, key=lambda x: (x[3], x[2]), reverse=True)

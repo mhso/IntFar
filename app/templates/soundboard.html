@@ -12,13 +12,16 @@
                 {% for sound_file in sounds %}
                 <div class="audio-player-wrapper">
                     <h3>{{ sound_file }}</h3>
+                    {% if logged_in_user %}
                     <audio controls>
                         <source src="{{ url_for('static', filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
-                    </audio> 
+                    </audio>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
-    
+
+            {% if logged_in_user %}
             <h2>Upload Sound File</h2>
             <div>
                 <form id="upload-sound-form" method="POST" enctype=multipart/form-data>
@@ -35,6 +38,7 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 </body>

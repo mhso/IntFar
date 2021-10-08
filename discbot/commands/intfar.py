@@ -8,7 +8,7 @@ async def handle_intfar_msg(client, message, target_id):
         games_played, intfar_reason_ids = client.database.get_intfar_stats(disc_id, monthly)
         games_played, intfars, _, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
         msg = f"{person_to_check}: Int-Far **{intfars}** times "
-        msg += f"**({pct_intfar}%** of {games_played} games) "
+        msg += f"**({pct_intfar:.2f}%** of {games_played} games) "
         msg = client.insert_emotes(msg)
         return msg, intfars, pct_intfar
 
@@ -28,10 +28,10 @@ async def handle_intfar_msg(client, message, target_id):
             monthly_games, monthly_intfars, _, pct_monthly = api_util.organize_intfar_stats(monthly_games, monthly_infar_ids)
 
             ratio_desc = f"\nHe has inted the most when playing **{champ_name}** (**{champ_count}** times)"
-            ratio_desc += "\n" + f"In total, he was Int-Far in **{pct_intfar}%** of his "
+            ratio_desc += "\n" + f"In total, he was Int-Far in **{pct_intfar:.2f}%** of his "
             ratio_desc += f"{games_played} games played.\n"
             ratio_desc += f"In {current_month}, he was Int-Far in **{monthly_intfars}** "
-            ratio_desc += f"of his {monthly_games} games played (**{pct_monthly}%**)\n"
+            ratio_desc += f"of his {monthly_games} games played (**{pct_monthly:.2f}%**)\n"
 
             reason_desc = "Int-Fars awarded so far:\n"
             for reason_id, reason in enumerate(api_util.INTFAR_REASONS):
@@ -73,12 +73,16 @@ async def handle_intfar_msg(client, message, target_id):
         messages_all_time.sort(key=lambda x: (x[1], x[2]), reverse=True)
         messages_monthly.sort(key=lambda x: (x[1], x[2]), reverse=True)
 
-        response = "**--- All time stats ---**\n"
+        response = "**--- All time stats ---**"
         for data in messages_all_time:
-            response += f"- {data[0]}\n"
-        response += f"**--- Stats for {current_month} ---**\n"
+            response += f"\n- {data[0]}"
+
+        await message.channel.send(response)
+
+        response = f"**--- Stats for {current_month} ---**"
         for data in messages_monthly:
-            response += f"- {data[0]}\n"
+            response += f"\n- {data[0]}"
+
     else: # Check intfar stats for a specific person.
         response = format_for_single(target_id)
 

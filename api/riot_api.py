@@ -122,7 +122,12 @@ class APIClient:
             if response.status_code != 200:
                 return None
             return response.json()
-        return response.json()["info"]
+
+        data = response.json()["info"]
+        duration = data["gameDuration"]
+        data["gameDuration"] = duration if "gameEndTimestamp" in data else duration / 1000 
+
+        return data
 
     def get_champ_name(self, champ_id):
         return self.champ_names.get(champ_id)

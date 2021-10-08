@@ -184,16 +184,20 @@ def index():
     for disc_id, _, _ in database.summoners:
         games_played, intfar_reason_ids = database.get_intfar_stats(disc_id)
         games_played_monthly, intfar_reason_ids_monthly = database.get_intfar_stats(disc_id, True)
-        pct_intfar = (0 if games_played == 0
-                      else int(len(intfar_reason_ids) / games_played * 100))
-        pct_intfar_monthly = (0 if games_played_monthly == 0
-                              else int(len(intfar_reason_ids_monthly) / games_played_monthly * 100))
+        pct_intfar = (
+            0 if games_played == 0
+            else len(intfar_reason_ids) / games_played * 100
+        )
+        pct_intfar_monthly = (
+            0 if games_played_monthly == 0
+            else len(intfar_reason_ids_monthly) / games_played_monthly * 100
+        )
 
         intfar_all_data.append(
-            (disc_id, games_played, len(intfar_reason_ids), pct_intfar)
+            (disc_id, games_played, len(intfar_reason_ids), f"{pct_intfar:.2f}")
         )
         intfar_month_data.append(
-            (disc_id, games_played_monthly, len(intfar_reason_ids_monthly), pct_intfar_monthly)
+            (disc_id, games_played_monthly, len(intfar_reason_ids_monthly), f"{pct_intfar_monthly:.2f}")
         )
 
     avatars = app_util.discord_request("func", "get_discord_avatar", None)

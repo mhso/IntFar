@@ -233,7 +233,7 @@ class DiscordClient(discord.Client):
                     await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
                 # Game was too short to count. Probably a remake.
-                elif game_info["gameDuration"] < self.config.min_game_minutes * 60 * 1000:
+                elif game_info["gameDuration"] < self.config.min_game_minutes * 60:
                     response = (
                         "That game lasted less than 5 minutes " +
                         "{emote_zinking} assuming it was a remake. " +
@@ -432,7 +432,7 @@ class DiscordClient(discord.Client):
             for summ_name, summ_id in zip(summ_names, summ_ids):
                 game_data = self.riot_api.get_active_game(summ_id)
                 if game_data is not None:
-                    game_start = int(game_data["gameStartTime"] / 1000)
+                    game_start = int(game_data["gameStartTime"]) / 1000
                     active_game_start = game_start
                     game_for_summoner = game_data
                     active_name = summ_name
@@ -695,7 +695,7 @@ class DiscordClient(discord.Client):
             "======================================" +
             f"\n{game_desc} Everybody gains **{tokens_gained}** {tokens_name}."
         )
-        response_bets = "**--- Results of bets made that game ---**\n"
+        response_bets = "**\n--- Results of bets made that game ---**\n"
         max_tokens_holder = self.database.get_max_tokens_details()[1]
 
         any_bets = False # Bool to indicate whether any bets were made.
@@ -957,7 +957,7 @@ class DiscordClient(discord.Client):
                 # Current Int-Far has played enough games to qualify for IFOTM.
                 curr_intfars = len(monthly_intfars) + 1
 
-        new_pct = int((curr_intfars / curr_num_games) * 100)
+        new_pct = (curr_intfars / curr_num_games) * 100
 
         if new_pct > highest_intfar[3]:
             return message

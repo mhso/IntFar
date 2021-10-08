@@ -358,8 +358,8 @@ def initialize_commands():
     bet_name = "bet"
     bet_desc = (
         "Bet a specific amount of credits on one or more events happening " +
-        "in the current or next game. Fx. `!bet game_win 100`, `!bet intfar all slurp` " +
-        "or `!bet game_win 20 & no_intfar 30` (bet on game win *AND* no Int-Far)."
+        "in the current or next game. Fx. `!bet 100 game_win`, `!bet all intfar slurp` " +
+        "or `!bet 20 game_win & 30 no_intfar` (bet on game win *AND* no Int-Far)."
     )
     register_command(
         bet_name, bet_desc, handle_make_bet_msg, access_level="all", parser=get_bet_params
@@ -555,6 +555,15 @@ def initialize_commands():
         optional_params=[RegularParam("list")]
     )
 
+    # random unplayed commmand
+    random_unplayed_name = "random_unplayed"
+    random_unplayed_desc = (
+        "Pick a random champion that you have not played before (from all champs, not a list)."
+    )
+    register_command(
+        random_unplayed_name, random_unplayed_desc, handle_random_unplayed_msg
+    )
+
     # champ lists command
     champ_lists_name = "champ_lists"
     champ_lists_desc = (
@@ -601,7 +610,7 @@ def initialize_commands():
         mandatory_params=[RegularParam("list")]
     )
 
-    # add champ command
+    # remove champ command
     remove_champ_name = "remove_champ"
     remove_champ_desc = (
         "Remove champion(s) from given list. Remove more than one champ at once " +
@@ -631,6 +640,14 @@ def initialize_commands():
     register_command(
         performance_name, performance_desc, handle_performance_msg, True, "self",
         optional_params=[TargetParam("person")]
+    )
+
+    # wr command
+    wr_name = "wr"
+    wr_desc = "Show winrate info on a champion for you or someone else."
+    register_command(
+        wr_name, wr_desc, handle_winrate_msg, access_level="self",
+        mandatory_params=[RegularParam("champion")], optional_params=[TargetParam("person")]
     )
  
     # ===== CUTE COMMANDS =====

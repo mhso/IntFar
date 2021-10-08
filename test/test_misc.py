@@ -148,13 +148,13 @@ class TestWrapper(TestRunner):
 
     @test
     def test_cool_stats(self, config, database):
-        with open("resources/data/game_5438872497.json", "r", encoding="utf-8") as fp:
+        game_id = 5438872497
+        with open(f"resources/data/game_{game_id}.json", "r", encoding="utf-8") as fp:
             data = json.load(fp)
 
         filtered_stats, users_in_game = game_stats.get_filtered_stats(database.summoners, [], data)
 
         guild_id = util.MAIN_GUILD_ID
-        game_id = 5438872497
 
         database = Database(config)
         database.delete_game(game_id)

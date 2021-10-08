@@ -1,6 +1,7 @@
 import asyncio
 import json
 import argparse
+from random import choice
 from api import award_qualifiers
 from api.audio_handler import AudioHandler
 from api.bets import BettingHandler
@@ -33,7 +34,7 @@ class TestMock(DiscordClient):
         self.guild_to_use = GUILDS[args.guild_name]
         self.task = args.task
         self.loud = not args.silent
-        self.play_sound = args.play
+        self.play_sound = args.play_sound.lower() in ("yes", "true", "1")
         self.ai_model = kwargs.get("ai_model")
 
     async def on_ready(self):
@@ -135,8 +136,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("game_id", type=int)
 parser.add_argument("guild_name", type=str, choices=GUILDS)
 parser.add_argument("task", type=str, choices=("all", "bets", "stats", "train"))
+parser.add_argument("play_sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
 parser.add_argument("-s", "--silent", action="store_true")
-parser.add_argument("-p", "--play", action="store_true")
 
 args = parser.parse_args()
 

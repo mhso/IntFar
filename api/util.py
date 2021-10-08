@@ -164,8 +164,10 @@ def organize_intfar_stats(games_played, intfar_reason_ids):
             if intfar_id == 1:
                 intfar_counts[index] += 1
 
-    pct_intfar = (0 if games_played == 0
-                  else int(len(intfar_reason_ids) / games_played * 100))
+    pct_intfar = (
+        0 if games_played == 0
+        else (len(intfar_reason_ids) / games_played) * 100
+    )
     return games_played, len(intfar_reason_ids), intfar_counts, pct_intfar
 
 def organize_doinks_stats(doinks_reason_ids):

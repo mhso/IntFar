@@ -95,7 +95,7 @@ def get_cool_stats(data, config):
     for disc_id, stats in data:
         cool_stats[disc_id] = []
 
-        time_dead = 0#stats["totalTimeSpentDead"]
+        time_dead = stats["totalTimeSpentDead"]
         if time_dead >= config.stats_min_time_dead:
             time_dead_mins = time_dead // 60
             time_dead_secs = time_dead % 60
@@ -105,7 +105,7 @@ def get_cool_stats(data, config):
 
             cool_stats[disc_id].append((0, fmt_str))
 
-        objectives_stolen = 0#stats["objectivesStolen"]
+        objectives_stolen = stats["objectivesStolen"]
         if objectives_stolen >= config.stats_min_objectives_stolen:
             cool_stats[disc_id].append((1, objectives_stolen))
 

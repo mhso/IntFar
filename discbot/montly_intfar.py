@@ -20,9 +20,9 @@ class MonthlyIntfar:
                              if current_time.day == 1 and current_time.hour < hour_of_announce
                              else next_month)
         year_to_announce = current_time.year if month_to_announce == current_month else next_year
-        self.time_at_announcement = current_time.replace(year_to_announce, month_to_announce, 1,
-                                                         hour_of_announce, 0, 0, 0,
-                                                         self.cph_timezone)
+        self.time_at_announcement = current_time.replace(
+            year_to_announce, month_to_announce, 1, hour_of_announce, 0, 0, 0, self.cph_timezone
+        )
 
     def should_announce(self):
         """
@@ -31,7 +31,7 @@ class MonthlyIntfar:
         return self.time_at_announcement < datetime.now(self.cph_timezone)
 
     def get_pct_desc(self, games, intfars, pct):
-        return f"**{pct}%** ({intfars}/{games})"
+        return f"**{pct:.2f}%** ({intfars}/{games})"
 
     def get_description_and_winners(self, intfar_details):
         nickname_1st = intfar_details[0][0]
@@ -107,8 +107,10 @@ if __name__ == "__main__":
     #     (2, 20, 6, 30),
     #     (3, 20, 6, 20),
     # ]
-    intfar_details = [("Disc ID: " + str(disc_id), games, intfars, ratio)
-                      for (disc_id, games, intfars, ratio) in details]
+    intfar_details = [
+        ("Disc ID: " + str(disc_id), games, intfars, ratio)
+        for (disc_id, games, intfars, ratio) in details
+    ]
 
     month = monthly_monitor.time_at_announcement.month
     prev_month = month - 1 if month != 1 else 12

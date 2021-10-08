@@ -1,6 +1,7 @@
 import random
 
 from api import lists
+from discbot.commands.util import try_find_champ
 
 async def handle_random_champ_msg(client, message, list_name=None):
     if list_name is None:
@@ -17,6 +18,21 @@ async def handle_random_champ_msg(client, message, list_name=None):
         champ_name = champ_list[index]
         sampled_list = list_name if list_name is not None else "all champs"
         response = f"Random champ sampled from `{sampled_list}`:\n"
+        response += f"**{champ_name}**"
+
+    await message.channel.send(client.insert_emotes(response))
+
+async def handle_random_unplayed_msg(client, message):
+    all_champs = set(client.riot_api.champ_names.keys())
+    played_champs = set(x[0] for x in client.database.get_played_champs(message.author.id))
+
+    unplayed_champs = [client.riot_api.get_champ_name(champ) for champ in (all_champs - played_champs)]
+    if len(unplayed_champs) == 0: # All champs have been played.
+        response = "You have already played every champ {emote_woahpikachu}"
+    else:
+        index = random.randint(0, len(unplayed_champs)-1)
+        champ_name = unplayed_champs[index]
+        response = f"Random champ sampled from your unplayed champs:\n"
         response += f"**{champ_name}**"
 
     await message.channel.send(client.insert_emotes(response))
@@ -88,21 +104,6 @@ async def handle_create_list_msg(client, message, list_name):
         response = f"Could not create list: {response}."
 
     await message.channel.send(client.insert_emotes(response))
-
-def try_find_champ(name, riot_api):
-    search_name = name.strip().lower()
-    candidates = []
-    for champ_id in riot_api.champ_names:
-        lowered = riot_api.champ_names[champ_id].lower()
-        if search_name in lowered:
-            candidates.append(champ_id)
-            break
-
-        # Remove apostrophe and period from name.
-        if search_name in lowered.replace("'", "").replace(".", ""):
-            candidates.append(champ_id)
-
-    return candidates[0] if len(candidates) == 1 else None
 
 def parse_champs_params(client, args):
     list_name = args[0]

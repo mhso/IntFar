@@ -98,12 +98,12 @@ def get_active_game_summary(data, summ_id, summoners, riot_api):
         now = time()
         dt_1 = datetime.fromtimestamp(game_start)
         dt_2 = datetime.fromtimestamp(now)
-        fmt_duration = format_duration(dt_1, dt_2)
+        fmt_duration = format_duration(dt_1, dt_2) + " "
     else:
-        fmt_duration = "Unknown Duration (Rito pls)"
+        fmt_duration = ""
     game_mode = data["gameMode"]
 
-    response = f"{fmt_duration} in a {game_mode} game, playing {champions[summ_id][1]}.\n"
+    response = f"{fmt_duration}in a {game_mode} game, playing {champions[summ_id][1]}.\n"
     if len(champions) > 1:
         response += "He is playing with:"
         for other_id in champions:
@@ -248,10 +248,11 @@ def get_filtered_stats(all_users, users_in_game, game_info):
             if participant_data["summonerId"] in summ_ids:
                 our_team = participant_data["teamId"]
                 combined_stats = participant_data
+                combined_stats["lane"] = participant_data["teamPosition"]
                 combined_stats["championId"] = participant_data["championId"]
                 combined_stats["timestamp"] = game_info["gameCreation"]
                 combined_stats["mapId"] = game_info["mapId"]
-                combined_stats["gameDuration"] = int(game_info["gameDuration"] / 1000)
+                combined_stats["gameDuration"] = game_info["gameDuration"]
                 combined_stats["totalCs"] = combined_stats["neutralMinionsKilled"] + combined_stats["totalMinionsKilled"]
                 combined_stats["csPerMin"] = (combined_stats["totalCs"] / combined_stats["gameDuration"]) * 60
                 filtered_stats.append((disc_id, combined_stats))

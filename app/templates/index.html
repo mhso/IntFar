@@ -41,10 +41,10 @@
                 <table class="nice-table">
                     <tr class="list-first intfar-list-entry">
                         <th></th>
-                        <th>Intboi</th>
+                        <th class="d-none d-sm-table-cell">Intboi</th>
                         <th>Int</th>
-                        <th>Gms</th>
-                        <th>%</th>
+                        <th>Games</th>
+                        <th>Pct</th>
                     </tr>
                     {% for name, disc_id, games, intfars, intfar_pct, avatar in intfar_all %}
                         {{ list_entry.entry(disc_id, name, games, intfars, intfar_pct, avatar) }}
@@ -58,10 +58,10 @@
                 <table class="nice-table">
                     <tr class="list-first intfar-list-entry">
                         <th></th>
-                        <th>Intboi</th>
+                        <th class="d-none d-sm-table-cell">Intboi</th>
                         <th>Int</th>
-                        <th>Gms</th>
-                        <th>%</th>
+                        <th>Games</th>
+                        <th>Pct</th>
                     </tr>
                     {% for name, disc_id, games, intfars, intfar_pct, avatar in intfar_month %}
                         {{ list_entry.entry(disc_id, name, games, intfars, intfar_pct, avatar) }}

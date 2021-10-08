@@ -5,7 +5,7 @@
             <img class="discord-avatar" src="{{ avatar }}" alt="{{ name }}'s Avatar">
         </a>
     </td>
-    <td><a href="{{ url_for('users.user', disc_id=disc_id) }}">{{ name }}</a></td>
+    <td class="d-none d-sm-table-cell"><a href="{{ url_for('users.user', disc_id=disc_id) }}">{{ name }}</a></td>
     <td>{{ intfars }}</td>
     <td>{{ games }}</td>
     <td>{{ intfar_pct }}%</td>

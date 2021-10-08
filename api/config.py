@@ -54,8 +54,7 @@ class Config:
 
         # ===== Int-Far of the Month =====
         self.ifotm_min_games = 10
-        self.hour_of_ifotm_announce = 12 # Hour of the day on which to announce IFOTM.
-
+        self.hour_of_ifotm_announce = 11 # Hour of the day on which to announce IFOTM.
 
         # ===== Logging & Messaging =====
         self.log_warning = 1

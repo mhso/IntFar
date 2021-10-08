@@ -1,10 +1,14 @@
 import json
 
-from api import award_qualifiers, config, database
+from api import award_qualifiers, config, database, riot_api
 from api.game_stats import get_filtered_stats
+from discbot.commands.util import ADMIN_DISC_ID
 
+AUTH = json.load(open("discbot/auth.json"))
 CONFIG = config.Config()
+CONFIG.riot_key = AUTH["riotDevKey"] if CONFIG.use_dev_token else AUTH["riotAPIKey"]
 DATABASE = database.Database(CONFIG)
+RIOT_API = riot_api.APIClient(CONFIG)
 
 def test_performance_score():
     id_dave = 115142485579137029
@@ -56,4 +60,14 @@ def test_cool_stats():
     print(total)
     print(more_than_threshold)
 
-test_performance_score()
+def test_unplayed_champs():
+    all_champs = set(RIOT_API.champ_names.keys())
+    played_champs = set(x[0] for x in DATABASE.get_played_champs(ADMIN_DISC_ID))
+
+    unplayed_champs = [RIOT_API.get_champ_name(champ) for champ in (all_champs - played_champs)]
+    for champ in unplayed_champs:
+        print(champ)
+
+DATABASE.get_monthly_delimiter()
+
+#test_unplayed_champs()

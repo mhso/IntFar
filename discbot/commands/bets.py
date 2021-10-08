@@ -25,8 +25,8 @@ def get_bet_params(client, args):
     targets = []
     index = 0
     while index < len(args):
-        event = args[index]
-        amount = args[index+1]
+        event = args[index+1]
+        amount = args[index]
         if "&" in (event, amount):
             raise ValueError("Multi-bet input is formatted incorrectly!")
         target = None
