@@ -2,8 +2,6 @@ import json
 from api.database import Database
 from api.config import Config
 
-auth = json.load(open("discbot/auth.json"))
-
 conf_1 = Config()
 
 database_client_1 = Database(conf_1)
@@ -27,6 +25,7 @@ with database_client_1.get_connection() as db_1:
     event_sounds = db_1.cursor().execute("SELECT * FROM event_sounds").fetchall()
     champ_lists = db_1.cursor().execute("SELECT * FROM champ_lists").fetchall()
     list_items = db_1.cursor().execute("SELECT * FROM list_items").fetchall()
+    lan_items = db_1.cursor().execute("SELECT * FROM lan_stats").fetchall()
 
     query_prefix = "INSERT INTO "
     query_cols = (
@@ -43,7 +42,7 @@ with database_client_1.get_connection() as db_1:
             disc_id = int(summ[0])
             secret = summ[3]
             db_2.cursor().execute("INSERT OR IGNORE INTO registered_summoners VALUES (?, ?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], secret, summ[4], summ[5]))
-        query = "INSERT INTO games VALUES (?, ?, ?, ?, 0, ?)"
+        query = "INSERT INTO games VALUES (?, ?, ?, ?, ?, ?, ?)"
         for data in data_games:
             db_2.cursor().execute(query, data)
         query = query_prefix + "best_stats" + query_cols
@@ -82,6 +81,9 @@ with database_client_1.get_connection() as db_1:
             db_2.cursor().execute(query, data)
         query = "INSERT INTO list_items(id, champ_id, list_id) VALUES (?, ?, ?)"
         for data in list_items:
+            db_2.cursor().execute(query, data)
+        query = "INSERT INTO lan_stats VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        for data in lan_items:
             db_2.cursor().execute(query, data)
 
         db_2.commit()

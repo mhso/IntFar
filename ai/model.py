@@ -59,7 +59,7 @@ class Model(torch.nn.Module):
 
         x = torch.tensor(data).float().unsqueeze(0)
 
-        device_name = "cpu" if self.config.env == "production" else "cuda"
+        device_name = "cpu"# if self.config.env == "production" else "cuda"
         device = torch.device(device_name)
 
         x = x.to(device)
@@ -107,7 +107,8 @@ def run_loop(config, bot_pipe):
                 bot_pipe.send(output)
             elif action == "train":
                 loss, probability, _ = train_online(ai_model, data[0], data[1])
+                probability = torch.sigmoid(probability.squeeze())
                 ai_model.save()
-                bot_pipe.send((loss, probability.squeeze().item()))
+                bot_pipe.send((loss, probability.item()))
     except (BrokenPipeError, KeyboardInterrupt):
         pass

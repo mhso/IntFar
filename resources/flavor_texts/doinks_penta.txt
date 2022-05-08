@@ -1,3 +1,3 @@
-wiping the floor with the enemy team, getting a JUICY pentakill!
-getting the BIG HIGHLIGHT clip with a NASTY pentakill!
-managing to last hit the entire enemy team in a single fight, getting a TASTY pentakill!
+wiping the floor with the enemy team, getting {value} JUICY pentakill{quantifier}!
+getting the BIG HIGHLIGHT clip with {value} NASTY pentakill{quantifier}!
+managing to last hit the entire enemy team in a single fight, getting {value} TASTY pentakill{quantifier}!

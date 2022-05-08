@@ -4,12 +4,7 @@ from api.config import Config
 from discbot.discord_bot import DiscordClient
 import threading
 
-auth = json.load(open("discbot/auth.json"))
-
 conf = Config()
-
-conf.discord_token = auth["discordToken"]
-conf.riot_key = auth["riotDevKey"] if conf.use_dev_token else auth["riotAPIKey"]
 
 conf.log("Initializing database...")
 

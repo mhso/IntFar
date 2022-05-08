@@ -11,15 +11,23 @@ API_REGION = "https://europe.api.riotgames.com"
 class APIClient:
     def __init__(self, config):
         self.config = config
+        self.champ_names = {}
+        self.champ_ids = {}
+        self.champ_portraits_path = "app/static/img/champions/portraits"
+        self.champ_splash_path = "app/static/img/champions/splashes"
+        self.champ_data_path = "app/static/champ_data"
+        self.latest_patch = None
+
+        self.get_latest_data()
+
+    def get_latest_data(self):
         self.latest_patch = self.get_latest_patch()
         if not exists(self.get_champions_file()):
             self.get_latest_champions_file()
-
-        self.champ_names = {}
-        self.champ_ids = {}
-        self.champ_portraits_path = "app/static/img/champions"
+        self.champ_splash_path = "app/static/img/champions/splashes"
         self.initialize_champ_dicts()
         self.get_champion_portraits()
+        self.get_champion_splashes()
 
     def initialize_champ_dicts(self):
         champions_file = self.get_champions_file()
@@ -65,6 +73,7 @@ class APIClient:
 
     def get_champion_portraits(self):
         base_url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/img/champion"
+
         with open(self.get_champions_file(), encoding="utf-8") as fp:
             champion_data = json.load(fp)
             for champ_name in champion_data["data"]:
@@ -85,14 +94,68 @@ class APIClient:
                     self.config.log(f"Exception when getting champion portrait for {champ_name}!")
                     self.config.log(exc)
 
-                sleep(1)
+                sleep(0.5)
+
+    def get_champion_splashes(self):
+        base_url = f"http://ddragon.leagueoflegends.com/cdn/img/champion/loading"
+
+        with open(self.get_champions_file(), encoding="utf-8") as fp:
+            champion_data = json.load(fp)
+            for champ_name in champion_data["data"]:
+                champ_id = int(champion_data["data"][champ_name]["key"])
+                filename = self.get_champ_splash_path(champ_id)
+                if exists(filename):
+                    continue
+
+                url = f"{base_url}/{champ_name}_0.jpg"
+                self.config.log(f"Downloading champion splash for '{champ_name}'")
+
+                try:
+                    data = requests.get(url, stream=True)
+                    with open(filename, "wb") as fp:
+                        for chunk in data.iter_content(chunk_size=128):
+                            fp.write(chunk)
+                except requests.exceptions.RequestException as exc:
+                    self.config.log(f"Exception when getting champion splash for {champ_name}!")
+                    self.config.log(exc)
+
+                sleep(0.5)
+
+    def get_champion_data(self):
+        base_url = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/champion"
+
+        with open(self.get_champions_file(), encoding="utf-8") as fp:
+            champion_data = json.load(fp)
+            for champ_name in champion_data["data"]:
+                champ_id = int(champion_data["data"][champ_name]["key"])
+
+                filename = self.get_champ_data_path(champ_id)
+                if exists(filename):
+                    continue
+
+                url = f"{base_url}/{champ_name}.json"
+                self.config.log(f"Downloading champion data for '{champ_name}'")
+
+                try:
+                    data = requests.get(url, stream=True)
+                    with open(filename, "wb") as fp:
+                        for chunk in data.iter_content(chunk_size=128):
+                            fp.write(chunk)
+                except requests.exceptions.RequestException as exc:
+                    self.config.log(f"Exception when getting champion data for {champ_name}!")
+                    self.config.log(exc)
+
+                sleep(0.5)
+
 
     def make_request(self, endpoint, api_route, *params):
         req_string = endpoint
         for index, param in enumerate(params):
             req_string = req_string.replace("{" + str(index) + "}", str(param))
         token_header = {"X-Riot-Token": self.config.riot_key}
-        response = requests.get(api_route + req_string, headers=token_header)
+        full_url = api_route + req_string
+        self.config.log(f"URL: {full_url}")
+        response = requests.get(full_url, headers=token_header)
         return response
 
     def get_summoner_id(self, summ_name):
@@ -104,24 +167,29 @@ class APIClient:
 
     def get_active_game(self, summ_id):
         endpoint = "/lol/spectator/v4/active-games/by-summoner/{0}"
-        response = self.make_request(endpoint, API_PLATFORM, summ_id)
-        if response.status_code != 200:
+        try:
+            response = self.make_request(endpoint, API_PLATFORM, summ_id)
+            if response.status_code != 200:
+                return None
+        except (requests.ConnectionError, requests.RequestException):
             return None
+
         return response.json()
 
     def get_game_details(self, game_id, tries=0):
         endpoint = "/lol/match/v5/matches/{0}"
         response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
         if response.status_code != 200:
+            self.config.log(f"Game details response code: {response.status_code}")
             if tries > 0:
-                sleep(20)
+                sleep(30)
                 return self.get_game_details(game_id, tries-1)
-
-            endpoint = "/lol/match/v4/matches/{0}"
-            response = self.make_request(endpoint, API_PLATFORM, game_id)
-            if response.status_code != 200:
-                return None
-            return response.json()
+            else:
+                endpoint = "/lol/match/v4/matches/{0}"
+                response = self.make_request(endpoint, API_PLATFORM, game_id)
+                if response.status_code != 200:
+                    return None
+                return response.json()
 
         data = response.json()["info"]
         duration = data["gameDuration"]
@@ -129,11 +197,54 @@ class APIClient:
 
         return data
 
+    def get_game_timeline(self, game_id, tries=0):
+        endpoint = "/lol/match/v5/matches/{0}/timeline"
+
+        response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
+        if response.status_code != 200:
+            if tries > 0:
+                sleep(30)
+                return self.get_game_details(game_id, tries-1)
+            else:
+                return None
+
+        return response.json()["info"]
+
+    def get_champion_mastery(self, summoner_id):
+        endpoint = "/lol/champion-mastery/v4/champion-masteries/by-summoner/{0}"
+        response = self.make_request(endpoint, API_PLATFORM, summoner_id)
+
+        if response.status_code != 200:
+            return None
+
+        return response.json()
+
     def get_champ_name(self, champ_id):
         return self.champ_names.get(champ_id)
 
     def get_champ_portrait_path(self, champ_id):
-        return f"{self.champ_portraits_path}/{champ_id}.png" 
+        return f"{self.champ_portraits_path}/{champ_id}.png"
+
+    def get_champ_splash_path(self, champ_id):
+        return f"{self.champ_splash_path}/{champ_id}.png"
+
+    def get_champ_data_path(self, champ_id):
+        return f"{self.champ_data_path}/{champ_id}.json"
+
+    def try_find_champ(self, name):
+        search_name = name.strip().lower().replace("_", " ")
+        candidates = []
+        for champ_id in self.champ_names:
+            lowered = self.champ_names[champ_id].lower()
+            if search_name in lowered:
+                candidates.append(champ_id)
+                break
+
+            # Remove apostrophe and period from name.
+            if search_name in lowered.replace("'", "").replace(".", ""):
+                candidates.append(champ_id)
+
+        return candidates[0] if len(candidates) == 1 else None
 
     def get_map_name(self, map_id):
         with open("api/maps.json", encoding="utf-8") as fp:

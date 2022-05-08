@@ -4,6 +4,7 @@ from datetime import datetime
 import sqlite3
 from sqlite3 import DatabaseError, OperationalError, ProgrammingError
 from contextlib import closing
+
 from api import game_stats
 from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, STAT_COMMANDS
 
@@ -146,7 +147,7 @@ class Database:
                     self.execute_query(
                         db, query, (discord_id, summ_name, summ_id, secret, 0)
                     )
-                    if summ_info:
+                    if summ_info is None:
                         # Only create betting balance table if user is new.
                         self.execute_query(
                             db, "INSERT INTO betting_balance VALUES (?, ?)", (discord_id, 100)
@@ -198,6 +199,24 @@ class Database:
             self.execute_query(db, query_3, (game_id,), commit=False)
             self.execute_query(db, query_4, (game_id,))
 
+    def get_latest_game(self, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
+
+        query_games = f"SELECT MAX(timestamp), win, intfar_id, intfar_reason FROM games{delim_str}"
+        query_doinks = f"""
+            SELECT timestamp, disc_id, doinks FROM (
+               SELECT MAX(timestamp) AS t
+               FROM games{delim_str}
+            ) sub_1, participants p
+            JOIN games g
+            ON p.game_id = g.game_id
+            WHERE doinks IS NOT NULL AND timestamp = sub_1.t
+        """
+        with self.get_connection() as db:
+            game_data = self.execute_query(db, query_games, params).fetchone()
+            doinks_data = self.execute_query(db, query_doinks, params).fetchall()
+            return game_data, doinks_data
+
     def get_most_extreme_stat(self, stat, best, maximize=True):
         with self.get_connection() as db:
             aggregator = "MAX" if maximize else "MIN"
@@ -241,11 +260,10 @@ class Database:
 
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
-    def get_champ_count_for_stat(self, stat, best, disc_id, maximize):
-        aggregator = "MAX" if maximize else "MIN"
+    def get_champ_count_for_stat(self, stat, best, disc_id):
         table = "best_stats" if best else "worst_stats"
         query = (
-            f"SELECT sub.champ_id, {aggregator}(sub.c) FROM ( " +
+            f"SELECT sub.champ_id, MAX(sub.c) FROM ( " +
             f"   SELECT COUNT(DISTINCT st.game_id) AS c, champ_id FROM {table} st" +
             f"   JOIN registered_summoners rs ON rs.disc_id=st.{stat}_id" +
             "   JOIN participants p ON p.game_id = st.game_id" +
@@ -256,21 +274,23 @@ class Database:
         with self.get_connection() as db:
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
-    def get_doinks_count(self, disc_id=None, context=None):
-        delimiter = "" if disc_id is None else" AND p.disc_id=?"
+    def get_doinks_count(self, disc_id=None, context=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
+
         query_doinks = (
             "SELECT SUM(sub.doinks_games), SUM(sub.doinks_total) FROM\n" +
             "(\n" +
             "   SELECT COUNT(*) AS doinks_games, SUM(LENGTH(REPLACE(sub_2.doinks, '0', ''))) AS doinks_total FROM"
             "   (\n" +
-            "       SELECT DISTINCT p.game_id, p.disc_id, doinks FROM participants AS p\n" +
+            "       SELECT DISTINCT p.game_id, p.disc_id, doinks, timestamp FROM participants AS p\n" +
             "       LEFT JOIN registered_summoners rs ON rs.disc_id=p.disc_id\n" +
-            f"      WHERE doinks IS NOT NULL AND rs.active=1{delimiter}\n" +
+            "       LEFT JOIN games g ON g.game_id = p.game_id\n" +
+            f"      WHERE doinks IS NOT NULL AND rs.active=1{delim_str}\n" +
             "   ) sub_2\n" +
             "   GROUP BY sub_2.disc_id\n" +
             ") sub"
         )
-        params = None if disc_id is None else (disc_id,)
+
         with (self.get_connection() if context is None else context) as db:
             doinks_games, doinks_total = self.execute_query(db, query_doinks, params).fetchone()
             return doinks_games or 0, doinks_total or 0
@@ -319,7 +339,7 @@ class Database:
             return self.execute_query(db, query).fetchall()
 
     def get_recent_intfars_and_doinks(self):
-        with (self.get_connection()) as db:
+        with self.get_connection() as db:
             query = (
                 "SELECT g.game_id, timestamp, p.disc_id, doinks, intfar_id, "
                 "intfar_reason FROM participants AS p LEFT JOIN games g ON "
@@ -328,22 +348,90 @@ class Database:
             )
             return self.execute_query(db, query).fetchall()
 
-    def get_games_count(self, context=None):
-        query_games = """
-        SELECT Count(game_id), timestamp FROM games
-        """
-        query_wins = """
-        SELECT COUNT(game_id) FROM games WHERE win=1
-        """
-        with (self.get_connection() if context is None else context) as db:
-            all_games = self.execute_query(db, query_games).fetchone()
-            won_games = self.execute_query(db, query_wins).fetchone()
-            return all_games + won_games
+    def get_delimeter(self, time_after, time_before, guild_id, other_key=None, other_param=None, prefix=None):
+        prefix = prefix if prefix is not None else "WHERE"
+        delimiter = "" if other_param is None else f" {prefix} {other_key} = ?"
+        params = None if other_param is None else (other_param,)
 
-    def get_champs_played(self, disc_id):
+        if time_after is not None:
+            if params is None:
+                params = (time_after,)
+                delimiter += f" {prefix} timestamp > ?"
+            else:
+                params = (other_param, time_after)
+                delimiter += " AND timestamp > ?"
+
+        if time_before is not None:
+            if params is None:
+                params = (time_before,)
+                delimiter += f" {prefix} timestamp < ?"
+            else:
+                delimiter += " AND timestamp < ?"
+                params = params + (time_before,)
+
+        if guild_id is not None:
+            if params is None:
+                params = (guild_id,)
+                delimiter += f" {prefix} guild_id = ?"
+            else:
+                params = params + (guild_id,)
+                delimiter += " AND guild_id = ?"
+
+        return delimiter, params
+
+    def get_recent_game_results(self, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
+
+        query = f"SELECT win FROM games{delim_str} ORDER BY timestamp DESC"
         with self.get_connection() as db:
-            query = "SELECT COUNT(DISTINCT champ_id) FROM participants WHERE disc_id=?"
-            return self.execute_query(db, query, (disc_id,)).fetchone()[0]
+            return [x[0] for x in self.execute_query(db, query, params).fetchall()]
+
+    def get_games_results(self, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
+
+        query = f"""
+            SELECT win, timestamp
+            FROM games{delim_str}
+            ORDER BY timestamp
+        """
+
+        with self.get_connection() as db:
+            return self.execute_query(db, query, params).fetchall()
+
+    def get_games_count(self, context=None, time_after=None, time_before=None, guild_id=None):
+        delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id)
+        delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "win", 1)
+
+        query = f"""
+            SELECT games.c, games.timestamp, wins.c FROM (
+                SELECT COUNT(*) AS c, timestamp FROM games g{delim_str_1}
+            ) games,
+            (
+                SELECT COUNT(*) AS c FROM games{delim_str_2}
+            ) wins
+        """
+        params = params_2 if params_1 is None else params_1 + params_2
+
+        with (self.get_connection() if context is None else context) as db:
+            return self.execute_query(db, query, params).fetchone()
+
+    def get_longest_game(self, context=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
+
+        query = f"SELECT MAX(duration), timestamp FROM games{delim_str}"
+
+        with (self.get_connection() if context is None else context) as db:
+            return self.execute_query(db, query, params).fetchone()
+
+    def get_champs_played(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
+
+        with self.get_connection() as db:
+            query = (
+                "SELECT COUNT(DISTINCT champ_id) FROM participants AS p " +
+                f"JOIN games g ON p.game_id = g.game_id{delim_str}"
+            )
+            return self.execute_query(db, query, params).fetchone()[0]
 
     def get_champ_with_most_intfars(self, disc_id):
         with self.get_connection() as db:
@@ -357,14 +445,25 @@ class Database:
             )
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
-    def get_intfar_count(self, context=None):
+    def get_intfar_count(self, disc_id=None, context=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id, "AND")
+
         query_intfars = (
-            "SELECT intfar_id FROM games LEFT JOIN registered_summoners rs " +
-            "ON rs.disc_id=intfar_id WHERE intfar_id IS NOT NULL AND " +
-            "rs.active=1 GROUP BY game_id"
+            "SELECT SUM(sub.intfars) FROM\n" +
+            "(\n" +
+            "   SELECT COUNT(*) AS intfars FROM"
+            "   (\n" +
+            "       SELECT DISTINCT g.game_id, intfar_id FROM games AS g\n" +
+            "       LEFT JOIN registered_summoners rs ON rs.disc_id=intfar_id\n" +
+            f"      WHERE intfar_id IS NOT NULL AND rs.active=1{delim_str}\n" +
+            "   ) sub_2\n" +
+            "   GROUP BY sub_2.intfar_id\n" +
+            ") sub"
         )
+
         with (self.get_connection() if context is None else context) as db:
-            return len(self.execute_query(db, query_intfars).fetchall())
+            intfars = self.execute_query(db, query_intfars, params).fetchone()
+            return (intfars[0] if intfars is not None else 0) or 0
 
     def get_intfar_reason_counts(self, context=None):
         query_intfar_multis = (
@@ -411,22 +510,20 @@ class Database:
     def get_champ_winrate(self, disc_id, champ_id):
         query = (
             "SELECT (wins.c / played.c) * 100 AS wr, played.c AS gs FROM (" +
-            "SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c, champ_id FROM games AS g " +
+            "   SELECT CAST(COALESCE(COUNT(DISTINCT g.game_id), 0) as real) AS c, champ_id FROM games AS g " +
             "       LEFT JOIN participants p on g.game_id=p.game_id " +
-            "       WHERE disc_id=? AND champ_id =? AND win=1 GROUP BY champ_id ORDER BY champ_id" +
+            "       WHERE disc_id=? AND champ_id =? AND win=1" +
             "   ) wins," +
             "   (" +
             "       SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c, champ_id FROM games AS g " +
             "       LEFT JOIN participants p on g.game_id=p.game_id " +
-            "       WHERE disc_id=? AND champ_id=? GROUP BY champ_id ORDER BY champ_id" +
+            "       WHERE disc_id=? AND champ_id=?" +
             "   ) played " +
-            f"   WHERE wins.champ_id = played.champ_id"
+            f"WHERE wins.champ_id = played.champ_id OR wins.champ_id IS NULL"
         )
 
         with self.get_connection() as db:
-            result = self.execute_query(db, query, (disc_id, champ_id, disc_id, champ_id)).fetchone()
-
-            return result
+            return self.execute_query(db, query, (disc_id, champ_id, disc_id, champ_id)).fetchone()
 
     def get_min_or_max_winrate_champ(self, disc_id, best, min_games=10):
         aggregate = "MAX" if best else "MIN"
@@ -500,6 +597,7 @@ class Database:
         users = (len(self.summoners),)
         with self.get_connection() as db:
             game_data = self.get_games_count(context=db)
+            longest_game = self.get_longest_game(context=db)
             intfar_data = self.get_intfar_count(context=db)
             doinks_data = self.get_doinks_count(context=db)
             persons_counts = self.execute_query(db, query_persons)
@@ -517,7 +615,7 @@ class Database:
             intfar_multis_ratios = [int((count / intfar_data) * 100) for count in intfar_multis_counts]
 
             return (
-                game_data + users + doinks_data +
+                game_data + longest_game + users + doinks_data +
                 (intfar_data, games_ratios, intfar_ratios, intfar_multis_ratios)
             )
 
@@ -525,7 +623,7 @@ class Database:
         tz_cph = TimeZone()
         curr_time = datetime.now(tz_cph)
         current_month = curr_time.month
-        if curr_time.day > 1 or curr_time.hour >= self.config.hour_of_ifotm_announce:
+        if curr_time.day > 1 or curr_time.hour > self.config.hour_of_ifotm_announce:
             # Get Int-Far stats for current month.
             start_of_month = curr_time.replace(day=1, hour=0, minute=0, second=0)
             min_timestamp = int(start_of_month.timestamp())
@@ -545,7 +643,7 @@ class Database:
 
         query_intfars = (
             "SELECT intfar_id FROM games g " +
-            "LEFT JOIN registered_summoners rs ON rs.disc_id=intfar_id WHERE  " +
+            "LEFT JOIN registered_summoners rs ON rs.disc_id=intfar_id WHERE " +
             "intfar_id IS NOT NULL AND " + delim_str + " AND rs.active=1 GROUP BY g.game_id"
         )
         query_games = (
@@ -553,6 +651,7 @@ class Database:
             "registered_summoners rs ON rs.disc_id=p.disc_id WHERE " +
             "g.game_id=p.game_id AND " + delim_str + " AND rs.active=1 GROUP BY g.game_id, p.disc_id"
         )
+
         with self.get_connection() as db:
             games_per_person = self.execute_query(db, query_games).fetchall()
             intfars_per_person = self.execute_query(db, query_intfars).fetchall()
@@ -653,23 +752,33 @@ class Database:
             """
             return self.execute_query(db, query).fetchone()
 
-    def get_intfar_stats(self, disc_id, monthly=False):
+    def get_intfar_stats(self, disc_id, monthly=False, time_after=None, time_before=None, guild_id=None):
+        params_1 = None
+        params_2 = None
+        if monthly:
+            monthly_delim = self.get_monthly_delimiter()
+            if disc_id is not None:
+                delim_str_1 = f" WHERE disc_id=? AND {monthly_delim}"
+                delim_str_2 = f" WHERE intfar_id=? AND {monthly_delim}"
+                params_1 = (disc_id,)
+                params_2 = (disc_id,)
+            else:
+                delim_str_1 = f" WHERE {monthly_delim}"
+                delim_str_2 = f" WHERE {monthly_delim}"
+        else:
+            delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
+            delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "intfar_id", disc_id)
+
         query_total = (
-            "SELECT Count(*) FROM games, participants WHERE disc_id=? " +
-            "AND games.game_id=participants.game_id"
+            f"SELECT Count(*) FROM games AS g JOIN participants p ON g.game_id = p.game_id{delim_str_1}"
         )
         query_intfar = (
-            "SELECT intfar_reason FROM games g, participants p " +
-            "WHERE intfar_id=? AND disc_id=intfar_id AND g.game_id=p.game_id"
+            f"SELECT intfar_reason FROM games g JOIN participants p ON g.game_id=p.game_id{delim_str_2} GROUP BY g.game_id"
         )
-        if monthly:
-            delim_str = self.get_monthly_delimiter()
-            query_total += f" AND {delim_str}"
-            query_intfar += f" AND {delim_str}"
 
         with self.get_connection() as db:
-            total_games = self.execute_query(db, query_total, (disc_id,)).fetchone()[0]
-            intfar_games = self.execute_query(db, query_intfar, (disc_id,)).fetchall()
+            total_games = self.execute_query(db, query_total, params_1).fetchone()[0]
+            intfar_games = self.execute_query(db, query_intfar, params_2).fetchall()
             return total_games, intfar_games
 
     def get_intfar_relations(self, disc_id):
@@ -695,21 +804,18 @@ class Database:
                     games_with_person[part_id] = games
             return games_with_person, intfars_with_person
 
-    def get_doinks_stats(self, disc_id=None):
+    def get_doinks_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
+
         query = (
             "SELECT doinks FROM participants AS p " +
             "LEFT JOIN registered_summoners rs ON rs.disc_id=p.disc_id " +
-            "WHERE doinks IS NOT NULL AND rs.active=1"
+            "LEFT JOIN games g ON p.game_id = g.game_id " +
+            f"WHERE doinks IS NOT NULL AND rs.active=1{delim_str} GROUP BY g.game_id"
         )
-        param = None
-        if disc_id is not None:
-            query += " AND p.disc_id=?"
-            param = (disc_id,)
-
-        query += " GROUP BY game_id"
 
         with self.get_connection() as db:
-            return self.execute_query(db, query, param).fetchall()
+            return self.execute_query(db, query, params).fetchall()
 
     def get_doinks_relations(self, disc_id):
         query_games = """
@@ -811,6 +917,7 @@ class Database:
     def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game, guild_id):
         kills_by_our_team = data[0][1]["kills_by_team"]
         timestamp = data[0][1]["timestamp"] // 1000
+        duration = data[0][1]["gameDuration"]
 
         first_blood_id = None
         for disc_id, stats in data:
@@ -858,13 +965,13 @@ class Database:
 
         with self.get_connection() as db:
             query_game = (
-                "INSERT INTO games(game_id, timestamp, intfar_id, " +
-                "intfar_reason, win, guild_id) VALUES (?, ?, ?, ?, ?, ?)"
+                "INSERT INTO games(game_id, timestamp, duration, intfar_id, " +
+                "intfar_reason, win, guild_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
             )
 
             win = 1 if data[0][1]["gameWon"] else 0
             self.execute_query(
-                db, query_game, (game_id, timestamp, intfar_id, intfar_reason, win, guild_id)
+                db, query_game, (game_id, timestamp, duration, intfar_id, intfar_reason, win, guild_id)
             )
 
             for table in ("best", "worst"):
@@ -897,6 +1004,77 @@ class Database:
             db.commit()
 
         return beaten_records_best, beaten_records_worst
+
+    def save_missed_game(self, game_id, guild_id, timestamp):
+        query = "INSERT INTO missed_games VALUES (?, ?, ?)"
+        with self.get_connection() as db:
+            self.execute_query(db, query, (game_id, guild_id, timestamp))
+
+    def get_missed_games(self):
+        query = "SELECT game_id, guild_id FROM missed_games"
+        with self.get_connection() as db:
+            return self.execute_query(db, query).fetchall()
+
+    def remove_missed_game(self, game_id):
+        query = "DELETE FROM missed_games WHERE game_id=?"
+        with self.get_connection() as db:
+            self.execute_query(db, query, (game_id,))
+
+    def save_lan_stats(self, game_id, data):
+        query = (
+            "INSERT INTO lan_stats(game_id, disc_id, kills, deaths, assists, " +
+            "damage, cs, cs_per_min, gold, kp, vision_wards, vision_score) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+
+        keys = [
+            "kills", "deaths", "assists", "totalDamageDealtToChampions", "totalCs",
+            "csPerMin", "goldEarned", "kp", "visionWardsBoughtInGame", "visionScore"
+        ]
+        kills_by_our_team = data[0][1]["kills_by_team"]
+
+        for disc_id, stats in data:
+            params = [game_id, disc_id]
+            for stat_key in keys:
+                params.append(game_stats.get_stat_value(stats, stat_key, kills_by_our_team))
+
+            with self.get_connection() as db:
+                self.execute_query(db, query, tuple(params))
+
+    def get_lan_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
+
+        query = f"""
+            SELECT
+                disc_id,
+                kills,
+                deaths,
+                assists,
+                cs,
+                cs_per_min,
+                damage,
+                gold,
+                kp,
+                vision_wards,
+                vision_score
+            FROM lan_stats
+            INNER JOIN games g
+            ON g.game_id = lan_stats.game_id
+            {delim_str}
+        """
+
+        with self.get_connection() as db:
+            results = self.execute_query(db, query, params).fetchall()
+            if disc_id is None:
+                result_dict = {}
+                for result_tuple in results:
+                    user_id = result_tuple[0]
+                    if user_id not in result_dict:
+                        result_dict[user_id] = []
+
+                    result_dict[user_id].append(result_tuple[1:])
+                return result_dict
+            return results
 
     def create_backup(self):
         backup_name = "resources/database_backup.db"
@@ -1330,3 +1508,99 @@ class Database:
             query = "DELETE FROM list_items WHERE id=?"
             db.cursor().executemany(query, item_ids)
             db.commit()
+
+    def get_lifetime_activity(self):
+        with self.get_connection() as db:
+            query = """
+                SELECT SUBSTR(
+                    DATE(
+                        DATETIME(g.timestamp, 'unixepoch', 'localtime')
+                    ),
+                1, 7) AS month, COUNT(g.game_id), COUNT(w.game_id)
+                FROM (
+                    SELECT game_id, timestamp
+                    FROM games
+                ) g
+                LEFT JOIN
+                (
+                    SELECT game_id
+                    FROM games
+                    WHERE win = 1
+                ) w
+                ON g.game_id = w.game_id
+                GROUP BY month
+            """
+            return self.execute_query(db, query).fetchall()
+
+    def get_weekday_activity(self):
+        with self.get_connection() as db:
+            query = """
+                SELECT STRFTIME(
+                    "%w",
+                    DATE(DATETIME(g.timestamp, 'unixepoch', 'localtime'))
+                ) AS day, COUNT(g.game_id), COUNT(w.game_id)
+                FROM (
+                    SELECT game_id, timestamp
+                    FROM games
+                ) g
+                LEFT JOIN
+                (
+                    SELECT game_id
+                    FROM games
+                    WHERE win = 1
+                ) w
+                ON g.game_id = w.game_id
+                GROUP BY day
+            """
+            return self.execute_query(db, query).fetchall()
+
+    def get_hourly_activity(self):
+        with self.get_connection() as db:
+            query = """
+                SELECT STRFTIME(
+                    "%H",
+                    DATETIME(timestamp, 'unixepoch', 'localtime')
+                ) AS hour, COUNT(g.game_id), COUNT(w.game_id)
+                FROM (
+                    SELECT game_id, timestamp
+                    FROM games
+                ) g
+                LEFT JOIN
+                (
+                    SELECT game_id
+                    FROM games
+                    WHERE win = 1
+                ) w
+                ON g.game_id = w.game_id
+                GROUP BY hour
+            """
+            return self.execute_query(db, query).fetchall()
+
+    def get_best_comps(self, participants):
+        with self.get_connection() as db:
+            join_str = "\n".join(
+                f"INNER JOIN participants p{i}\nON p{i}.game_id = p{i-1}.game_id"
+                for i in range(2, 6)
+            )
+
+            where_str = "\nAND ".join(
+                f"p{i}.disc_id = {disc_id}"
+                for i, disc_id in enumerate(participants, start=1)
+            )
+
+            query = f"""
+                SELECT
+                    g.win,
+                    p1.champ_id,
+                    p2.champ_id,
+                    p3.champ_id,
+                    p4.champ_id,
+                    p5.champ_id
+                FROM participants p1
+                {join_str}
+                INNER JOIN games g
+                ON g.game_id = p1.game_id
+                WHERE {where_str}
+            """
+
+            return self.execute_query(db, query).fetchall()

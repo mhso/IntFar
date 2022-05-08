@@ -1,4 +1,1 @@
-Make an "interesting stats" feature at the end of the game.
-Ideas for data to use from games:
-- TimeSpentDead
-- ObjectivesStolen
+Make an 'About' thing on Int-Far maybe.

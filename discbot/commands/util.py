@@ -24,7 +24,10 @@ def valid_command(message, cmd, args):
             break
 
     if valid_cmd is None:
-        return False, False
+        return False, False # Command is not valid.
+
+    if message.guild.id not in COMMANDS[valid_cmd].guilds:
+        return False, False # Command is not valid in the current guild.  
 
     mandatory_params = COMMANDS[valid_cmd].mandatory_params
 
@@ -39,18 +42,3 @@ def extract_target_name(split, start_index, end_index=None, default="me"):
     if len(split) > start_index:
         return " ".join(split[start_index:end_index])
     return default
-
-def try_find_champ(name, riot_api):
-    search_name = name.strip().lower()
-    candidates = []
-    for champ_id in riot_api.champ_names:
-        lowered = riot_api.champ_names[champ_id].lower()
-        if search_name in lowered:
-            candidates.append(champ_id)
-            break
-
-        # Remove apostrophe and period from name.
-        if search_name in lowered.replace("'", "").replace(".", ""):
-            candidates.append(champ_id)
-
-    return candidates[0] if len(candidates) == 1 else None

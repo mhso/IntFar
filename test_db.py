@@ -10,7 +10,7 @@ database = argv[1]
 conn = sqlite3.connect("resources/" + database + ".db")
 
 if len(argv) > 2:
-    filename = argv[2]
+    filename = f"misc/queries/{argv[2]}"
     with open(filename + ".sql", "r") as fp:
         time_start = time()
         result = conn.cursor().execute(fp.read())

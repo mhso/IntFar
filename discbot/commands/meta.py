@@ -67,8 +67,9 @@ async def handle_commands_msg(client, message):
     lines = []
     for cmd in commands_util.COMMANDS:
         cmd_obj = commands_util.COMMANDS[cmd]
-        cmd_str = f"{cmd_obj} - {cmd_obj.desc}"
-        lines.append(cmd_str)
+        if message.guild.id in cmd_obj.guilds:
+            cmd_str = f"{cmd_obj} - {cmd_obj.desc}"
+            lines.append(cmd_str)
 
     await client.paginate(message.channel, lines, 0, 7, header)
 
@@ -108,12 +109,18 @@ async def handle_status_msg(client, message):
     response = f"**Uptime:** {get_uptime(client.time_initialized)}\n"
 
     (
-        games, earliest_game, games_won, users, doinks_games,
-        total_doinks, intfars, games_ratios, intfar_ratios,
-        intfar_multi_ratios
+        games, earliest_game, games_won, longest_game_duration,
+        longest_game_time, users, doinks_games,
+        total_doinks, intfars, games_ratios,
+        intfar_ratios, intfar_multi_ratios
     ) = client.database.get_meta_stats()
 
     pct_games_won = (games_won / games) * 100
+
+    longest_game_start = datetime.fromtimestamp(longest_game_time)
+    longest_game_end = datetime.fromtimestamp(longest_game_time + longest_game_duration)
+    longest_game_fmt = api_util.format_duration(longest_game_start, longest_game_end)
+    longest_game_date = datetime.fromtimestamp(longest_game_time).strftime("%Y-%m-%d")
 
     pct_intfar = int((intfars / games) * 100)
     pct_doinks = int((doinks_games / games) * 100)
@@ -154,6 +161,7 @@ async def handle_status_msg(client, message):
 
     response += f"--- Since {earliest_time} ---\n"
     response += f"- **{games}** games have been played (**{pct_games_won:.1f}%** was won)\n"
+    response += f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
     response += f"- **{users}** users have signed up\n"
     response += f"- **{intfars}** Int-Far awards have been given\n"
     response += f"- **{total_doinks}** {doinks_emote} have been earned\n"

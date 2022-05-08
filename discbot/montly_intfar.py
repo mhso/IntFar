@@ -116,8 +116,8 @@ if __name__ == "__main__":
     prev_month = month - 1 if month != 1 else 12
     month_name = MONTH_NAMES[prev_month-1]
 
-    intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"
-    intro_desc += "*DRUM ROLL*\n"
+    intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n\n"
+    intro_desc += "*DRUM ROLL*\n\n"
     desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
     winners = [tupl[0] for tupl in details[:num_winners]]
     desc += ":clap: :clap: :clap: :clap: :clap: \n"

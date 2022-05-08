@@ -1,20 +1,27 @@
 from datetime import tzinfo, timedelta, datetime
+from dateutil.relativedelta import relativedelta
 from os.path import exists
+import json
+import secrets
+
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-import secrets
-import json
 
 MAIN_GUILD_ID = 619073595561213953
+MY_GUILD_ID  = 512363920044982272
 
 GUILD_IDS = [ # List of ids of guilds that Int-Far is active in.
-    MAIN_GUILD_ID, 347488541397483543, 803987403932172359
+    MAIN_GUILD_ID, 347488541397483543, 803987403932172359, MY_GUILD_ID
 ]
 
 GUILD_ABBREVIATIONS = {
     MAIN_GUILD_ID: "LN",
     347488541397483543: "DC",
     803987403932172359: "LN"
+}
+
+GUILD_MAP = {
+    "nibs": MAIN_GUILD_ID, "circus": 347488541397483543, "core": 803987403932172359
 }
 
 INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
@@ -79,6 +86,32 @@ def round_digits(number):
     return str(number)
 
 def format_duration(dt_1, dt_2):
+    delta = relativedelta(dt_2, dt_1)
+
+    years = delta.years
+    months = delta.months
+    days = delta.days
+    hours = delta.hours
+    minutes = delta.minutes
+    seconds = delta.seconds
+
+    response = f"{zero_pad(hours)}h, {zero_pad(minutes)}m, {zero_pad(seconds)}s"
+    if minutes == 0:
+        response = f"{seconds} seconds"
+    else:
+        response = f"{zero_pad(minutes)} minutes & {zero_pad(seconds)} seconds"
+    if hours > 0:
+        response = f"{zero_pad(hours)}h, {zero_pad(minutes)}m, {zero_pad(seconds)}s"
+    if days > 0:
+        response = f"{days} days, " + response
+    if months > 0:
+        response = f"{months} months, " + response
+    if years > 0:
+        response = f"{years} years, " + response
+
+    return response
+
+def format_duration_old(dt_1, dt_2):
     normed_dt = dt_2.replace(year=dt_1.year, month=dt_1.month)
     month_normed = dt_2.month if dt_2.month >= dt_1.month else dt_2.month + 12
     months = month_normed - dt_1.month

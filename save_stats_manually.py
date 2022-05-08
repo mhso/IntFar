@@ -12,7 +12,7 @@ from discbot.discord_bot import DiscordClient
 from discbot.commands.util import ADMIN_DISC_ID
 from api.riot_api import APIClient
 from api.game_stats import get_filtered_stats
-from api.util import GUILD_IDS, create_predictions_timeline_image
+from api.util import MAIN_GUILD_ID, GUILD_IDS, create_predictions_timeline_image
 from ai.data import shape_predict_data
 from ai.train import train_online
 from ai.model import Model
@@ -30,89 +30,108 @@ class MockChannel:
 class TestMock(DiscordClient):
     def __init__(self, args, config, database, betting_handler, riot_api, audio_handler, shop_handler, **kwargs):
         super().__init__(config, database, betting_handler, riot_api, audio_handler, shop_handler, **kwargs)
-        self.game_id = args.game_id
-        self.guild_to_use = GUILDS[args.guild_name]
-        self.task = args.task
-        self.loud = not args.silent
-        self.play_sound = args.play_sound.lower() in ("yes", "true", "1")
+        self.missing = args.missing
+        self.game_id = args.game
+        self.guild_to_use = GUILDS.get(args.guild)
+        self.task = args.task if not self.missing else "all"
+        self.loud = not args.silent if not self.missing else False
+        self.play_sound = args.sound.lower() in ("yes", "true", "1") if not self.missing else False
         self.ai_model = kwargs.get("ai_model")
 
     async def on_ready(self):
         await super(TestMock, self).on_ready()
 
-        self.active_game[self.guild_to_use] = {"id": self.game_id}
-        game_info = self.riot_api.get_game_details(self.game_id)
-        self.active_game[self.guild_to_use]["queue_id"] = game_info["queueId"]
-
-        filtered, users_in_game = get_filtered_stats(
-            self.database.summoners, [], game_info
-        )
-
-        self.users_in_game[self.guild_to_use] = users_in_game
-
-        if self.loud:
-            intfar, intfar_reason, response = self.get_intfar_data(filtered, self.guild_to_use)
+        if self.missing:
+            ids_to_save = self.database.get_missed_games()
         else:
-            intfar, intfar_reason, response = self.get_intfar_and_doinks(filtered)
+            ids_to_save = [(self.game_id, self.guild_to_use)]
 
-        doinks, doinks_response = self.get_doinks_data(filtered, self.guild_to_use)
-        if doinks_response is not None:
-            response += "\n" + self.insert_emotes(doinks_response)
+        main_channel = self.channels_to_write[MAIN_GUILD_ID]
 
-        if self.loud and self.task == "all":
-            await self.channels_to_write[self.guild_to_use].send(response)
+        for game_id, guild_id in ids_to_save:
+            self.active_game[guild_id] = {"id": game_id}
+            game_info = self.riot_api.get_game_details(game_id)
+            self.active_game[guild_id]["queue_id"] = game_info["queueId"]
 
-        await asyncio.sleep(1)
-
-        response = ""
-
-        if self.task in ("all", "bets"):
-            if not self.loud:
-                self.channels_to_write[self.guild_to_use] = MockChannel()
-
-            response, max_tokens_id, new_max_tokens_id = self.resolve_bets(
-                filtered, intfar, intfar_reason, doinks, self.guild_to_use
-            )
-            if max_tokens_id != new_max_tokens_id:
-                await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
-
-        if self.task in ("all", "stats"):
-            best_records, worst_records = self.save_stats(
-                filtered, intfar, intfar_reason, doinks, self.guild_to_use
+            filtered, users_in_game = get_filtered_stats(
+                self.database.summoners, [], game_info
             )
 
-            if best_records != [] or worst_records != []:
-                records_response = self.get_beaten_records_msg(
-                    best_records, worst_records, self.guild_to_use
+            self.users_in_game[guild_id] = users_in_game
+
+            intfar, intfar_reason, response = self.get_intfar_data(filtered, guild_id)
+
+            doinks, doinks_response = self.get_doinks_data(filtered, guild_id)
+            if doinks_response is not None:
+                response += "\n" + self.insert_emotes(doinks_response)
+
+            if self.loud and self.task == "all":
+                await self.send_message_unprompted(response, guild_id)
+
+            await asyncio.sleep(1)
+
+            response = ""
+
+            if self.task in ("all", "bets"):
+                if not self.loud:
+                    self.channels_to_write[guild_id] = MockChannel()
+
+                response, max_tokens_id, new_max_tokens_id = self.resolve_bets(
+                    filtered, intfar, intfar_reason, doinks, guild_id
                 )
-                response = records_response + response
+                if max_tokens_id != new_max_tokens_id:
+                    await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
 
-        if self.loud and self.task == "all":
-            await self.channels_to_write[self.guild_to_use].send(response)
+            if self.task in ("all", "stats"):
+                best_records, worst_records = self.save_stats(
+                    filtered, intfar, intfar_reason, doinks, guild_id
+                )
 
-        if self.play_sound:
-            await self.play_event_sounds(self.guild_to_use, intfar, doinks)
+                if best_records != [] or worst_records != []:
+                    records_response = self.get_beaten_records_msg(
+                        best_records, worst_records, guild_id
+                    )
+                    response = records_response + response
 
-        if self.ai_model is not None and self.task in ("all", "train"):
-            self.config.log("Training AI Model with new game data.")
-            train_data = shape_predict_data(
-                self.database, self.riot_api, self.config, users_in_game
+            if self.loud and self.task == "all":
+                await self.send_message_unprompted(response, guild_id)
+
+            if self.play_sound:
+                await self.play_event_sounds(guild_id, intfar, doinks)
+
+            if self.ai_model is not None and self.task in ("all", "train"):
+                self.config.log("Training AI Model with new game data.")
+                train_data = shape_predict_data(
+                    self.database, self.riot_api, self.config, users_in_game
+                )
+                loss = train_online(
+                    self.ai_model, train_data, filtered[0][1]["gameWon"]
+                )
+                self.ai_model.save()
+                self.config.log(f"Loss: {loss}")
+
+            if self.config.generate_predictions_img:
+                predictions_img = None
+                for user_data in users_in_game:
+                    if ADMIN_DISC_ID == user_data[0]:
+                        predictions_img = create_predictions_timeline_image()
+                        break
+
+                if predictions_img is not None:
+                    await self.send_predictions_timeline_image(predictions_img, guild_id)
+
+            self.database.remove_missed_game(game_id)
+
+        if self.missing:
+            response = (
+                f"Saved **{len(ids_to_save)}** games that were missed "
+                "due to Riot API shennanigans. Wont spam the chat "
+                "with the game details {emote_big_doinks}"
             )
-            loss = train_online(
-                self.ai_model, train_data, filtered[0][1]["gameWon"]
-            )
-            self.ai_model.save()
-            self.config.log(f"Loss: {loss}")
+            await main_channel.send(self.insert_emotes(response))
 
-        if self.config.generate_predictions_img:
-            predictions_img = None
-            for user_data in users_in_game:
-                if ADMIN_DISC_ID == user_data[0]:
-                    predictions_img = create_predictions_timeline_image()
-                    break
-
-            if predictions_img is not None:
-                await self.send_predictions_timeline_image(predictions_img, self.guild_to_use)
+    async def user_joined_voice(self, member, guild, poll=False):
+        pass
 
     def get_intfar_and_doinks(self, filtered_stats):
         (final_intfar, final_intfar_data,
@@ -133,21 +152,20 @@ class TestMock(DiscordClient):
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("game_id", type=int)
-parser.add_argument("guild_name", type=str, choices=GUILDS)
-parser.add_argument("task", type=str, choices=("all", "bets", "stats", "train"))
-parser.add_argument("play_sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
+parser.add_argument("--missing", action="store_true")
+parser.add_argument("--game", type=int)
+parser.add_argument("--guild", type=str, choices=GUILDS)
+parser.add_argument("--task", type=str, choices=("all", "bets", "stats", "train"))
+parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
 parser.add_argument("-s", "--silent", action="store_true")
 
 args = parser.parse_args()
 
-auth = json.load(open("discbot/auth.json"))
+if not args.missing:
+    if None in (args.game, args.guild, args.task, args.sound):
+        print("Either specificy --missing or all of --game, --guild, --task, and --sound")
 
 conf = Config()
-conf.env = auth["env"]
-
-conf.discord_token = auth["discordToken"]
-conf.riot_key = auth["riotDevKey"] if conf.use_dev_token else auth["riotAPIKey"]
 
 riot_api = APIClient(conf)
 

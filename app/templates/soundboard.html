@@ -9,13 +9,19 @@
         <div id="soundboard-inner-wrapper">
             <h2>All Sounds</h2>
             <div class="all-sounds-wrapper">
-                {% for sound_file in sounds %}
+                {% for sound_file, owner_id in sounds %}
                 <div class="audio-player-wrapper">
                     <h3>{{ sound_file }}</h3>
                     {% if logged_in_user %}
                     <audio controls>
                         <source src="{{ url_for('static', filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
                     </audio>
+                    {% if logged_in_user == owner_id or logged_in_user == admin_id %}
+                    <form method="POST" enctype="multipart/form-data" action="{{ url_for('soundboard.delete') }}">
+                        <input type="hidden" name="filename" value="{{ sound_file }}">
+                        <input class="audio-delete-btn" type="submit" value="Delete">
+                    </form>
+                    {% endif %}
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -24,7 +30,7 @@
             {% if logged_in_user %}
             <h2>Upload Sound File</h2>
             <div>
-                <form id="upload-sound-form" method="POST" enctype=multipart/form-data>
+                <form id="upload-sound-form" method="POST" enctype="multipart/form-data">
                     <input type="file" name="file">
                     <br>
                     <input type="submit" value="Upload">

@@ -1,21 +1,29 @@
 from datetime import datetime
+import json
+from os.path import abspath
 
 class Config:
     def __init__(self):
+        auth = json.load(open("resources/auth.json"))
+
         # ===== Meta and Auth =====
         self.use_dev_token = False
         self.debug = True
         self.testing = False
-        self.discord_token = ""
-        self.env = ""
-        self.riot_key = ""
+        self.discord_token = auth["discordToken"]
+        self.riot_key = auth["riotDevKey"] if self.use_dev_token else auth["riotAPIKey"]
+        self.env = auth["env"]
         self.database = "resources/database.db"
         self.generate_predictions_img = False
         self.min_game_minutes = 5 # Minimum amount of minutes for a game to be valid.
+        if self.env == "dev":
+            self.ffmpeg_exe = "ffmpeg"
+        else:
+            self.ffmpeg_exe = abspath("resources/ffmpeg-4.1.6/ffmpeg")
 
         # ===== Active Game Monitoring =====
         self.status_interval_dormant = 60 * 2 # 2 minutes wait time between checking for status.
-        self.status_interval_ingame = 30 # 30 seconds wait time when in-game.
+        self.status_interval_ingame = 30 # 40 seconds wait time when in-game.
 
         # ===== Betting =====
         self.betting_tokens = "*good-boi points*"
@@ -37,6 +45,7 @@ class Config:
         self.kp_lower_threshold = 20
         self.kp_takedowns_criteria = 10
         self.kp_structures_criteria = 2
+        self.kp_deaths_criteria = 2
         self.vision_score_lower_threshold = 11
         self.vision_kda_criteria = 3.0
         self.vision_secs_lower_threshold = 1200
@@ -51,6 +60,11 @@ class Config:
         self.stats_min_time_dead = 60 * 10
         self.stats_min_objectives_stolen = 1
         self.stats_min_turrets_killed = 7
+
+        # ===== Noteworthy Timeline-related Stats Criterias =====
+        self.timeline_min_deficit = 8000
+        self.timeline_min_lead = 8000
+        self.timeline_min_curr_gold = 4000
 
         # ===== Int-Far of the Month =====
         self.ifotm_min_games = 10

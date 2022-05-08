@@ -47,13 +47,7 @@ def start_ai_process(config):
     return ai_process, bot_end_ai
 
 if __name__ == "__main__":
-    auth = json.load(open("discbot/auth.json"))
-
     conf = Config()
-    conf.discord_token = auth["discordToken"]
-    conf.riot_key = auth["riotDevKey"] if conf.use_dev_token else auth["riotAPIKey"]
-    conf.env = auth["env"]
-
     env_desc = "DEVELOPMENT" if conf.env == "dev" else "PRODUCTION"
     conf.log(f"+++++ Running in {env_desc} mode +++++")
 

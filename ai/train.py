@@ -14,7 +14,7 @@ def train_step(x, y, model, criterion, optim, device, phase):
         loss.backward()
         optim.step()
 
-    preds = out_prob
+    preds = out_prob.detach().clone()
 
     preds[preds >= 0.5] = 1
     preds[preds < 0.5] = 0

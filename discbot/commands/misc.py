@@ -5,7 +5,6 @@ import requests
 
 from api import util as api_util
 from api import game_stats
-from ai.data import shape_predict_data
 from discbot.commands import util as commands_util
 
 FLIRT_MESSAGES = {
@@ -13,11 +12,11 @@ FLIRT_MESSAGES = {
     "spanish": api_util.load_flavor_texts("flirt_spanish")
 }
 
-async def handle_game_msg(self, message, target_id):
+async def handle_game_msg(client, message, target_id):
     summoner_ids = None
-    target_name = self.get_discord_nick(target_id, message.guild.id)
+    target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    for disc_id, _, summ_ids in self.database.summoners:
+    for disc_id, _, summ_ids in client.database.summoners:
         if disc_id == target_id:
             summoner_ids = summ_ids
             break
@@ -26,7 +25,7 @@ async def handle_game_msg(self, message, target_id):
     game_data = None
     active_summoner = None
     for summ_id in summoner_ids:
-        game_data = self.riot_api.get_active_game(summ_id)
+        game_data = client.riot_api.get_active_game(summ_id)
         if game_data is not None:
             active_summoner = summ_id
             break
@@ -36,42 +35,39 @@ async def handle_game_msg(self, message, target_id):
         response = f"{target_name} is "
         summary, users_in_game = game_stats.get_active_game_summary(
             game_data, active_summoner,
-            self.database.summoners, self.riot_api
+            client.database.summoners, client.riot_api
         )
         response += summary
+        active_guild = None
 
         for guild_id in api_util.GUILD_IDS:
-            active_game = self.active_game.get(guild_id)
+            active_game = client.active_game.get(guild_id)
             if active_game is not None:
                 if active_game["id"] == game_data["gameId"]:
-                    guild_name = self.get_guild_name(guild_id)
+                    active_guild = guild_id
+                    guild_name = client.get_guild_name(guild_id)
                     response += f"\nPlaying in *{guild_name}*"
                     break
 
-        if commands_util.ADMIN_DISC_ID in [x[0] for x in users_in_game]:
+        if False and commands_util.ADMIN_DISC_ID in [x[0] for x in users_in_game]:
+            # Not used.
             predict_url = f"http://mhooge.com:5000/intfar/prediction?game_id={game_data['gameId']}"
             try:
                 predict_response = requests.get(predict_url)
                 if predict_response.ok:
                     pct_win = predict_response.json()["response"]
                     response += f"\nPredicted chance of winning: **{pct_win}%**"
-                elif self.ai_conn is not None:
-                    input_data = shape_predict_data(
-                        self.database, self.riot_api, self.config, users_in_game
-                    )
-                    self.ai_conn.send(("predict", [input_data]))
-                    ratio_win = self.ai_conn.recv()
-                    pct_win = int(ratio_win * 100)
-                    response += f"\nPredicted chance of winning: **{pct_win}%**"
                 else:
                     error_msg = predict_response.json()["response"]
-                    self.config.log(f"Get game prediction error: {error_msg}")
-
+                    client.config.log(f"Get game prediction error: {error_msg}")
             except requests.exceptions.RequestException as e:
-                self.config.log("Exception ignored in !game: " + str(e))
+                client.config.log("Exception ignored in !game: " + str(e))
+        elif client.ai_conn is not None:
+            pct_win = client.get_ai_prediction(active_guild)
+            response += f"\nPredicted chance of winning: **{pct_win}%**"
     else:
         response = f"{target_name} is not in a game at the moment "
-        response += self.insert_emotes("{emote_simp_but_closeup}")
+        response += client.insert_emotes("{emote_simp_but_closeup}")
 
     await message.channel.send(response)
 
@@ -190,13 +186,16 @@ async def handle_performance_msg(client, message, target_id=None):
     await message.channel.send(response)
 
 async def handle_winrate_msg(client, message, champ_name, target_id):
-    champ_id = commands_util.try_find_champ(champ_name, client.riot_api)
+    champ_id = client.riot_api.try_find_champ(champ_name)
     if champ_id is None:
         response = f"Not a valid champion: `{champ_name}`."
     else:
         winrate, games = client.database.get_champ_winrate(target_id, champ_id)
-        user_name = client.get_discord_nick(target_id, message.guild.id)
         champ_name = client.riot_api.get_champ_name(champ_id)
-        response = f"{user_name} has a **{winrate:.2f}%** winrate with {champ_name} in **{int(games)}** games.\n"
+        user_name = client.get_discord_nick(target_id, message.guild.id)
+        if games == 0:
+            response = f"{user_name} has not played any games on {champ_name}."
+        else:
+            response = f"{user_name} has a **{winrate:.2f}%** winrate with {champ_name} in **{int(games)}** games.\n"
 
     await message.channel.send(response)

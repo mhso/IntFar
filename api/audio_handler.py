@@ -20,17 +20,12 @@ class AudioHandler: # Keep track of connection to voice channel.
         self.sound_queue = []
 
     async def play_loop(self):
-        if self.config.env == "dev":
-            ffmpeg_exe = "ffmpeg"
-        else:
-            ffmpeg_exe = os.path.abspath("resources/ffmpeg-4.1.6/ffmpeg")
-
         while self.sound_queue != []:
             sound = self.sound_queue.pop(0)
 
             # Create volume controlled FFMPEG player from sound file.
             player = PCMVolumeTransformer(
-                FFmpegPCMAudio(f"{SOUNDS_PATH}/{sound}.mp3", executable=ffmpeg_exe)
+                FFmpegPCMAudio(f"{SOUNDS_PATH}/{sound}.mp3", executable=self.config.ffmpeg_exe)
             )
 
             # Start the player and wait until it is done.
@@ -57,7 +52,8 @@ class AudioHandler: # Keep track of connection to voice channel.
                     f"Invalid name of sound: '{sound}'. " +
                     "Use !sounds for a list of available sounds."
                 )
-                return False, err_msg
+                if len(sounds) == 1:
+                    return False, err_msg
 
         if voice_state is None: # Check if user is in a voice channel.
             err_msg = (

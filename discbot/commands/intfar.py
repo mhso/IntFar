@@ -137,11 +137,15 @@ async def handle_intfar_criteria_msg(client, message, criteria=None):
         crit_1 = client.config.kp_lower_threshold
         crit_2 = client.config.kp_takedowns_criteria
         crit_3 = client.config.kp_structures_criteria
-        response = ("Criteria for being Int-Far by low KP:\n" +
-                    " - Having the lowest KP of the people playing\n" +
-                    f" - Having a KP of less than {crit_1}%\n" +
-                    f" - Having less than {crit_2} kills + assists\n" +
-                    f" - Having less than {crit_3} structures destroyed")
+        crit_4 = client.config.kp_deaths_criteria
+        response = (
+            "Criteria for being Int-Far by low KP:\n" +
+            " - Having the lowest KP of the people playing\n" +
+            f" - Having a KP of less than {crit_1}%\n" +
+            f" - Having less than {crit_2} kills + assists\n" +
+            f" - Having less than {crit_3} structures destroyed\n"
+            f" - Having more than {crit_4} deaths"
+        )
     elif criteria == "vision":
         crit_1 = client.config.vision_score_lower_threshold
         crit_2 = client.config.vision_kda_criteria

@@ -28,7 +28,7 @@ def get_big_doinks(data):
         if damage_dealt > stats["damage_by_team"] - damage_dealt:
             mention_list.append((2, damage_dealt))
         if stats["pentaKills"] > 0:
-            mention_list.append((3, None))
+            mention_list.append((3, stats["pentaKills"]))
         if stats["visionScore"] > 100:
             mention_list.append((4, stats["visionScore"]))
         kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
@@ -60,8 +60,8 @@ def get_big_doinks(data):
 
 def get_honorable_mentions(data, config):
     """
-    Returns a string describing honorable mentions (questionable stats),
-    that wasn't quite bad enough to be named Int-Far for.
+    Returns players that deserve honorable mentions (questionable stats),
+    for stuff that wasn't quite bad enough to be named Int-Far for.
     Honorable mentions are given for:
         - Having 0 control wards purchased.
         - Being adc/mid/top/jungle and doing less than 8000 damage.
@@ -76,11 +76,11 @@ def get_honorable_mentions(data, config):
             mentions[disc_id].append((0, stats["visionWardsBoughtInGame"]))
 
         damage_dealt = stats["totalDamageDealtToChampions"]
-        if stats["role"] != "SUPPORT" and damage_dealt < config.mentions_max_damage:
+        if stats["lane"] != "UTILITY" and damage_dealt < config.mentions_max_damage:
             mentions[disc_id].append((1, damage_dealt))
 
         cs_per_min = stats["csPerMin"]
-        if stats["role"] != "SUPPORT" and stats["lane"] != "JUNGLE" and cs_per_min < config.mentions_max_cs_per_min:
+        if stats["lane"] != "UTILITY" and stats["lane"] != "JUNGLE" and cs_per_min < config.mentions_max_cs_per_min:
             mentions[disc_id].append((2, api_util.round_digits(cs_per_min)))
 
         epic_monsters_secured = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
@@ -114,6 +114,63 @@ def get_cool_stats(data, config):
             cool_stats[disc_id].append((2, turrets_killed))
 
     return cool_stats
+
+def get_cool_timeline_events(data, config):
+    """
+    Returns a list of cool/embarrasing events that happened during the course of the game.
+    These events include:
+        - We lost the game after being up by more than 8k gold
+        - We won the game after being down by more than 8k gold
+        - Someone had more than 4000 gold at one point
+    """
+    # Dictionary that maps from participantId to disc_id
+    participant_dict = {
+        entry["participantId"]: data["puuid_map"].get(entry["puuid"])
+        for entry in data["participants"]
+    }
+    frame_interval = data["frameInterval"]
+
+    timeline_events = []
+
+    # Calculate stats from timeline frames.
+    biggest_gold_lead = 0
+    biggest_gold_deficit = 0
+    too_much_gold = {}
+
+    for frame_data in data["frames"]:
+        our_total_gold = 0
+        enemy_total_gold = 0
+        for participant_id in frame_data["participantFrames"]:
+            participant_data = frame_data["participantFrames"][participant_id]
+            disc_id = participant_dict.get(participant_id)
+            total_gold = participant_data["totalGold"]
+            curr_gold = participant_data["currentGold"]
+            our_team = (int(participant_id) > 5) ^ data["ourTeamLower"]
+
+            if our_team:
+                our_total_gold += total_gold
+            else:
+                enemy_total_gold += total_gold
+
+            if disc_id is not None and curr_gold > config.timeline_min_curr_gold:
+                curr_value_for_player = too_much_gold.get(disc_id, 0)
+                curr_value_for_player[disc_id] = max(curr_gold, curr_value_for_player)
+
+        gold_diff = our_total_gold - enemy_total_gold
+        if gold_diff < 0:
+            biggest_gold_deficit = max(abs(gold_diff), biggest_gold_deficit) 
+        else:
+            biggest_gold_lead = max(gold_diff, biggest_gold_lead)
+
+    if biggest_gold_deficit > config.timeline_min_deficit and data["gameWon"]: # Epic comeback!
+        timeline_events.append((0, biggest_gold_deficit, None))
+    elif biggest_gold_lead > config.timeline_min_lead and not data["gameWon"]: # Huge throw...
+        timeline_events.append((1, biggest_gold_lead, None))
+
+    for disc_id in too_much_gold:
+        timeline_events.append((2, too_much_gold[disc_id], disc_id))
+
+    return timeline_events
 
 def intfar_by_kda(data, config):
     """
@@ -177,6 +234,7 @@ def intfar_by_kp(data, config):
         - KP being less than 20
         - Number of kills + assists being less than 10
         - Turrets + Inhibitors destroyed < 2
+        - Deaths > 2
     Returns None if none of these criteria matches a person.
     """
     team_kills = data[0][1]["kills_by_team"]
@@ -185,15 +243,17 @@ def intfar_by_kp(data, config):
     kp_criteria = config.kp_lower_threshold
     takedowns_criteria = config.kp_takedowns_criteria
     structures_criteria = config.kp_structures_criteria
+    deaths_criteria = config.kp_deaths_criteria
 
     potential_intfars = []
     for intfar, stats in zip(tied_intfars, tied_stats):
         structures_destroyed = stats["turretKills"] + stats["inhibitorKills"]
         kills = stats["kills"]
+        deaths = stats["deaths"]
         assists = stats["assists"]
 
         if (lowest_kp < kp_criteria and kills + assists < takedowns_criteria
-                and structures_destroyed < structures_criteria):
+                and deaths > deaths_criteria and structures_destroyed < structures_criteria):
             potential_intfars.append(intfar)
 
     if potential_intfars == []:
@@ -259,16 +319,20 @@ def resolve_intfar_ties(intfar_data, max_count, game_data):
     for disc_id, stats in sorted_by_deaths:
         if stats["deaths"] == max_count:
             ties.append(disc_id)
+        else:
+            break
 
     if len(ties) == 1:
         return ties[0], True, "Ties resolved by most amount of deaths."
 
-    sorted_by_kda = sorted(filtered_data, key=lambda x: game_stats.calc_kda(x[1]), reverse=True)
+    sorted_by_kda = sorted(filtered_data, key=lambda x: game_stats.calc_kda(x[1]))
     max_count = game_stats.calc_kda(sorted_by_deaths[0][1])
     ties = []
     for disc_id, stats in sorted_by_kda:
         if game_stats.calc_kda(stats) == max_count:
             ties.append(disc_id)
+        else:
+            break
 
     if len(ties) == 1:
         return ties[0], True, "Ties resolved by lowest KDA."

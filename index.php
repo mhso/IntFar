@@ -1,6 +1,6 @@
 <?php
 
-$url = "http://mhooge.com:5000/intfar";
+$url = "https://mhooge.com:5000/intfar";
 
 $redir = "";
 if ($_SERVER["REQUEST_URI"] != "/intfar/") {

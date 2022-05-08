@@ -2,6 +2,7 @@ from discbot.commands.admin import *
 from discbot.commands.bets import *
 from discbot.commands.doinks import *
 from discbot.commands.intfar import *
+from discbot.commands.lan import *
 from discbot.commands.lists import *
 from discbot.commands.meta import *
 from discbot.commands.misc import *
@@ -10,6 +11,7 @@ from discbot.commands.stats import *
 from discbot.commands.sounds import *
 from discbot.commands import util as commands_util
 from api.database import DBException
+from api.util import GUILD_IDS, GUILD_MAP
 
 class TargetParam:
     def __init__(self, name, default="me", end_index=None):
@@ -61,13 +63,14 @@ class RegularParam:
 class Command:
     def __init__(
         self, command, description, handler, target_all=False, access_level=None,
-        mandatory_params=[], optional_params=[], aliases=[], parser=None
+        guilds=None, mandatory_params=[], optional_params=[], aliases=[], parser=None
     ):
         self.cmd = command
         self.desc = description
         self.handler = handler
         self.target_all = target_all
         self.access_level = access_level
+        self.guilds = guilds or GUILD_IDS
         self.mandatory_params = mandatory_params
         self.optional_params = optional_params
         self.aliases = aliases
@@ -182,10 +185,10 @@ def get_handler(cmd):
 def register_command(
     name, desc, handler, target_all=False, access_level=None,
     mandatory_params=[], optional_params=[], aliases=[], parser=None,
-    command_dict=commands_util.COMMANDS
+    command_dict=commands_util.COMMANDS, guilds=None
 ):
     command_dict[name] = Command(
-        name, desc, handler, target_all, access_level,
+        name, desc, handler, target_all, access_level, guilds,
         mandatory_params, optional_params, aliases, parser
     )
 
@@ -564,6 +567,16 @@ def initialize_commands():
         random_unplayed_name, random_unplayed_desc, handle_random_unplayed_msg
     )
 
+    # random nochest command
+    random_nochest_name = "random_nochest"
+    random_nochest_desc = (
+        "Pick a random champion that you have not yet earned a chest on (from all champs)."
+    )
+    register_command(
+        random_nochest_name, random_nochest_desc, handle_random_nochest,
+        False, "all", optional_params=[TargetParam("person")]
+    )
+
     # champ lists command
     champ_lists_name = "champ_lists"
     champ_lists_desc = (
@@ -647,9 +660,41 @@ def initialize_commands():
     wr_desc = "Show winrate info on a champion for you or someone else."
     register_command(
         wr_name, wr_desc, handle_winrate_msg, access_level="self",
-        mandatory_params=[RegularParam("champion")], optional_params=[TargetParam("person")]
+        mandatory_params=[RegularParam("champion")], optional_params=[TargetParam("person")],
+        aliases=["winrate"]
     )
- 
+
+    lan_name = "lan"
+    lan_desc = "Show information about how the current LAN is going."
+    register_command(
+        lan_name, lan_desc, handle_lan_msg, access_level="all", guilds=[GUILD_MAP["core"]]
+    )
+
+    lan_performance_name = "lan_performance"
+    lan_performance_desc = "Show the performance of you (or someone else) at the current LAN."
+    register_command(
+        lan_performance_name, lan_performance_desc, handle_lan_performance_msg,
+        access_level="all", optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+    )
+
+    lan_intfar_name = "lan_intfar"
+    lan_intfar_desc = (
+        "Show how many Int-Fars you (or someone else) has gotten at the current LAN."
+    )
+    register_command(
+        lan_intfar_name, lan_intfar_desc, handle_lan_intfar_msg,
+        True, "all", optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+    )
+
+    lan_doinks_name = "lan_doinks"
+    lan_doinks_desc = (
+        "Show how many Doinks you (or someone else) has gotten at the current LAN."
+    )
+    register_command(
+        lan_doinks_name, lan_doinks_desc, handle_lan_doinks_msg,
+        True, "all", optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+    )
+
     # ===== CUTE COMMANDS =====
 
     # intdaddy command

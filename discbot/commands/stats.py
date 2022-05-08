@@ -56,8 +56,9 @@ async def handle_stat_msg(client, message, best, stat, target_id):
         if min_or_max_value is not None and game_id is not None:
             min_or_max_value = api_util.round_digits(min_or_max_value)
             game_info = client.riot_api.get_game_details(game_id)
-            summ_ids = client.database.summoner_from_discord_id(target_id)[2]
-            game_summary = game_stats.get_finished_game_summary(game_info, summ_ids, client.riot_api)
+            if game_info is not None:
+                summ_ids = client.database.summoner_from_discord_id(target_id)[2]
+                game_summary = game_stats.get_finished_game_summary(game_info, summ_ids, client.riot_api)
 
         emote_to_use = "{emote_pog}" if best else "{emote_peberno}"
 
@@ -69,11 +70,12 @@ async def handle_stat_msg(client, message, best, stat, target_id):
                 response += client.insert_emotes(emote_to_use)
             else:
                 response = f"The {readable_stat} ever in a game was **{min_or_max_value}** "
-                response += f"by {recepient} " + client.insert_emotes(emote_to_use) + "\n"
-                response += f"He got this as {game_summary}"
+                response += f"by {recepient} " + client.insert_emotes(emote_to_use)
+                if game_summary is not None:
+                    response += f"\nHe got this as {game_summary}"
         else:
             champ_id, champ_count = client.database.get_champ_count_for_stat(
-                stat, best, target_id, maximize
+                stat, best, target_id
             )
             champ_name = client.riot_api.get_champ_name(champ_id)
             response = (

@@ -12,16 +12,16 @@ def calc_kill_participation(stats, total_kills):
         return 100
     return int((float(stats["kills"] + stats["assists"]) / float(total_kills)) * 100.0)
 
-def outlier_func(x, key, total_kills):
+def get_stat_value(stats, key, total_kills):
     if key == "kda":
-        return calc_kda(x)
+        return calc_kda(stats)
     if key == "kp":
-        return calc_kill_participation(x, total_kills)
-    return x[key]
+        return calc_kill_participation(stats, total_kills)
+    return stats[key]
 
 def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):
     def outlier_func_short(x):
-        return outlier_func(x[1], key, total_kills)
+        return get_stat_value(x[1], key, total_kills)
 
     sorted_data = sorted(data, key=outlier_func_short, reverse=not asc)
 
@@ -40,9 +40,9 @@ def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):
 
 def get_outlier_stat(stat, data, reverse_order=False, total_kills=0):
     most_id, stats = get_outlier(data, stat, asc=not reverse_order, total_kills=total_kills)
-    most = outlier_func(stats, stat, total_kills)
+    most = get_stat_value(stats, stat, total_kills)
     least_id, stats = get_outlier(data, stat, asc=reverse_order, total_kills=total_kills)
-    least = outlier_func(stats, stat, total_kills)
+    least = get_stat_value(stats, stat, total_kills)
     return most_id, most, least_id, least
 
 def get_player_stats(data, summ_ids):
@@ -69,8 +69,6 @@ def get_finished_game_summary(data, summ_ids, riot_api):
         champ_played = "Unknown Champ (Rito pls)"
     date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
     duration = data["gameDuration"]
-    if "participantIdentities" not in data:
-        duration = duration / 1000
     dt_1 = datetime.fromtimestamp(time())
     dt_2 = datetime.fromtimestamp(time() + duration)
     fmt_duration = format_duration(dt_1, dt_2)
@@ -249,10 +247,9 @@ def get_filtered_stats(all_users, users_in_game, game_info):
                 our_team = participant_data["teamId"]
                 combined_stats = participant_data
                 combined_stats["lane"] = participant_data["teamPosition"]
-                combined_stats["championId"] = participant_data["championId"]
                 combined_stats["timestamp"] = game_info["gameCreation"]
                 combined_stats["mapId"] = game_info["mapId"]
-                combined_stats["gameDuration"] = game_info["gameDuration"]
+                combined_stats["gameDuration"] = int(game_info["gameDuration"])
                 combined_stats["totalCs"] = combined_stats["neutralMinionsKilled"] + combined_stats["totalMinionsKilled"]
                 combined_stats["csPerMin"] = (combined_stats["totalCs"] / combined_stats["gameDuration"]) * 60
                 filtered_stats.append((disc_id, combined_stats))
@@ -287,3 +284,22 @@ def get_filtered_stats(all_users, users_in_game, game_info):
                 stats["enemyHeraldKills"] = objectives["riftHerald"]["kills"]
 
     return filtered_stats, active_users
+
+def get_filtered_timeline_stats(filtered_game_stats, timeline_data):
+    puuid_map = {}
+
+    our_team_lower = True
+
+    for disc_id, stats in filtered_game_stats:
+        puuid = stats["puuid"]
+        for participant_data in timeline_data["participants"]:
+            if participant_data["puuid"] == puuid:
+                our_team_lower = participant_data["participantId"] <= 5
+                puuid_map[puuid] = disc_id
+                break
+
+    timeline_data["puuid_map"] = puuid_map
+    timeline_data["gameWon"] = filtered_game_stats[0][1]["gameWon"]
+    timeline_data["ourTeamLower"] = our_team_lower
+
+    return timeline_data

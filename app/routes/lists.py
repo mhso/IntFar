@@ -1,7 +1,7 @@
 import flask
 
 from api import lists
-from app.util import make_template_context, get_user_details, discord_request
+from app.util import make_template_context, get_user_details, discord_request, make_text_response
 
 lists_page = flask.Blueprint("lists", __name__, template_folder="templates")
 
@@ -79,11 +79,6 @@ def list_view(list_id, error_msg=None, status=200):
         list_name=list_name, user_owns_list=user_owns_list,
         champions=all_champions, error=error_msg
     )
-
-def make_text_response(text, status_code):
-    resp = flask.Response(response=text, status=status_code, mimetype="text/raw")
-    resp.headers["Content-Type"] = "text/raw; charset=utf-8"
-    return resp
 
 @lists_page.route("/<list_id>/rename", methods=["POST"])
 def rename(list_id):

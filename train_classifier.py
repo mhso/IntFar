@@ -19,15 +19,9 @@ def set_global_seed(seed, set_cuda_deterministic=False):
             torch.backends.cudnn.benchmark = False
 
 def main():
-    auth = json.load(open("discbot/auth.json"))
-
     set_global_seed(SEED)
 
     config = Config()
-    config.env = auth["env"]
-
-    config.discord_token = auth["discordToken"]
-    config.riot_key = auth["riotDevKey"] if config.use_dev_token else auth["riotAPIKey"]
 
     database_client = Database(config)
 

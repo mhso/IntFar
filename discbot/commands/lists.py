@@ -1,7 +1,6 @@
 import random
 
 from api import lists
-from discbot.commands.util import try_find_champ
 
 async def handle_random_champ_msg(client, message, list_name=None):
     if list_name is None:
@@ -88,6 +87,7 @@ async def handle_champs_msg(client, message, list_name):
             if len(champions) > max_champs:
                 champs_left = len(champions) - max_champs
                 response += f"\n- `(and {champs_left} more)`"
+                response += f"\nSee all the champs at: https://mhooge.com/intfar/lists/{list_id}"
 
             response += f"\nWrite `!random_champ {name}` to pick a random champ from this list."
 
@@ -117,7 +117,7 @@ def parse_champs_params(client, args):
 
     champ_ids = []
     for champ_name in champ_args:
-        champ_id = try_find_champ(champ_name, client.riot_api)
+        champ_id = client.riot_api.try_find_champ(champ_name)
         if champ_id is None:
             raise ValueError(f"Invalid champion name: `{champ_name}`")
 
@@ -159,5 +159,26 @@ async def handle_remove_champ(client, message, list_id, champ_ids):
         response = f"{response} from `{list_name}`."
     else:
         response = f"Could not remove champ from list: {response}."
+
+    await message.channel.send(client.insert_emotes(response))
+
+async def handle_random_nochest(client, message, target_id=None):
+    summ_data = client.database.summoner_from_discord_id(target_id)
+    champion_mastery_data = client.riot_api.get_champion_mastery(summ_data[2][0])
+
+    # Filter champs with no chest granted.
+    no_chest_champs = []
+    for mastery_data in champion_mastery_data:
+        if not mastery_data["chestGranted"]:
+            champion_id = mastery_data["championId"]
+            no_chest_champs.append(client.riot_api.get_champ_name(champion_id))
+
+    if len(no_chest_champs) == 0: # Chests have been earned on every champ.
+        response = "You have already earned a chest on every champ {emote_woahpikachu}"
+    else:
+        index = random.randint(0, len(no_chest_champs)-1)
+        champ_name = no_chest_champs[index]
+        response = f"Random champ that you have not earned a chest on:\n"
+        response += f"**{champ_name}**"
 
     await message.channel.send(client.insert_emotes(response))

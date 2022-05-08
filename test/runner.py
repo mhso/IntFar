@@ -39,8 +39,9 @@ class TestRunner:
         self.tests = []
         self.test_args = None
 
-    def before_all(self, *test_args):
-        self.test_args = test_args
+    def before_all(self, **test_args):
+        for k, v in test_args.items():
+            self.__setattr__(k, v)
 
     @abstractmethod
     def before_test(self):
@@ -133,9 +134,10 @@ class TestRunner:
                 self.current_test = test_name
                 self.before_test()
                 try:
-                    test_func(*self.test_args)
+                    test_func()
                 except Exception as e:
                     print(f"Exception during '{test_name}':")
+                    self.failed += 1
                     print(traceback.format_exc())
                 finally:
                     self.tests_run += 1

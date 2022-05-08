@@ -2,7 +2,7 @@ import random
 import asyncio
 from io import BytesIO
 from threading import Thread
-from time import time
+from time import time, sleep
 from math import ceil
 from traceback import print_exc
 from datetime import datetime
@@ -17,11 +17,11 @@ from discbot import commands
 from discbot.commands.meta import handle_usage_msg
 from api import game_stats, bets, award_qualifiers
 from api.database import DBException
+from api.lan import is_lan_ongoing
 import discbot.commands.util as commands_util
 import api.util as api_util
 from ai.data import shape_predict_data
 
-MY_GUILD_ID = 512363920044982272
 MAIN_CHANNEL_ID = 730744358751567902
 
 CHANNEL_IDS = [ # List of channels that Int-Far will write to.
@@ -55,6 +55,12 @@ COOL_STATS = [
     api_util.load_flavor_texts("stats_turrets_killed")
 ]
 
+TIMELINE_EVENTS = [
+    api_util.load_flavor_texts("timeline_comeback"),
+    api_util.load_flavor_texts("timeline_throw"),
+    api_util.load_flavor_texts("timeline_goldkeeper")
+]
+
 DOINKS_FLAVORS = [
     api_util.load_flavor_texts("doinks_kda"),
     api_util.load_flavor_texts("doinks_kills"),
@@ -75,6 +81,10 @@ def get_intfar_flavor_text(nickname, reason):
 def get_no_intfar_flavor_text():
     return NO_INTFAR_FLAVOR_TEXTS[random.randint(0, len(NO_INTFAR_FLAVOR_TEXTS)-1)]
 
+def replace_value(flavor_text, value, keyword="value"):
+    quantifier = "" if isinstance(value, int) and value == 1 else "s"
+    return flavor_text.replace("{" + keyword + "}", f"**{value}**").replace("{quantifier}", quantifier)
+
 def get_reason_flavor_text(value, reason):
     flavor_values = []
     if reason == "kda":
@@ -86,17 +96,22 @@ def get_reason_flavor_text(value, reason):
     elif reason == "visionScore":
         flavor_values = LOWEST_VISION_FLAVORS
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
-    return flavor_text.replace("{" + reason + "}", f"**{value}**")
+    return replace_value(flavor_text, value, reason)
 
 def get_honorable_mentions_flavor_text(index, value):
     flavor_values = HONORABLE_MENTIONS[index]
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
-    return flavor_text.replace("{value}", f"**{value}**")
+    return replace_value(flavor_text, value)
 
 def get_cool_stat_flavor_text(index, value):
     flavor_values = COOL_STATS[index]
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
-    return flavor_text.replace("{value}", f"**{value}**")
+    return replace_value(flavor_text, value)
+
+def get_timeline_events_flavor_text(index, value):
+    flavor_values = TIMELINE_EVENTS[index]
+    flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
+    return replace_value(flavor_text, value)
 
 def get_doinks_flavor_text(index, value):
     flavor_values = DOINKS_FLAVORS[index]
@@ -104,7 +119,8 @@ def get_doinks_flavor_text(index, value):
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
     if value is None:
         return flavor_text
-    return flavor_text.replace("{value}", f"**{value}**")
+
+    return replace_value(flavor_text, value)
 
 def get_streak_flavor_text(nickname, streak):
     index = streak - 2 if streak - 2 < len(STREAK_FLAVORS) else len(STREAK_FLAVORS) - 1
@@ -182,33 +198,39 @@ class DiscordClient(discord.Client):
         game_status = self.check_game_status(guild_id)
         if game_status == 2: # Game is over.
             try:
+                game_id = self.active_game[guild_id]["id"]
                 self.config.log("GAME OVER!!")
-                self.config.log(f"Active game: {self.active_game[guild_id]['id']}")
+                self.config.log(f"Active game: {game_id}")
                 game_info = self.riot_api.get_game_details(
-                    self.active_game[guild_id]["id"], tries=2
+                    game_id, tries=2
                 )
 
                 retry = 0
                 retries = 4
-                time_to_sleep = 15
+                time_to_sleep = 30
                 while game_info is None and retry < retries:
                     self.config.log(
                         f"Game info is None! Retrying in {time_to_sleep} secs...",
                         self.config.log_warning
                     )
                     await asyncio.sleep(time_to_sleep)
-                    game_info = self.riot_api.get_game_details(
-                        self.active_game[guild_id]["id"]
-                    )
+                    game_info = self.riot_api.get_game_details(game_id)
                     retry += 1
 
                 if game_info is None: # Game info is still None after 3 retries.
                     self.config.log(
-                        "Game info is STILL None after 3 retries!", self.config.log_error
+                        "Game info is STILL None after 3 retries! Saving to missing games...",
+                        self.config.log_error
                     )
-                    raise ValueError("Game info is None!")
+                    self.database.save_missed_game(game_id, guild_id, int(time()))
+                    mention_me = self.get_mention_str(commands_util.ADMIN_DISC_ID, guild_id)
+                    message_str = (
+                        "Riot API is being a dickfish again, not much I can do :shrug:\n"
+                        f"{mention_me} will add the game manually later."
+                    )
+                    await self.send_message_unprompted(message_str, guild_id)
 
-                if self.database.game_exists(game_info["gameId"]):
+                elif self.database.game_exists(game_info["gameId"]):
                     self.config.log(
                         "We triggered end of game stuff again... Strange!",
                         self.config.log_warning
@@ -246,7 +268,7 @@ class DiscordClient(discord.Client):
 
                 req_data = {
                     "secret": self.config.discord_token,
-                    "guild_id": guild_id, "game_id": self.active_game[guild_id]["id"]
+                    "guild_id": guild_id, "game_id": game_id
                 }
                 self.send_game_update("game_ended", req_data)
 
@@ -309,6 +331,14 @@ class DiscordClient(discord.Client):
         if max_tokens_id != new_max_tokens_id:
             await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
 
+        # Get timeline data events for the game.
+        timeline_data = self.riot_api.get_game_timeline(game_info)
+        if timeline_data is not None:
+            timeline_response = self.get_cool_timeline_data(timeline_data, guild_id)
+            if timeline_response is not None:
+                response = timeline_response + "\n" + response
+
+        # Get other cool stats about players.
         cool_stats_response = self.get_cool_stats_data(filtered_stats, guild_id)
         if cool_stats_response is not None:
             response = cool_stats_response + "\n" + response
@@ -412,6 +442,7 @@ class DiscordClient(discord.Client):
     def check_game_status(self, guild_id):
         active_game = None
         active_game_start = None
+        active_game_team = None
         game_ids = set()
         # First check if users are in the same game (or all are in no games).
         user_list = (
@@ -438,27 +469,44 @@ class DiscordClient(discord.Client):
                     active_name = summ_name
                     active_id = summ_id
                     break
+                sleep(0.5)
             if game_for_summoner is not None:
                 game_ids.add(game_for_summoner["gameId"])
-                champ_id = game_stats.get_player_stats(game_for_summoner, summ_ids)["championId"]
+                player_stats = game_stats.get_player_stats(game_for_summoner, summ_ids)
+                champ_id = player_stats["championId"]
+                active_game_team = player_stats["teamId"]
                 users_in_current_game.append((disc_id, [active_name], [active_id], champ_id))
                 active_game = game_for_summoner
 
         if len(game_ids) > 1: # People are in different games.
             return 0
 
+        for player_data in users_in_current_game:
+            champ_id = player_data[-1]
+            # New champ has been released, that we don't know about.
+            if self.riot_api.get_champ_name(champ_id) is None:
+                self.riot_api.get_latest_data()
+                break
+
         if active_game is not None and self.active_game.get(guild_id) is None:
             self.config.log(active_game_start)
             if active_game_start == 0:
                 active_game_start = int(time())
 
+            enemy_champ_ids = []
+            for participant in active_game["participants"]:
+                if participant["teamId"] != active_game_team:
+                    enemy_champ_ids.append(participant["championId"])
+
             self.active_game[guild_id] = {
                 "id": active_game["gameId"],
                 "start": active_game_start,
+                "team_id": active_game_team,
+                "enemy_champ_ids": enemy_champ_ids,
                 "map_id": active_game["mapId"],
                 "map_name": self.riot_api.get_map_name(active_game["mapId"]),
                 "game_mode": active_game["gameMode"],
-                "game_guild_name": self.get_guild_name(guild_id)
+                "game_guild_name": self.get_guild_name(guild_id),
             }
 
             self.game_start[guild_id] = active_game_start
@@ -474,6 +522,9 @@ class DiscordClient(discord.Client):
 
     def get_active_game(self, guild_id):
         return self.active_game.get(guild_id)
+
+    def get_users_in_game(self, guild_id):
+        return self.users_in_game.get(guild_id)
 
     def get_mention_str(self, disc_id, guild_id=api_util.MAIN_GUILD_ID):
         """
@@ -632,6 +683,16 @@ class DiscordClient(discord.Client):
                             users_in_voice[guild.id].append(user_info)
         return users_in_voice
 
+    def get_ai_prediction(self, guild_id):
+        if self.ai_conn is not None and guild_id in self.users_in_game:
+            input_data = shape_predict_data(
+                self.database, self.riot_api, self.config, self.users_in_game[guild_id]
+            )
+            self.ai_conn.send(("predict", [input_data]))
+            ratio_win = self.ai_conn.recv()
+            return int(ratio_win * 100)
+        return None
+
     def try_get_user_data(self, name, guild_id):
         if name.startswith("<@"):
             start_index = 3 if name[2] == "!" else 2
@@ -672,10 +733,12 @@ class DiscordClient(discord.Client):
         role = nibs_guild.get_role(role_id)
 
         old_head_honcho = nibs_guild.get_member(old_holder)
-        await old_head_honcho.remove_roles(role)
+        if old_head_honcho is not None:
+            await old_head_honcho.remove_roles(role)
 
         new_head_honcho = nibs_guild.get_member(new_holder)
-        await new_head_honcho.add_roles(role)
+        if new_head_honcho is not None:
+            await new_head_honcho.add_roles(role)
 
     def resolve_bets(self, game_info, intfar, intfar_reason, doinks, guild_id):
         game_won = game_info[0][1]["gameWon"]
@@ -900,6 +963,27 @@ class DiscordClient(discord.Client):
 
         return None if not any_stats else self.insert_emotes(stats_str)
 
+    def get_cool_timeline_msg(self, timeline_mentions, guild_id):
+        timeline_str = "======================================\n"
+        any_stats = False
+        for event_index, value, disc_id in timeline_mentions:
+            if not any_stats:
+                event_str = ""
+                any_stats = True
+            else:
+                event_str = "\n"
+
+            if disc_id is not None: # User specific mention.
+                event_str += f"{self.get_mention_str(disc_id, guild_id)} "
+            else:
+                event_str += "We "
+
+            event_str += get_timeline_events_flavor_text(event_index, value)
+
+            timeline_str += event_str
+
+        return None if timeline_mentions == [] else self.insert_emotes(timeline_str)
+
     def get_streak_msg(self, intfar_id, guild_id, intfar_streak, prev_intfar):
         """
         Return a message describing the current Int-Far streak.
@@ -1054,9 +1138,15 @@ class DiscordClient(discord.Client):
 
     def get_cool_stats_data(self, filtered_stats, guild_id):
         stat_mentions = award_qualifiers.get_cool_stats(filtered_stats, self.config)
-        redeemed_text = self.get_cool_stats_msg(stat_mentions, guild_id)
+        cool_stats_msg = self.get_cool_stats_msg(stat_mentions, guild_id)
 
-        return redeemed_text
+        return cool_stats_msg
+
+    def get_cool_timeline_data(self, timeline_data, guild_id):
+        timeline_mentions = award_qualifiers.get_cool_timeline_events(timeline_data, self.config)
+        cool_events_msg = self.get_cool_timeline_msg(timeline_mentions, guild_id)
+
+        return cool_events_msg
 
     def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks, guild_id):
         if not self.config.testing:
@@ -1066,6 +1156,13 @@ class DiscordClient(discord.Client):
                     self.active_game[guild_id]["id"], filtered_stats,
                     self.users_in_game.get(guild_id), guild_id
                 )
+
+                timestamp = filtered_stats[0][1]["timestamp"] // 1000
+                if is_lan_ongoing(timestamp, guild_id):
+                    # Saved LAN stats (if LAN is active).
+                    self.config.log("LAN is active! Saving LAN stats...")
+                    self.database.save_lan_stats(self.active_game[guild_id]["id"], filtered_stats)
+
                 self.database.create_backup()
                 self.config.log("Game over! Stats were saved succesfully.")
                 return best_records, worst_records
@@ -1232,7 +1329,7 @@ class DiscordClient(discord.Client):
         return (
             self.channels_to_write[api_util.MAIN_GUILD_ID]
             if self.config.env == "production"
-            else self.channels_to_write[MY_GUILD_ID]
+            else self.channels_to_write[api_util.MY_GUILD_ID]
         )
 
     async def on_connect(self):
@@ -1266,7 +1363,7 @@ class DiscordClient(discord.Client):
                     if text_channel.id in CHANNEL_IDS and self.config.env == "production":
                         self.channels_to_write[guild.id] = text_channel
                         break
-            elif guild.id == MY_GUILD_ID and self.config.env == "dev":
+            elif guild.id == api_util.MY_GUILD_ID and self.config.env == "dev":
                 CHANNEL_IDS.append(guild.text_channels[0].id)
                 self.channels_to_write[guild.id] = guild.text_channels[0]
 
@@ -1348,7 +1445,7 @@ class DiscordClient(discord.Client):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
 
-        if ((self.config.env == "dev" and message.guild.id != MY_GUILD_ID)
+        if ((self.config.env == "dev" and message.guild.id != api_util.MY_GUILD_ID)
                 or (self.config.env == "production" and message.guild.id not in api_util.GUILD_IDS)):
             return
 

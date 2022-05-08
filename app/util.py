@@ -11,7 +11,7 @@ def register_discord_connection():
     conn_lock = flask.current_app.config["CONN_LOCK"]
     sess_id = flask.session["user_id"]
 
-    lock_success = conn_lock.acquire(timeout=5)
+    lock_success = conn_lock.acquire(timeout=3)
     if not lock_success:
         exit(1)
 
@@ -180,3 +180,8 @@ def get_persistent_data():
 def make_template_context(template, status=200, **variables):
     variables.update(get_persistent_data())
     return flask.render_template(template, **variables), status
+
+def make_text_response(text, status_code):
+    resp = flask.Response(response=text, status=status_code, mimetype="text/raw")
+    resp.headers["Content-Type"] = "text/raw; charset=utf-8"
+    return resp

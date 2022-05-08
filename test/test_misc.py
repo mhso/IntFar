@@ -17,21 +17,20 @@ class TestWrapper(TestRunner):
         super().__init__()
         conf = Config()
         database = Database(conf)
-        self.before_all(conf, database)
+        self.before_all(config=conf, database=database)
 
     def before_test(self):
-        auth = json.load(open("discbot/auth.json"))
-        config = self.test_args[0]
-        config.riot_key = auth["riotDevKey"] if config.use_dev_token else auth["riotAPIKey"]
+        auth = json.load(open("resources/auth.json"))
+        self.config.riot_key = auth["riotDevKey"] if self.config.use_dev_token else auth["riotAPIKey"]
 
         shutil.copy("resources/database.db", "resources/database_test.db")
-        config.database = "resources/database_test.db"
+        self.config.database = "resources/database_test.db"
 
     def after_test(self):
         os.remove("resources/database_test.db")
 
     @test
-    def test_stat_record(self, config, database):
+    def test_stat_record(self):
         with open("misc/test_data.json", "r", encoding="utf-8") as fp:
             data = json.load(fp)
 
@@ -46,13 +45,13 @@ class TestWrapper(TestRunner):
         guild_id = util.MAIN_GUILD_ID
         game_id = 5452408885
 
-        database = Database(config)
+        database = Database(self.config)
         database.delete_game(game_id)
 
-        riot_api = APIClient(config)
-        betting_handler = BettingHandler(config, database)
+        riot_api = APIClient(self.config)
+        betting_handler = BettingHandler(self.config, database)
 
-        client = DiscordClient(config, database, betting_handler, riot_api, None, None)
+        client = DiscordClient(self.config, database, betting_handler, riot_api, None, None)
         client.active_game[guild_id] = {
             "id": data["gameId"],
             "start": 0,
@@ -93,7 +92,7 @@ class TestWrapper(TestRunner):
         print(response)
 
     @test
-    def test_match_v5(self, config, database):
+    def test_match_v5(self):
         with open("misc/game_5448295599_old.json") as fp:
             old_data = json.load(fp)
 
@@ -107,8 +106,8 @@ class TestWrapper(TestRunner):
             (331082926475182081, None, None, 3)
         ]
 
-        filtered_old = game_stats.get_filtered_stats_v4(database.summoners, users_in_game, old_data)[0]
-        filtered_new = game_stats.get_filtered_stats(database.summoners, users_in_game, new_data)[0]
+        filtered_old = game_stats.get_filtered_stats_v4(self.database.summoners, users_in_game, old_data)[0]
+        filtered_new = game_stats.get_filtered_stats(self.database.summoners, users_in_game, new_data)[0]
 
         mappings = {"magicalDamageTaken": "magicDamageTaken", "totalTimeCrowdControlDealt": "totalTimeCCDealt"}
         exceptions = [
@@ -133,7 +132,7 @@ class TestWrapper(TestRunner):
         self.assert_true(same_keys, "Same keys compared to match v4.")
 
     @test
-    def test_role_info(self, config, database):
+    def test_role_info(self):
         all_none = True
         for game_file in glob("resources/data/game_*.json"):
             with open(game_file) as fp:
@@ -147,22 +146,22 @@ class TestWrapper(TestRunner):
         self.assert_true(all_none, "All jungle lane roles are NONE.")
 
     @test
-    def test_cool_stats(self, config, database):
+    def test_cool_stats(self):
         game_id = 5438872497
         with open(f"resources/data/game_{game_id}.json", "r", encoding="utf-8") as fp:
             data = json.load(fp)
 
-        filtered_stats, users_in_game = game_stats.get_filtered_stats(database.summoners, [], data)
+        filtered_stats, users_in_game = game_stats.get_filtered_stats(self.database.summoners, [], data)
 
         guild_id = util.MAIN_GUILD_ID
 
-        database = Database(config)
+        database = Database(self.config)
         database.delete_game(game_id)
 
-        riot_api = APIClient(config)
-        betting_handler = BettingHandler(config, database)
+        riot_api = APIClient(self.config)
+        betting_handler = BettingHandler(self.config, database)
 
-        client = DiscordClient(config, database, betting_handler, riot_api, None, None)
+        client = DiscordClient(self.config, database, betting_handler, riot_api, None, None)
         client.active_game[guild_id] = {
             "id": data["gameId"],
             "start": 0,

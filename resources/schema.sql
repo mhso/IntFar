@@ -10,10 +10,16 @@ CREATE TABLE [registered_summoners] (
 CREATE TABLE [games] (
   [game_id] INTEGER PRIMARY KEY,
   [timestamp] INTEGER,
+  [duration] INTEGER,
   [intfar_id] INTEGER,
   [intfar_reason] NVARCHAR(4),
   [win] INTEGER(1),
   [guild_id] INTEGER
+);
+CREATE TABLE [missed_games] (
+    [game_id] INTEGER PRIMARY KEY,
+    [guild_id] INTEGER NOT NULL,
+    [timestamp] INTEGER
 );
 CREATE TABLE [participants] (
   [game_id] INTEGER NOT NULL,
@@ -121,4 +127,19 @@ CREATE TABLE [list_items] (
     [champ_id] INTEGER NOT NULL,
     [list_id] INTEGER NOT NULL,
     UNIQUE(champ_id, list_id)
+);
+CREATE TABLE [lan_stats] (
+    [game_id] INTEGER NOT NULL,
+    [disc_id] INTEGER NOT NULL,
+    [kills] INTEGER NOT NULL,
+    [deaths] INTEGER NOT NULL,
+    [assists] INTEGER NOT NULL,
+    [damage] INTEGER NOT NULL,
+    [cs] INTEGER NOT NULL,
+    [cs_per_min] INTEGER NOT NULL,
+    [gold] INTEGER NOT NULL,
+    [kp] INTEGER NOT NULL,
+    [vision_wards] INTEGER NOT NULL,
+    [vision_score] INTEGER NOT NULL,
+    PRIMARY KEY (game_id, disc_id)
 );
