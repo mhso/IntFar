@@ -1,0 +1,290 @@
+@font-face {
+    font-family: cyber;
+    src: url(../fonts/Cyberjunkies.otf);
+}
+
+@font-face {
+    font-family: dash;
+    src: url(../fonts/Dash-Horizon-Demo.otf);
+}
+
+@font-face {
+    font-family: tektur;
+    src: url(../fonts/TekturNarrow-Bold.ttf);
+}
+
+@font-face {
+    font-family: unbutton;
+    src: url(../fonts/unbutton.ttf);
+}
+
+body {
+    overflow-y: hidden;
+}
+
+#bg-image {
+    position: absolute;
+    z-index: -1;
+    background-image: url(../img/sr_bg.jpeg);
+    background-size: cover;
+    backdrop-filter: blur(5px);
+    filter: blur(5px) brightness(0.55);
+    height: 101%;
+    width: 101%;
+    top: -0.5%;
+    left: -0.5%;
+}
+
+h1, h2 {
+    letter-spacing: 1px;
+}
+
+h1 {
+    font-size: 5rem;
+    color: rgb(255, 24, 197);
+}
+
+h2 {
+    font-family: tektur;
+    color: rgb(44, 146, 255);
+    letter-spacing: 2px;
+    font-size: 2.5rem;
+    margin-bottom: 0.25rem;
+    margin-top: 0.75rem;
+}
+
+#lan-wrapper p {
+    font-size: 18px;
+}
+
+#lan-wrapper > h1 {
+    margin-bottom: 15px;
+    font-family: unbutton;
+    text-shadow: 1px 3px 2px rgba(0,0,0,0.75);
+    padding-top: 1rem;
+    margin-top: 0;
+}
+
+#lan-left-column {
+    position: relative;
+    min-height: 80vh;
+}
+
+#lan-latest-game-wrapper > p {
+    margin-bottom: 0.75rem;
+}
+
+.lan-performance-avatar {
+    width: auto;
+    height: 70px;
+}
+
+.lan-performance-wrapper {
+    position: relative;
+}
+
+.lan-performance-wrapper p {
+    margin-bottom: 0.75rem;
+}
+
+#lan-best-worst-wrapper {
+    border-bottom: 2px solid white;
+}
+
+#lan-perform-first-row {
+    border-bottom: 2px solid white;
+}
+
+.lan-perform-entry {
+    width: 8%;
+    text-align: center;
+    padding: 6px 0;
+}
+
+.lan-perform-entry-6, .lan-perform-entry-7 {
+    width: 12%;
+}
+
+#lan-active-game-wrapper {
+    text-align: center;
+}
+
+#lan-blue-side-wrapper, #lan-red-side-wrapper {
+    position: relative;
+}
+
+.lan-champ-splash-wrapper {
+    display: inline-flex;
+    position: relative;
+    width: 18%;
+    padding: 5px;
+}
+
+.lan-champ-splash {
+    width: 100%;
+    height: auto;
+}
+
+.lan-champ-splash-blue {
+    border: solid 2px rgb(25, 93, 219);
+}
+
+.lan-champ-splash-red {
+    border: solid 2px rgb(202, 23, 23);
+}
+
+.lan-champ-face {
+    position: absolute;
+}
+
+#lan-vs-img {
+    width: 50px;
+    height: auto;
+}
+
+@keyframes live_dot {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.3;
+    }
+}
+
+#live-indicator {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    clip-path: circle();
+    background-color: red;
+    margin-bottom: 2px;
+
+    animation-name: live_dot;
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+    animation-fill-mode: both;
+}
+
+.lan-our-team {
+    font-family: cyber, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+    font-size: 30px;
+    letter-spacing: 3px;
+    color: gold;
+    margin-top: 2rem;
+}
+
+.lan-enemy-team {
+    font-family: "Comic Sans MS", "Comic Sans", cursive;
+    font-size: 30px;
+    letter-spacing: 2px;
+    color: #d98b53;
+}
+
+.lan-emph {
+    font-weight: 600;
+}
+
+.lan-won {
+    color: rgb(35, 202, 57);
+}
+
+.lan-lost {
+    color: rgb(202, 23, 23);
+}
+
+#lan-tilt-meter-wrapper {
+    position: relative;
+    margin-top: 40px;
+    margin-bottom: 40px;
+    width: 100%;
+    height: 120px;
+}
+
+#lan-tilt-meter {
+    position: relative;
+    border: solid 1px white;
+    height: 50px;
+    background-color: rgba(0, 0, 0, 0.438);
+}
+
+#lan-tilt-filled {
+    height: 100%;
+    background-color: red;
+}
+
+#lan-tilt-text {
+    color: #0289ff;
+    font-size: 24px;
+    font-weight: 800;
+    position: absolute;
+    margin: 0;
+    height: 30px;
+    top: calc(50% - 15px);
+    width: 200px;
+    left: calc(50% - 100px);
+}
+
+#lan-teamcomp-wrapper {
+    margin: 0 auto;
+    text-align: center;
+}
+
+#lan-teamcomp-scroll {
+    max-height: 290px;
+    overflow-y: auto;
+    padding-bottom: 10px;
+    scrollbar-width: none;
+}
+
+#lan-teamcomp-scroll > p {
+    font-size: 18px;
+    margin-top: 1rem;
+    margin-bottom: 5px;
+}
+
+.lan-team-comp-champ {
+    width: 60px;
+    height: auto;
+    margin-right: 5px;
+}
+
+#lan-no-games-wrapper > video {
+    position: fixed;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+}
+
+@keyframes pink_fade {
+    0% {
+        color: #eb13c0;
+    }
+    100% {
+        color: #ad00fd;
+    }
+}
+
+#lan-no-games-wrapper > h1 {
+    position: relative;
+    font-family: dash;
+
+    height: 650px;
+    top: calc(50vh - 360px);
+    font-size: 220px;
+    z-index: 2;
+    text-shadow: 2px 4px 2px rgba(0, 0, 0, 0.75);
+
+    animation-name: pink_fade;
+    animation-duration: 10s;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+    animation-fill-mode: both;
+}
+
+.lan-catjam {
+    width: 140%;
+    border-left: 2px solid white;
+}

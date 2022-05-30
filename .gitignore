@@ -10,6 +10,9 @@ api/champions*.json
 api/maps.json
 debug.log
 app/static/*
+app/static/*/bootstrap/
+!app/static/js/
+!app/static/css/
 resouces/consola.tff
 resources/data
 vendor
