@@ -1,6 +1,7 @@
-import json
 from time import sleep
 from multiprocessing import Process, Pipe
+
+from discord.opus import load_opus
 
 import run_flask
 from api.audio_handler import AudioHandler
@@ -50,6 +51,9 @@ if __name__ == "__main__":
     conf = Config()
     env_desc = "DEVELOPMENT" if conf.env == "dev" else "PRODUCTION"
     conf.log(f"+++++ Running in {env_desc} mode +++++")
+
+    if conf.env == "production":
+        load_opus("/usr/local/lib/libopus.so")
 
     conf.log("Initializing database...")
     database_client = Database(conf)

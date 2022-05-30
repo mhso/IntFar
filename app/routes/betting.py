@@ -16,23 +16,29 @@ def get_bets(database, only_active):
     ]
     names_dict = dict(zip((x[0] for x in database.summoners), names))
     avatar_dict = dict(zip((x[0] for x in database.summoners), avatars))
+
     presentable_data = []
     for disc_id in all_bets:
         bets = all_bets[disc_id]
+
         for bet_ids, guild_id, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
             event_descs = [
                 (i, get_dynamic_bet_desc(e, names_dict.get(t)), api_util.format_tokens_amount(a))
                 for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
             ]
+
             bet_date = app_util.format_bet_timestamp(timestamp)
             guild_short = api_util.get_guild_abbreviation(guild_id)
+
             presentable_data.append(
                 (
                     disc_id, names_dict[disc_id], bet_date, guild_short, str(guild_id), event_descs,
                     result_or_ticket, api_util.format_tokens_amount(payout), avatar_dict[disc_id]
                 )
             )
+
     presentable_data.sort(key=lambda x: x[5][0][0], reverse=True)
+
     return presentable_data
 
 @betting_page.route('/')

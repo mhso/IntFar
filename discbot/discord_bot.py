@@ -166,7 +166,7 @@ class DiscordClient(discord.Client):
 
     def send_game_update(self, endpoint, data):
         try:
-            return requests.post(f"http://mhooge.com:5000/intfar/{endpoint}", data=data)
+            return requests.post(f"https://mhooge.com:5000/intfar/{endpoint}", data=data)
         except requests.exceptions.RequestException as e:
             self.config.log("Error ignored in online_monitor: " + str(e))
 
@@ -276,12 +276,14 @@ class DiscordClient(discord.Client):
                 self.game_start[guild_id] = None
                 del self.users_in_game[guild_id] # Reset the list of users who are in a game.
                 asyncio.create_task(self.poll_for_game_start(guild_id))
+
             except Exception as e:
                 self.config.log("Exception after game was over!!!", self.config.log_error)
                 await self.send_error_msg(guild_id)
-                with open("errorlog.txt", "a", encoding="UTF-8") as fp:
+                with open("log/errorlog.txt", "a", encoding="utf-8") as fp:
                     print_exc(file=fp)
                 raise e
+
         elif game_status == 0:
             await self.poll_for_game_end(guild_id)
 
@@ -451,6 +453,7 @@ class DiscordClient(discord.Client):
             else self.users_in_game[guild_id]
         )
         users_in_current_game = []
+
         for user_data in user_list:
             disc_id = user_data[0]
             summ_names = user_data[1]
@@ -459,6 +462,7 @@ class DiscordClient(discord.Client):
             active_name = None
             active_id = None
             champ_id = None
+
             # Check if any of the summ_names/summ_ids for a given player is in a game.
             for summ_name, summ_id in zip(summ_names, summ_ids):
                 game_data = self.riot_api.get_active_game(summ_id)
@@ -470,6 +474,7 @@ class DiscordClient(discord.Client):
                     active_id = summ_id
                     break
                 sleep(0.5)
+
             if game_for_summoner is not None:
                 game_ids.add(game_for_summoner["gameId"])
                 player_stats = game_stats.get_player_stats(game_for_summoner, summ_ids)

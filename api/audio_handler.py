@@ -25,7 +25,7 @@ class AudioHandler: # Keep track of connection to voice channel.
 
             # Create volume controlled FFMPEG player from sound file.
             player = PCMVolumeTransformer(
-                FFmpegPCMAudio(f"{SOUNDS_PATH}/{sound}.mp3", executable=self.config.ffmpeg_exe)
+                FFmpegPCMAudio(f"{SOUNDS_PATH}/{sound}.mp3", executable="ffmpeg")
             )
 
             # Start the player and wait until it is done.

@@ -1,3 +1,4 @@
+import json
 from multiprocessing import Lock
 from flask import Flask
 from flask_cors import CORS
@@ -24,8 +25,21 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     root = "/intfar/"
 
     # Set up the blueprints for all the pages/routes.
-    from app.routes import index, users, verify, betting, doinks, stats, errors, soundboard, lan, lists, quiz
-    from app.util import create_session_id
+    from app.routes import (
+        index,
+        users,
+        verify,
+        betting,
+        doinks,
+        stats,
+        errors,
+        soundboard,
+        lan,
+        lists,
+        quiz,
+        api
+    )
+    from app.util import before_request
     web_app.register_blueprint(index.start_page, url_prefix=root)
     web_app.register_blueprint(users.user_page, url_prefix=root + "user/")
     web_app.register_blueprint(verify.verify_page, url_prefix=root + "verify/")
@@ -36,7 +50,8 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     web_app.register_blueprint(lan.lan_page, url_prefix=root + "lan/")
     web_app.register_blueprint(lists.lists_page, url_prefix=root + "lists/")
     web_app.register_blueprint(quiz.quiz_page, url_prefix=root + "quiz/")
-    web_app.before_request(create_session_id)
+    web_app.register_blueprint(api.api_page, url_prefix=root + "api/")
+    web_app.before_request(before_request)
     web_app.register_error_handler(500, errors.handle_internal_error)
     web_app.register_error_handler(404, errors.handle_missing_page_error)
 
@@ -57,6 +72,7 @@ def create_app(database, bet_handler, riot_api, conf, bot_pipe):
     web_app.config["QUIZ_CATEGORIES"] = set()
     web_app.config["QUIZ_TEAM_BLUE"] = True
 
-    web_app.secret_key = open("app/static/secret.txt").readline()
+    with open("app/static/secret.json") as fp:
+        web_app.secret_key = json.load(fp)["app_secret"]
 
     return web_app

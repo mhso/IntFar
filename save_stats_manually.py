@@ -83,15 +83,19 @@ class TestMock(DiscordClient):
                     await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
 
             if self.task in ("all", "stats"):
-                best_records, worst_records = self.save_stats(
-                    filtered, intfar, intfar_reason, doinks, guild_id
-                )
-
-                if best_records != [] or worst_records != []:
-                    records_response = self.get_beaten_records_msg(
-                        best_records, worst_records, guild_id
+                try:
+                    best_records, worst_records = self.save_stats(
+                        filtered, intfar, intfar_reason, doinks, guild_id
                     )
-                    response = records_response + response
+
+                    if best_records != [] or worst_records != []:
+                        records_response = self.get_beaten_records_msg(
+                            best_records, worst_records, guild_id
+                        )
+                        response = records_response + response
+                except Exception as e:
+                    print(f"Error when saving stats for {game_id}. Probably already exists.")
+                    continue
 
             if self.loud and self.task == "all":
                 await self.send_message_unprompted(response, guild_id)
@@ -121,14 +125,6 @@ class TestMock(DiscordClient):
                     await self.send_predictions_timeline_image(predictions_img, guild_id)
 
             self.database.remove_missed_game(game_id)
-
-        if self.missing:
-            response = (
-                f"Saved **{len(ids_to_save)}** games that were missed "
-                "due to Riot API shennanigans. Wont spam the chat "
-                "with the game details {emote_big_doinks}"
-            )
-            await main_channel.send(self.insert_emotes(response))
 
     async def user_joined_voice(self, member, guild, poll=False):
         pass

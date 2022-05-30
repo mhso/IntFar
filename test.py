@@ -1,6 +1,7 @@
 import json
 import argparse
 import os
+from glob import glob
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -124,8 +125,9 @@ class TestFuncs:
         print(stats)
 
     def test_normalize_sound(self):
-        filename = os.path.abspath("app/static/sounds/penta.mp3")
-        normalize_sound_volume(filename, self.config)
+        files = glob("app/static/sounds/*.mp3")
+        for filename in files:
+            normalize_sound_volume(filename, self.config)
 
 PARSER = argparse.ArgumentParser()
 

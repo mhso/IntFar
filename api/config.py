@@ -1,6 +1,5 @@
 from datetime import datetime
 import json
-from os.path import abspath
 
 class Config:
     def __init__(self):
@@ -16,14 +15,10 @@ class Config:
         self.database = "resources/database.db"
         self.generate_predictions_img = False
         self.min_game_minutes = 5 # Minimum amount of minutes for a game to be valid.
-        if self.env == "dev":
-            self.ffmpeg_exe = "ffmpeg"
-        else:
-            self.ffmpeg_exe = abspath("resources/ffmpeg-4.1.6/ffmpeg")
 
         # ===== Active Game Monitoring =====
-        self.status_interval_dormant = 60 * 2 # 2 minutes wait time between checking for status.
-        self.status_interval_ingame = 30 # 40 seconds wait time when in-game.
+        self.status_interval_dormant = 60 * 2 # Seconds to wait between checking for game status.
+        self.status_interval_ingame = 30 # Seconds to wait between checking for status when in-game.
 
         # ===== Betting =====
         self.betting_tokens = "*good-boi points*"
@@ -35,7 +30,7 @@ class Config:
         # ===== Shop =====
         self.max_shop_price = int(1e12)
         self.max_shop_quantity = 1000
-        self.shop_open = True
+        self.shop_open = False
 
         # ===== Intfar Criterias =====
         self.kda_lower_threshold = 1.3

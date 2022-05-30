@@ -25,6 +25,18 @@ def create_session_id():
         flask.current_app.config["USER_COUNT"] = flask.current_app.config["USER_COUNT"] + 1
         flask.session["user_id"] = flask.current_app.config["USER_COUNT"]
 
+def ensure_https():
+    config = flask.current_app.config["APP_CONFIG"]
+
+    if config.env == "production" and not flask.request.is_secure:
+        url = flask.request.url.replace('http://', 'https://', 1)
+        code = 301
+        return flask.redirect(url, code=code)
+
+def before_request():
+    create_session_id()
+    ensure_https()
+
 def discord_request(command_types, commands, params, pipe=None):
     """
     Request some information from the Discord API.
@@ -51,6 +63,7 @@ def discord_request(command_types, commands, params, pipe=None):
     command_type_list = command_types
     command_list = commands
     param_list = params
+
     if not any_list:
         command_type_list = [command_types]
         command_list = [commands]
@@ -80,6 +93,7 @@ def discord_request(command_types, commands, params, pipe=None):
 
         result = pipe.recv()
         return result if any_list else result[0]
+
     except (EOFError, BrokenPipeError, ConnectionError, ConnectionResetError):
         register_discord_connection() # We timed out. Re-establish connection and try again.
         return discord_request(command_types, commands, params, conn_map[sess_id])
@@ -128,6 +142,7 @@ def get_logged_in_user(database, user_id):
     for tup in users:
         if get_hashed_secret(tup[3]) == user_id:
             return tup[0]
+
     return None
 
 def get_user_details():
@@ -155,7 +170,7 @@ def format_bet_timestamp(timestamp):
         return None
     return datetime.fromtimestamp(timestamp).strftime("%d-%m-%y %H:%M:%S")
 
-def make_json_response(data, http_code):
+def make_json_response(data, http_code=200):
     if not isinstance(data, dict):
         data = {"response": str(data)}
 

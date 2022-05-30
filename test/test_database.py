@@ -123,7 +123,12 @@ class TestWrapper(TestRunner):
 
     @test
     def test_intfar_queries(self):
-        self.assert_no_exception(self.database.get_intfar_count, "Get intfar counts.")
+        def get_intfar_counts_func():
+            self.database.get_intfar_count(MY_DISC_ID)
+            result = self.database.get_intfar_count()
+            print(result) 
+
+        self.assert_no_exception(get_intfar_counts_func, "Get intfar counts.")
 
         self.assert_no_exception(self.database.get_intfar_reason_counts, "Get intfar reason counts.")
 

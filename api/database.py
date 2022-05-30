@@ -427,50 +427,49 @@ class Database:
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
 
         with self.get_connection() as db:
-            query = (
-                "SELECT COUNT(DISTINCT champ_id) FROM participants AS p " +
-                f"JOIN games g ON p.game_id = g.game_id{delim_str}"
-            )
+            query = f"""
+                SELECT COUNT(DISTINCT champ_id) FROM participants AS p
+                JOIN games g ON p.game_id = g.game_id{delim_str}
+            """
             return self.execute_query(db, query, params).fetchone()[0]
 
     def get_champ_with_most_intfars(self, disc_id):
         with self.get_connection() as db:
-            query = (
-                "SELECT sub.champ_id, MAX(sub.c) FROM ( " +
-                f"  SELECT COUNT(DISTINCT p.game_id) AS c, champ_id FROM games g"
-                "   JOIN participants p ON p.game_id=g.game_id AND g.intfar_id=p.disc_id" +
-                f"  WHERE g.intfar_id=? AND g.intfar_id IS NOT NULL" +
-                "   GROUP BY champ_id" +
-                ") sub"
-            )
+            query = """
+                SELECT sub.champ_id, MAX(sub.c) FROM (
+                    SELECT COUNT(DISTINCT p.game_id) AS c, champ_id FROM games g
+                    JOIN participants p
+                    ON p.game_id=g.game_id AND g.intfar_id=p.disc_id
+                    WHERE g.intfar_id=? AND g.intfar_id IS NOT NULL
+                    GROUP BY champ_id
+                ) sub
+            """
             return self.execute_query(db, query, (disc_id,)).fetchone()
 
     def get_intfar_count(self, disc_id=None, context=None, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id, "AND")
 
-        query_intfars = (
-            "SELECT SUM(sub.intfars) FROM\n" +
-            "(\n" +
-            "   SELECT COUNT(*) AS intfars FROM"
-            "   (\n" +
-            "       SELECT DISTINCT g.game_id, intfar_id FROM games AS g\n" +
-            "       LEFT JOIN registered_summoners rs ON rs.disc_id=intfar_id\n" +
-            f"      WHERE intfar_id IS NOT NULL AND rs.active=1{delim_str}\n" +
-            "   ) sub_2\n" +
-            "   GROUP BY sub_2.intfar_id\n" +
-            ") sub"
-        )
+        query_intfars = f"""
+            SELECT SUM(sub.intfars) FROM (
+                SELECT COUNT(*) AS intfars FROM (
+                   SELECT DISTINCT g.game_id, intfar_id FROM games AS g
+                   LEFT JOIN registered_summoners rs ON rs.disc_id=intfar_id
+                  WHERE intfar_id IS NOT NULL AND rs.active = 1{delim_str}
+                ) sub_2
+                GROUP BY sub_2.intfar_id
+            ) sub
+        """
 
         with (self.get_connection() if context is None else context) as db:
             intfars = self.execute_query(db, query_intfars, params).fetchone()
             return (intfars[0] if intfars is not None else 0) or 0
 
     def get_intfar_reason_counts(self, context=None):
-        query_intfar_multis = (
-            "SELECT intfar_reason FROM games LEFT JOIN registered_summoners rs " +
-            "ON rs.disc_id=intfar_id WHERE intfar_id IS NOT NULL AND " +
-            "rs.active=1 GROUP BY game_id"
-        )
+        query_intfar_multis = """
+            SELECT intfar_reason FROM games LEFT JOIN registered_summoners rs
+            ON rs.disc_id=intfar_id WHERE intfar_id IS NOT NULL AND
+            rs.active=1 GROUP BY game_id
+        """
         with (self.get_connection() if context is None else context) as db:
             intfar_multis_data = self.execute_query(db, query_intfar_multis).fetchall()
 
@@ -1079,7 +1078,10 @@ class Database:
     def create_backup(self):
         backup_name = "resources/database_backup.db"
         try:
-            os.remove(backup_name)
+            # Remove old backup if it exists.
+            if os.path.exists(backup_name):
+                os.remove(backup_name)
+
             copyfile(self.config.database, backup_name)
         except (OSError, IOError) as exc:
             raise DBException(exc.args[0])
