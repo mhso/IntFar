@@ -236,6 +236,22 @@ def get_game_stats(disc_id, database):
     any_gold_best = False
     worst_stats = []
     any_gold_worst = False
+
+    # Get who has the best stat ever in every category.
+    best_stats_dict = {}
+    for stat in api_util.STAT_COMMANDS:
+        maximize = stat != "deaths"
+        best_or_worst_ever_id = database.get_most_extreme_stat(stat, True, maximize)[0]
+        best_stats_dict[best_or_worst_ever_id] = best_stats_dict.get(best_or_worst_ever_id, 0) + 1
+
+    most_best_stats = max(best_stats_dict.values())
+    most_best_stats_candidates = []
+    for other_id in best_stats_dict:
+        if best_stats_dict[other_id] == most_best_stats:
+            most_best_stats_candidates.append(other_id)
+
+    has_most_best = len(most_best_stats_candidates) == 1 and most_best_stats_candidates[0] == disc_id
+
     for best in (True, False):
         for stat in api_util.STAT_COMMANDS:
             maximize = not ((stat != "deaths") ^ best)
@@ -282,7 +298,8 @@ def get_game_stats(disc_id, database):
                 )
 
     return {
-        "game_stats": [(best_stats, any_gold_best), (worst_stats, any_gold_worst)]
+        "game_stats": [(best_stats, any_gold_best), (worst_stats, any_gold_worst)],
+        "most_best_stats": has_most_best
     }
 
 @user_page.route("/<disc_id>")

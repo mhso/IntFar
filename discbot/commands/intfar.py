@@ -165,6 +165,6 @@ async def handle_intfar_criteria_msg(client, message, criteria=None):
         valid_criteria = False
 
     if valid_criteria:
-        response += "\nThese criteria must all be met to be Int-Far."
+        response += "\nThese criteria must **all** be met to be Int-Far."
 
     await message.channel.send(response)

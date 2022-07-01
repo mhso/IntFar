@@ -610,8 +610,8 @@ class Database:
             games_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
 
             intfar_counts, intfar_multis_counts = self.get_intfar_reason_counts(db)
-            intfar_ratios = [int((count / intfar_data) * 100) for count in intfar_counts]
-            intfar_multis_ratios = [int((count / intfar_data) * 100) for count in intfar_multis_counts]
+            intfar_ratios = [(count / intfar_data) * 100 for count in intfar_counts]
+            intfar_multis_ratios = [(count / intfar_data) * 100 for count in intfar_multis_counts]
 
             return (
                 game_data + longest_game + users + doinks_data +
@@ -1278,13 +1278,17 @@ class Database:
     def get_reports(self, disc_id=None, context=None):
         with (self.get_connection() if context is None else context) as db:
             query_select = (
-                "SELECT DISTINCT(disc_id), reports FROM registered_summoners " +
+                "SELECT disc_id, reports FROM registered_summoners " +
                 "WHERE active=1 "
             )
+
             params = None
             if disc_id is not None:
                 query_select += "AND disc_id=? "
                 params = (disc_id,)
+            else:
+                query_select += "GROUP BY disc_id "
+
             query_select += "ORDER BY reports DESC"
             return self.execute_query(db, query_select, params).fetchall()
 

@@ -1,4 +1,6 @@
 import asyncio
+import sys
+import traceback
 from concurrent.futures import TimeoutError as FutureTimeout, CancelledError
 from time import time, sleep
 from multiprocessing import Pipe
@@ -10,6 +12,8 @@ def listen_for_request(disc_client, event_loop):
     timeouts = {}
     connections = {0: disc_client.flask_conn}
     while not disc_client.is_closed():
+        conns_to_remove = []
+
         for conn in wait(connections.values(), 0.001): # Loop through pending connections.
             try:
                 conn_id, command_types, commands, paramses = conn.recv()
@@ -45,9 +49,13 @@ def listen_for_request(disc_client, event_loop):
                 conn.send(results)
             except (EOFError, BrokenPipeError, ConnectionResetError) as exc:
                 # Connection to user has stopped.
-                disc_client.config.log(f"App Listener Exception: {exc}")
+                disc_client.config.log(f"App Listener Exception:")
+                traceback.print_exc(file=sys.stderr)
+                # Add crashed connection to those that should be removed.
+                for conn_id in connections:
+                    if connections[conn_id] == conn:
+                        conns_to_remove.append(conn_id)
 
-        conns_to_remove = []
         now = time()
         for conn_id in timeouts: # Check to see if any connection has timed out.
             if now - timeouts[conn_id] > max_timeout:
@@ -55,7 +63,9 @@ def listen_for_request(disc_client, event_loop):
 
         for conn_id in conns_to_remove: # Remove/forget timed out connections.
             disc_client.config.log(f"Session ID {conn_id} timed out.")
-            del timeouts[conn_id]
+            if conn_id in timeouts:
+                del timeouts[conn_id]
+
             connections[conn_id].close()
             del connections[conn_id]
 

@@ -593,19 +593,21 @@ table {
 }
 
 #bet-add-event, #bet-submit {
+    position: relative;
     color: rgb(228, 228, 228);
     border: solid 2px rgb(228, 228, 228);
     background-color: rgb(28, 26, 61);
+    cursor: pointer;
     border-radius: 5px;
     font-size: 16px;
     width: 140px;
     height: 36px;
     margin-bottom: 8px;
-    position: relative;
 }
 
 #bet-submit:disabled {
     background-color: rgb(43, 43, 43);
+    cursor: default;
 }
 
 #bet-events-wrapper {

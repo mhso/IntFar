@@ -46,6 +46,7 @@ def get_statistics():
             index = 1
             while index < len(monthly_intfars) and monthly_intfars[index][-1] == tied_intfars[index-1][-1]:
                 tied_intfars.append(monthly_intfars[index])
+                index += 1
 
             tied_intfars = [
                 (app_util.discord_request("func", "get_discord_nick", disc_id), games, intfars, ratio)

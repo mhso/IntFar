@@ -1,3 +1,5 @@
+import random
+
 from api import audio_handler
 
 async def handle_set_event_sound(client, message, sound, event):
@@ -34,6 +36,19 @@ async def handle_set_event_sound(client, message, sound, event):
 
 async def handle_play_sound_msg(client, message, sound):
     voice_state = message.author.voice
+    success, status = await client.audio_handler.play_sound(voice_state, sound)
+
+    if not success:
+        await message.channel.send(client.insert_emotes(status))
+
+async def handle_random_sound_msg(client, message):
+    voice_state = message.author.voice
+
+    sounds_list = audio_handler.get_available_sounds()
+    sound = sounds_list[random.randint(0, len(sounds_list)-1)]
+
+    await message.channel.send(f"Playing random sound: `{sound}`")
+
     success, status = await client.audio_handler.play_sound(voice_state, sound)
 
     if not success:

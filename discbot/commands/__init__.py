@@ -133,6 +133,10 @@ class Command:
             client.config.log(db_exception, client.config.log_error)
 
     def format_params_list(self, params):
+        """
+        Create a string that shows which mandatory 
+        and optional parameters the command accepts.
+        """
         if params == "mandatory":
             params_list = self.mandatory_params
             l_brace, r_brace = "[", "]"
@@ -148,6 +152,11 @@ class Command:
         return f"{l_brace}" + f"{r_brace} {l_brace}".join(param_list_str) + f"{r_brace}"
 
     def __str__(self):
+        """
+        Create string representation of command.
+        This returns the name of the command
+        as well as a description of the mandatory and optional parameters.
+        """
         cmd_str = self.cmd
         for alias in self.aliases:
             cmd_str += f"/!{alias}"
@@ -160,6 +169,7 @@ class Command:
         if params_str_2 != "":
             params_str_2 = " " + params_str_2
         params_str = f"{params_str_1}{params_str_2}`"
+
         return f"`!{cmd_str}{params_str}"
 
 def get_handler(cmd):
@@ -496,6 +506,11 @@ def initialize_commands():
         mandatory_params=[RegularParam("sound")]
     )
 
+    # play command
+    play_random_name = "play_random"
+    play_random_desc = "Play a random sound. (See `!sounds` for a list of them)."
+    register_command(play_random_name, play_random_desc, handle_random_sound_msg)
+
     # sounds command
     sounds_name = "sounds"
     sounds_desc = "See a list of all possible sounds to play."
@@ -725,6 +740,12 @@ def initialize_commands():
     register_command(
         "kick", None, handle_kick_msg,
         mandatory_params=[TargetParam("person")],
+        command_dict=commands_util.ADMIN_COMMANDS
+    )
+
+    # restart command
+    register_command(
+        "restart", None, handle_restart_msg,
         command_dict=commands_util.ADMIN_COMMANDS
     )
 

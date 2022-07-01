@@ -159,7 +159,7 @@ async def handle_status_msg(client, message):
     pct_bets_won = int((bets_won / total_bets) * 100)
     highest_payout_name = client.get_discord_nick(highest_payout_user, message.guild.id)
 
-    response += f"--- Since {earliest_time} ---\n"
+    response += f"--- Since **{earliest_time}** ---\n"
     response += f"- **{games}** games have been played (**{pct_games_won:.1f}%** was won)\n"
     response += f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
     response += f"- **{users}** users have signed up\n"
@@ -178,14 +178,14 @@ async def handle_status_msg(client, message):
     response += f"- **{games_ratios[2]}%** were as a four-man\n"
     response += f"- **{games_ratios[3]}%** were as a five-man stack\n"
     response += "--- When Int-Fars were earned ---\n"
-    response += f"- **{intfar_ratios[0]}%** were for dying a ton\n"
-    response += f"- **{intfar_ratios[1]}%** were for having an awful KDA\n"
-    response += f"- **{intfar_ratios[2]}%** were for having a low KP\n"
-    response += f"- **{intfar_ratios[3]}%** were for having a low vision score\n"
-    response += f"- **{intfar_multi_ratios[0]}%** of Int-Fars met just one criteria\n"
-    response += f"- **{intfar_multi_ratios[1]}%** of Int-Fars met two criterias\n"
-    response += f"- **{intfar_multi_ratios[2]}%** of Int-Fars met three criterias\n"
-    response += f"- **{intfar_multi_ratios[3]}%** of Int-Fars swept and met all four criterias"
+    response += f"- **{intfar_ratios[0]:.1f}%** were for dying a ton\n"
+    response += f"- **{intfar_ratios[1]:.1f}%** were for having an awful KDA\n"
+    response += f"- **{intfar_ratios[2]:.1f}%** were for having a low KP\n"
+    response += f"- **{intfar_ratios[3]:.1f}%** were for having a low vision score\n"
+    response += f"- **{intfar_multi_ratios[0]:.1f}%** of Int-Fars met just one criteria\n"
+    response += f"- **{intfar_multi_ratios[1]:.1f}%** of Int-Fars met two criterias\n"
+    response += f"- **{intfar_multi_ratios[2]:.1f}%** of Int-Fars met three criterias\n"
+    response += f"- **{intfar_multi_ratios[3]:.1f}%** of Int-Fars swept and met all four criterias"
 
     await message.channel.send(response)
 
@@ -194,7 +194,7 @@ async def handle_website_msg(client, message):
         "Check out the amazing Int-Far website {emote_smol_gual}\n" +
         "https://mhooge.com/intfar\n" +
         "Write `!website_verify` to sign in to the website, " +
-        "allowing you to create bets and see stats."
+        "allowing you to create bets, see stats, upload sounds, and more!"
     )
 
     await message.channel.send(client.insert_emotes(response))

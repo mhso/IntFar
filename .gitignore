@@ -20,5 +20,6 @@ composer.lock
 all_messages.txt
 fix_payouts.py
 misc
+log
 todo.txt
 dummy.txt

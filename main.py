@@ -1,4 +1,6 @@
 from time import sleep
+import subprocess
+from sys import executable
 from multiprocessing import Process, Pipe
 
 from discord.opus import load_opus
@@ -91,13 +93,28 @@ if __name__ == "__main__":
                     conf, database_client, betting_handler, riot_api,
                     audio_handler, shop_handler, our_end_ai, bot_end_flask
                 )
+
             if bot_process.exitcode == 1:
-                bot_process, our_end_bot = start_discord_process(
-                    conf, database_client, betting_handler, riot_api,
-                    audio_handler, shop_handler, our_end_ai, bot_end_flask
-                )
+                ai_process.kill()
+                flask_process.kill()
+                bot_process.kill()
+
+                processes = [ai_process, flask_process, bot_process]
+                while all(p.is_alive() for p in processes):
+                    sleep(0.5)
+
+                # We have issued a restart command on Discord to restart the program.
+                print()
+                print(f"++++++ Restarting {__file__} ++++++", flush=True)
+                print()
+
+                subprocess.Popen([executable, __file__])
+                break
+
         except BrokenPipeError:
             print("Stopping bot...", flush=True)
+            if bot_process.is_alive():
+                bot_process.kill()
             ai_process.kill()
             flask_process.kill()
         except KeyboardInterrupt:

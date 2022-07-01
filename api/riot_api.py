@@ -204,7 +204,7 @@ class APIClient:
         if response.status_code != 200:
             if tries > 0:
                 sleep(30)
-                return self.get_game_details(game_id, tries-1)
+                return self.get_game_timeline(game_id, tries-1)
             else:
                 return None
 

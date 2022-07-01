@@ -64,7 +64,10 @@ async def handle_doinks_relations_msg(client, message, target_id):
     await message.channel.send(response)
 
 async def handle_doinks_criteria_msg(client, message):
-    response = "Criteria for being awarded {emote_Doinks}:"
+    response = "Criteria for being awarded {emote_Doinks}:\n"
     for reason in api_util.DOINKS_REASONS:
-        response += f"\n - {reason}"
+        response += f"- {reason}\n"
+
+    response += "Any of these being met will award 1 {emote_Doinks}"
+
     await message.channel.send(client.insert_emotes(response))

@@ -119,8 +119,8 @@ def get_cool_timeline_events(data, config):
     """
     Returns a list of cool/embarrasing events that happened during the course of the game.
     These events include:
-        - We lost the game after being up by more than 8k gold
-        - We won the game after being down by more than 8k gold
+        - We lost the game after being up by more than 8k gold (the big throw)
+        - We won the game after being down by more than 8k gold (the epic comeback)
         - Someone had more than 4000 gold at one point
     """
     # Dictionary that maps from participantId to disc_id
@@ -128,18 +128,19 @@ def get_cool_timeline_events(data, config):
         entry["participantId"]: data["puuid_map"].get(entry["puuid"])
         for entry in data["participants"]
     }
-    frame_interval = data["frameInterval"]
 
     timeline_events = []
 
-    # Calculate stats from timeline frames.
     biggest_gold_lead = 0
     biggest_gold_deficit = 0
     too_much_gold = {}
 
+    # Calculate stats from timeline frames.
     for frame_data in data["frames"]:
+        # Tally up our and ememy teams total gold during the game.
         our_total_gold = 0
         enemy_total_gold = 0
+
         for participant_id in frame_data["participantFrames"]:
             participant_data = frame_data["participantFrames"][participant_id]
             disc_id = participant_dict.get(participant_id)
@@ -147,19 +148,22 @@ def get_cool_timeline_events(data, config):
             curr_gold = participant_data["currentGold"]
             our_team = (int(participant_id) > 5) ^ data["ourTeamLower"]
 
+            # Add players gold to total for their team.
             if our_team:
                 our_total_gold += total_gold
             else:
                 enemy_total_gold += total_gold
 
             if disc_id is not None and curr_gold > config.timeline_min_curr_gold:
+                # Player has enough current gold to warrant a mention.
+                # If this amount of gold is more than their previous max, save it.
                 curr_value_for_player = too_much_gold.get(disc_id, 0)
                 curr_value_for_player[disc_id] = max(curr_gold, curr_value_for_player)
 
         gold_diff = our_total_gold - enemy_total_gold
-        if gold_diff < 0:
+        if gold_diff < 0: # Record max gold deficit during the game.
             biggest_gold_deficit = max(abs(gold_diff), biggest_gold_deficit) 
-        else:
+        else: # Record max gold lead during the game.
             biggest_gold_lead = max(gold_diff, biggest_gold_lead)
 
     if biggest_gold_deficit > config.timeline_min_deficit and data["gameWon"]: # Epic comeback!

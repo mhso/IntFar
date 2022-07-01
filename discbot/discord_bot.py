@@ -5,7 +5,7 @@ from threading import Thread
 from time import time, sleep
 from math import ceil
 from traceback import print_exc
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 import discord
@@ -74,6 +74,8 @@ DOINKS_FLAVORS = [
 
 STREAK_FLAVORS = api_util.load_flavor_texts("streak")
 
+IFOTM_FLAVORS = api_util.load_flavor_texts("ifotm")
+
 def get_intfar_flavor_text(nickname, reason):
     flavor_text = INTFAR_FLAVOR_TEXTS[random.randint(0, len(INTFAR_FLAVOR_TEXTS)-1)]
     return flavor_text.replace("{nickname}", nickname).replace("{reason}", reason)
@@ -125,6 +127,9 @@ def get_doinks_flavor_text(index, value):
 def get_streak_flavor_text(nickname, streak):
     index = streak - 2 if streak - 2 < len(STREAK_FLAVORS) else len(STREAK_FLAVORS) - 1
     return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
+
+def get_ifotm_flavor_text(month):
+    return IFOTM_FLAVORS[month - 1]
 
 class DiscordClient(discord.Client):
     def __init__(self, config, database, betting_handler, riot_api, audio_handler, shop_handler, **kwargs):
@@ -281,6 +286,9 @@ class DiscordClient(discord.Client):
                 self.config.log("Exception after game was over!!!", self.config.log_error)
                 await self.send_error_msg(guild_id)
                 with open("log/errorlog.txt", "a", encoding="utf-8") as fp:
+                    tz_info = timezone(2, "CET")
+                    dt_now = datetime.now(tz_info).strftime("%y-%m-%d %H:%M:%S")
+                    fp.write(f"===== {dt_now} =====\n")
                     print_exc(file=fp)
                 raise e
 
@@ -334,11 +342,16 @@ class DiscordClient(discord.Client):
             await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
 
         # Get timeline data events for the game.
-        timeline_data = self.riot_api.get_game_timeline(game_info)
-        if timeline_data is not None:
-            timeline_response = self.get_cool_timeline_data(timeline_data, guild_id)
-            if timeline_response is not None:
-                response = timeline_response + "\n" + response
+        try:
+            timeline_data = self.riot_api.get_game_timeline(game_info["gameId"])
+            if timeline_data is not None:
+                timeline_response = self.get_cool_timeline_data(
+                    filtered_stats, timeline_data, guild_id
+                )
+                if timeline_response is not None:
+                    response = timeline_response + "\n" + response
+        except Exception:
+            print_exc()
 
         # Get other cool stats about players.
         cool_stats_response = self.get_cool_stats_data(filtered_stats, guild_id)
@@ -535,14 +548,21 @@ class DiscordClient(discord.Client):
         """
         Return a string that allows for @mention of the given user.
         """
+        # Try and find the person in the specified guild.
         for guild in self.guilds:
             if guild.id == guild_id:
                 for member in guild.members:
                     if member.id == disc_id:
                         return member.mention
-        return None
+
+        # If person is not found, find nickname from any guild instead.
+        return self.get_discord_nick(disc_id, guild_id)
 
     def get_member_safe(self, disc_id, guild_id=api_util.MAIN_GUILD_ID):
+        """
+        Try to find a member in the guild with the given guild ID.
+        If person is not found, search through all registered guilds instead.
+        """
         if isinstance(disc_id, str):
             disc_id = int(disc_id)
 
@@ -556,6 +576,7 @@ class DiscordClient(discord.Client):
             for member in server.members:
                 if member.id == disc_id:
                     return member
+
         return None
 
     def get_discord_nick(self, discord_id=None, guild_id=api_util.MAIN_GUILD_ID):
@@ -572,6 +593,7 @@ class DiscordClient(discord.Client):
             member = self.get_member_safe(disc_id, guild_id)
             name = "Unnamed" if member is None else member.display_name
             nicknames.append(name)
+
         return nicknames
 
     async def get_discord_avatar(self, discord_id=None, size=64):
@@ -1147,8 +1169,9 @@ class DiscordClient(discord.Client):
 
         return cool_stats_msg
 
-    def get_cool_timeline_data(self, timeline_data, guild_id):
-        timeline_mentions = award_qualifiers.get_cool_timeline_events(timeline_data, self.config)
+    def get_cool_timeline_data(self, filtered_stats, timeline_data, guild_id):
+        filtered_timeline = game_stats.get_filtered_timeline_stats(filtered_stats, timeline_data)
+        timeline_mentions = award_qualifiers.get_cool_timeline_events(filtered_timeline, self.config)
         cool_events_msg = self.get_cool_timeline_msg(timeline_mentions, guild_id)
 
         return cool_events_msg
@@ -1272,13 +1295,18 @@ class DiscordClient(discord.Client):
         intfar_data = self.database.get_intfars_of_the_month()
         intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
                           for (disc_id, games, intfars, ratio) in intfar_data]
-        intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n"
+
+        intro_desc = get_ifotm_flavor_text(month) + "\n\n"
+        intro_desc += f"Int-Far of the month for {month_name} is...\n"
         intro_desc += "***DRUM ROLL***\n"
+
         desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
         desc += ":clap: :clap: :clap: :clap: :clap: \n"
         desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
         desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
-        final_msg = intro_desc + self.insert_emotes(desc)
+
+        final_msg = self.insert_emotes(intro_desc + desc)
+
         await self.channels_to_write[api_util.MAIN_GUILD_ID].send(final_msg)
 
         # Assign Int-Far of the Month 'badge' (role) to the top Int-Far.
@@ -1286,28 +1314,41 @@ class DiscordClient(discord.Client):
         winners = [tupl[0] for tupl in intfar_data[:num_winners]]
         await self.assign_monthly_intfar_role(current_month, winners)
 
-    async def sleep_until_monthly_infar(self):
+    async def polling_loop(self):
         """
-        Sleeps until the first of the next month (run in seperate thread).
-        When the next month rolls around,
-        this method announces the Int-Far of the previous month.
+        Incrementally polls for a few things.
+        Firstly, checks whether it's the first of the next month.
+        If so, the Int-Far of the previous month is announced.
+        Secondly, once every day, the newest patch for League
+        is checked for, to see if any new champs have been released.
         """
-        monitor = MonthlyIntfar(self.config.hour_of_ifotm_announce)
+        ifotm_monitor = MonthlyIntfar(self.config.hour_of_ifotm_announce)
         self.config.log("Starting Int-Far-of-the-month monitor... ")
-        format_time = monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S")
+
+        format_time = ifotm_monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S")
         self.config.log(f"Monthly Int-Far will be crowned at {format_time} UTC+1")
-        dt_now = datetime.now(monitor.cph_timezone)
-        duration = api_util.format_duration(dt_now, monitor.time_at_announcement)
+
+        dt_now = datetime.now(ifotm_monitor.cph_timezone)
+        duration = api_util.format_duration(dt_now, ifotm_monitor.time_at_announcement)
         self.config.log(f"Time until then: {duration}")
 
+        curr_day = dt_now.day
+
         time_to_sleep = 30
-        while not monitor.should_announce():
+        while not ifotm_monitor.should_announce():
+            new_day = datetime.now(ifotm_monitor.cph_timezone).day
+            if new_day != curr_day:
+                # Download latest information from Riot API.
+                self.riot_api.get_latest_data()
+                curr_day = new_day
+
             await asyncio.sleep(time_to_sleep)
 
-        await self.declare_monthly_intfar(monitor)
+        await self.declare_monthly_intfar(ifotm_monitor)
 
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
-        asyncio.create_task(self.sleep_until_monthly_infar())
+
+        asyncio.create_task(self.polling_loop())
 
     async def send_error_msg(self, guild_id):
         """
@@ -1372,7 +1413,7 @@ class DiscordClient(discord.Client):
                 CHANNEL_IDS.append(guild.text_channels[0].id)
                 self.channels_to_write[guild.id] = guild.text_channels[0]
 
-        asyncio.create_task(self.sleep_until_monthly_infar())
+        asyncio.create_task(self.polling_loop())
 
         if self.flask_conn is not None: # Listen for external commands from web page.
             event_loop = asyncio.get_event_loop()
@@ -1447,15 +1488,22 @@ class DiscordClient(discord.Client):
         await message.channel.send(msg)
 
     async def on_message(self, message):
+        """
+        Method that is called when a message is sent on Discord
+        in any of the channels that Int-Far is active in. 
+        """
+        
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
 
         if ((self.config.env == "dev" and message.guild.id != api_util.MY_GUILD_ID)
                 or (self.config.env == "production" and message.guild.id not in api_util.GUILD_IDS)):
+            # If Int-Far is running in dev mode, only handle messages that are sent from
+            # my personal sandbox Discord server.
             return
 
         msg = message.content.strip()
-        if msg.startswith("!"):
+        if msg.startswith("!"): # Message is a command.
             split = msg.split(None)
             command = split[0][1:].lower()
 

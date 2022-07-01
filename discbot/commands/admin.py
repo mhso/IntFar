@@ -6,3 +6,9 @@ async def handle_kick_msg(client, message, target_id):
     response += "and he will forever live in shame {emote_im_nat_kda_player_yo}"
 
     await message.channel.send(client.insert_emotes(response))
+
+async def handle_restart_msg(client, message):
+    await message.channel.send("Restarting Int-Far...")
+
+    # Exit code is caught by main process.
+    exit(1)

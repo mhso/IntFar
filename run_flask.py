@@ -19,6 +19,9 @@ class RedirectStderr(object):
 
         self.logger.error(msg)
 
+    def flush(self):
+        pass
+
     def close(self):
         super(RedirectStderr, self).close()
 
