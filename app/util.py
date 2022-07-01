@@ -13,7 +13,7 @@ def register_discord_connection():
 
     lock_success = conn_lock.acquire(timeout=3)
     if not lock_success:
-        exit(1)
+        exit(2)
 
     new_conn = discord_request("register", None, None, bot_conn)
     conn_lock.release()

@@ -1,3 +1,4 @@
+import sys
 from time import sleep
 import subprocess
 from sys import executable
@@ -49,7 +50,7 @@ def start_ai_process(config):
     ai_process.start()
     return ai_process, bot_end_ai
 
-if __name__ == "__main__":
+def main():
     conf = Config()
     env_desc = "DEVELOPMENT" if conf.env == "dev" else "PRODUCTION"
     conf.log(f"+++++ Running in {env_desc} mode +++++")
@@ -80,8 +81,10 @@ if __name__ == "__main__":
 
     while True:
         try:
-            if flask_process.exitcode == 1:
+            if flask_process.exitcode == 2:
+                # 'Soft' reset processes.
                 conf.log("Restarting Flask process.")
+
                 flask_process, bot_end_flask = start_flask_process(
                     database_client, betting_handler,
                     riot_api, conf
@@ -94,22 +97,20 @@ if __name__ == "__main__":
                     audio_handler, shop_handler, our_end_ai, bot_end_flask
                 )
 
-            if bot_process.exitcode == 1:
+            if bot_process.exitcode == 2:
+                # We have issued a restart command on Discord to restart the program.
                 ai_process.kill()
                 flask_process.kill()
                 bot_process.kill()
 
+                # Wait for all subprocesses to exit.
                 processes = [ai_process, flask_process, bot_process]
                 while all(p.is_alive() for p in processes):
                     sleep(0.5)
 
-                # We have issued a restart command on Discord to restart the program.
-                print()
-                print(f"++++++ Restarting {__file__} ++++++", flush=True)
-                print()
+                conf.log(f"++++++ Restarting {__file__} ++++++")
 
-                subprocess.Popen([executable, __file__])
-                break
+                exit(2)
 
         except BrokenPipeError:
             print("Stopping bot...", flush=True)
@@ -117,8 +118,30 @@ if __name__ == "__main__":
                 bot_process.kill()
             ai_process.kill()
             flask_process.kill()
+            break
+
         except KeyboardInterrupt:
             conf.log("Stopping bot...")
-            exit(0)
+            break
 
         sleep(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "child":
+        main()
+        exit(0)
+
+    try:
+        while True:
+            process = subprocess.Popen([sys.executable, __file__, "child"])
+
+            while process.poll() is None:
+                sleep(0.1)
+
+            if process.returncode == 2:
+                sleep(1)
+            else:
+                break
+
+    except KeyboardInterrupt:
+        process.kill()

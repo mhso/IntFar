@@ -177,9 +177,10 @@ async def handle_performance_msg(client, message, target_id=None):
             f"**{score:.2f}**/**10**. This ranks him at **{rank}**/**{num_scores}**."
         )
 
-    score_fmt = "These scores are" if target_id is None else "This score is"
+    score_fmt = "\nHigher score = better player (but smaller dick). Maximum is 10. "
+    score_fmt += "These scores are" if target_id is None else "This score is"
     response += (
-        f"\n{score_fmt} calculated using the percentage of " +
+        f"\n{score_fmt} calculated using the ratio of " +
         "games being Int-Far, getting doinks, or winning."
     )
 

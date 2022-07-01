@@ -11,4 +11,4 @@ async def handle_restart_msg(client, message):
     await message.channel.send("Restarting Int-Far...")
 
     # Exit code is caught by main process.
-    exit(1)
+    exit(2)
