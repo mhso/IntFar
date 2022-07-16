@@ -1,21 +1,22 @@
 import asyncio
-import json
 import argparse
-from random import choice
+
+from mhooge_flask.logging import logger
+
 from api import award_qualifiers
 from api.audio_handler import AudioHandler
 from api.bets import BettingHandler
 from api.config import Config
 from api.database import Database
 from api.shop import ShopHandler
-from discbot.discord_bot import DiscordClient
-from discbot.commands.util import ADMIN_DISC_ID
 from api.riot_api import APIClient
 from api.game_stats import get_filtered_stats
 from api.util import MAIN_GUILD_ID, GUILD_IDS, create_predictions_timeline_image
 from ai.data import shape_predict_data
 from ai.train import train_online
 from ai.model import Model
+from discbot.discord_bot import DiscordClient
+from discbot.commands.util import ADMIN_DISC_ID
 
 GUILDS = {
     "nibs": GUILD_IDS[0],
@@ -104,7 +105,7 @@ class TestMock(DiscordClient):
                 await self.play_event_sounds(guild_id, intfar, doinks)
 
             if self.ai_model is not None and self.task in ("all", "train"):
-                self.config.log("Training AI Model with new game data.")
+                logger.info("Training AI Model with new game data.")
                 train_data = shape_predict_data(
                     self.database, self.riot_api, self.config, users_in_game
                 )
@@ -112,7 +113,7 @@ class TestMock(DiscordClient):
                     self.ai_model, train_data, filtered[0][1]["gameWon"]
                 )
                 self.ai_model.save()
-                self.config.log(f"Loss: {loss}")
+                logger.info(f"Loss: {loss}")
 
             if self.config.generate_predictions_img:
                 predictions_img = None
@@ -165,11 +166,11 @@ conf = Config()
 
 riot_api = APIClient(conf)
 
-conf.log("Initializing database...")
+logger.info("Initializing database...")
 
 database_client = Database(conf)
 
-conf.log("Starting Discord Client...")
+logger.info("Starting Discord Client...")
 
 bet_client = BettingHandler(conf, database_client)
 audio_client = AudioHandler(conf)

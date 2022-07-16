@@ -62,15 +62,11 @@ conf = Config()
 conf.discord_token = auth["discordToken"]
 conf.riot_key = auth["riotDevKey"] if conf.use_dev_token else auth["riotAPIKey"]
 
-conf.log("Initializing database...")
-
 database_client = Database(conf)
 
 test = []
 for x, y, z in test:
     print("LOL")
-
-# conf.log("Starting Discord Client...")
 
 # client = TestMock(conf, database_client)
 

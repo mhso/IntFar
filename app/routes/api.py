@@ -20,26 +20,24 @@ def get_statistics():
         )
 
     try:
-        # Start persistent connection for efficiency.
-        database.start_persistent_connection()
+        with database:
+            # Get active games, if any are ongoing.
+            active_games = app_util.get_game_info()
 
-        # Get active games, if any are ongoing.
-        active_games = app_util.get_game_info()
+            # Get total games played and won.
+            games_played, _, games_won = database.get_games_count()
+            won_pct = float(f"{(games_won / games_played) * 100:.1f}")
 
-        # Get total games played and won.
-        games_played, _, games_won = database.get_games_count()
-        won_pct = float(f"{(games_won / games_played) * 100:.1f}")
+            # Get total count of Int-Fars awarded.
+            intfars_total = database.get_intfar_count()
+            intfars_pct = float(f"{(intfars_total / games_played) * 100:.1f}")
 
-        # Get total count of Int-Fars awarded.
-        intfars_total = database.get_intfar_count()
-        intfars_pct = float(f"{(intfars_total / games_played) * 100:.1f}")
+            # Games where doinks were earned and total doinks earned.
+            doinks_games, doinks_total = database.get_doinks_count()
+            doinks_pct = float(f"{(doinks_games / games_played) * 100:.1f}")
 
-        # Games where doinks were earned and total doinks earned.
-        doinks_games, doinks_total = database.get_doinks_count()
-        doinks_pct = float(f"{(doinks_games / games_played) * 100:.1f}")
-
-        # Get Int-Far of the month leads.
-        monthly_intfars = database.get_intfars_of_the_month()
+            # Get Int-Far of the month leads.
+            monthly_intfars = database.get_intfars_of_the_month()
 
         if monthly_intfars != []:
             tied_intfars = [monthly_intfars[0]]
@@ -86,6 +84,3 @@ def get_statistics():
             {"error": f"Internal error during API call: {e.args[0]}"},
             http_code=500
         )
-
-    finally:
-        database.close_persistent_connection()

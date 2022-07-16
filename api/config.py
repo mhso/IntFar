@@ -66,8 +66,6 @@ class Config:
         self.hour_of_ifotm_announce = 11 # Hour of the day on which to announce IFOTM.
 
         # ===== Logging & Messaging =====
-        self.log_warning = 1
-        self.log_error = 2
         self.message_timeout = 1.5
 
         # ===== ML Classifier =====
@@ -84,14 +82,3 @@ class Config:
         self.ai_weight_decay = 0e-4
         self.ai_epochs = 100
         self.ai_init_range = 0.001
-
-    def log(self, data, severity=0, end="\n"):
-        curr_time = datetime.now()
-        prefix = curr_time.strftime("%Y-%m-%d %H:%M:%S")
-        if severity == self.log_warning:
-            prefix = prefix + " - [Warning]"
-        elif severity == self.log_error:
-            prefix = prefix + " - [### ERROR ###]"
-
-        if self.debug:
-            print(prefix + " - " + str(data), flush=True, end=end)

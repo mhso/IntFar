@@ -9,7 +9,12 @@ $url = "https://mhooge.com:" . $port . "/" . $app_name;
 
 $redir = "";
 if ($_SERVER["REQUEST_URI"] != "/" . $app_name . "/") {
-    $redir = $url."/".(explode("/", $_SERVER["REQUEST_URI"], 3)[2]);
+    $expl = explode("/", $_SERVER["REQUEST_URI"]);
+    $redir = "";
+    for ($index = 2; $index < count($expl); $index++) {
+        $redir = $redir . "/" . $expl[$index];
+    }
+    $redir = $url . $redir;
 }
 else {
     $redir = $url;

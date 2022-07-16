@@ -1,10 +1,9 @@
-import sys
+import sys, subprocess, signal
 from time import sleep
-import subprocess
-from sys import executable
 from multiprocessing import Process, Pipe
 
 from discord.opus import load_opus
+from mhooge_flask.logging import logger
 
 import run_flask
 from api.audio_handler import AudioHandler
@@ -14,18 +13,19 @@ from api.database import Database
 from api.shop import ShopHandler
 from api.riot_api import APIClient
 from ai import model
-from discbot.discord_bot import run_client
+from discbot import discord_bot
 
 def start_discord_process(config, database, betting_handler, riot_api, audio_handler, shop_handler, bot_end_ai, bot_end_flask):
     our_end, bot_end_us = Pipe()
     bot_process = Process(
         name="Discord Bot",
-        target=run_client,
+        target=discord_bot.run_client,
         args=(
             config, database, betting_handler, riot_api, audio_handler, shop_handler, bot_end_ai, bot_end_us, bot_end_flask
         )
     )
     bot_process.start()
+
     return bot_process, our_end
 
 def start_flask_process(database, betting_handler, riot_api, config):
@@ -38,6 +38,7 @@ def start_flask_process(database, betting_handler, riot_api, config):
         )
     )
     flask_process.start()
+
     return flask_process, bot_end_flask
 
 def start_ai_process(config):
@@ -48,31 +49,36 @@ def start_ai_process(config):
         args=(config, ai_end)
     )
     ai_process.start()
+
     return ai_process, bot_end_ai
 
 def main():
     conf = Config()
+
     env_desc = "DEVELOPMENT" if conf.env == "dev" else "PRODUCTION"
-    conf.log(f"+++++ Running in {env_desc} mode +++++")
+    logger.info(f"+++++ Running in {env_desc} mode +++++")
 
     if conf.env == "production":
         load_opus("/usr/local/lib/libopus.so")
 
-    conf.log("Initializing database...")
+    logger.info("Initializing database...")
+
     database_client = Database(conf)
     betting_handler = BettingHandler(conf, database_client)
     shop_handler = ShopHandler(conf, database_client)
     audio_handler = AudioHandler(conf)
     riot_api = APIClient(conf)
+
+    # Start process with machine learning model
+    # that trains in the background after each game.
     ai_process, our_end_ai = start_ai_process(conf)
 
-    conf.log("Starting Flask web app...")
+    logger.info("Starting Flask web app...")
     flask_process, bot_end_flask = start_flask_process(
-        database_client, betting_handler,
-        riot_api, conf
+        database_client, betting_handler, riot_api, conf
     )
 
-    conf.log("Starting Discord Client...")
+    logger.info("Starting Discord Client...")
 
     bot_process, our_end_bot = start_discord_process(
         conf, database_client, betting_handler, riot_api,
@@ -83,13 +89,14 @@ def main():
         try:
             if flask_process.exitcode == 2:
                 # 'Soft' reset processes.
-                conf.log("Restarting Flask process.")
+                logger.info("Restarting Flask process.")
 
                 flask_process, bot_end_flask = start_flask_process(
                     database_client, betting_handler,
                     riot_api, conf
                 )
                 ai_process.kill()
+
                 ai_process, our_end_ai = start_ai_process(conf)
                 bot_process.kill()
                 bot_process, our_end_bot = start_discord_process(
@@ -108,9 +115,11 @@ def main():
                 while all(p.is_alive() for p in processes):
                     sleep(0.5)
 
-                conf.log(f"++++++ Restarting {__file__} ++++++")
+                logger.info(f"++++++ Restarting {__file__} ++++++")
 
                 exit(2)
+
+            sleep(1)
 
         except BrokenPipeError:
             print("Stopping bot...", flush=True)
@@ -121,27 +130,41 @@ def main():
             break
 
         except KeyboardInterrupt:
-            conf.log("Stopping bot...")
+            logger.info("Stopping bot...")
             break
-
-        sleep(1)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "child":
+        # This runs the actual program. It runs in a subprocess
+        # if 'child' is given as an argument on the CLI.
         main()
         exit(0)
 
+    # Run a master process that starts the actual program in a child process and monitors it.
+    # If the child process exits with return code 2, restart it.
     try:
         while True:
+            # Start child process that runs the actual program.
             process = subprocess.Popen([sys.executable, __file__, "child"])
 
-            while process.poll() is None:
+            while process.poll() is None: # Wait for child process to exit.
                 sleep(0.1)
 
-            if process.returncode == 2:
-                sleep(1)
+            if process.returncode == 2: # Process requested a restart.
+                sleep(1) # Sleep for a sec and restart while loop.
             else:
-                break
+                break # Process exited naturally, terminate program.
 
     except KeyboardInterrupt:
-        process.kill()
+        # We have to handle interrupt signal differently on Linux vs. Windows.
+        if sys.platform == "linux":
+            sig = signal.SIGINT
+        else:
+            sig = signal.CTRL_C_EVENT
+    
+        # End child process and terminate program.
+        process.send_signal(sig)
+
+        # Wait for child process to exit properly.
+        while process.poll() is None:
+            sleep(0.1)

@@ -8,7 +8,6 @@ __pycache__
 *.pt
 api/champions*.json
 api/maps.json
-debug.log
 app/static/*
 app/static/*/bootstrap/
 !app/static/js/

@@ -418,36 +418,30 @@ class TestWrapper(TestRunner):
         all_bet_targets.extend([[None], [None], [None]])
         all_target_names.extend([[None], [None], [None]])
 
-        self.db_client.start_persistent_connection()
-        self.db_client.execute_query(
-            self.db_client.persistent_connection,
-            "UPDATE betting_balance SET tokens=100000000 WHERE disc_id=?",
-            (disc_id,)
-        )
+        with self.db_client:
+            self.db_client.execute_query(
+                "UPDATE betting_balance SET tokens=100000000 WHERE disc_id=?",
+                disc_id,
+            )
 
-        count = 1
-        for multi_count in range(1, 4):
-            for amount_index in range(0, len(all_bet_amounts), multi_count):
-                bet_amounts = all_bet_amounts[amount_index:amount_index+multi_count]
-                bet_strs = all_bet_strs[amount_index:amount_index+multi_count]
-                for game_timestamp in all_game_timestamp:
-                    for target_ids, target_names in zip(all_bet_targets, all_target_names):
-                        success, _, _ = self.bet_handler.place_bet(
-                            disc_id, guild_id, bet_amounts, game_timestamp,
-                            bet_strs, target_ids, target_names
-                        )
+            count = 1
+            for multi_count in range(1, 4):
+                for amount_index in range(0, len(all_bet_amounts), multi_count):
+                    bet_amounts = all_bet_amounts[amount_index:amount_index+multi_count]
+                    bet_strs = all_bet_strs[amount_index:amount_index+multi_count]
+                    for game_timestamp in all_game_timestamp:
+                        for target_ids, target_names in zip(all_bet_targets, all_target_names):
+                            success, _, _ = self.bet_handler.place_bet(
+                                disc_id, guild_id, bet_amounts, game_timestamp,
+                                bet_strs, target_ids, target_names
+                            )
 
-                        test_name = f"Many Bets #{count} - Bet Placed."
-                        if game_timestamp is not None and time() - game_timestamp > 5 * 60:
-                            self.assert_false(success, test_name)
-                        else:
-                            self.assert_true(success, test_name)
-                        count += 1
-
-        # for active_bets in self.db_client.get_bets(True, disc_id, guild_id):
-             # resolve all the bets (somehow).
-
-        self.db_client.close_persistent_connection()
+                            test_name = f"Many Bets #{count} - Bet Placed."
+                            if game_timestamp is not None and time() - game_timestamp > 5 * 60:
+                                self.assert_false(success, test_name)
+                            else:
+                                self.assert_true(success, test_name)
+                            count += 1
 
     @test
     def test_multi_bet_fail(self):

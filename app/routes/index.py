@@ -2,7 +2,10 @@ import json
 from time import time
 from os import remove
 from os.path import exists
+
+from mhooge_flask.logging import logger
 import flask
+
 import api.util as api_util
 import app.util as app_util
 from api.bets import get_dynamic_bet_desc
@@ -308,7 +311,7 @@ def set_prediction():
 
     game_id = int(data["game_id"])
 
-    conf.log(f"Updated game prediction: {data['pct_win']}% chance of winning.")
+    logger.info(f"Updated game prediction: {data['pct_win']}% chance of winning.")
 
     save_prediction_to_file(data["pct_win"], int(data["game_duration"]))
 

@@ -1,3 +1,4 @@
+from mhooge_flask.logging import logger
 import torch
 
 from ai.train import train_online
@@ -94,7 +95,7 @@ class Model(torch.nn.Module):
     def load(self):
         self.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=torch.device("cpu")))
         self.eval()
-        self.config.log("Prediction Classifier Loaded")
+        logger.info("Prediction Classifier Loaded")
 
 def run_loop(config, bot_pipe):
     ai_model = Model(config)

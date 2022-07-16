@@ -321,16 +321,15 @@ def user(disc_id):
     if avatar is not None:
         avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
-    database.start_persistent_connection()
-    intfar_data = get_intfar_data(disc_id, database)
-    intfar_relation_data = get_intfar_relations_data(disc_id, database)
-    doinks_data = get_doinks_data(disc_id, database)
-    doinks_relation_data = get_doinks_relations_data(disc_id, database)
-    betting_data = get_betting_data(disc_id, database)
-    tokens_data = get_betting_tokens_data(disc_id, database)
-    game_stat_data = get_game_stats(disc_id, database)
-    most_reports_id = database.get_max_reports_details()[1]
-    database.close_persistent_connection()
+    with database:
+        intfar_data = get_intfar_data(disc_id, database)
+        intfar_relation_data = get_intfar_relations_data(disc_id, database)
+        doinks_data = get_doinks_data(disc_id, database)
+        doinks_relation_data = get_doinks_relations_data(disc_id, database)
+        betting_data = get_betting_data(disc_id, database)
+        tokens_data = get_betting_tokens_data(disc_id, database)
+        game_stat_data = get_game_stats(disc_id, database)
+        most_reports_id = database.get_max_reports_details()[1]
 
     context = {
         "disc_id": disc_id, "nickname": nickname, "avatar": avatar,

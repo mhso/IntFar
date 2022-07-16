@@ -69,13 +69,12 @@ async def handle_make_bet_msg(client, message, amounts, events, targets):
         target_ids.append(target_id)
         target_names.append(discord_name)
 
-    client.database.start_persistent_connection()
-    response = client.betting_handler.place_bet(
-        message.author.id, message.guild.id, amounts,
-        client.game_start.get(message.guild.id), events,
-        target_ids, target_names
-    )[1]
-    client.database.close_persistent_connection()
+    with client.database:
+        response = client.betting_handler.place_bet(
+            message.author.id, message.guild.id, amounts,
+            client.game_start.get(message.guild.id), events,
+            target_ids, target_names
+        )[1]
 
     await message.channel.send(response)
 

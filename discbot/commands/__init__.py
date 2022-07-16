@@ -13,6 +13,8 @@ from discbot.commands import util as commands_util
 from api.database import DBException
 from api.util import GUILD_IDS, GUILD_MAP
 
+from mhooge_flask.logging import logger
+
 class TargetParam:
     def __init__(self, name, default="me", end_index=None):
         self.name = name
@@ -123,14 +125,17 @@ class Command:
             await self.handler(*handler_args) # Execute command using handler.
 
         except ValueError as arg_exception:
+            # Log error during command handling
+            logger.bind(input_list=input_list).error("Error when handling Discord command")
             await message.channel.send(client.insert_emotes(arg_exception.args[0]))
-            client.config.log(arg_exception, client.config.log_error)
 
-        except DBException as db_exception:
+        except DBException:
+            # Log database error during command handling
+            logger.bind(input_list=input_list).error("Database error when handling Discord command")
+
             response = "Something went wrong when querying the database! "
             response += client.insert_emotes("{emote_fu}")
             await message.channel.send(response)
-            client.config.log(db_exception, client.config.log_error)
 
     def format_params_list(self, params):
         """

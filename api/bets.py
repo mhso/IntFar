@@ -1,6 +1,9 @@
 from time import time
 from datetime import datetime
 from traceback import print_exc
+
+from mhooge_flask.logging import logger
+
 from api.database import DBException
 from api.util import format_duration, round_digits, format_tokens_amount, parse_amount_str
 from api import game_stats
@@ -322,14 +325,18 @@ class BettingHandler:
         all_success = True
         for amount, event_id, target_id in zip(amounts, events, targets):
             success = False
+    
             if event_id in (0, 1): # The bet concerns winning or losing the game.
                 success = resolve_game_outcome(stats, event_id == 0)
+
             elif event_id < BETTING_TYPES_INDICES["doinks"]: # The bet concerns someone being Int-Far for something.
                 resolve_func = RESOLVE_INTFAR_BET_FUNCS[event_id - BETTING_TYPES_INDICES["intfar"]]
                 success = resolve_func(intfar, intfar_reason, target_id)
+
             elif event_id < BETTING_TYPES_INDICES["stats"]:
                 resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id - BETTING_TYPES_INDICES["doinks"]]
                 success = resolve_func(doinks, target_id)
+
             elif event_id < len(BETTING_IDS):
                 resolve_func = RESOLVE_STATS_BET_FUNCS[event_id - BETTING_TYPES_INDICES["stats"]]
                 success = resolve_func(stats, target_id)
@@ -354,8 +361,7 @@ class BettingHandler:
                     bet_id, game_id, timestamp, all_success, total_value
                 )
             except DBException:
-                print_exc()
-                self.config.log("Database error during bet resolution!", self.config.log_error)
+                logger.error("Database error during bet resolution!")
                 return
 
         if all_success:
@@ -432,6 +438,7 @@ class BettingHandler:
         except ValueError:
             err_msg = self.get_bet_error_msg(bet_desc, f"Invalid bet amount: '{bet_amount}'.")
             return (False, err_msg)
+
         time_now = time()
         duration = 0 if game_timestamp is None else time_now - game_timestamp
         if duration > 60 * MAX_BETTING_THRESHOLD:
@@ -440,17 +447,33 @@ class BettingHandler:
                 "The game is too far progressed. You must place bet before " +
                 f"{MAX_BETTING_THRESHOLD} minutes in game."
             )
+
             return (False, err_msg)
 
         if self.database.get_bet_id(disc_id, guild_id, event_id, bet_target, ticket) is not None:
             err_msg = self.get_bet_error_msg(bet_desc, "Such a bet has already been made!")
             return (False, err_msg)
+
         if running_cost + amount > balance:
             err_msg = self.get_bet_error_msg(bet_desc, f"You do not have enough {tokens_name}.")
             return (False, err_msg)
+
         return (True, (amount, event_id, duration, bet_desc))
 
     def place_bet(self, disc_id, guild_id, amounts, game_timestamp, events, targets, target_names):
+        """
+        Places one or more bets the best are valid
+        and the user has enough points to afford them.
+
+        :param disc_id:         Discord ID of the user placing the bet
+        :param guild_id:        ID of the Discord server in which the should be placed
+        :param amounts:         List of amount of points to bet for on each bet
+        :param game_timestamp:  How many seconds the current game is underway (or None)
+                                if no game is currently ongoing
+        :param events:          List of events to bet on
+        :param targets:         List of user Discord IDs to target with each bet
+        :param target_names:    List of user names to target with each bet
+        """
         tokens_name = self.config.betting_tokens
         ticket = None if len(amounts) == 1 else self.database.generate_ticket_id(disc_id)
         bet_data = []
@@ -509,8 +532,21 @@ class BettingHandler:
                     any_target = True
 
                 first = False
+
         except DBException:
-            print_exc()
+            # Log error along with relevant variables
+            logger.bind(
+                disc_id=disc_id,
+                guild_id=guild_id,
+                amounts=amounts,
+                game_timestamp=game_timestamp,
+                events=events,
+                targets=targets,
+                target_names=target_names,
+                bet_data=bet_data,
+                ticket=ticket
+            ).error("Bet could not be placed")
+
             return (False, "Bet was not placed: Database error occured :(", None)
 
         final_value *= len(amounts)

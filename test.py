@@ -127,7 +127,7 @@ class TestFuncs:
     def test_normalize_sound(self):
         files = glob("app/static/sounds/*.mp3")
         for filename in files:
-            normalize_sound_volume(filename, self.config)
+            normalize_sound_volume(filename)
 
 PARSER = argparse.ArgumentParser()
 

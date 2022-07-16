@@ -14,8 +14,8 @@ class TestWrapper(TestRunner):
         remove("resources/test.db")
         copy("resources/database.db", "resources/test.db")
         conf.database = "resources/test.db"
-        self.database_client = Database(conf)
-        self.before_all(database=self.database_client)
+        database_client = Database(conf)
+        self.before_all(database=database_client)
 
     @test
     def test_user_queries(self):
@@ -29,7 +29,7 @@ class TestWrapper(TestRunner):
         self.assert_equals(users_after, users_before + 1, "User was added.")
 
         def add_smurf_func():
-            self.database.add_user("summ_name", "summ_id", MY_DISC_ID)
+            self.database.add_user("summ_name2", "summ_id2", MY_DISC_ID)
 
         users_before = len(self.database.summoners)
         self.assert_no_exception(add_smurf_func, "Add Smurf.")
@@ -91,14 +91,26 @@ class TestWrapper(TestRunner):
         def most_extreme_stat_func():
             self.database.get_most_extreme_stat("kills", True, True)
             self.database.get_most_extreme_stat("first_blood", True, True)
-
         self.assert_no_exception(most_extreme_stat_func, "Get most extreme stat.")
 
         def get_stat_func():
             self.database.get_stat("kills", True, MY_DISC_ID, True)
             self.database.get_stat("first_blood", True, MY_DISC_ID, True)
-
         self.assert_no_exception(get_stat_func, "Get stat.")
+
+        def get_total_winrate_func():
+            self.database.get_total_winrate(MY_DISC_ID)
+        self.assert_no_exception(get_total_winrate_func, "Get total winrate.")
+
+        def get_champ_winrate_func():
+            self.database.get_champ_winrate(MY_DISC_ID, 4)
+        self.assert_no_exception(get_champ_winrate_func, "Get champ winrate.")
+
+        def get_min_or_max_winrate_champ_func():
+            self.database.get_min_or_max_winrate_champ(MY_DISC_ID, True)
+            self.database.get_min_or_max_winrate_champ(MY_DISC_ID, False)
+        self.assert_no_exception(get_min_or_max_winrate_champ_func, "Get min or max winrate champ.")
+
 
     @test
     def test_doinks_queries(self):
@@ -125,8 +137,7 @@ class TestWrapper(TestRunner):
     def test_intfar_queries(self):
         def get_intfar_counts_func():
             self.database.get_intfar_count(MY_DISC_ID)
-            result = self.database.get_intfar_count()
-            print(result) 
+            self.database.get_intfar_count()
 
         self.assert_no_exception(get_intfar_counts_func, "Get intfar counts.")
 
@@ -196,6 +207,119 @@ class TestWrapper(TestRunner):
         def get_better_id_func():
             self.database.get_better_id(30)
         self.assert_no_exception(get_better_id_func, "Get better ID.")
+
+    @test
+    def test_shop_queries(self):
+        def add_items_to_shop_func():
+            items = [
+                ("Item 1", 50),
+                ("Item 2", 1337)
+            ]
+            self.database.add_items_to_shop(items)
+        self.assert_no_exception(add_items_to_shop_func, "Add shop items.")
+
+        def buy_items_func():
+            items = self.database.get_items_matching_price("Item 1", 50, 1)
+            self.database.buy_item(MY_DISC_ID, items, 50, "Item 1")
+        self.assert_no_exception(buy_items_func, "Buy shop item.")
+
+        def get_item_by_name_func():
+            self.database.get_item_by_name("Item 2", "buy")
+            self.database.get_item_by_name("Item 2", "cancel")
+            self.database.get_item_by_name("Item 1", "sell")
+        self.assert_no_exception(get_item_by_name_func, "Get shop item by name.")
+
+        def get_items_for_user_func():
+             self.database.get_items_for_user(MY_DISC_ID)
+        self.assert_no_exception(get_items_for_user_func, "Get shop items for user.")
+
+        self.assert_no_exception(self.database.get_items_in_shop, "Get shop items.")
+
+        def sell_item_func():
+            items = self.database.get_matching_items_for_user(MY_DISC_ID, "Item 1", 1)
+            self.database.sell_item(MY_DISC_ID, items, "Item 1", 500)
+        self.assert_no_exception(sell_item_func, "Sell shop items.")
+
+        def get_items_matching_price_func():
+            self.database.get_items_matching_price("Item 2", 1337, 1)
+            self.database.get_items_matching_price("Item 1", 500, 1, MY_DISC_ID)
+        self.assert_no_exception(get_items_matching_price_func, "Get shop items matching price.")
+
+        def cancel_listings_func():
+            items = self.database.get_items_matching_price("Item 1", 500, 1, MY_DISC_ID)
+            self.database.cancel_listings([item[0] for item in items], "Item 1", MY_DISC_ID)
+        self.assert_no_exception(cancel_listings_func, "Cancel shop listings.")
+
+    @test
+    def test_sound_queries(self):
+        def get_event_sound_func():
+            self.database.get_event_sound(MY_DISC_ID, "intfar")
+            self.database.get_event_sound(MY_DISC_ID, "doinks")
+        self.assert_no_exception(get_event_sound_func, "Get event sound.")
+
+        def set_event_sound_func():
+            self.database.set_event_sound(MY_DISC_ID, "sound", "intfar")
+            self.database.set_event_sound(MY_DISC_ID, "sound", "doinks")
+        self.assert_no_exception(set_event_sound_func, "Set event sound.")
+        
+        def remove_event_sound_func():
+            self.database.remove_event_sound(MY_DISC_ID, "intfar")
+            self.database.remove_event_sound(MY_DISC_ID, "doinks")
+        self.assert_no_exception(remove_event_sound_func, "Remove event sound.")
+
+    @test
+    def test_list_queries(self):
+        def create_list_func():
+            self.database.create_list(MY_DISC_ID, "test_list1")
+            self.database.create_list(MY_DISC_ID, "test_list2")
+        self.assert_no_exception(create_list_func, "Create list.")
+
+        def get_lists_func():
+            self.database.get_lists()
+            self.database.get_lists(MY_DISC_ID)
+        self.assert_no_exception(get_lists_func, "Get lists.")
+        
+        def get_list_by_name_func():
+            self.database.get_list_by_name("test_list1")
+        self.assert_no_exception(get_list_by_name_func, "Get list by name.")
+
+        def rename_list_func():
+            list_id = self.database.get_list_by_name("test_list1")[0]
+            self.database.rename_list(list_id, "new_list_name")
+        self.assert_no_exception(rename_list_func, "Rename list.")
+
+        def get_list_data_func():
+            list_id = self.database.get_list_by_name("new_list_name")[0]
+            self.database.get_list_data(list_id)
+        self.assert_no_exception(get_list_data_func, "Get list data.")
+        
+        def add_items_to_list_func():
+            list_id = self.database.get_list_by_name("new_list_name")[0]
+            self.database.add_item_to_list(42, list_id)
+            items = [
+                (420, list_id),
+                (1337, list_id)
+            ]
+            self.database.add_items_to_list(items)
+        self.assert_no_exception(add_items_to_list_func, "Add items to list.")
+
+        def get_list_items_func():
+            list_id = self.database.get_list_by_name("new_list_name")[0]
+            self.database.get_list_items(list_id)
+        self.assert_no_exception(get_list_items_func, "Get items from list.")
+        
+        def get_list_from_item_id_func():
+            list_id = self.database.get_list_by_name("new_list_name")[0]
+            item_ids = self.database.get_list_items(list_id)
+            self.database.get_list_from_item_id(item_ids[0][0])
+        self.assert_no_exception(get_list_from_item_id_func, "Get list from list item.")
+        
+        def delete_item_from_list_func():
+            list_id = self.database.get_list_by_name("new_list_name")[0]
+            item_ids = self.database.get_list_items(list_id)
+            self.database.delete_item_from_list(item_ids[0][0])
+            self.database.delete_items_from_list([(item[0],) for item in item_ids[1:]])
+        self.assert_no_exception(delete_item_from_list_func, "Delete items from list.")
 
     @test
     def test_misc_queries(self):

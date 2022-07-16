@@ -2,7 +2,10 @@ import json
 from time import time
 from datetime import datetime
 from hashlib import sha256
+
+from mhooge_flask.logging import logger
 import flask
+
 from api.util import GUILD_IDS
 
 def register_discord_connection():
@@ -87,8 +90,7 @@ def discord_request(command_types, commands, params, pipe=None):
         pipe.send((sess_id, command_type_list, command_list, tuple_params))
         conn_received = pipe.poll(5)
         if not conn_received:
-            conf = flask.current_app.config["APP_CONFIG"]
-            conf.log("Connection to App Listener timed out!", conf.log_warning)
+            logger.warning("Connection to App Listener timed out!")
             raise ConnectionError()
 
         result = pipe.recv()

@@ -1,59 +1,61 @@
-import json
-from logging import Logger, ERROR
-from logging.handlers import TimedRotatingFileHandler
+from multiprocessing import Lock
 
-from gevent.pywsgi import WSGIServer
+from mhooge_flask.logging import logger
 
-from app import init
+from mhooge_flask import init
+from mhooge_flask.init import Route
 
-class RedirectStderr(object):
-
-    def __init__(self, logger):
-        self.logger = logger
-
-    def write(self, msg):
-        # Just in-case you want to write to both stderr and another log file
-        #super(RedirectStderr, self).write(msg)
-        if msg and msg.endswith('\n'):
-            msg = msg[:-1]
-
-        self.logger.error(msg)
-
-    def flush(self):
-        pass
-
-    def close(self):
-        super(RedirectStderr, self).close()
-
-logger = Logger("WSGI_Error", ERROR)
-handler = TimedRotatingFileHandler("log/wsgi_error.log", "d", 7, 0, encoding="utf-8")
-logger.addHandler(TimedRotatingFileHandler("log/wsgi_error.log", "d", 7, 0, encoding="utf-8"))
-
-import sys
-sys.stderr = RedirectStderr(logger)
+from app.util import before_request
+from app.routes import errors
 
 def run_app(database, bet_handler, riot_api, config, bot_pipe):
-    application = init.create_app(database, bet_handler, riot_api, config, bot_pipe)
-    application.static_folder = 'static'
+    # Define URL routes
+    routes = [
+        Route("index", "start_page"),
+        Route("users", "user_page", "user"),
+        Route("verify", "verify_page", "verify"),
+        Route("betting", "betting_page", "betting"),
+        Route("doinks", "doinks_page", "doinks"),
+        Route("stats", "stats_page", "stats"),
+        Route("soundboard", "soundboard_page", "soundboard"),
+        Route("lan", "lan_page", "lan"),
+        Route("lists", "lists_page", "lists"),
+        Route("quiz", "quiz_page", "quiz"),
+        Route("api", "api_page", "api"),
+    ]
 
-    # Run on HTTPS (with SSL) when on production environment.
-    ssl_args = {}
-    if config.env == "production":
-        with open("resources/auth.json", "r", encoding="utf-8") as fp:
-            data = json.load(fp)
-            key_file = data["sslKey"]
-            cert_file = data["sslCert"]
+    app_name = "intfar"
 
-        ssl_args = {
-            "keyfile": key_file,
-            "certfile": cert_file
-        }
+    # Create Flask app.
+    web_app = init.create_app(
+        app_name,
+        "/intfar/",
+        routes,
+        database,
+        propagate_exceptions=False,
+        app_config=config,
+        bet_handler=bet_handler,
+        bot_conn=bot_pipe,
+        logged_in_users={},
+        riot_api=riot_api,
+        active_game={},
+        game_prediction={},
+        user_count=0,
+        conn_map={},
+        conn_lock=Lock(),
+        max_content_length=1024 * 512, # 500 KB
+        quiz_categories=set(),
+        quiz_team_blue=True
+    )
 
-    with open("../flask_ports.json", "r", encoding="utf-8") as fp:
-        port_map = json.load(fp)
-        port = port_map["intfar"]
+    # Misc. routing handling.
+    web_app.before_request(before_request)
+    web_app.register_error_handler(500, errors.handle_internal_error)
+    web_app.register_error_handler(404, errors.handle_missing_page_error)
+
+    ports_file = "../flask_ports.json"
 
     try:
-        WSGIServer(('', port), application, log=sys.stdout, **ssl_args).serve_forever()
+        init.run_app(web_app, app_name, ports_file)
     except KeyboardInterrupt:
-        config.log("Stopping Flask web app...")
+        logger.info("Stopping Flask web app...")

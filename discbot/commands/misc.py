@@ -2,6 +2,7 @@ import asyncio
 import random
 
 import requests
+from mhooge_flask.logging import logger
 
 from api import util as api_util
 from api import game_stats
@@ -59,9 +60,9 @@ async def handle_game_msg(client, message, target_id):
                     response += f"\nPredicted chance of winning: **{pct_win}%**"
                 else:
                     error_msg = predict_response.json()["response"]
-                    client.config.log(f"Get game prediction error: {error_msg}")
+                    logger.error(f"Get game prediction error: {error_msg}")
             except requests.exceptions.RequestException as e:
-                client.config.log("Exception ignored in !game: " + str(e))
+                logger.error("Exception ignored in !game: " + str(e))
         elif client.ai_conn is not None:
             pct_win = client.get_ai_prediction(active_guild)
             response += f"\nPredicted chance of winning: **{pct_win}%**"

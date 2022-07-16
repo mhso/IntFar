@@ -1,4 +1,7 @@
 from datetime import datetime
+
+from mhooge_flask.logging import logger
+
 from api.util import parse_amount_str, format_tokens_amount, format_duration
 
 def get_shop_error_msg(msg, event):
@@ -16,10 +19,11 @@ class ShopHandler:
         self.config = config
         self.database = database
         self.shop_closing_dt = datetime(2021, 4, 1, 12, 0, 0)
+
         if self.shop_is_open():
             dt_now = datetime.now()
             time_to_closing = format_duration(dt_now, self.shop_closing_dt)
-            self.config.log(f"Shop closes in {time_to_closing}.")
+            logger.info(f"Shop closes in {time_to_closing}.")
 
     def shop_is_open(self):
         if not self.config.shop_open:
@@ -27,7 +31,7 @@ class ShopHandler:
 
         dt_now = datetime.now()
         if dt_now.timestamp() > self.shop_closing_dt.timestamp():
-            self.config.log("The shop is now closed!")
+            logger.info("The shop is now closed!")
             self.config.shop_open = False
 
         return self.config.shop_open

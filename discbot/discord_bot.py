@@ -5,11 +5,13 @@ from threading import Thread
 from time import time, sleep
 from math import ceil
 from traceback import print_exc
-from datetime import datetime, timezone
+from datetime import datetime
 
 import requests
 import discord
 from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
+
+from mhooge_flask.logging import logger
 
 from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
@@ -172,8 +174,8 @@ class DiscordClient(discord.Client):
     def send_game_update(self, endpoint, data):
         try:
             return requests.post(f"https://mhooge.com:5000/intfar/{endpoint}", data=data)
-        except requests.exceptions.RequestException as e:
-            self.config.log("Error ignored in online_monitor: " + str(e))
+        except requests.exceptions.RequestException:
+            logger.bind(endpoint=endpoint, data=data).error("Error ignored in send_game_update")
 
     async def send_predictions_timeline_image(self, image, guild_id):
         channel = self.channels_to_write[guild_id]
@@ -190,7 +192,7 @@ class DiscordClient(discord.Client):
         it calls the 'game_over' method, which determines who is the Int-Far,
         who to give doinks to, etc.
         """
-        self.config.log("Polling for game end...")
+        logger.info("Polling for game end...")
         time_slept = 0
         sleep_per_loop = 0.2
         try:
@@ -204,8 +206,10 @@ class DiscordClient(discord.Client):
         if game_status == 2: # Game is over.
             try:
                 game_id = self.active_game[guild_id]["id"]
-                self.config.log("GAME OVER!!")
-                self.config.log(f"Active game: {game_id}")
+
+                logger.info("GAME OVER!!")
+                logger.debug(f"Active game: {game_id}")
+
                 game_info = self.riot_api.get_game_details(
                     game_id, tries=2
                 )
@@ -214,31 +218,33 @@ class DiscordClient(discord.Client):
                 retries = 4
                 time_to_sleep = 30
                 while game_info is None and retry < retries:
-                    self.config.log(
-                        f"Game info is None! Retrying in {time_to_sleep} secs...",
-                        self.config.log_warning
+                    logger.warning(
+                        f"Game info is None! Retrying in {time_to_sleep} secs..."
                     )
                     await asyncio.sleep(time_to_sleep)
                     game_info = self.riot_api.get_game_details(game_id)
                     retry += 1
 
                 if game_info is None: # Game info is still None after 3 retries.
-                    self.config.log(
-                        "Game info is STILL None after 3 retries! Saving to missing games...",
-                        self.config.log_error
+                    # Log error
+                    logger.bind(game_id=game_id, guild_id=guild_id).error(
+                        "Game info is STILL None after 3 retries! Saving to missing games..."
                     )
+    
                     self.database.save_missed_game(game_id, guild_id, int(time()))
+    
+                    # Send message pinging me about the error.
                     mention_me = self.get_mention_str(commands_util.ADMIN_DISC_ID, guild_id)
                     message_str = (
                         "Riot API is being a dickfish again, not much I can do :shrug:\n"
                         f"{mention_me} will add the game manually later."
                     )
+
                     await self.send_message_unprompted(message_str, guild_id)
 
                 elif self.database.game_exists(game_info["gameId"]):
-                    self.config.log(
-                        "We triggered end of game stuff again... Strange!",
-                        self.config.log_warning
+                    logger.warning(
+                        "We triggered end of game stuff again... Strange!"
                     )
 
                 elif len(self.users_in_game[guild_id]) == 1:
@@ -271,6 +277,7 @@ class DiscordClient(discord.Client):
                 else:
                     await self.game_over(game_info, guild_id)
 
+                # Send update to Int-Far website that game is over.
                 req_data = {
                     "secret": self.config.discord_token,
                     "guild_id": guild_id, "game_id": game_id
@@ -283,13 +290,12 @@ class DiscordClient(discord.Client):
                 asyncio.create_task(self.poll_for_game_start(guild_id))
 
             except Exception as e:
-                self.config.log("Exception after game was over!!!", self.config.log_error)
+                game_id = self.active_game.get(guild_id, {}).get("id")
+
+                logger.bind(game_id=game_id).error("Exception after game was over!!!")
+
+                # Send error message to Discord and re-raise exception.
                 await self.send_error_msg(guild_id)
-                with open("log/errorlog.txt", "a", encoding="utf-8") as fp:
-                    tz_info = timezone(2, "CET")
-                    dt_now = datetime.now(tz_info).strftime("%y-%m-%d %H:%M:%S")
-                    fp.write(f"===== {dt_now} =====\n")
-                    print_exc(file=fp)
                 raise e
 
         elif game_status == 0:
@@ -297,24 +303,24 @@ class DiscordClient(discord.Client):
 
     async def game_over(self, game_info, guild_id):
         # Print who was in the game, for sanity checks.
-        self.config.log(f"Users in game before: {self.users_in_game.get(guild_id)}")
+        logger.debug(f"Users in game before: {self.users_in_game.get(guild_id)}")
+
         try: # Get formatted stats that are relevant for the players in the game.
             filtered_stats, users_in_game = game_stats.get_filtered_stats(
                 self.database.summoners, self.users_in_game.get(guild_id), game_info
             )
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito pls).
-            self.config.log(
-                "Game data is not well formed! Exception: " + str(exc),
-                self.config.log_error
+            logger.bind(game_id=game_info["gameId"]).error(
+                "Game data is not well formed!"
             )
+
+            # Send error message to Discord and re-raise exception.
             await self.send_error_msg(guild_id)
-            with open("errorlog.txt", "a", encoding="utf-8") as fp:
-                print_exc(file=fp)
             raise exc
 
         self.users_in_game[guild_id] = users_in_game
-        self.config.log(f"Users in game after: {users_in_game}")
+        logger.debug(f"Users in game after: {users_in_game}")
 
         self.active_game[guild_id]["queue_id"] = game_info["queueId"]
 
@@ -373,17 +379,22 @@ class DiscordClient(discord.Client):
         await self.play_event_sounds(guild_id, intfar, doinks)
 
         if self.ai_conn is not None:
-            self.config.log("Training AI Model with new game data.")
+            logger.info("Training AI Model with new game data.")
+
             train_data = shape_predict_data(
                 self.database, self.riot_api, self.config, users_in_game
             )
+
+            # Send train request to AI process and recieve result
             self.ai_conn.send(
                 ("train", [train_data, filtered_stats[0][1]["gameWon"]])
             )
             loss, probability = self.ai_conn.recv()
+
             pct_win = int(probability * 100)
-            self.config.log(f"We had a {pct_win}% chance of winning.")
-            self.config.log(f"Training Loss: {loss}.")
+
+            logger.debug(f"We had a {pct_win}% chance of winning.")
+            logger.debug(f"Training Loss: {loss}.")
 
         if self.config.generate_predictions_img:
             predictions_img = None
@@ -400,16 +411,19 @@ class DiscordClient(discord.Client):
         self.polling_active[guild_id] = True
         time_slept = 0
         sleep_per_loop = 0.2
-        self.config.log(f"People are active in {guild_name}! Polling for games...")
+        logger.info(f"People are active in {guild_name}! Polling for games...")
+
         if not immediately:
             try:
                 while time_slept < self.config.status_interval_dormant:
                     if not self.polling_is_active(guild_id): # Stop if people leave voice channels.
                         self.polling_active[guild_id] = False
-                        self.config.log(f"Polling is no longer active in {guild_name}.")
+                        logger.info(f"Polling is no longer active in {guild_name}.")
                         return
+
                     await asyncio.sleep(sleep_per_loop)
                     time_slept += sleep_per_loop
+
             except KeyboardInterrupt:
                 self.polling_active[guild_id] = False
                 return
@@ -417,14 +431,18 @@ class DiscordClient(discord.Client):
         game_status = self.check_game_status(guild_id)
 
         if game_status == 1: # Game has started.
+            # Send update to Int-Far website that a game has started.
             req_data = {
                 "secret": self.config.discord_token,
                 "guild_id": guild_id
             }
             req_data.update(self.active_game[guild_id])
             self.send_game_update("game_started", req_data)
-            self.config.log(f"Game is now active in {guild_name}, polling for game end...")
+
+            logger.info(f"Game is now active in {guild_name}, polling for game end...")
+
             await self.poll_for_game_end(guild_id)
+
         elif game_status == 0: # Sleep for a bit and check game status again.
             await self.poll_for_game_start(guild_id)
 
@@ -459,6 +477,7 @@ class DiscordClient(discord.Client):
         active_game_start = None
         active_game_team = None
         game_ids = set()
+
         # First check if users are in the same game (or all are in no games).
         user_list = (
             self.get_users_in_voice()[guild_id]
@@ -503,11 +522,12 @@ class DiscordClient(discord.Client):
             champ_id = player_data[-1]
             # New champ has been released, that we don't know about.
             if self.riot_api.get_champ_name(champ_id) is None:
+                logger.warning(f"Champ ID is unknown: {champ_id}")
                 self.riot_api.get_latest_data()
                 break
 
         if active_game is not None and self.active_game.get(guild_id) is None:
-            self.config.log(active_game_start)
+            logger.debug(f"Game start original: {active_game_start}")
             if active_game_start == 0:
                 active_game_start = int(time())
 
@@ -528,11 +548,14 @@ class DiscordClient(discord.Client):
             }
 
             self.game_start[guild_id] = active_game_start
-            self.config.log(f"Game start: {datetime.fromtimestamp(self.game_start[guild_id])}")
+            logger.debug(f"Game start datetime: {datetime.fromtimestamp(self.game_start[guild_id])}")
             self.users_in_game[guild_id] = users_in_current_game
+
             return 1 # Game is now active.
+
         if active_game is None and self.active_game.get(guild_id) is not None:
             return 2 # Game is over.
+
         return 0
 
     def get_game_start(self, guild_id):
@@ -664,6 +687,7 @@ class DiscordClient(discord.Client):
                 guild_names.append(guild.name)
 
         if guild_names == []:
+            logger.warning(f"get_guild_name: Could not find name of guild with ID '{guild_id}'")
             return None
 
         return guild_names if guild_id is None else guild_names[0]
@@ -685,6 +709,7 @@ class DiscordClient(discord.Client):
         for guild in self.guilds:
             if guild.id == api_util.MAIN_GUILD_ID:
                 return [emoji.url for emoji in guild.emojis]
+
         return None
 
     def get_emoji_by_name(self, emoji_name):
@@ -696,6 +721,7 @@ class DiscordClient(discord.Client):
                 for emoji in guild.emojis:
                     if emoji.name == emoji_name:
                         return str(emoji)
+
         return None
 
     def get_users_in_voice(self):
@@ -718,15 +744,18 @@ class DiscordClient(discord.Client):
             self.ai_conn.send(("predict", [input_data]))
             ratio_win = self.ai_conn.recv()
             return int(ratio_win * 100)
+
         return None
 
     def try_get_user_data(self, name, guild_id):
-        if name.startswith("<@"):
+        if name.startswith("<@"): # Mention string
             start_index = 3 if name[2] == "!" else 2
             return int(name[start_index:-1])
+
         user_data = self.database.discord_id_from_summoner(name, exact_match=False)
         if user_data is None: # Summoner name gave no result, try Discord name.
             return self.get_discord_id(name, guild_id, exact_match=False)
+
         return user_data[0]
 
     def insert_emotes(self, text):
@@ -736,22 +765,28 @@ class DiscordClient(discord.Client):
         """
         replaced = text
         emote_index = replaced.find("{emote_")
+
         while emote_index > -1:
             emote = ""
             end_index = emote_index + 7
+
             while replaced[end_index] != "}":
                 emote += replaced[end_index]
                 end_index += 1
+
             emoji = self.get_emoji_by_name(emote)
             if emoji is None:
                 emoji = "" # Replace with empty string if emoji could not be found.
+
             replaced = replaced.replace("{emote_" + emote + "}", emoji)
             emote_index = replaced.find("{emote_")
+
         return replaced
 
     async def assign_top_tokens_role(self, old_holder, new_holder):
         role_id = 750111830529146980
         nibs_guild = None
+
         for guild in self.guilds:
             if guild.id == api_util.MAIN_GUILD_ID:
                 nibs_guild = guild
@@ -797,11 +832,12 @@ class DiscordClient(discord.Client):
                     break
 
             gain_for_user = 0
-            if user_in_game: # If current user was in-game, he gains tokens for playing.
+            if user_in_game: # If current user was in-game, they gain tokens for playing.
                 gain_for_user = tokens_gained
-                if disc_id in doinks: # If user was awarded doinks, he gets more tokens.
+                if disc_id in doinks: # If user was awarded doinks, they get more tokens.
                     number_of_doinks = len(list(filter(lambda x: x == "1", doinks[disc_id])))
                     gain_for_user += (self.config.betting_tokens_for_doinks * number_of_doinks)
+    
                 self.betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
             # Get list of active bets for the current user.
@@ -819,7 +855,7 @@ class DiscordClient(discord.Client):
 
                 for bet_ids, _, _, amounts, events, targets, bet_timestamp, _, _ in bets_made:
                     any_bets = True
-                    # Resolve current bet which the user made, marks it as won/lost in DB.
+                    # Resolve current bet which the user made. Marks it as won/lost in database.
                     bet_success, payout = self.betting_handler.resolve_bet(
                         disc_id, bet_ids, amounts, events, bet_timestamp, targets,
                         (
@@ -854,20 +890,22 @@ class DiscordClient(discord.Client):
                         tokens_lost += total_cost
 
                 balance_before += tokens_lost
-                if tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved.
+                if tokens_lost >= balance_before / 2: # Betting tokens was (at least) halved by losing.
                     quant_desc = "half"
                     if tokens_lost == balance_before: # Current bet cost ALL the user's tokens.
                         quant_desc = "all"
                     elif tokens_lost > balance_before / 2:
                         quant_desc = "more than half"
                     response_bets += f"{disc_name} lost {quant_desc} his {tokens_name} that game!\n"
+
                 elif tokens_earned >= balance_before: # Betting tokens balanced was (at least) doubled.
                     quant_desc = "" if tokens_earned == balance_before else "more than"
                     response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
 
         new_max_tokens_holder = self.database.get_max_tokens_details()[1]
-        if new_max_tokens_holder != max_tokens_holder:
+        if new_max_tokens_holder != max_tokens_holder: # See if user now has most tokens after winning.
             max_tokens_name = self.get_discord_nick(new_max_tokens_holder, guild_id)
+
             # This person now has the most tokens of all users!
             response_bets += f"{max_tokens_name} now has the most {tokens_name} of everyone! "
             response_bets += "***HAIL TO THE KING!!!***\n"
@@ -880,6 +918,7 @@ class DiscordClient(discord.Client):
     async def play_event_sounds(self, guild_id, intfar, doinks):
         users_in_voice = self.get_users_in_voice()
         voice_state = None
+
         # Check if any users from the game are in a voice channel.
         for user_data in self.users_in_game[guild_id]:
             for voice_user_data in users_in_voice[guild_id]:
@@ -912,6 +951,7 @@ class DiscordClient(discord.Client):
         response = "======================================"
         for index, record_list in enumerate((best_records, worst_records)):
             best = index == 0
+
             for stat, value, disc_id, prev_value, prev_id in record_list:
                 stat_index = api_util.STAT_COMMANDS.index(stat)
                 stat_fmt = api_util.round_digits(value)
@@ -922,12 +962,14 @@ class DiscordClient(discord.Client):
                 emote = "poggers" if best else "im_nat_kda_player_yo"
                 best_fmt = "best" if best else "worst"
                 by_fmt = "also by" if disc_id == prev_id else "by"
+
                 response += (
                     f"\n{name} got the {readable_stat} EVER " +
                     f"with **{stat_fmt}** {stat_name_fmt}!!!" + " {emote_" + emote + "} " +
                     f"Prev {best_fmt} was **{api_util.round_digits(prev_value)}** " +
                     f"{by_fmt} {prev_name}"
                 )
+
         return self.insert_emotes(response)
 
     def get_big_doinks_msg(self, doinks, guild_id):
@@ -1021,19 +1063,25 @@ class DiscordClient(discord.Client):
         current_nick = self.get_discord_nick(intfar_id, guild_id)
         current_mention = self.get_mention_str(intfar_id, guild_id)
         prev_mention = self.get_mention_str(prev_intfar, guild_id)
+
         if intfar_id is None:
             if intfar_streak > 1: # No one was Int-Far this game, but a streak was active.
                 for user_data in self.users_in_game.get(guild_id, []):
                     if user_data[0] == prev_intfar:
-                        return (f"{prev_mention} has redeemed himself! " +
-                                f"His Int-Far streak of {intfar_streak} has been broken. " +
-                                "Well done, my son {emote_uwu}")
+                        return (
+                            f"{prev_mention} has redeemed himself! " +
+                            f"His Int-Far streak of {intfar_streak} has been broken. " +
+                            "Well done, my son {emote_uwu}"
+                        )
             return None
+
         if intfar_id == prev_intfar: # Current Int-Far was also previous Int-Far.
             return get_streak_flavor_text(current_mention, intfar_streak + 1)
+
         if intfar_streak > 1: # Previous Int-Far has broken his streak!
             return (f"Thanks to {current_nick}, the {intfar_streak} games Int-Far streak of " +
                     f"{prev_mention} is over " + "{emote_woahpikachu}")
+    
         return None
 
     def get_ifotm_lead_msg(self, intfar_id, guild_id):
@@ -1072,6 +1120,7 @@ class DiscordClient(discord.Client):
 
         if new_pct > highest_intfar[3]:
             return message
+
         return None
 
     def get_intfar_message(self, disc_id, guild_id, reason, ties_msg, intfar_streak, prev_intfar):
@@ -1080,12 +1129,11 @@ class DiscordClient(discord.Client):
         """
         mention_str = self.get_mention_str(disc_id, guild_id)
         if mention_str is None:
-            self.config.log(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}",
-                            self.config.log_warning)
+            logger.warning(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}")
             mention_str = f"Unknown (w/ discord ID '{disc_id}')"
 
         if reason is None:
-            self.config.log("Int-Far reason was None!", self.config.log_warning)
+            logger.warning("Int-Far reason was None!")
             reason = "being really, really bad"
 
         message = ties_msg
@@ -1111,9 +1159,12 @@ class DiscordClient(discord.Client):
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
         reason_ids = ["0", "0", "0", "0"]
 
-        (final_intfar,
-         final_intfar_data,
-         ties, ties_msg) = award_qualifiers.get_intfar(filtered_stats, self.config)
+        (
+            final_intfar,
+            final_intfar_data,
+            ties, ties_msg
+        ) = award_qualifiers.get_intfar(filtered_stats, self.config)
+
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
 
         if final_intfar is not None: # Send int-far message.
@@ -1130,18 +1181,19 @@ class DiscordClient(discord.Client):
 
             full_ties_msg = ""
             if ties:
-                self.config.log("There are Int-Far ties.")
-                self.config.log(ties_msg)
+                logger.info("There are Int-Far ties.")
+                logger.info(ties_msg)
                 full_ties_msg = "There are Int-Far ties! " + ties_msg + "\n"
 
             response = self.get_intfar_message(
                 final_intfar, guild_id, reason, full_ties_msg, intfar_streak, prev_intfar
             )
         else: # No one was bad enough to be Int-Far.
-            self.config.log("No Int-Far that game!")
+            logger.info("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
             honorable_mentions = award_qualifiers.get_honorable_mentions(filtered_stats, self.config)
             honorable_mention_text = self.get_honorable_mentions_msg(honorable_mentions, guild_id)
+
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
 
@@ -1188,34 +1240,48 @@ class DiscordClient(discord.Client):
                 timestamp = filtered_stats[0][1]["timestamp"] // 1000
                 if is_lan_ongoing(timestamp, guild_id):
                     # Saved LAN stats (if LAN is active).
-                    self.config.log("LAN is active! Saving LAN stats...")
+                    logger.info("LAN is active! Saving LAN stats...")
                     self.database.save_lan_stats(self.active_game[guild_id]["id"], filtered_stats)
 
                 self.database.create_backup()
-                self.config.log("Game over! Stats were saved succesfully.")
+                logger.info("Game over! Stats were saved succesfully.")
+
                 return best_records, worst_records
+
             except DBException as exception:
-                self.config.log("Game stats could not be saved!", self.config.log_error)
-                self.config.log(exception)
+                # Log error along with relevant variables.
+                game_id = self.active_game.get(guild_id, {}).get("id")
+                logger.bind(
+                    game_id=game_id,
+                    intfar_id=intfar_id,
+                    intfar_reason=intfar_reason,
+                    doinks=doinks,
+                    guild_id=guild_id
+                ).error("Game stats could not be saved!")
+
                 raise exception
 
     async def user_joined_voice(self, disc_id, guild_id, poll_immediately=False):
         guild_name = self.get_guild_name(guild_id)
-        self.config.log(f"User joined voice in {guild_name}: {disc_id}")
+        logger.debug(f"User joined voice in {guild_name}: {disc_id}")
         summoner_info = self.database.summoner_from_discord_id(disc_id)
+
         if summoner_info is not None:
             users_in_voice = self.get_users_in_voice()[guild_id]
-            self.config.log("Summoner joined voice: " + summoner_info[1][0])
+            logger.debug("Summoner joined voice: " + summoner_info[1][0])
+
             if len(users_in_voice) > 1 and not self.polling_active.get(guild_id, False):
-                self.config.log("Polling is now active!")
+                logger.info("Polling is now active!")
                 self.polling_active[guild_id] = True
                 asyncio.create_task(self.poll_for_game_start(guild_id, poll_immediately))
-            self.config.log(f"Active users in {guild_name}: {len(users_in_voice)}")
+
+            logger.info(f"Active users in {guild_name}: {len(users_in_voice)}")
 
     async def user_left_voice(self, disc_id, guild_id):
         guild_name = self.get_guild_name(guild_id)
-        self.config.log(f"User left voice in {guild_name}: {disc_id}")
+        logger.debug(f"User left voice in {guild_name}: {disc_id}")
         users_in_voice = self.get_users_in_voice()[guild_id]
+
         if len(users_in_voice) < 2 and self.polling_active.get(guild_id, False):
             self.polling_active[guild_id] = False
 
@@ -1238,10 +1304,11 @@ class DiscordClient(discord.Client):
         for month in range(12):
             month_name = api_util.MONTH_NAMES[month]
             role_name = f"Int-Far of the Month - {month_name}"
+
             for role in guild.roles:
                 if role.name == role_name:
                     for member in role.members:
-                        self.config.log(f"Removing {role.name} from {member.name}.")
+                        logger.info(f"Removing {role.name} from {member.name}.")
                         await member.remove_roles(role)
 
     async def assign_monthly_intfar_role(self, month, winner_ids):
@@ -1285,7 +1352,7 @@ class DiscordClient(discord.Client):
             if member is not None:
                 await member.add_roles(role)
             else:
-                self.config.log("Int-Far to add badge to was None!", self.config.log_error)
+                logger.bind(intfar_id=intfar_id).error("Int-Far to add badge to was None!")
 
     async def declare_monthly_intfar(self, monthly_monitor):
         month = monthly_monitor.time_at_announcement.month
@@ -1323,14 +1390,14 @@ class DiscordClient(discord.Client):
         is checked for, to see if any new champs have been released.
         """
         ifotm_monitor = MonthlyIntfar(self.config.hour_of_ifotm_announce)
-        self.config.log("Starting Int-Far-of-the-month monitor... ")
+        logger.info("Starting Int-Far-of-the-month monitor... ")
 
         format_time = ifotm_monitor.time_at_announcement.strftime("%Y-%m-%d %H:%M:%S")
-        self.config.log(f"Monthly Int-Far will be crowned at {format_time} UTC+1")
+        logger.info(f"Monthly Int-Far will be crowned at {format_time} UTC+1")
 
         dt_now = datetime.now(ifotm_monitor.cph_timezone)
         duration = api_util.format_duration(dt_now, ifotm_monitor.time_at_announcement)
-        self.config.log(f"Time until then: {duration}")
+        logger.info(f"Time until then: {duration}")
 
         curr_day = dt_now.day
 
@@ -1379,24 +1446,29 @@ class DiscordClient(discord.Client):
         )
 
     async def on_connect(self):
-        self.config.log("Client connected")
+        logger.info("Client connected")
 
     async def on_disconnect(self):
-        self.config.log("Client disconnected...")
+        logger.info("Client disconnected...")
 
     async def on_ready(self):
         if self.initialized:
-            self.config.log("Ready was called, but bot was already initialized... Weird stuff.")
+            logger.warning("Ready was called, but bot was already initialized... Weird stuff.")
             return
 
         await self.change_presence( # Change Discord activity.
-            activity=discord.Activity(name="you inting in league",
-                                      type=discord.ActivityType.watching)
+            activity=discord.Activity(
+                name="you inting in league",
+                type=discord.ActivityType.watching
+            )
         )
-        self.config.log('Logged on as {0}!'.format(self.user))
+
+        logger.info('Logged on as {0}!'.format(self.user))
         self.initialized = True
+
         for guild in self.guilds:
             await guild.chunk()
+
             if guild.id in api_util.GUILD_IDS:
                 for voice_channel in guild.voice_channels:
                     members_in_voice = voice_channel.members
@@ -1404,11 +1476,13 @@ class DiscordClient(discord.Client):
                         # Start polling for an active game
                         # if more than one user is active in voice.
                         await self.user_joined_voice(member.id, guild.id, True)
+
                 for text_channel in guild.text_channels:
                     # Find the channel to write in for each guild.
                     if text_channel.id in CHANNEL_IDS and self.config.env == "production":
                         self.channels_to_write[guild.id] = text_channel
                         break
+
             elif guild.id == api_util.MY_GUILD_ID and self.config.env == "dev":
                 CHANNEL_IDS.append(guild.text_channels[0].id)
                 self.channels_to_write[guild.id] = guild.text_channels[0]

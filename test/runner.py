@@ -130,9 +130,11 @@ class TestRunner:
     def run_tests(self, tests_to_run=None):
         for test_func in self.get_test_funcs("test"):
             test_name = test_func.__name__
+
             if tests_to_run is None or test_name in tests_to_run:
                 self.current_test = test_name
                 self.before_test()
+
                 try:
                     test_func()
                 except Exception as e:
@@ -142,4 +144,5 @@ class TestRunner:
                 finally:
                     self.tests_run += 1
                     self.after_test()
+
         self.print_test_summary()

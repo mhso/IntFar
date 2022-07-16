@@ -3,6 +3,8 @@ from glob import glob
 from os import remove
 from os.path import exists
 import json
+
+from mhooge_flask.logging import logger
 import requests
 
 API_PLATFORM = "https://euw1.api.riotgames.com"
@@ -51,14 +53,13 @@ class APIClient:
         try:
             response_json = requests.get(url).json()
             return response_json[0]
-        except requests.exceptions.RequestException as exc:
-            self.config.log("Exception when getting newest game version!")
-            self.config.log(exc)
+        except requests.exceptions.RequestException:
+            logger.error("Exception when getting newest game version from Riot API!")
             return None
 
     def get_latest_champions_file(self):
         url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/champion.json"
-        self.config.log(f"Downloading latest champions file: '{self.get_champions_file()}'")
+        logger.info(f"Downloading latest champions file: '{self.get_champions_file()}'")
 
         old_file = glob("api/champions-*.json")[0]
 
@@ -67,9 +68,8 @@ class APIClient:
             f_out = open(self.get_champions_file(), "w", encoding="utf-8")
             json.dump(response_json, f_out)
             remove(old_file)
-        except requests.exceptions.RequestException as exc:
-            self.config.log("Exception when getting newest champions.json file!")
-            self.config.log(exc)
+        except requests.exceptions.RequestException:
+            logger.error("Exception when getting newest champions.json file from Riot API.")
 
     def get_champion_portraits(self):
         base_url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/img/champion"
@@ -83,16 +83,15 @@ class APIClient:
                     continue
 
                 url = f"{base_url}/{champ_name}.png"
-                self.config.log(f"Downloading champion portrait for '{champ_name}'")
+                logger.info(f"Downloading champion portrait for '{champ_name}'")
 
                 try:
                     data = requests.get(url, stream=True)
                     with open(filename, "wb") as fp:
                         for chunk in data.iter_content(chunk_size=128):
                             fp.write(chunk)
-                except requests.exceptions.RequestException as exc:
-                    self.config.log(f"Exception when getting champion portrait for {champ_name}!")
-                    self.config.log(exc)
+                except requests.exceptions.RequestException:
+                    logger.error(f"Exception when getting champion portrait for {champ_name} from Riot API.")
 
                 sleep(0.5)
 
@@ -108,16 +107,15 @@ class APIClient:
                     continue
 
                 url = f"{base_url}/{champ_name}_0.jpg"
-                self.config.log(f"Downloading champion splash for '{champ_name}'")
+                logger.info(f"Downloading champion splash for '{champ_name}'")
 
                 try:
                     data = requests.get(url, stream=True)
                     with open(filename, "wb") as fp:
                         for chunk in data.iter_content(chunk_size=128):
                             fp.write(chunk)
-                except requests.exceptions.RequestException as exc:
-                    self.config.log(f"Exception when getting champion splash for {champ_name}!")
-                    self.config.log(exc)
+                except requests.exceptions.RequestException:
+                    logger.error(f"Exception when getting champion splash for {champ_name} from Riot API.")
 
                 sleep(0.5)
 
@@ -134,16 +132,15 @@ class APIClient:
                     continue
 
                 url = f"{base_url}/{champ_name}.json"
-                self.config.log(f"Downloading champion data for '{champ_name}'")
+                logger.info(f"Downloading champion data for '{champ_name}'")
 
                 try:
                     data = requests.get(url, stream=True)
                     with open(filename, "wb") as fp:
                         for chunk in data.iter_content(chunk_size=128):
                             fp.write(chunk)
-                except requests.exceptions.RequestException as exc:
-                    self.config.log(f"Exception when getting champion data for {champ_name}!")
-                    self.config.log(exc)
+                except requests.exceptions.RequestException:
+                    logger.error(f"Exception when getting champion data for {champ_name} from Riot API.")
 
                 sleep(0.5)
 
@@ -152,10 +149,13 @@ class APIClient:
         req_string = endpoint
         for index, param in enumerate(params):
             req_string = req_string.replace("{" + str(index) + "}", str(param))
-        token_header = {"X-Riot-Token": self.config.riot_key}
+
         full_url = api_route + req_string
-        self.config.log(f"URL: {full_url}")
+        logger.debug(f"URL: {full_url}")
+
+        token_header = {"X-Riot-Token": self.config.riot_key}
         response = requests.get(full_url, headers=token_header)
+
         return response
 
     def get_summoner_id(self, summ_name):
@@ -179,16 +179,20 @@ class APIClient:
     def get_game_details(self, game_id, tries=0):
         endpoint = "/lol/match/v5/matches/{0}"
         response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
+
         if response.status_code != 200:
-            self.config.log(f"Game details response code: {response.status_code}")
+            logger.debug(f"Game details response code: {response.status_code}")
+
             if tries > 0:
                 sleep(30)
                 return self.get_game_details(game_id, tries-1)
             else:
                 endpoint = "/lol/match/v4/matches/{0}"
                 response = self.make_request(endpoint, API_PLATFORM, game_id)
+
                 if response.status_code != 200:
                     return None
+
                 return response.json()
 
         data = response.json()["info"]

@@ -40,15 +40,12 @@ def soundboard_template(success=False, status_msg=None):
         admin_id=ADMIN_DISC_ID
     )
 
-def normalize_sound_volume(filename, config):
+def normalize_sound_volume(filename):
     filename_no_ext = ".".join(filename.split(".")[:-1])
 
     new_filename = f"{filename_no_ext}_normed.mp3"
 
     command = f"ffmpeg -i {filename} -filter:a loudnorm {new_filename}"
-
-    config.log("Doing the ffmpeg thing:")
-    config.log(command)
 
     os.system(command)
 
@@ -96,8 +93,7 @@ def home():
         file.save(path)
 
         # Normalize sound volumne.
-        config = flask.current_app.config["APP_CONFIG"]
-        normalize_sound_volume(path, config)
+        normalize_sound_volume(path)
 
         # Add sound/user to owners.json file.
         owner_file_path = os.path.join(UPLOAD_FOLDER, "owners.json")

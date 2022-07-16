@@ -1,3 +1,5 @@
+from mhooge_flask.logging import logger
+
 from api import game_stats
 import api.util as api_util
 
@@ -17,34 +19,48 @@ def get_big_doinks(data):
     """
     mentions = {} # List of mentioned users for the different criteria.
     formatted_mentions = {}
+
     for disc_id, stats in data:
         mention_list = []
         kda = game_stats.calc_kda(stats)
+
         if kda >= 10.0:
             mention_list.append((0, api_util.round_digits(kda)))
+
         if stats["kills"] >= 20:
             mention_list.append((1, stats["kills"]))
+
         damage_dealt = stats["totalDamageDealtToChampions"]
+
         if damage_dealt > stats["damage_by_team"] - damage_dealt:
             mention_list.append((2, damage_dealt))
+
         if stats["pentaKills"] > 0:
             mention_list.append((3, stats["pentaKills"]))
+
         if stats["visionScore"] > 100:
             mention_list.append((4, stats["visionScore"]))
+
         kp = game_stats.calc_kill_participation(stats, stats["kills_by_team"])
+
         if kp > 80:
             mention_list.append((5, kp))
+
         own_epics = stats["baronKills"] + stats["dragonKills"] + stats["heraldKills"]
         enemy_epics = stats["enemyBaronKills"] + stats["enemyDragonKills"] + stats["enemyHeraldKills"]
+
         if stats["lane"] == "JUNGLE" and stats["role"] == "NONE" and own_epics > 3 and enemy_epics == 0:
             mention_list.append((6, own_epics))
+
         cs_per_min = stats["csPerMin"]
+
         if cs_per_min >= 8:
             mention_list.append((7, api_util.round_digits(cs_per_min)))
 
         if mention_list != []:
             mentions[disc_id] = mention_list
             format_str = ""
+
             for index in range(len(api_util.DOINKS_REASONS)):
                 has_doinks_for_stats = False
                 for stat_index, _ in mention_list:
@@ -347,21 +363,21 @@ def resolve_intfar_ties(intfar_data, max_count, game_data):
 def get_intfar_details(stats, config):
     intfar_kda_id, kda = intfar_by_kda(stats, config)
     if intfar_kda_id is not None:
-        config.log("Int-Far because of KDA.")
+        logger.info("Int-Far because of KDA.")
 
     intfar_deaths_id, deaths = intfar_by_deaths(stats, config)
     if intfar_deaths_id is not None:
-        config.log("Int-Far because of deaths.")
+        logger.info("Int-Far because of deaths.")
 
     intfar_kp_id, kp = intfar_by_kp(stats, config)
     if intfar_kp_id is not None:
-        config.log("Int-Far because of kill participation.")
+        logger.info("Int-Far because of kill participation.")
 
     intfar_vision_id, vision_score = None, None
     if stats[0][1]["mapId"] != 21:
         intfar_vision_id, vision_score = intfar_by_vision_score(stats, config)
         if intfar_vision_id is not None:
-            config.log("Int-Far because of vision score.")
+            logger.info("Int-Far because of vision score.")
 
     return [
         (intfar_kda_id, kda), (intfar_deaths_id, deaths),
