@@ -36,8 +36,7 @@ def soundboard_template(success=False, status_msg=None):
 
     return app_util.make_template_context(
         "soundboard.html", upload_success=success,
-        status_msg=status_msg, sounds=sound_list,
-        admin_id=ADMIN_DISC_ID
+        status_msg=status_msg, sounds=sound_list
     )
 
 def normalize_sound_volume(filename):

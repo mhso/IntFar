@@ -54,8 +54,17 @@ async def handle_random_sound_msg(client, message):
     if not success:
         await message.channel.send(client.insert_emotes(status))
 
-async def handle_sounds_msg(client, message):
-    sounds_list = client.audio_handler.get_sounds()
+async def handle_sounds_msg(client, message, ordering="alphabetical"):
+    valid_orders = ["alphabetical", "oldest", "newest"]
+
+    if ordering not in valid_orders:
+        await message.channel.send(
+            f"Invalid ordering: '{ordering}'. Must be one of: `{', '.join(valid_orders)}`."
+        )
+        return
+
+    sounds_list = client.audio_handler.get_sounds(ordering)
     header = "Available sounds:"
     footer = "Upload your own at `https://mhooge.com/intfar/soundboard`!"
+
     await client.paginate(message.channel, sounds_list, 0, 10, header, footer)

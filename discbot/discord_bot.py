@@ -210,22 +210,32 @@ class DiscordClient(discord.Client):
                 logger.info("GAME OVER!!")
                 logger.debug(f"Active game: {game_id}")
 
-                game_info = self.riot_api.get_game_details(
-                    game_id, tries=2
-                )
+                # Check if game was a custom game, if so don't save stats.
+                custom_game = self.active_game[guild_id]["game_type"] == "CUSTOM_GAME"
 
-                retry = 0
-                retries = 4
-                time_to_sleep = 30
-                while game_info is None and retry < retries:
-                    logger.warning(
-                        f"Game info is None! Retrying in {time_to_sleep} secs..."
+                game_info = None
+
+                if not custom_game:
+                    game_info = self.riot_api.get_game_details(
+                        game_id, tries=2
                     )
-                    await asyncio.sleep(time_to_sleep)
-                    game_info = self.riot_api.get_game_details(game_id)
-                    retry += 1
 
-                if game_info is None: # Game info is still None after 3 retries.
+                    retry = 0
+                    retries = 4
+                    time_to_sleep = 30
+                    while game_info is None and retry < retries:
+                        logger.warning(
+                            f"Game info is None! Retrying in {time_to_sleep} secs..."
+                        )
+
+                        await asyncio.sleep(time_to_sleep)
+                        game_info = self.riot_api.get_game_details(game_id)
+                        retry += 1
+
+                if custom_game: # Do nothing.
+                    logger.info(f"Game was a custom game: {game_id}")
+
+                elif game_info is None: # Game info is still None after 3 retries.
                     # Log error
                     logger.bind(game_id=game_id, guild_id=guild_id).error(
                         "Game info is STILL None after 3 retries! Saving to missing games..."
@@ -252,14 +262,16 @@ class DiscordClient(discord.Client):
                     response += "no Int-Far will be crowned "
                     response += "and no stats will be saved."
                     await self.channels_to_write[guild_id].send(response)
-                # Gamemode was URF. Don't save stats then.
+
                 elif self.riot_api.is_urf(game_info["gameMode"]):
+                    # Gamemode was URF. Don't save stats then.
                     response = "That was an URF game {emote_poggers} "
                     response += "no Int-Far will be crowned "
                     response += "and no stats will be saved."
                     await self.channels_to_write[guild_id].send(self.insert_emotes(response))
-                # Game is not on summoners rift. Same deal.
+
                 elif not self.riot_api.map_is_sr(game_info["mapId"]):
+                    # Game is not on summoners rift. Same deal.
                     response = "That game was not on Summoner's Rift "
                     response += "{emote_woahpikachu} no Int-Far will be crowned "
                     response += "and no stats will be saved."
@@ -543,6 +555,7 @@ class DiscordClient(discord.Client):
                 "enemy_champ_ids": enemy_champ_ids,
                 "map_id": active_game["mapId"],
                 "map_name": self.riot_api.get_map_name(active_game["mapId"]),
+                "game_type": active_game["gameType"],
                 "game_mode": active_game["gameMode"],
                 "game_guild_name": self.get_guild_name(guild_id),
             }
@@ -641,7 +654,7 @@ class DiscordClient(discord.Client):
                     await member.avatar_url_as(format="png", size=size).save(path)
                     self.cached_avatars[key] = time_now
                 except (DiscordException, HTTPException, NotFound) as exc:
-                    print(exc)
+                    logger.bind(disc_id=discord_id).error("Could not load Discord avatar")
                     path = default_avatar
 
             avatar_paths.append(path)
@@ -1566,7 +1579,6 @@ class DiscordClient(discord.Client):
         Method that is called when a message is sent on Discord
         in any of the channels that Int-Far is active in. 
         """
-        
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
 
@@ -1602,6 +1614,7 @@ class DiscordClient(discord.Client):
                         curr_timeout = 10
                     self.user_timeout_length[message.author.id] = curr_timeout
                 return
+
             if time_from_last_msg < self.config.message_timeout:
                 # Some guy is sending messages too fast!
                 self.user_timeout_length[message.author.id] = self.config.message_timeout

@@ -51,21 +51,26 @@ async def handle_make_bet_msg(client, message, amounts, events, targets):
 
     target_ids = []
     target_names = []
+
     for target_name in targets:
         target_id = None
         discord_name = None
+
         if target_name is not None: # Bet on a specific person doing a thing.
             if target_name == "me":
                 target_id = message.author.id
             else:
                 target_name = target_name.lower()
                 target_id = client.try_get_user_data(target_name.strip(), message.guild.id)
+
                 if target_id is None:
                     msg = "Error: Invalid summoner or Discord name "
                     msg += f"{client.get_emoji_by_name('PepeHands')}"
                     await message.channel.send(msg)
                     return
+    
             discord_name = client.get_discord_nick(target_id, message.guild.id)
+
         target_ids.append(target_id)
         target_names.append(discord_name)
 
@@ -86,6 +91,7 @@ async def handle_cancel_bet_msg(client, message, betting_event, target_id=None):
         message.author.id, message.guild.id, betting_event,
         client.game_start.get(message.guild.id), target_id, target_name
     )[1]
+
     await message.channel.send(response)
 
 async def handle_give_tokens_msg(client, message, amount, target_id):

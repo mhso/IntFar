@@ -12,4 +12,5 @@ config = Config()
 db_client = Database(config)
 
 db_client.delete_game(game_id)
-print(f"Delete game with ID {game_id}")
+
+print(f"Deleted game data for game_id: {game_id}")

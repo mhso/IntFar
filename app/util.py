@@ -7,6 +7,7 @@ from mhooge_flask.logging import logger
 import flask
 
 from api.util import GUILD_IDS
+from discbot.commands.util import ADMIN_DISC_ID
 
 def register_discord_connection():
     bot_conn = flask.current_app.config["BOT_CONN"]
@@ -16,7 +17,7 @@ def register_discord_connection():
 
     lock_success = conn_lock.acquire(timeout=3)
     if not lock_success:
-        exit(2)
+        exit(3)
 
     new_conn = discord_request("register", None, None, bot_conn)
     conn_lock.release()
@@ -186,6 +187,7 @@ def get_persistent_data():
         "logged_in_user": logged_in_user,
         "logged_in_name": logged_in_name,
         "logged_in_avatar": logged_in_avatar,
+        "admin_id": ADMIN_DISC_ID
     }
     game_info = get_game_info()
     shown_games = filter_hidden_games(game_info, logged_in_user)

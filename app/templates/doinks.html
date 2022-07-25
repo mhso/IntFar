@@ -1,9 +1,10 @@
+<!DOCTYPE html>
 <html>
 {% include 'head.html' %}
 {% import "navbar.html" as navbar %}
 <body>
     <div id="doinks-wrapper" class="container-flex">
-        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data) }}
+        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
         <h1>Doinks</h1>
 
         <div class="row">

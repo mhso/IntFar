@@ -7,11 +7,22 @@ from discord.player import FFmpegPCMAudio
 
 SOUNDS_PATH = "app/static/sounds/"
 
-def get_available_sounds():
-    return sorted([
-        x.replace("\\", "/").split("/")[-1].split(".")[0]
-        for x in glob(f"{SOUNDS_PATH}/*.mp3")
-    ])
+def get_available_sounds(ordering="alphabetical"):
+    sounds = [
+        (os.path.basename(sound).split(".")[0], os.stat(sound).st_ctime)
+        for sound in glob(f"{SOUNDS_PATH}/*.mp3")
+    ]
+
+    def order_func(sound_tuple):
+        if ordering == "newest":
+            return -sound_tuple[1]
+
+        if ordering == "oldest":
+            return sound_tuple[1]
+
+        return sound_tuple[0]        
+
+    return [sound_tuple[0] for sound_tuple in sorted(sounds, key=order_func)]
 
 class AudioHandler: # Keep track of connection to voice channel.
     def __init__(self, config):
@@ -74,8 +85,9 @@ class AudioHandler: # Keep track of connection to voice channel.
 
             return True, None
 
-    def get_sounds(self):
+    def get_sounds(self, ordering):
         sounds = []
-        for sound in get_available_sounds():
+        for sound in get_available_sounds(ordering):
             sounds.append(f"- `{sound}`")
+
         return sounds

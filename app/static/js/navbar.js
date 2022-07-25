@@ -181,6 +181,66 @@ function updateDuration() {
     }
 }
 
+function pollUntilAnswer(attempt=0, limit=20, waitTime=1000) {
+    console.log("Waiting for restart " + attempt + "/" + limit + "...");
+
+    if (attempt == limit) {
+        // It's taking too long to restart...
+        alert("Something went wrong when restarting :(");
+    }
+
+    let baseUrl = getBaseURL();
+
+    let timeBefore = Date.now();
+
+    $.ajax(baseUrl + "/intfar/heartbeat", {
+        method: "GET",
+        timeout: 1000
+    }).then(() => {
+        let button = document.getElementById("admin-restart-btn");
+        button.getElementsByClassName("admin-restart-waiting").item(0).style.display = "none";
+
+        let successImg = button.getElementsByClassName("admin-restart-success").item(0);
+        successImg.style.display = "block";
+        successImg.style.opacity = 1;
+
+        setTimeout(function() {
+            successImg.style.opacity = 0;
+
+            setTimeout(function() {
+                let initBtn = button.getElementsByClassName("admin-restart-init").item(0)
+                initBtn.style.display = "block";
+                initBtn.style.opacity = 1;
+            }, 1000);
+        }, 1500);
+    }, () => {
+        let timeAfter = Date.now();
+        let diff = timeAfter - timeBefore;
+        let timeToWait = diff < waitTime ? waitTime - diff : 10;
+
+        // Wait a bit before polling again.
+        setTimeout(function() {
+            pollUntilAnswer(attempt + 1, limit, waitTime);
+        }, timeToWait);
+    });
+}
+
+function restartIntfar() {
+    let baseUrl = getBaseURL();
+
+    let button = document.getElementById("admin-restart-btn");
+    let initBtn = button.getElementsByClassName("admin-restart-init").item(0)
+    initBtn.style.opacity = 0;
+    initBtn.style.display = "none";
+    button.getElementsByClassName("admin-restart-waiting").item(0).style.display = "block";
+
+    $.ajax(baseUrl + "/intfar/restart", {
+        method: "POST"
+    });
+
+    pollUntilAnswer();
+}
+
 window.addEventListener("resize", function() {
     resizeNav();
 });

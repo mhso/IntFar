@@ -9,6 +9,7 @@ import flask
 import api.util as api_util
 import app.util as app_util
 from api.bets import get_dynamic_bet_desc
+from discbot.commands.util import ADMIN_DISC_ID
 
 start_page = flask.Blueprint("index", __name__, template_folder="templates")
 
@@ -283,6 +284,24 @@ def active_game_ended():
     flask.current_app.config["GAME_PREDICTION"][int(data["game_id"])] = None
 
     return flask.make_response(("Success! Active game ID deleted.", 200))
+
+@start_page.route("/heartbeat")
+def heartbeat():
+    if flask.current_app.config["EXIT_CODE"] != 0:
+        return app_util.make_text_response("Restarting", 503)
+
+    return app_util.make_text_response("Alive and kicking!", 200)
+
+@start_page.route("/restart", methods=["POST"])
+def restart():
+    logged_in_user = app_util.get_user_details()[0]
+
+    if logged_in_user is None or logged_in_user != ADMIN_DISC_ID:
+        return app_util.make_text_response("Unathorized Access.", 401)
+
+    flask.current_app.config["EXIT_CODE"] = 2
+
+    exit(2)
 
 def save_prediction_to_file(prediction, game_duration):
     filename = "resources/predictions_temp.json"

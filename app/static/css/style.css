@@ -156,6 +156,8 @@ table {
 .navbar-user {
     font-size: 14px;
     text-align: right;
+    height: 30px;
+    margin-top: -5px;
     text-decoration: none !important;
 }
 
@@ -215,6 +217,68 @@ table {
     .navbar-menu, .navbar-user {
         margin-top: 10px;
     }
+}
+
+@keyframes rotato {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(180deg)
+    }
+}
+
+#admin-restart-btn {
+    font-size: 18px;
+    background-color: #004d9f;
+    border-radius: 20px;
+    border: 2px #8c8c8c groove;
+    color: #eee;
+    cursor: pointer;
+    position: absolute;
+    padding: 0;
+    padding-left: 0px;
+    padding-left: 0px;
+    padding-left: 10px;
+    height: 28px;
+    width: 28px;
+    text-align: left;
+    font-family: Consolas;
+    font-weight: 800;
+    right: 150px;
+    top: 10px;
+}
+
+#admin-restart-btn:hover {
+    background-color: #005ec2;
+}
+
+#admin-restart-btn:hover > .admin-restart-init {
+    animation: rotato 2s linear 0s infinite normal forwards;
+}
+
+.admin-restart-waiting {
+    animation: rotato 2s linear 0s infinite normal forwards;
+}
+
+.admin-restart-success, .admin-restart-waiting {
+    display: none;
+}
+
+.admin-restart-success, .admin-restart-init {
+    transition: opacity 1s;
+}
+
+.admin-restart-success {
+    opacity: 0;
+}
+
+#admin-restart-btn > img {
+    width: 24px;
+    position: absolute;
+    right: 10px;
+    top: 0;
+    left: 0;
 }
 
 .open-hamburger {
@@ -835,7 +899,7 @@ table {
 
 .audio-player-wrapper {
     display: block;
-    margin-bottom: 5px;
+    padding-bottom: 10px;
     border-bottom: 2px inset;
 }
 

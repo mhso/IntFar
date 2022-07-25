@@ -90,6 +90,7 @@ class APIClient:
                     with open(filename, "wb") as fp:
                         for chunk in data.iter_content(chunk_size=128):
                             fp.write(chunk)
+
                 except requests.exceptions.RequestException:
                     logger.error(f"Exception when getting champion portrait for {champ_name} from Riot API.")
 
@@ -114,6 +115,7 @@ class APIClient:
                     with open(filename, "wb") as fp:
                         for chunk in data.iter_content(chunk_size=128):
                             fp.write(chunk)
+
                 except requests.exceptions.RequestException:
                     logger.error(f"Exception when getting champion splash for {champ_name} from Riot API.")
 
@@ -139,13 +141,14 @@ class APIClient:
                     with open(filename, "wb") as fp:
                         for chunk in data.iter_content(chunk_size=128):
                             fp.write(chunk)
+
                 except requests.exceptions.RequestException:
                     logger.error(f"Exception when getting champion data for {champ_name} from Riot API.")
 
                 sleep(0.5)
 
 
-    def make_request(self, endpoint, api_route, *params):
+    def make_request(self, endpoint, api_route, *params, ignore_errors=[]):
         req_string = endpoint
         for index, param in enumerate(params):
             req_string = req_string.replace("{" + str(index) + "}", str(param))
@@ -156,6 +159,13 @@ class APIClient:
         token_header = {"X-Riot-Token": self.config.riot_key}
         response = requests.get(full_url, headers=token_header)
 
+        if response.status_code != 200 and response.status_code not in ignore_errors:
+            logger.bind(
+                url=full_url,
+                response=response.text,
+                status_code=response.status_code 
+            ).error("Error during Riot API request")
+
         return response
 
     def get_summoner_id(self, summ_name):
@@ -163,14 +173,16 @@ class APIClient:
         response = self.make_request(endpoint, API_PLATFORM, summ_name)
         if response.status_code != 200:
             return None
+
         return response.json()["id"]
 
     def get_active_game(self, summ_id):
         endpoint = "/lol/spectator/v4/active-games/by-summoner/{0}"
         try:
-            response = self.make_request(endpoint, API_PLATFORM, summ_id)
+            response = self.make_request(endpoint, API_PLATFORM, summ_id, ignore_errors=[404])
             if response.status_code != 200:
                 return None
+
         except (requests.ConnectionError, requests.RequestException):
             return None
 
@@ -181,11 +193,10 @@ class APIClient:
         response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
 
         if response.status_code != 200:
-            logger.debug(f"Game details response code: {response.status_code}")
-
             if tries > 0:
                 sleep(30)
                 return self.get_game_details(game_id, tries-1)
+
             else:
                 endpoint = "/lol/match/v4/matches/{0}"
                 response = self.make_request(endpoint, API_PLATFORM, game_id)
@@ -256,6 +267,7 @@ class APIClient:
             for map_info in map_data:
                 if map_info["mapId"] == map_id:
                     return map_info["mapName"]
+
         return None
 
     def map_is_sr(self, map_id):
@@ -264,6 +276,7 @@ class APIClient:
             for map_info in map_data:
                 if map_info["mapId"] == map_id:
                     return map_info["mapName"] in ("Summoner's Rift", "Nexus Blitz")
+
         return False
 
     def is_urf(self, gamemode):

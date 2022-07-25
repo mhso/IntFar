@@ -94,8 +94,10 @@ class TestMock(DiscordClient):
                             best_records, worst_records, guild_id
                         )
                         response = records_response + response
-                except Exception as e:
-                    print(f"Error when saving stats for {game_id}. Probably already exists.")
+                except Exception:
+                    logger.bind(game_id=game_id).error(
+                        f"Error when saving stats for {game_id}. Probably already exists."
+                    )
                     continue
 
             if self.loud and self.task == "all":
@@ -160,7 +162,7 @@ args = parser.parse_args()
 
 if not args.missing:
     if None in (args.game, args.guild, args.task, args.sound):
-        print("Either specificy --missing or all of --game, --guild, --task, and --sound")
+        logger.warning("Either specificy --missing or all of --game, --guild, --task, and --sound")
 
 conf = Config()
 

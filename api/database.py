@@ -1255,8 +1255,10 @@ class Database(SQLiteDatabase):
                 )
                 VALUES (?, ?, ?, ?)
             """
+
+            logger.debug("User data:")
             for user_data in users_in_game:
-                print(user_data)
+                logger.debug(user_data)
                 disc_id = user_data[0]
                 champ_id = user_data[-1]
                 doink = doinks.get(disc_id, None)

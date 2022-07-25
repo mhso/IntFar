@@ -87,7 +87,7 @@ def main():
 
     while True:
         try:
-            if flask_process.exitcode == 2:
+            if flask_process.exitcode == 3:
                 # 'Soft' reset processes.
                 logger.info("Restarting Flask process.")
 
@@ -104,8 +104,8 @@ def main():
                     audio_handler, shop_handler, our_end_ai, bot_end_flask
                 )
 
-            if bot_process.exitcode == 2:
-                # We have issued a restart command on Discord to restart the program.
+            if flask_process.exitcode == 2 or bot_process.exitcode == 2:
+                # We have issued a restart command on Discord or the website to restart the program.
                 ai_process.kill()
                 flask_process.kill()
                 bot_process.kill()
@@ -122,7 +122,7 @@ def main():
             sleep(1)
 
         except BrokenPipeError:
-            print("Stopping bot...", flush=True)
+            logger.info("Stopping bot...")
             if bot_process.is_alive():
                 bot_process.kill()
             ai_process.kill()

@@ -511,7 +511,7 @@ def initialize_commands():
         mandatory_params=[RegularParam("sound")]
     )
 
-    # play command
+    # play_random command
     play_random_name = "play_random"
     play_random_desc = "Play a random sound. (See `!sounds` for a list of them)."
     register_command(play_random_name, play_random_desc, handle_random_sound_msg)
@@ -519,7 +519,10 @@ def initialize_commands():
     # sounds command
     sounds_name = "sounds"
     sounds_desc = "See a list of all possible sounds to play."
-    register_command(sounds_name, sounds_desc, handle_sounds_msg)
+    register_command(
+        sounds_name, sounds_desc, handle_sounds_msg,
+        optional_params=[RegularParam("ordering")]
+    )
 
     # shop command
     shop_name = "shop"

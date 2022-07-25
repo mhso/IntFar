@@ -1,5 +1,6 @@
 from shutil import copy
 from os import remove
+from time import time
 from test.runner import TestRunner, test
 from api.config import Config
 from api.database import Database
@@ -207,6 +208,16 @@ class TestWrapper(TestRunner):
         def get_better_id_func():
             self.database.get_better_id(30)
         self.assert_no_exception(get_better_id_func, "Get better ID.")
+
+        self.assert_no_exception(self.database.get_max_tokens_details, "Get max token balance ID.")
+
+        def make_bet_func():
+            self.database.make_bet(MY_DISC_ID, MAIN_GUILD_ID, 0, 10, 0, int(time()))
+            self.database.make_bet(MY_DISC_ID, MAIN_GUILD_ID, 3, 10, 0, int(time()), MY_DISC_ID)
+
+        with self.database:
+            self.assert_no_exception(make_bet_func, "Make bet.")
+        
 
     @test
     def test_shop_queries(self):

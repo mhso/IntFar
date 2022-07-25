@@ -45,7 +45,8 @@ def run_app(database, bet_handler, riot_api, config, bot_pipe):
         conn_lock=Lock(),
         max_content_length=1024 * 512, # 500 KB
         quiz_categories=set(),
-        quiz_team_blue=True
+        quiz_team_blue=True,
+        exit_code=0
     )
 
     # Misc. routing handling.

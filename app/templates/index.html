@@ -1,14 +1,16 @@
+<!DOCTYPE html>
 <html>
 {% include 'head.html' %}
 {% import "intfar_list_entry.html" as list_entry %}
 {% import "navbar.html" as navbar %}
 <body>
     <div class="wrapper container-flex">
-        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data) }}
+        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
         <div id="header-wrapper-feed" class="header-wrapper">
             <h1>Feeding Feed</h1>
         </div>
 
+        <!-- List of latest events (bets, int-fars, doinks, etc.) across Int-Far -->
         <div class="row">
             <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
             <div id="feed-wrapper" class="col-12 col-md-10 col-lg-8 col-xxl-6">
@@ -36,6 +38,8 @@
 
         <div id="intfar-list-wrapper" class="row">
             <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 col-xl-2"></div>
+    
+            <!-- List of all-time Int-Far awards -->
             <div id="intfar-all" class="col-xs-12 col-sm-10 col-md-8 col-lg-6 col-xl-4">
                 <h2>All Time</h2>
                 <table class="nice-table">
@@ -51,8 +55,11 @@
                     {% endfor %}
                 </table>
             </div>
+
             <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 d-xl-none"></div>
             <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 d-xl-none"></div>
+
+            <!-- List of all-time Int-Far awards -->
             <div id="intfar-month" class="col-xs-12 col-sm-10 col-md-8 col-lg-6 col-xl-4">
                 <h2>{{ curr_month }}</h2>
                 <table class="nice-table">
