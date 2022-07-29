@@ -5,7 +5,7 @@ import torch
 from ai import data, train, validate_classifier
 from ai.model import Model
 from api.config import Config
-from api.riot_api import APIClient
+from api.riot_api import RiotAPIClient
 from api.database import Database
 
 SEED = 2132412
@@ -25,7 +25,7 @@ def main():
 
     database_client = Database(config)
 
-    riot_api = APIClient(config)
+    riot_api = RiotAPIClient(config)
 
     game_data, labels = data.load_train_data(database_client, riot_api, config.ai_input_dim)
 

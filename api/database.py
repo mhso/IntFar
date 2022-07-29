@@ -1138,8 +1138,8 @@ class Database(SQLiteDatabase):
             min_stat_id, min_stat,
             max_stat_id, max_stat
         ) = game_stats.get_outlier_stat(
-            stat_key,
             data,
+            stat_key,
             reverse_order=reverse_order,
             total_kills=total_kills
         )

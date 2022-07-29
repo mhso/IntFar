@@ -388,7 +388,7 @@ class DiscordClient(discord.Client):
 
         await self.channels_to_write[guild_id].send(response)
 
-        await self.play_event_sounds(guild_id, intfar, doinks)
+        await self.play_event_sounds(intfar, doinks, guild_id)
 
         if self.ai_conn is not None:
             logger.info("Training AI Model with new game data.")
@@ -830,7 +830,7 @@ class DiscordClient(discord.Client):
 
         game_desc = "Game won!" if game_won else "Game lost."
         response = (
-            "======================================" +
+            "=" * 38 +
             f"\n{game_desc} Everybody gains **{tokens_gained}** {tokens_name}."
         )
         response_bets = "**\n--- Results of bets made that game ---**\n"
@@ -928,7 +928,14 @@ class DiscordClient(discord.Client):
 
         return response, max_tokens_holder, new_max_tokens_holder
 
-    async def play_event_sounds(self, guild_id, intfar, doinks):
+    async def play_event_sounds(self, intfar: int, doinks: list[int], guild_id: int):
+        """
+        Play potential Int-Far and Doinks sounds after a game has finished.
+
+        :param intfar:  Discord ID of the person that is Int-Far (or None)
+        :param doinks:  List of Discord IDs of people who got doinks
+        :guild_id:      ID of the Discord server where the game took place
+        """
         users_in_voice = self.get_users_in_voice()
         voice_state = None
 
@@ -945,14 +952,15 @@ class DiscordClient(discord.Client):
                     break
 
         if voice_state is not None:
+            # One or more users from the game is in a voice channel.
             sounds_to_play = []
 
-            # Add Int-Far sound first (if it exists).
+            # Add Int-Far sound to queue (if it exists).
             intfar_sound = self.database.get_event_sound(intfar, "intfar")
             if intfar_sound is not None:
                 sounds_to_play.append(intfar_sound)
 
-            # Add each doinks sound if any exist.
+            # Add each doinks sound to queue (if any exist).
             for disc_id in doinks:
                 doinks_sound = self.database.get_event_sound(disc_id, "doinks")
                 if doinks_sound is not None:
@@ -960,8 +968,22 @@ class DiscordClient(discord.Client):
 
             await self.audio_handler.play_sound(voice_state, sounds_to_play)
 
-    def get_beaten_records_msg(self, best_records, worst_records, guild_id):
-        response = "======================================"
+    def get_beaten_records_msg(
+        self,
+        best_records: list[tuple],
+        worst_records: list[tuple],
+        guild_id: int
+    ):
+        """
+        Return a mesage describing any potentially beaten records (good or bad),
+        such as a player getting the most kills ever, or most deaths ever, etc.
+
+        :param best_records:    A list of data for broken good records (fx. most kills)
+        :param worst_records:   A list of data for broken bad records (fx. least gold)
+        :guild_id:              ID of the Discord server where the game took place
+        """
+        response = "=" * 38
+
         for index, record_list in enumerate((best_records, worst_records)):
             best = index == 0
 
@@ -985,9 +1007,18 @@ class DiscordClient(discord.Client):
 
         return self.insert_emotes(response)
 
-    def get_big_doinks_msg(self, doinks, guild_id):
+    def get_big_doinks_msg(self, doinks: dict[list[tuple]], guild_id: int):
+        """
+        Return a message describing doinks criterias met for each player.
+        These criterias include a lot of kills, high kda, high cs/min, etc.
+
+        :param doinks:      Dictionary mapping discord IDs, for each player, to
+                            a list of doink criterias met for that player
+        :param guild_id:    ID of the Discord server where the game took place
+        """
         mentions_str = ""
         any_mentions = False
+
         for disc_id in doinks:
             user_str = ""
             if doinks[disc_id] != []:
@@ -1003,7 +1034,9 @@ class DiscordClient(discord.Client):
 
             multiplier = 1
             if self.riot_api.is_clash(self.active_game[guild_id]["queue_id"]):
+                # Doinks are worth 5x more during clash
                 multiplier = self.config.clash_multiplier
+
             points = self.config.betting_tokens_for_doinks * len(doinks[disc_id]) * multiplier
             tokens_name = self.config.betting_tokens
             mentions_str += f"\nHe is also given **{points}** bonus {tokens_name} "
@@ -1011,11 +1044,24 @@ class DiscordClient(discord.Client):
 
         return None if not any_mentions else mentions_str
 
-    def get_honorable_mentions_msg(self, mentions, guild_id):
+    def get_honorable_mentions_msg(self, mentions: dict[list[tuple]], guild_id: int):
+        """
+        Return a message describing honorable mentions for events that
+        happened during the game that were bad, but not bad enough to warrant
+        someone getting Int-Far because of them. These events include
+        not buying pinkwards, farming poorly, etc.
+
+        :param mentions:    Dictionary mapping discord IDs, for each player, to
+                            a list of events worth an honorable mention 
+                            related to that player
+        :param guild_id:    ID of the Discord server where the game took place
+        """
         mentions_str = "Honorable mentions goes out to:\n"
         any_mentions = False
+
         for disc_id in mentions:
             user_str = ""
+
             if mentions[disc_id] != []:
                 prefix = "\n" if any_mentions else ""
                 user_str = f"{prefix}- {self.get_mention_str(disc_id, guild_id)} for "
@@ -1024,15 +1070,29 @@ class DiscordClient(discord.Client):
             for (count, (stat_index, stat_value)) in enumerate(mentions[disc_id]):
                 prefix = " **and** " if count > 0 else ""
                 user_str += prefix + get_honorable_mentions_flavor_text(stat_index, stat_value)
+
             mentions_str += user_str
 
         return None if not any_mentions else mentions_str
 
-    def get_cool_stats_msg(self, cool_stats, guild_id):
-        stats_str = "======================================\n"
+    def get_cool_stats_msg(self, cool_stats: dict[list[tuple]], guild_id: int):
+        """
+        Return a message describing random notable events that happened during
+        the game that are not worthy of intfars, doinks, or honorable mentions,
+        but are still interesting enough to mention. This includes stuff like
+        stealing epic monsters, being dead for more than 10 minutes,
+        and destroying 7 turrets or more.
+
+        :param cool_stats:  Dictionary mapping discord IDs, for each player, to
+                            a list of interesting events related to that player
+        :param guild_id:    ID of the Discord server where the game took place
+        """
+        stats_str = "=" * 38 + "\n"
         any_stats = False
+
         for disc_id in cool_stats:
             user_str = ""
+
             if cool_stats[disc_id] != []:
                 prefix = "\n" if any_stats else ""
                 user_str = f"{prefix}{self.get_mention_str(disc_id, guild_id)} "
@@ -1041,13 +1101,24 @@ class DiscordClient(discord.Client):
             for (count, (stat_index, stat_value)) in enumerate(cool_stats[disc_id]):
                 prefix = " **and** " if count > 0 else ""
                 user_str += prefix + get_cool_stat_flavor_text(stat_index, stat_value)
+
             stats_str += user_str
 
         return None if not any_stats else self.insert_emotes(stats_str)
 
-    def get_cool_timeline_msg(self, timeline_mentions, guild_id):
-        timeline_str = "======================================\n"
+    def get_cool_timeline_msg(self, timeline_mentions: list[tuple], guild_id: int):
+        """
+        Return a message describing interesting events that happened during the game
+        that relate to the Riot timeline API. This includes whether the team came
+        back from a large gold deficit or threw a huge gold lead.
+
+        :param timeline_mentions:   List of info about interesting timeline related
+                                    events that happened during the game
+        :param guild_id:            ID of the Discord server where the game took place
+        """
+        timeline_str = "=" * 38 + "\n"
         any_stats = False
+
         for event_index, value, disc_id in timeline_mentions:
             if not any_stats:
                 event_str = ""
@@ -1055,9 +1126,9 @@ class DiscordClient(discord.Client):
             else:
                 event_str = "\n"
 
-            if disc_id is not None: # User specific mention.
+            if disc_id is not None: # User specific event.
                 event_str += f"{self.get_mention_str(disc_id, guild_id)} "
-            else:
+            else: # Team-wide event.
                 event_str += "We "
 
             event_str += get_timeline_events_flavor_text(event_index, value)
@@ -1066,12 +1137,25 @@ class DiscordClient(discord.Client):
 
         return None if timeline_mentions == [] else self.insert_emotes(timeline_str)
 
-    def get_streak_msg(self, intfar_id, guild_id, intfar_streak, prev_intfar):
+    def get_streak_msg(
+        self,
+        intfar_id: int,
+        guild_id: int,
+        intfar_streak: int,
+        prev_intfar: int
+    ):
         """
         Return a message describing the current Int-Far streak.
-        This happens if someone ends his Int-Far streak, either by playing well,
+        This happens if someone ends their Int-Far streak, either by playing well,
         or by someone else getting Int-Far.
         It also describes whether someone is currently on an Int-Far streak.
+
+        :param intfar_id:       Discord ID of the person who is Int-Far
+        :param guild_id:        ID of the Discord server where the game took place
+        :param intfar_streak:   Currently active Int-Far streak. I.e. how many games
+                                in a row the same person has been the current Int-Far
+        :param prev_intfar:     Discord ID of the person who was Int-Far
+                                in the previous game
         """
         current_nick = self.get_discord_nick(intfar_id, guild_id)
         current_mention = self.get_mention_str(intfar_id, guild_id)
@@ -1097,15 +1181,20 @@ class DiscordClient(discord.Client):
     
         return None
 
-    def get_ifotm_lead_msg(self, intfar_id, guild_id):
+    def get_ifotm_lead_msg(self, intfar_id: int, guild_id: int):
         """
-        Return a message describing whether the person being Int-Far is now
-        in the lead for Int-Far Of The Month (IFOTM) after acquring their new Int-Far award.
+        Return a message describing whether the person being Int-Far
+        is now in the lead for Int-Far Of The Month (IFOTM)
+        after acquring their new Int-Far award.
+
+        :param intfar_id:   Discord ID of the person who is Int-Far
+        :param guild_id:    ID of the Discord server where the game took place
         """
         mention_str = self.get_mention_str(intfar_id, guild_id)
         message = f"{mention_str} has now taken the lead for Int-Far of the Month " + "{emote_nazi}"
         intfar_details = self.database.get_intfars_of_the_month()
         monthly_games, monthly_intfars = self.database.get_intfar_stats(intfar_id, monthly=True)
+
         if intfar_details == []: # No one was Int-Far yet this month.
             if monthly_games == self.config.ifotm_min_games - 1:
                 return message # Current Int-Far is the first qualified person for IFOTM.
@@ -1136,9 +1225,28 @@ class DiscordClient(discord.Client):
 
         return None
 
-    def get_intfar_message(self, disc_id, guild_id, reason, ties_msg, intfar_streak, prev_intfar):
+    def get_intfar_message(
+        self,
+        disc_id: int,
+        guild_id: int,
+        reason: str,
+        ties_msg: str,
+        intfar_streak: int,
+        prev_intfar: int
+    ):
         """
-        Send Int-Far message to the appropriate Discord channel.
+        Get message detailing who was the Int-Far and what condition(s) they met.
+
+        :param disc_id:         Discord ID of the person being Int-Far
+        :param guild_id:        ID of the Discord server where the game took place
+        :param reason:          String describing the reason(s) for being Int-Far.
+        :param ties_msg:        Message describing any potential ties that had to be
+                                resolved between Int-Far candidates. Fx. if two people
+                                both met the deaths criteria and had the same deaths
+        :param intfar_streak:   Currently active Int-Far streak. I.e. how many games
+                                in a row the same person has been the current Int-Far
+        :param prev_intfar:     Discord ID of the person who was Int-Far
+                                in the previous game
         """
         mention_str = self.get_mention_str(disc_id, guild_id)
         if mention_str is None:
@@ -1147,27 +1255,33 @@ class DiscordClient(discord.Client):
 
         if reason is None:
             logger.warning("Int-Far reason was None!")
-            reason = "being really, really bad"
+            reason = "being really, really bad" # Generic reason, if None was given
 
         message = ties_msg
         message += get_intfar_flavor_text(mention_str, reason)
 
+        # Get message detailing whether current Int-Far is on an Int-Far streak,
+        # or whether them getting Int-Far broken another persons streak
         streak_msg = self.get_streak_msg(disc_id, guild_id, intfar_streak, prev_intfar)
         if streak_msg is not None:
             message += "\n" + streak_msg
 
+        # Get message describing whether current Int-Far is now Int-Far Of The Month
         ifotm_lead_msg = self.get_ifotm_lead_msg(disc_id, guild_id)
         if ifotm_lead_msg is not None:
             message += "\n" + ifotm_lead_msg
 
         return self.insert_emotes(message)
 
-    def get_intfar_data(self, filtered_stats, guild_id):
+    def get_intfar_data(self, filtered_stats: list[tuple], guild_id: int):
         """
-        Called when the currently active game is over.
-        Determines if an Int-Far should be crowned and for what,
-        and sends out a status message about the potential Int-Far (if there was one).
-        Also saves worst/best stats for the current game.
+        Determines whether a person in a finished game should be crowned Int-Far.
+        Returns who the Int-Far is (if any), what conditions they met, and a message
+        describing why they got Int-Far.
+
+        :filtered_stats:    List containing a tuple of (discord_id, game_stats)
+                            for each Int-Far registered player in the game
+        :guild_id:          ID of the Discord server where the game took place
         """
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
         reason_ids = ["0", "0", "0", "0"]
@@ -1175,7 +1289,8 @@ class DiscordClient(discord.Client):
         (
             final_intfar,
             final_intfar_data,
-            ties, ties_msg
+            ties,
+            ties_msg
         ) = award_qualifiers.get_intfar(filtered_stats, self.config)
 
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
@@ -1188,6 +1303,7 @@ class DiscordClient(discord.Client):
                 key = reason_keys[reason_index]
                 reason_text = get_reason_flavor_text(api_util.round_digits(stat_value), key)
                 reason_ids[reason_index] = "1"
+
                 if count > 0:
                     reason_text = " **AND** " + reason_text
                 reason += reason_text
@@ -1196,11 +1312,13 @@ class DiscordClient(discord.Client):
             if ties:
                 logger.info("There are Int-Far ties.")
                 logger.info(ties_msg)
+
                 full_ties_msg = "There are Int-Far ties! " + ties_msg + "\n"
 
             response = self.get_intfar_message(
                 final_intfar, guild_id, reason, full_ties_msg, intfar_streak, prev_intfar
             )
+
         else: # No one was bad enough to be Int-Far.
             logger.info("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
@@ -1210,6 +1328,7 @@ class DiscordClient(discord.Client):
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
 
+            # Get info about a potential Int-Far streak the person is currently on.
             streak_msg = self.get_streak_msg(None, guild_id, intfar_streak, prev_intfar)
             if streak_msg is not None:
                 response += "\n" + streak_msg
@@ -1541,18 +1660,25 @@ class DiscordClient(discord.Client):
 
     async def on_raw_reaction_add(self, react_info):
         seconds_max = 60 * 60 * 12
+        messages_to_remove = []
+
         # Clean up old messages.
         for message_id in self.pagination_data:
             created_at = self.pagination_data[message_id]["message"].created_at
             if time() - created_at.timestamp() > seconds_max:
-                del self.pagination_data[message_id]
+                messages_to_remove.append(message_id)
+
+        for message_id in messages_to_remove:
+            del self.pagination_data[message_id]
 
         message_id = react_info.message_id
-        if (react_info.event_type == "REACTION_ADD"
-                and react_info.member != self.user
-                and message_id in self.pagination_data 
-                and react_info.emoji.name in ("▶", "◀")
-                and self.pagination_data[message_id]["message"].created_at):
+        if (
+            react_info.event_type == "REACTION_ADD"
+            and react_info.member != self.user
+            and message_id in self.pagination_data 
+            and react_info.emoji.name in ("▶", "◀")
+            and self.pagination_data[message_id]["message"].created_at
+        ):
             message_data = self.pagination_data[message_id]
             reaction_next = react_info.emoji.name == "▶"
             new_chunk = message_data["chunk"] + 1 if reaction_next else message_data["chunk"] - 1

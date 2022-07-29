@@ -133,7 +133,7 @@ PARSER = argparse.ArgumentParser()
 
 CONFIG = config.Config()
 DATABASE = database.Database(CONFIG)
-RIOT_API = riot_api.APIClient(CONFIG)
+RIOT_API = riot_api.RiotAPIClient(CONFIG)
 
 TEST_RUNNER = TestFuncs(CONFIG, DATABASE, RIOT_API)
 FUNCS = [

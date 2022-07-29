@@ -1,6 +1,7 @@
 import sys, subprocess, signal
 from time import sleep
 from multiprocessing import Process, Pipe
+from multiprocessing.connection import Connection
 
 from discord.opus import load_opus
 from mhooge_flask.logging import logger
@@ -11,11 +12,23 @@ from api.bets import BettingHandler
 from api.config import Config
 from api.database import Database
 from api.shop import ShopHandler
-from api.riot_api import APIClient
+from api.riot_api import RiotAPIClient
 from ai import model
 from discbot import discord_bot
 
-def start_discord_process(config, database, betting_handler, riot_api, audio_handler, shop_handler, bot_end_ai, bot_end_flask):
+def start_discord_process(
+    config: Config,
+    database: Database,
+    betting_handler: BettingHandler,
+    riot_api: RiotAPIClient,
+    audio_handler: AudioHandler,
+    shop_handler: ShopHandler,
+    bot_end_ai: Connection,
+    bot_end_flask: Connection
+):
+    """
+    Run Discord bot in a separate process.
+    """
     our_end, bot_end_us = Pipe()
     bot_process = Process(
         name="Discord Bot",
@@ -28,7 +41,12 @@ def start_discord_process(config, database, betting_handler, riot_api, audio_han
 
     return bot_process, our_end
 
-def start_flask_process(database, betting_handler, riot_api, config):
+def start_flask_process(
+    config: Config,
+    database: Database,
+    betting_handler: BettingHandler,
+    riot_api: RiotAPIClient
+):
     flask_end, bot_end_flask = Pipe()
     flask_process = Process(
         name="Flask Web App",
@@ -67,7 +85,7 @@ def main():
     betting_handler = BettingHandler(conf, database_client)
     shop_handler = ShopHandler(conf, database_client)
     audio_handler = AudioHandler(conf)
-    riot_api = APIClient(conf)
+    riot_api = RiotAPIClient(conf)
 
     # Start process with machine learning model
     # that trains in the background after each game.
@@ -75,7 +93,7 @@ def main():
 
     logger.info("Starting Flask web app...")
     flask_process, bot_end_flask = start_flask_process(
-        database_client, betting_handler, riot_api, conf
+        conf, database_client, betting_handler, riot_api
     )
 
     logger.info("Starting Discord Client...")
@@ -92,8 +110,10 @@ def main():
                 logger.info("Restarting Flask process.")
 
                 flask_process, bot_end_flask = start_flask_process(
-                    database_client, betting_handler,
-                    riot_api, conf
+                    conf,
+                    database_client,
+                    betting_handler,
+                    riot_api
                 )
                 ai_process.kill()
 

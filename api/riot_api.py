@@ -10,7 +10,10 @@ import requests
 API_PLATFORM = "https://euw1.api.riotgames.com"
 API_REGION = "https://europe.api.riotgames.com"
 
-class APIClient:
+class RiotAPIClient:
+    """
+    Class for interacting with Riot Games League of Legends game data API.
+    """
     def __init__(self, config):
         self.config = config
         self.champ_names = {}
@@ -23,9 +26,15 @@ class APIClient:
         self.get_latest_data()
 
     def get_latest_data(self):
+        """
+        Fetch information about the latest League of Legends patch.
+        First, fetches what the latest patch is,
+        then downloads champion metadata, splashes, and portraits.
+        """
         self.latest_patch = self.get_latest_patch()
         if not exists(self.get_champions_file()):
             self.get_latest_champions_file()
+
         self.champ_splash_path = "app/static/img/champions/splashes"
         self.initialize_champ_dicts()
         self.get_champion_portraits()
@@ -246,9 +255,23 @@ class APIClient:
     def get_champ_data_path(self, champ_id):
         return f"{self.champ_data_path}/{champ_id}.json"
 
-    def try_find_champ(self, name):
-        search_name = name.strip().lower().replace("_", " ")
+    def try_find_champ(self, search_term):
+        """
+        Search for a champion by name.
+        
+        Tries to find candidates that have `search_term` as part
+        of their name. If only one candidate is found it is returned,
+        if more are found, None is returned.
+
+        :param search_term: The search term to try and match champions against
+                            Should use _ in place of spaces and should not include
+                            . or ' (fx. Kai'sa should be Kaisa,
+                            Dr. Mundo should be Dr_Mundo)
+        """
+        search_name = search_term.strip().lower().replace("_", " ")
         candidates = []
+
+        # Try to find candidates that have the search_term in ther name.
         for champ_id in self.champ_names:
             lowered = self.champ_names[champ_id].lower()
             if search_name in lowered:
@@ -262,6 +285,9 @@ class APIClient:
         return candidates[0] if len(candidates) == 1 else None
 
     def get_map_name(self, map_id):
+        """
+        Get name of League of Legends map with id `map_id`.
+        """
         with open("api/maps.json", encoding="utf-8") as fp:
             map_data = json.load(fp)
             for map_info in map_data:

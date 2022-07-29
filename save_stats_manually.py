@@ -9,7 +9,7 @@ from api.bets import BettingHandler
 from api.config import Config
 from api.database import Database
 from api.shop import ShopHandler
-from api.riot_api import APIClient
+from api.riot_api import RiotAPIClient
 from api.game_stats import get_filtered_stats
 from api.util import MAIN_GUILD_ID, GUILD_IDS, create_predictions_timeline_image
 from ai.data import shape_predict_data
@@ -46,8 +46,6 @@ class TestMock(DiscordClient):
             ids_to_save = self.database.get_missed_games()
         else:
             ids_to_save = [(self.game_id, self.guild_to_use)]
-
-        main_channel = self.channels_to_write[MAIN_GUILD_ID]
 
         for game_id, guild_id in ids_to_save:
             self.active_game[guild_id] = {"id": game_id}
@@ -104,7 +102,7 @@ class TestMock(DiscordClient):
                 await self.send_message_unprompted(response, guild_id)
 
             if self.play_sound:
-                await self.play_event_sounds(guild_id, intfar, doinks)
+                await self.play_event_sounds(intfar, doinks, guild_id)
 
             if self.ai_model is not None and self.task in ("all", "train"):
                 logger.info("Training AI Model with new game data.")
@@ -166,7 +164,7 @@ if not args.missing:
 
 conf = Config()
 
-riot_api = APIClient(conf)
+riot_api = RiotAPIClient(conf)
 
 logger.info("Initializing database...")
 

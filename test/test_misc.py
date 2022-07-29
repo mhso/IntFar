@@ -9,7 +9,7 @@ from api.config import Config
 from api.database import Database
 from discbot.discord_bot import DiscordClient
 from api.database import Database
-from api.riot_api import APIClient
+from api.riot_api import RiotAPIClient
 from api.bets import BettingHandler
 
 class TestWrapper(TestRunner):
@@ -48,7 +48,7 @@ class TestWrapper(TestRunner):
         database = Database(self.config)
         database.delete_game(game_id)
 
-        riot_api = APIClient(self.config)
+        riot_api = RiotAPIClient(self.config)
         betting_handler = BettingHandler(self.config, database)
 
         client = DiscordClient(self.config, database, betting_handler, riot_api, None, None)
@@ -158,7 +158,7 @@ class TestWrapper(TestRunner):
         database = Database(self.config)
         database.delete_game(game_id)
 
-        riot_api = APIClient(self.config)
+        riot_api = RiotAPIClient(self.config)
         betting_handler = BettingHandler(self.config, database)
 
         client = DiscordClient(self.config, database, betting_handler, riot_api, None, None)

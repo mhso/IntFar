@@ -1,53 +1,126 @@
 from datetime import datetime
 from time import time
-from api.util import format_duration
 
-def calc_kda(stats):
+from api.util import format_duration
+from api.riot_api import RiotAPIClient
+
+def calc_kda(stats: dict):
+    """
+    Calculate kill/death/assist ratio.
+
+    :param stats:   Stats data for a player in a finished game,
+                    fetched from Riot API
+    """
     if stats["deaths"] == 0:
         return stats["kills"] + stats["assists"]
+
     return (stats["kills"] + stats["assists"]) / stats["deaths"]
 
-def calc_kill_participation(stats, total_kills):
+def calc_kill_participation(stats: dict, total_kills: int):
+    """
+    Calculate kill participation.
+
+    :param stats:       Stats data for a player in a finished game,
+                        fetched from Riot API
+    :param total_kills: Total kills by the team that the player was on
+    """
     if total_kills == 0:
         return 100
+
     return int((float(stats["kills"] + stats["assists"]) / float(total_kills)) * 100.0)
 
-def get_stat_value(stats, key, total_kills):
-    if key == "kda":
-        return calc_kda(stats)
-    if key == "kp":
-        return calc_kill_participation(stats, total_kills)
-    return stats[key]
+def get_stat_value(stats: dict, stat: str, total_kills: int):
+    """
+    Get the value of a stat for a player in a finished game.
 
-def get_outlier(data, key, asc=True, total_kills=0, include_ties=False):
+    :param stats:       Stats data for a player in a finished game,
+                        fetched from Riot API
+    :param stat         Name of the stat, fx. 'kills', 'gold', etc.
+    :param total_kills: Total kills by the team that the player was on
+    """
+    if stat == "kda":
+        return calc_kda(stats)
+
+    if stat == "kp":
+        return calc_kill_participation(stats, total_kills)
+
+    return stats[stat]
+
+def get_outlier(
+    data: list[tuple(int, dict)],
+    stat: str,
+    asc=True,
+    total_kills=0,
+    include_ties=False
+):
+    """
+    Get the best or worse stat for a player in a finished game, fx.
+    the player with most kills, and how many kills that was.
+
+    :param data:            List containing a tuple of (discord_id, stats_data)
+                            for each Int-Far registered player in the game
+    :param stat:            Name of the stat to find the outlier for
+    :param asc:             Whether to sort the data in ascending or descending order
+                            to find an outlier
+    :param total_kills:     Total kills by the team that the players were on
+    :param include_ties:    Whether to return a list of potentially tied outliers
+                            or just return one person as an outlier, ignoring ties
+    """
     def outlier_func_short(x):
-        return get_stat_value(x[1], key, total_kills)
+        return get_stat_value(x[1], stat, total_kills)
 
     sorted_data = sorted(data, key=outlier_func_short, reverse=not asc)
 
-    if include_ties:
+    if include_ties: # Determine whether there are tied outliers.
         outlier = outlier_func_short(sorted_data[0])
         ties_ids = []
         ties_data = []
         index = 0
+
         while index < len(sorted_data) and outlier_func_short(sorted_data[index]) == outlier:
             ties_ids.append(sorted_data[index][0])
             ties_data.append(sorted_data[index][1])
             index += 1
+
         return ties_ids, ties_data
 
     return sorted_data[0]
 
-def get_outlier_stat(stat, data, reverse_order=False, total_kills=0):
+def get_outlier_stat(
+    data: list[tuple(int, dict)],
+    stat: str,
+    reverse_order=False,
+    total_kills=0
+):
+    """
+    Get data about the outlier (both good and bad)
+    for a specific stat in a finished game.
+
+    :param stat:            Name of the stat to find the outlier for
+    :param data:            List containing a tuple of (discord_id, game_stats)
+                            for each Int-Far registered player in the game
+    :param reverse_order    Whether to reverse the order in order to find the outliers
+                            Fx. for kills, most are best, for deaths, fewest is best.
+    :param total_kills      Total kills by the team that the players were on
+    """
     most_id, stats = get_outlier(data, stat, asc=not reverse_order, total_kills=total_kills)
     most = get_stat_value(stats, stat, total_kills)
     least_id, stats = get_outlier(data, stat, asc=reverse_order, total_kills=total_kills)
     least = get_stat_value(stats, stat, total_kills)
+
     return most_id, most, least_id, least
 
 def get_player_stats(data, summ_ids):
-    # We have to do this to handle /match/v4 stuff...
+    """
+    Get a specific player's stats from a dictionary of game data
+
+    :param data:        Dictionary containing un-filtered data about a finished
+                        game fetched from Riot League API
+    :param summ_ids:    List of summoner ids belonging to a player,
+                        for which to extract stats for
+    """
     if "participantIdentities" in data:
+        # We have to do this to handle /match/v4 stuff...
         for part_info in data["participantIdentities"]:
             if part_info["player"]["summonerId"] in summ_ids:
                 for participant in data["participants"]:
@@ -55,18 +128,34 @@ def get_player_stats(data, summ_ids):
                         stats = participant["stats"]
                         stats["championId"] = participant["championId"]
                         return stats
+
     else:
         for participant_data in data["participants"]:
             if participant_data["summonerId"] in summ_ids:
                 return participant_data
+
     return None
 
-def get_finished_game_summary(data, summ_ids, riot_api):
+def get_finished_game_summary(
+    data: dict,
+    summ_ids: list[str],
+    riot_api: RiotAPIClient
+):
+    """
+    Get a brief text that summaries a player's performance in a finished game.
+
+    :param data:        Dictionary containing un-filtered data about a finished
+                        game fetched from Riot League API
+    :param summ_ids:    List of summoner ids belonging to a player,
+                        for which to get the summary for
+    :parma riot_api:    Riot API client instance
+    """
     stats = get_player_stats(data, summ_ids)
 
     champ_played = riot_api.get_champ_name(stats["championId"])
     if champ_played is None:
         champ_played = "Unknown Champ (Rito pls)"
+
     date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
     duration = data["gameDuration"]
     dt_1 = datetime.fromtimestamp(time())
@@ -79,6 +168,15 @@ def get_finished_game_summary(data, summ_ids, riot_api):
     )
 
 def get_active_game_summary(data, summ_id, summoners, riot_api):
+    """
+    Extract data about a currently active game.
+
+    :param data:    Data aquired from Riot's API about an active game
+    :summ_id:       The summoner ID that we should extract data for in the game
+    :summoners:     List of summoners/users that are registered with Int-Far.
+                    Any summoners in the game not part of this list is filtered out
+    :riot_api       Riot API Client instance. Used to get champion name of the player
+    """
     champions = {}
     users_in_game = []
     for participant in data["participants"]:
@@ -170,12 +268,17 @@ def get_filtered_stats_v4(all_users, users_in_game, game_info):
     """
     Get relevant stats from the given game data and filter the data
     that is relevant for the Discord users that participated in the game.
+
+    This method is used for Riot's older Match API v4, where data is formatted
+    differently from v5. This method is only used to get data from older games,
+    before Riot migrated to Match API v5.
     """
     kills_per_team = {100: 0, 200: 0}
     damage_per_team = {100: 0, 200: 0}
     our_team = 100
     filtered_stats = []
     active_users = users_in_game
+
     for part_info in game_info["participantIdentities"]:
         for participant in game_info["participants"]:
             if part_info["participantId"] == participant["participantId"]:
@@ -229,6 +332,9 @@ def get_filtered_stats(all_users, users_in_game, game_info):
     """
     Get relevant stats from the given game data and filter the data
     that is relevant for the Discord users that participated in the game.
+
+    This method is used for Riot's newer Match API v5. This is now the standard
+    for all new League of Legends games (until a new one comes along).
     """
     if "participantIdentities" in game_info: # Old match v4 data.
         return get_filtered_stats_v4(all_users, users_in_game, game_info)
@@ -286,6 +392,11 @@ def get_filtered_stats(all_users, users_in_game, game_info):
     return filtered_stats, active_users
 
 def get_filtered_timeline_stats(filtered_game_stats, timeline_data):
+    """
+    Get interesting timeline related data. This pertains to data that
+    changes during the game, such as maximum gold deficit/lead of a team
+    during the course of the game.
+    """
     puuid_map = {}
 
     our_team_lower = True
