@@ -52,9 +52,10 @@ def load_train_data(database, riot_api, input_dim):
         if game_data is None:
             continue
 
-        filtered_data = game_stats.get_filtered_stats_v4(
+        relevant_data = game_stats.get_relevant_stats_v4(
             database.summoners, database.summoners, game_data
         )[0]
+        filtered_data = game_stats.get_filtered_stats(relevant_data)
 
         # Data vector is 25 (users) x 170 (champions)
         data_vector = np.zeros(input_dim)

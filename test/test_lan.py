@@ -63,7 +63,8 @@ class TestWrapper(TestRunner):
             with open(filename, "r", encoding="utf-8") as fp:
                 data = json.load(fp)
                 data["gameDuration"] /= 1000
-                filtered, users = game_stats.get_filtered_stats(self.database.summoners, [], data)
+                relevant, users = game_stats.get_relevant_stats(self.database.summoners, [], data)
+                filtered = game_stats.get_filtered_stats(relevant)
 
                 self.database.save_lan_stats(game_id, filtered)
 

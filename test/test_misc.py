@@ -40,7 +40,8 @@ class TestWrapper(TestRunner):
             (331082926475182081, 'Dumbledonger', 'z6svwF0nkD_TY5SLXAOEW3MaDLqJh1ziqOsE9lbqPQavp3o')
         ]
 
-        filtered_stats, users_in_game = game_stats.get_filtered_stats(users_in_game, users_in_game, data)
+        relevant_stats, users_in_game = game_stats.get_relevant_stats(users_in_game, users_in_game, data)
+        filtered_stats = game_stats.get_filtered_stats(relevant_stats)
 
         guild_id = util.MAIN_GUILD_ID
         game_id = 5452408885
@@ -63,7 +64,7 @@ class TestWrapper(TestRunner):
         }
         client.users_in_game[guild_id] = users_in_game
 
-        intfar, intfar_reason, intfar_response = client.get_intfar_data(filtered_stats, guild_id)
+        intfar, intfar_reason, intfar_response = client.get_intfar_data(relevant_stats, filtered_stats, guild_id)
         doinks, doinks_response = client.get_doinks_data(filtered_stats, guild_id)
 
         if doinks_response is not None:
@@ -106,8 +107,11 @@ class TestWrapper(TestRunner):
             (331082926475182081, None, None, 3)
         ]
 
-        filtered_old = game_stats.get_filtered_stats_v4(self.database.summoners, users_in_game, old_data)[0]
-        filtered_new = game_stats.get_filtered_stats(self.database.summoners, users_in_game, new_data)[0]
+        relevant_old = game_stats.get_relevant_stats_v4(self.database.summoners, users_in_game, old_data)[0]
+        relevant_new = game_stats.get_relevant_stats(self.database.summoners, users_in_game, old_data)[0]
+
+        filtered_old = game_stats.get_filtered_stats(relevant_old)
+        filtered_new = game_stats.get_filtered_stats(relevant_new)
 
         mappings = {"magicalDamageTaken": "magicDamageTaken", "totalTimeCrowdControlDealt": "totalTimeCCDealt"}
         exceptions = [
@@ -151,7 +155,8 @@ class TestWrapper(TestRunner):
         with open(f"resources/data/game_{game_id}.json", "r", encoding="utf-8") as fp:
             data = json.load(fp)
 
-        filtered_stats, users_in_game = game_stats.get_filtered_stats(self.database.summoners, [], data)
+        relevant_stats, users_in_game = game_stats.get_relevant_stats(self.database.summoners, [], data)
+        filtered_stats = game_stats.get_filtered_stats(relevant_stats)
 
         guild_id = util.MAIN_GUILD_ID
 
@@ -173,7 +178,11 @@ class TestWrapper(TestRunner):
         }
         client.users_in_game[guild_id] = users_in_game
 
-        intfar, intfar_reason, intfar_response = client.get_intfar_data(filtered_stats, guild_id)
+        intfar, intfar_reason, intfar_response = client.get_intfar_data(
+            relevant_stats,
+            filtered_stats,
+            guild_id
+        )
         doinks, doinks_response = client.get_doinks_data(filtered_stats, guild_id)
 
         if doinks_response is not None:

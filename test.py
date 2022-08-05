@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, riot_api, util
-from api.game_stats import get_filtered_stats, get_filtered_timeline_stats
+from api.game_stats import get_relevant_stats, get_filtered_stats, get_filtered_timeline_stats
 from discbot.commands.util import ADMIN_DISC_ID
 
 class TestFuncs:
@@ -49,7 +49,8 @@ class TestFuncs:
             except FileNotFoundError:
                 continue
 
-            filtered_stats, _ = get_filtered_stats(self.database.summoners, [], game_info)
+            relevant_stats, _ = get_relevant_stats(self.database.summoners, [], game_info)
+            filtered_stats = get_filtered_stats(relevant_stats)
             if key not in filtered_stats[0][1]:
                 continue
 
@@ -77,8 +78,8 @@ class TestFuncs:
     def test_tie_stuff(self):
         game_id = 5560333770
         game_data = self.riot_api.get_game_details(game_id)
-        filtered = get_filtered_stats(self.database.summoners, [], game_data)[0]
-        intfar_data = award_qualifiers.get_intfar(filtered, CONFIG)
+        relevant = get_relevant_stats(self.database.summoners, [], game_data)[0]
+        intfar_data = award_qualifiers.get_intfar(relevant, CONFIG)
         print(intfar_data)
 
     def test_ifotm_stuff(self):
@@ -118,7 +119,8 @@ class TestFuncs:
         game_id = 5826515143
         game_data = self.riot_api.get_game_details(game_id)
         timeline_data = self.riot_api.get_game_timeline(game_id)
-        filtered = get_filtered_stats(self.database.summoners, [], game_data)[0]
+        relevant = get_relevant_stats(self.database.summoners, [], game_data)[0]
+        filtered = get_filtered_stats(relevant)
         filtered_timeline = get_filtered_timeline_stats(filtered, timeline_data)
 
         stats = award_qualifiers.get_cool_timeline_events(filtered_timeline, CONFIG)
@@ -128,6 +130,9 @@ class TestFuncs:
         files = glob("app/static/sounds/*.mp3")
         for filename in files:
             normalize_sound_volume(filename)
+
+    def test_random_player_intfar(self):
+        pass
 
 PARSER = argparse.ArgumentParser()
 

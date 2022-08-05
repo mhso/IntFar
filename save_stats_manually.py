@@ -10,8 +10,8 @@ from api.config import Config
 from api.database import Database
 from api.shop import ShopHandler
 from api.riot_api import RiotAPIClient
-from api.game_stats import get_filtered_stats
-from api.util import MAIN_GUILD_ID, GUILD_IDS, create_predictions_timeline_image
+from api.game_stats import get_relevant_stats, get_filtered_stats
+from api.util import GUILD_IDS, create_predictions_timeline_image
 from ai.data import shape_predict_data
 from ai.train import train_online
 from ai.model import Model
@@ -52,13 +52,14 @@ class TestMock(DiscordClient):
             game_info = self.riot_api.get_game_details(game_id)
             self.active_game[guild_id]["queue_id"] = game_info["queueId"]
 
-            filtered, users_in_game = get_filtered_stats(
+            relevant, users_in_game = get_relevant_stats(
                 self.database.summoners, [], game_info
             )
+            filtered = get_filtered_stats(relevant)
 
             self.users_in_game[guild_id] = users_in_game
 
-            intfar, intfar_reason, response = self.get_intfar_data(filtered, guild_id)
+            intfar, intfar_reason, response = self.get_intfar_data(relevant, filtered, guild_id)
 
             doinks, doinks_response = self.get_doinks_data(filtered, guild_id)
             if doinks_response is not None:

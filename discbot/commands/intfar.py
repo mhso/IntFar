@@ -122,17 +122,21 @@ async def handle_intfar_criteria_msg(client, message, criteria=None):
     if criteria == "kda":
         crit_1 = client.config.kda_lower_threshold
         crit_2 = client.config.kda_death_criteria
-        response = ("Criteria for being Int-Far by low KDA:\n" +
-                    " - Having the lowest KDA of the people playing\n" +
-                    f" - Having a KDA of less than {crit_1}\n" +
-                    f" - Having more than {crit_2} deaths")
+        response = (
+            "Criteria for being Int-Far by low KDA:\n" +
+            " - Having the lowest KDA of the people playing (including randoms)\n" +
+            f" - Having a KDA of less than {crit_1}\n" +
+            f" - Having more than {crit_2} deaths"
+        )
     elif criteria == "deaths":
         crit_1 = client.config.death_lower_threshold
         crit_2 = client.config.death_kda_criteria
-        response = ("Criteria for being Int-Far by many deaths:\n" +
-                    " - Having the most deaths of the people playing\n" +
-                    f" - Having more than {crit_1} deaths\n"
-                    f" - Having less than {crit_2} KDA")
+        response = (
+            "Criteria for being Int-Far by many deaths:\n" +
+            " - Having the most deaths of the people playing (including randoms)\n" +
+            f" - Having more than {crit_1} deaths\n"
+            f" - Having less than {crit_2} KDA"
+        )
     elif criteria == "kp":
         crit_1 = client.config.kp_lower_threshold
         crit_2 = client.config.kp_takedowns_criteria

@@ -199,7 +199,7 @@ def intfar_by_kda(data, config):
         - KDA being the lowest of the group
         - KDA being less than 1.3
         - Number of deaths being more than 2.
-    Returns None if none of these criteria matches a person.
+    Returns None if none of these criteria matches a registered person.
     """
     tied_intfars, tied_stats = game_stats.get_outlier(data, "kda", include_ties=True)
     lowest_kda = game_stats.calc_kda(tied_stats[0])
@@ -213,7 +213,13 @@ def intfar_by_kda(data, config):
         if lowest_kda < kda_criteria and deaths > death_criteria:
             potential_intfars.append(intfar)
 
-    if potential_intfars == []:
+    # Check if all Int-Far candidates are randos (not registered with Int-Far)
+    all_intfars_randos = not any(potential_intfars)
+
+    if all_intfars_randos:
+        logger.info("Int-Far for low KDA goes to a random!")
+
+    if potential_intfars == [] or all_intfars_randos:
         return (None, None)
 
     return (potential_intfars, lowest_kda)
@@ -241,7 +247,13 @@ def intfar_by_deaths(data, config):
         if highest_deaths > death_criteria and kda < kda_criteria:
             potential_intfars.append(intfar)
 
-    if potential_intfars == []:
+    # Check if all Int-Far candidates are randos (not registered with Int-Far)
+    all_intfars_randos = not any(potential_intfars)
+
+    if all_intfars_randos:
+        logger.info("Int-Far for many deaths goes to a random!")
+
+    if potential_intfars == [] or all_intfars_randos:
         return (None, None)
 
     return (potential_intfars, highest_deaths)
@@ -360,22 +372,22 @@ def resolve_intfar_ties(intfar_data, max_count, game_data):
     sorted_by_gold = sorted(filtered_data, key=lambda x: x[1]["goldEarned"])
     return sorted_by_gold[0][0], True, "Ties resolved by fewest gold earned."
 
-def get_intfar_details(stats, config):
-    intfar_kda_id, kda = intfar_by_kda(stats, config)
+def get_intfar_qualifiers(relevant_stats, filtered_stats, config):
+    intfar_kda_id, kda = intfar_by_kda(relevant_stats, config)
     if intfar_kda_id is not None:
         logger.info("Int-Far because of KDA.")
 
-    intfar_deaths_id, deaths = intfar_by_deaths(stats, config)
+    intfar_deaths_id, deaths = intfar_by_deaths(relevant_stats, config)
     if intfar_deaths_id is not None:
         logger.info("Int-Far because of deaths.")
 
-    intfar_kp_id, kp = intfar_by_kp(stats, config)
+    intfar_kp_id, kp = intfar_by_kp(filtered_stats, config)
     if intfar_kp_id is not None:
         logger.info("Int-Far because of kill participation.")
 
     intfar_vision_id, vision_score = None, None
-    if stats[0][1]["mapId"] != 21:
-        intfar_vision_id, vision_score = intfar_by_vision_score(stats, config)
+    if filtered_stats[0][1]["mapId"] != 21:
+        intfar_vision_id, vision_score = intfar_by_vision_score(filtered_stats, config)
         if intfar_vision_id is not None:
             logger.info("Int-Far because of vision score.")
 
@@ -384,11 +396,12 @@ def get_intfar_details(stats, config):
         (intfar_kp_id, kp), (intfar_vision_id, vision_score)
     ]
 
-def get_intfar_qualifiers(intfar_details):
+def get_intfar_candidates(intfar_details):
     max_intfar_count = 1
     intfar_counts = {}
     max_count_intfar = None
     qualifier_data = {}
+
     # Look through details for the people qualifying for Int-Far.
     # The one with most criteria met gets chosen.
     for (index, (tied_intfars, stat_value)) in enumerate(intfar_details):
@@ -396,25 +409,28 @@ def get_intfar_qualifiers(intfar_details):
             for intfar_disc_id in tied_intfars:
                 current_intfar_count = intfar_counts.get(intfar_disc_id, 0) + 1
                 intfar_counts[intfar_disc_id] = current_intfar_count
+
                 if current_intfar_count >= max_intfar_count:
                     max_intfar_count = current_intfar_count
                     max_count_intfar = intfar_disc_id
+
                 data_list = qualifier_data.get(intfar_disc_id, [])
                 data_list.append((index, stat_value))
                 qualifier_data[intfar_disc_id] = data_list
 
     return qualifier_data, max_count_intfar, max_intfar_count
 
-def get_intfar(filtered_stats, config):
-    intfar_details = get_intfar_details(filtered_stats, config)
+def get_intfar(relevant_stats, filtered_stats, config):
+    intfar_details = get_intfar_qualifiers(relevant_stats, filtered_stats, config)
 
     (intfar_data,
      max_count_intfar,
-     max_intfar_count) = get_intfar_qualifiers(intfar_details)
+     max_intfar_count) = get_intfar_candidates(intfar_details)
 
     if max_count_intfar is None:
         return None, None, None, None
 
     (final_intfar,
      ties, tie_desc) = resolve_intfar_ties(intfar_data, max_intfar_count, filtered_stats)
+
     return final_intfar, intfar_data[final_intfar], ties, tie_desc

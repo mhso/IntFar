@@ -47,7 +47,7 @@ def get_stat_value(stats: dict, stat: str, total_kills: int):
     return stats[stat]
 
 def get_outlier(
-    data: list[tuple(int, dict)],
+    data: list[tuple],
     stat: str,
     asc=True,
     total_kills=0,
@@ -87,7 +87,7 @@ def get_outlier(
     return sorted_data[0]
 
 def get_outlier_stat(
-    data: list[tuple(int, dict)],
+    data: list[tuple],
     stat: str,
     reverse_order=False,
     total_kills=0
@@ -264,7 +264,7 @@ def are_filtered_stats_well_formed(filtered_info):
     # for disc_id, stats in game_info:
     #     pass
 
-def get_filtered_stats_v4(all_users, users_in_game, game_info):
+def get_relevant_stats_v4(all_users, users_in_game, game_info):
     """
     Get relevant stats from the given game data and filter the data
     that is relevant for the Discord users that participated in the game.
@@ -328,7 +328,7 @@ def get_filtered_stats_v4(all_users, users_in_game, game_info):
 
     return filtered_stats, active_users
 
-def get_filtered_stats(all_users, users_in_game, game_info):
+def get_relevant_stats(all_users, users_in_game, game_info):
     """
     Get relevant stats from the given game data and filter the data
     that is relevant for the Discord users that participated in the game.
@@ -337,43 +337,49 @@ def get_filtered_stats(all_users, users_in_game, game_info):
     for all new League of Legends games (until a new one comes along).
     """
     if "participantIdentities" in game_info: # Old match v4 data.
-        return get_filtered_stats_v4(all_users, users_in_game, game_info)
+        return get_relevant_stats_v4(all_users, users_in_game, game_info)
 
     kills_per_team = {100: 0, 200: 0}
     damage_per_team = {100: 0, 200: 0}
     our_team = 100
-    filtered_stats = []
+    relevant_stats = []
     active_users = users_in_game
+
     for participant_data in game_info["participants"]:
         kills_per_team[participant_data["teamId"]] += participant_data["kills"]
         damage_per_team[participant_data["teamId"]] += participant_data["totalDamageDealtToChampions"]
 
+        player_disc_id = None
+
         for disc_id, _, summ_ids in all_users:
             if participant_data["summonerId"] in summ_ids:
-                our_team = participant_data["teamId"]
-                combined_stats = participant_data
-                combined_stats["lane"] = participant_data["teamPosition"]
-                combined_stats["timestamp"] = game_info["gameCreation"]
-                combined_stats["mapId"] = game_info["mapId"]
-                combined_stats["gameDuration"] = int(game_info["gameDuration"])
-                combined_stats["totalCs"] = combined_stats["neutralMinionsKilled"] + combined_stats["totalMinionsKilled"]
-                combined_stats["csPerMin"] = (combined_stats["totalCs"] / combined_stats["gameDuration"]) * 60
-                filtered_stats.append((disc_id, combined_stats))
+                player_disc_id = disc_id
+                break
 
-                if users_in_game is not None:
-                    user_in_list = False
-                    for user_data in users_in_game:
-                        if user_data[0] == disc_id:
-                            user_in_list = True
-                            break
-                    if not user_in_list:
-                        summ_data = (
-                            disc_id, participant_data["summonerName"],
-                            participant_data["summonerId"], participant_data["championId"]
-                        )
-                        active_users.append(summ_data)
+        our_team = participant_data["teamId"]
+        combined_stats = participant_data
+        combined_stats["lane"] = participant_data["teamPosition"]
+        combined_stats["timestamp"] = game_info["gameCreation"]
+        combined_stats["mapId"] = game_info["mapId"]
+        combined_stats["gameDuration"] = int(game_info["gameDuration"])
+        combined_stats["totalCs"] = combined_stats["neutralMinionsKilled"] + combined_stats["totalMinionsKilled"]
+        combined_stats["csPerMin"] = (combined_stats["totalCs"] / combined_stats["gameDuration"]) * 60
+        relevant_stats.append((player_disc_id, combined_stats))
 
-    for _, stats in filtered_stats:
+        if player_disc_id is not None and users_in_game is not None:
+            user_in_list = False
+            for user_data in users_in_game:
+                if user_data[0] == player_disc_id:
+                    user_in_list = True
+                    break
+            if not user_in_list:
+                summ_data = (
+                    player_disc_id, participant_data["summonerName"],
+                    participant_data["summonerId"], participant_data["championId"]
+                )
+                active_users.append(summ_data)
+
+    for _, stats in relevant_stats:
         stats["kills_by_team"] = kills_per_team[our_team]
         stats["damage_by_team"] = damage_per_team[our_team]
         for team in game_info["teams"]:
@@ -389,7 +395,13 @@ def get_filtered_stats(all_users, users_in_game, game_info):
                 stats["enemyDragonKills"] = objectives["dragon"]["kills"]
                 stats["enemyHeraldKills"] = objectives["riftHerald"]["kills"]
 
-    return filtered_stats, active_users
+    return relevant_stats, active_users
+
+def get_filtered_stats(relevant_stats):
+    """
+    Filter out stats for any player not registered with Int-Far
+    """
+    return list(filter(lambda x: x[0] is not None, relevant_stats))
 
 def get_filtered_timeline_stats(filtered_game_stats, timeline_data):
     """

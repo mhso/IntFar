@@ -318,9 +318,10 @@ class DiscordClient(discord.Client):
         logger.debug(f"Users in game before: {self.users_in_game.get(guild_id)}")
 
         try: # Get formatted stats that are relevant for the players in the game.
-            filtered_stats, users_in_game = game_stats.get_filtered_stats(
+            relevant_stats, users_in_game = game_stats.get_relevant_stats(
                 self.database.summoners, self.users_in_game.get(guild_id), game_info
             )
+            filtered_stats = game_stats.get_filtered_stats(relevant_stats)
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito pls).
             logger.bind(game_id=game_info["gameId"]).error(
@@ -343,7 +344,11 @@ class DiscordClient(discord.Client):
                 f"{multiplier} TIMES AS MUCH!!! <<<<<**"
             )
 
-        intfar, intfar_reason, response = self.get_intfar_data(filtered_stats, guild_id)
+        intfar, intfar_reason, response = self.get_intfar_data(
+            relevant_stats,
+            filtered_stats,
+            guild_id
+        )
         doinks, doinks_response = self.get_doinks_data(filtered_stats, guild_id)
 
         if doinks_response is not None:
@@ -1273,14 +1278,19 @@ class DiscordClient(discord.Client):
 
         return self.insert_emotes(message)
 
-    def get_intfar_data(self, filtered_stats: list[tuple], guild_id: int):
+    def get_intfar_data(
+        self,
+        relevant_stats: list[tuple],
+        filtered_stats: list[tuple],
+        guild_id: int
+    ):
         """
         Determines whether a person in a finished game should be crowned Int-Far.
         Returns who the Int-Far is (if any), what conditions they met, and a message
         describing why they got Int-Far.
 
         :filtered_stats:    List containing a tuple of (discord_id, game_stats)
-                            for each Int-Far registered player in the game
+                            for each player on our team (registered or not)
         :guild_id:          ID of the Discord server where the game took place
         """
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
@@ -1291,7 +1301,7 @@ class DiscordClient(discord.Client):
             final_intfar_data,
             ties,
             ties_msg
-        ) = award_qualifiers.get_intfar(filtered_stats, self.config)
+        ) = award_qualifiers.get_intfar(relevant_stats, self.config)
 
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
 

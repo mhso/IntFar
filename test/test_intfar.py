@@ -28,11 +28,11 @@ class TestWrapper(TestRunner):
             (331082926475182081, 'Dumbledonger', 'z6svwF0nkD_TY5SLXAOEW3MaDLqJh1ziqOsE9lbqPQavp3o')
         ]
 
-        filtered_data, users_in_game = game_stats.get_filtered_stats(users_in_game, users_in_game, data)
+        relevant_data, users_in_game = game_stats.get_relevant_stats(users_in_game, users_in_game, data)
 
         (final_intfar,
          final_intfar_data,
-         ties, ties_msg) = award_qualifiers.get_intfar(filtered_data, self.config)
+         ties, ties_msg) = award_qualifiers.get_intfar(relevant_data, self.config)
 
     @test
     def test_flavor_texts(self):
