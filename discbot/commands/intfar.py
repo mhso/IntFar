@@ -10,7 +10,7 @@ async def handle_intfar_msg(client, message, target_id):
         msg = f"{person_to_check}: Int-Far **{intfars}** times "
         msg += f"**({pct_intfar:.2f}%** of {games_played} games) "
         msg = client.insert_emotes(msg)
-        return msg, intfars, pct_intfar
+        return msg, intfars, pct_intfar, games_played
 
     def format_for_single(disc_id):
         person_to_check = client.get_discord_nick(disc_id, message.guild.id)
@@ -64,11 +64,12 @@ async def handle_intfar_msg(client, message, target_id):
         messages_all_time = []
         messages_monthly = []
         for disc_id, _, _ in client.database.summoners:
-            resp_str_all_time, intfars, pct_all_time = format_for_all(disc_id)
-            resp_str_month, intfars_month, pct_month = format_for_all(disc_id, monthly=True)
+            resp_str_all_time, intfars, pct_all_time, _ = format_for_all(disc_id)
+            resp_str_month, intfars_month, pct_month, games_played = format_for_all(disc_id, monthly=True)
 
             messages_all_time.append((resp_str_all_time, intfars, pct_all_time))
-            messages_monthly.append((resp_str_month, intfars_month, pct_month))
+            if games_played > 0: # Don't include users with no games this month.
+                messages_monthly.append((resp_str_month, intfars_month, pct_month))
 
         messages_all_time.sort(key=lambda x: (x[1], x[2]), reverse=True)
         messages_monthly.sort(key=lambda x: (x[1], x[2]), reverse=True)
@@ -80,8 +81,12 @@ async def handle_intfar_msg(client, message, target_id):
         await message.channel.send(response)
 
         response = f"**--- Stats for {current_month} ---**"
-        for data in messages_monthly:
-            response += f"\n- {data[0]}"
+
+        if len(messages_monthly) == 0: # No games this month
+            response += "\nNo one has played any games (yet) this month."
+        else:
+            for data in messages_monthly:
+                response += f"\n- {data[0]}"
 
     else: # Check intfar stats for a specific person.
         response = format_for_single(target_id)

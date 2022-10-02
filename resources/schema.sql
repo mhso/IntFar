@@ -8,13 +8,14 @@ CREATE TABLE [registered_summoners] (
     PRIMARY KEY (disc_id, summ_id)
 );
 CREATE TABLE [games] (
-  [game_id] INTEGER PRIMARY KEY,
-  [timestamp] INTEGER,
-  [duration] INTEGER,
-  [intfar_id] INTEGER,
-  [intfar_reason] NVARCHAR(4),
-  [win] INTEGER(1),
-  [guild_id] INTEGER
+    [game_id] INTEGER PRIMARY KEY,
+    [timestamp] INTEGER,
+    [duration] INTEGER,
+    [intfar_id] INTEGER,
+    [intfar_reason] NVARCHAR(4),
+    [first_blood] INTEGER,
+    [win] INTEGER(1),
+    [guild_id] INTEGER
 );
 CREATE TABLE [missed_games] (
     [game_id] INTEGER PRIMARY KEY,
@@ -22,61 +23,23 @@ CREATE TABLE [missed_games] (
     [timestamp] INTEGER
 );
 CREATE TABLE [participants] (
-  [game_id] INTEGER NOT NULL,
-  [disc_id] INTEGER NOT NULL,
-  [champ_id] INTEGER NOT NULL,
-  [doinks] NVARCHAR(10),
-  PRIMARY KEY (game_id, disc_id)
-);
-CREATE TABLE [best_stats] (
-    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
-    [game_id] INTEGER UNIQUE NOT NULL,
-    [first_blood] INTEGER,
+    [game_id] INTEGER NOT NULL,
+    [disc_id] INTEGER NOT NULL,
+    [champ_id] INTEGER NOT NULL,
+    [doinks] NVARCHAR(10),
     [kills] INTEGER,
-    [kills_id] INTEGER,
     [deaths] INTEGER,
-    [deaths_id] INTEGER,
+    [assists] INTEGER,
     [kda] REAL,
-    [kda_id] INTEGER,
     [damage] INTEGER,
-    [damage_id] INTEGER,
     [cs] INTEGER,
-    [cs_id] INTEGER,
-    [cs_per_min] REAL,
-    [cs_per_min_id] INTEGER,
+    [cs_per_min] INTEGER,
     [gold] INTEGER,
-    [gold_id] INTEGER,
     [kp] INTEGER,
-    [kp_id] INTEGER,
     [vision_wards] INTEGER,
-    [vision_wards_id] INTEGER,
     [vision_score] INTEGER,
-    [vision_score_id] INTEGER
-);
-CREATE TABLE [worst_stats] (
-    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
-    [game_id] INTEGER UNIQUE NOT NULL,
-    [first_blood] INTEGER,
-    [kills] INTEGER,
-    [kills_id] INTEGER,
-    [deaths] INTEGER,
-    [deaths_id] INTEGER,
-    [kda] REAL,
-    [kda_id] INTEGER,
-    [damage] INTEGER,
-    [damage_id] INTEGER,
-    [cs] INTEGER,
-    [cs_id] INTEGER,
-    [cs_per_min] REAL,
-    [cs_per_min_id] INTEGER,
-    [gold] INTEGER,
-    [gold_id] INTEGER,
-    [kp] INTEGER,
-    [kp_id] INTEGER,
-    [vision_wards] INTEGER,
-    [vision_wards_id] INTEGER,
-    [vision_score] INTEGER,
-    [vision_score_id] INTEGER
+    [steals] INTEGER,
+    PRIMARY KEY (game_id, disc_id)
 );
 CREATE TABLE [betting_balance] (
     [disc_id] INTEGER PRIMARY KEY,
@@ -127,19 +90,4 @@ CREATE TABLE [list_items] (
     [champ_id] INTEGER NOT NULL,
     [list_id] INTEGER NOT NULL,
     UNIQUE(champ_id, list_id)
-);
-CREATE TABLE [lan_stats] (
-    [game_id] INTEGER NOT NULL,
-    [disc_id] INTEGER NOT NULL,
-    [kills] INTEGER NOT NULL,
-    [deaths] INTEGER NOT NULL,
-    [assists] INTEGER NOT NULL,
-    [damage] INTEGER NOT NULL,
-    [cs] INTEGER NOT NULL,
-    [cs_per_min] INTEGER NOT NULL,
-    [gold] INTEGER NOT NULL,
-    [kp] INTEGER NOT NULL,
-    [vision_wards] INTEGER NOT NULL,
-    [vision_score] INTEGER NOT NULL,
-    PRIMARY KEY (game_id, disc_id)
 );

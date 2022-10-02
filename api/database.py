@@ -173,13 +173,9 @@ class Database(SQLiteDatabase):
     def delete_game(self, game_id):
         with self:
             query_1 = "DELETE FROM games WHERE game_id=?"
-            query_2 = "DELETE FROM best_stats WHERE game_id=?"
-            query_3 = "DELETE FROM worst_stats WHERE game_id=?"
-            query_4 = "DELETE FROM participants WHERE game_id=?"
+            query_2 = "DELETE FROM participants WHERE game_id=?"
             self.execute_query(query_1, game_id, commit=False)
-            self.execute_query(query_2, game_id, commit=False)
-            self.execute_query(query_3, game_id, commit=False)
-            self.execute_query(query_4, game_id)
+            self.execute_query(query_2, game_id)
 
     def get_latest_game(self, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
@@ -199,10 +195,9 @@ class Database(SQLiteDatabase):
             doinks_data = self.execute_query(query_doinks, *params).fetchall()
             return game_data, doinks_data
 
-    def get_most_extreme_stat(self, stat, best, maximize=True):
+    def get_most_extreme_stat(self, stat, maximize=True):
         with self:
             aggregator = "MAX" if maximize else "MIN"
-            table = "best_stats" if best else "worst_stats"
 
             if stat == "first_blood":
                 query = f"""
@@ -212,8 +207,10 @@ class Database(SQLiteDatabase):
                     FROM  (
                         SELECT
                             first_blood,
-                            Count(DISTINCT game_id) AS c FROM {table},
-                        registered_summoners as rs
+                            Count(DISTINCT game_id) AS c
+                        FROM
+                            games,
+                            registered_summoners AS rs
                         WHERE
                             rs.disc_id=first_blood
                             AND rs.active=1 
@@ -221,51 +218,146 @@ class Database(SQLiteDatabase):
                             HAVING first_blood IS NOT NULL
                     ) sub
                 """
+
                 result = self.execute_query(query).fetchone()
                 return result + (None,)
 
-            query = (
-                f"SELECT {stat}_id, {aggregator}({stat}), game_id FROM {table}, " +
-                f"registered_summoners as rs WHERE rs.disc_id={stat}_id AND rs.active=1"
-            )
+            query = f"""
+                SELECT
+                    p.disc_id,
+                    {aggregator}({stat}),
+                    game_id
+                FROM participants AS p
+                JOIN registered_summoners AS rs
+                ON rs.disc_id = p.disc_id
+                WHERE rs.active=1
+            """
+
             return self.execute_query(query).fetchone()
 
-    def get_stat(self, stat, best, disc_id, maximize=True):
+    def get_best_or_worst_stat(self, stat, disc_id, maximize=True):
         with self:
             aggregator = "MAX" if maximize else "MIN"
-            table = "best_stats" if best else "worst_stats"
 
             if stat == "first_blood":
                 query = f"""
-                    SELECT Count(DISTINCT game_id) FROM {table} JOIN registered_summoners rs ON 
-                    rs.disc_id=first_blood WHERE first_blood=? AND rs.active=1
+                    SELECT Count(DISTINCT g.game_id)
+                    FROM games AS g
+                    JOIN participants AS p
+                    ON p.game_id = g.game_id
+                    JOIN registered_summoners AS rs
+                    ON rs.disc_id=p.disc_id
+                    WHERE
+                        g.first_blood=?
+                        AND rs.active=1
                 """
+
                 result = self.execute_query(query, disc_id).fetchone()
                 return result[0], None, None
 
             query = f"""
-                SELECT Count(DISTINCT game_id), {aggregator}({stat}), game_id 
-                FROM {table} JOIN registered_summoners rs ON 
-                rs.disc_id={stat}_id WHERE {stat}_id=? AND rs.active=1
+                SELECT
+                    COUNT(*),
+                    MAX(c),
+                    game_id
+                FROM (
+                    SELECT
+                        {aggregator}({stat}) AS c,
+                        p.game_id,
+                        p.disc_id
+                    FROM participants p
+                    JOIN registered_summoners rs
+                    ON rs.disc_id=p.disc_id
+                    WHERE rs.active = 1
+                    GROUP BY game_id
+                ) sub
+                WHERE disc_id = ?
             """
 
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_champ_count_for_stat(self, stat, best, disc_id):
-        table = "best_stats" if best else "worst_stats"
+    def get_champ_count_for_stat(self, stat, maximize, disc_id):
+        aggregator = "MAX" if maximize else "MIN"
+
         query = f"""
-            SELECT sub.champ_id, MAX(sub.c) FROM (
-               SELECT COUNT(DISTINCT st.game_id) AS c, champ_id FROM {table} st
-               JOIN registered_summoners rs ON rs.disc_id=st.{stat}_id
-               JOIN participants p ON p.game_id = st.game_id
-               WHERE st.{stat}_id=? AND p.disc_id=rs.disc_id AND rs.active=1
-               GROUP BY champ_id
-            ) sub
+            SELECT sub2.champ_id, {aggregator}(c) FROM (
+                SELECT
+                    sub.champ_id,
+                    COUNT(*) AS c
+                FROM (
+                    SELECT
+                        {aggregator}({stat}) AS c,
+                        p.champ_id,
+                        p.disc_id
+                    FROM participants AS p
+                    JOIN games AS g
+                    ON g.game_id = p.game_id
+                    JOIN registered_summoners AS rs
+                    ON rs.disc_id=p.disc_id
+                    WHERE rs.active = 1
+                    GROUP BY p.game_id
+                ) sub
+                WHERE disc_id = ?
+                GROUP BY champ_id
+            ) sub2
         """
+
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_doinks_count(self, disc_id=None, context=None, time_after=None, time_before=None, guild_id=None):
+    def get_average_stat(self, stat, disc_id, champ_id=None):
+        champ_condition = "AND p.champ_id=?" if champ_id is not None else ""
+        params = (
+            [disc_id, disc_id]
+            if champ_id is None
+            else [disc_id, champ_id, disc_id, champ_id]
+        )
+
+        if stat == "first_blood":
+            query = f"""
+                SELECT (first_bloods.c) / played.c
+                FROM (
+                    SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                    FROM games AS g
+                    INNER JOIN participants AS p
+                    ON p.game_id = g.game_id
+                    WHERE
+                        g.first_blood=?
+                        {champ_condition}
+                ) first_bloods,
+                (
+                    SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                    FROM games AS g
+                    LEFT JOIN participants p
+                        ON g.game_id=p.game_id
+                    WHERE
+                        p.disc_id=?
+                        {champ_condition}
+                ) played
+            """
+
+        else:
+            query = f"""
+                SELECT (SUM({stat}) / played.c)
+                FROM participants AS p,
+                (
+                    SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                    FROM games AS g
+                    LEFT JOIN participants p
+                        ON g.game_id=p.game_id
+                    WHERE
+                        p.disc_id=?
+                        {champ_condition}
+                ) played
+                WHERE
+                    p.disc_id=?
+                    {champ_condition}
+            """
+
+        with self:
+            return self.execute_query(query, *params).fetchone()[0]
+
+    def get_doinks_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
 
         query_doinks = f"""
@@ -561,8 +653,17 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, disc_id, champ_id, disc_id, champ_id).fetchone()
 
-    def get_min_or_max_winrate_champ(self, disc_id, best, min_games=10):
+    def get_min_or_max_winrate_champ(self, disc_id, best, included_champs=None, min_games=10):
         aggregate = "MAX" if best else "MIN"
+        if included_champs is not None:
+            champs_condition = (
+                f"AND played.champ_id IN (" +
+                ",\n".join(map(str, included_champs)) +
+                ")"
+            )
+        else:
+            champs_condition = ""
+
         query = f"""
             SELECT
                 {aggregate}(sub.wr),
@@ -597,8 +698,9 @@ class Database(SQLiteDatabase):
                     ORDER BY champ_id
                ) played
                WHERE
-                wins.champ_id = played.champ_id
-                AND played.c > {min_games}
+                    wins.champ_id = played.champ_id
+                    AND played.c > {min_games}
+                    {champs_condition}
             ) sub
         """
 
@@ -1148,13 +1250,13 @@ class Database(SQLiteDatabase):
             best_ever_id,
             best_ever,
             _
-        ) = self.get_most_extreme_stat(stat_name, True, stat_name != "deaths")
+        ) = self.get_most_extreme_stat(stat_name, stat_name != "deaths")
 
         (
             worst_ever_id,
             worst_ever,
             _
-        ) = self.get_most_extreme_stat(stat_name, False, stat_name == "deaths")
+        ) = self.get_most_extreme_stat(stat_name, stat_name == "deaths")
 
         return min_stat_id, min_stat, max_stat_id, max_stat, best_ever, best_ever_id, worst_ever, worst_ever_id
 
@@ -1170,31 +1272,20 @@ class Database(SQLiteDatabase):
                 break
 
         keys = [
-            "kills", "deaths", "kda", "totalDamageDealtToChampions",
+            "kills", "deaths", "assists", "kda", "totalDamageDealtToChampions",
             "totalCs", "csPerMin", "goldEarned", "kp",
-            "visionWardsBoughtInGame", "visionScore"
+            "visionWardsBoughtInGame", "visionScore", "objectivesStolen"
         ]
-
-        stats_query = "first_blood"
-        for stat_name in STAT_COMMANDS[:-1]:
-            stats_query += f", {stat_name}, {stat_name}_id"
-        question_marks = ", ".join("?" * len(STAT_COMMANDS) * 2)
-        query_cols = f"(game_id, {stats_query}) VALUES ({question_marks})"
 
         beaten_records_best = []
         beaten_records_worst = []
 
-        best_values = [game_id, first_blood_id]
-        worst_values = [game_id, first_blood_id]
         for key, stat in zip(keys, STAT_COMMANDS[:-1]):
             reverse_order = key == "deaths"
             (
                 min_id, min_value, max_id, max_value,
                 prev_best, prev_best_id, prev_worst, prev_worst_id
             ) = self.get_stat_data(key, stat, data, reverse_order, kills_by_our_team)
-
-            best_values.extend([max_value, max_id])
-            worst_values.extend([min_value, min_id])
 
             if reverse_order: # Stat is 'deaths'.
                 if min_value < prev_best: # Fewest deaths ever has been reached.
@@ -1215,35 +1306,16 @@ class Database(SQLiteDatabase):
                     duration,
                     intfar_id,
                     intfar_reason,
+                    first_blood,
                     win,
                     guild_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """
 
             win = 1 if data[0][1]["gameWon"] else 0
             self.execute_query(
-                query_game, game_id, timestamp, duration, intfar_id, intfar_reason, win, guild_id
-            )
-
-            for table in ("best", "worst"):
-                value_list = best_values if table == "best" else worst_values
-                print_str = (f"{x} - {y}" for (x, y) in zip(value_list[1::2], value_list[::2]))
-                print_str = "), (".join(print_str)
-
-                logger.debug(
-                    f"Saving {table} stats:\n" +
-                    f"{game_id}, {intfar_id}, {intfar_reason}, " +
-                    f"{first_blood_id}, ({print_str})"
-                )
-
-                query = f"INSERT INTO {table}_stats {query_cols}"
-
-                self.execute_query(query, *value_list)
-
-            logger.debug(
-                "Saving participants:\n"+
-                f"{game_id}, {users_in_game}, {timestamp}, {doinks}"
+                query_game, game_id, timestamp, duration, intfar_id, intfar_reason, first_blood_id, win, guild_id
             )
 
             query = """
@@ -1251,18 +1323,41 @@ class Database(SQLiteDatabase):
                     game_id,
                     disc_id,
                     champ_id,
-                    doinks
+                    doinks,
+                    kills,
+                    deaths,
+                    assists,
+                    kda,
+                    damage,
+                    cs,
+                    cs_per_min,
+                    gold,
+                    kp,
+                    vision_wards,
+                    vision_score,
+                    steals
                 )
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
 
-            logger.debug("User data:")
             for user_data in users_in_game:
-                logger.debug(user_data)
                 disc_id = user_data[0]
+
+                user_stats = None
+                for data_disc_id, stats in data:
+                    if data_disc_id == disc_id:
+                        user_stats = stats
+                        break
+
                 champ_id = user_data[-1]
                 doink = doinks.get(disc_id, None)
-                self.execute_query(query, game_id, disc_id, champ_id, doink)
+                params = [game_id, disc_id, champ_id, doink]
+                for stat_key in keys:
+                    params.append(game_stats.get_stat_value(user_stats, stat_key, kills_by_our_team))
+
+                logger.debug(f"Saving participant data:\n", params)
+
+                self.execute_query(query, *params)
 
         return beaten_records_best, beaten_records_worst
 
@@ -1281,39 +1376,6 @@ class Database(SQLiteDatabase):
         with self:
             self.execute_query(query, game_id)
 
-    def save_lan_stats(self, game_id, data):
-        query = """
-            INSERT INTO lan_stats(
-                game_id,
-                disc_id,
-                kills,
-                deaths,
-                assists,
-                damage,
-                cs,
-                cs_per_min,
-                gold,
-                kp,
-                vision_wards,
-                vision_score
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
-
-        keys = [
-            "kills", "deaths", "assists", "totalDamageDealtToChampions", "totalCs",
-            "csPerMin", "goldEarned", "kp", "visionWardsBoughtInGame", "visionScore"
-        ]
-        kills_by_our_team = data[0][1]["kills_by_team"]
-
-        for disc_id, stats in data:
-            params = [game_id, disc_id]
-            for stat_key in keys:
-                params.append(game_stats.get_stat_value(stats, stat_key, kills_by_our_team))
-
-            with self:
-                self.execute_query(query, *params)
-
     def get_lan_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
 
@@ -1329,8 +1391,9 @@ class Database(SQLiteDatabase):
                 gold,
                 kp,
                 vision_wards,
-                vision_score
-            FROM lan_stats
+                vision_score,
+                steals
+            FROM participants
             INNER JOIN games g
             ON g.game_id = lan_stats.game_id
             {delim_str}

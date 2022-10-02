@@ -146,6 +146,9 @@ def resolve_doinks_for_kp(doinks, target_id):
 def resolve_doinks_for_monsters(doinks, target_id):
     return resolve_doinks_by_reason(doinks, target_id, 6)
 
+def resolve_doinks_for_cs(doinks, target_id):
+    return resolve_doinks_by_reason(doinks, target_id, 7)
+
 def resolve_most_kills(game_data, target_id):
     # Ties for most kills are NOT included. If more than one person has most kills, bet is lost.
     most_kills_ties = game_stats.get_outlier(game_data, "kills", asc=False, include_ties=True)[0]
@@ -175,7 +178,7 @@ RESOLVE_INTFAR_BET_FUNCS = [
 RESOLVE_DOINKS_BET_FUNCS = [
     resolve_got_doinks, resolve_doinks_for_kda, resolve_doinks_for_kills,
     resolve_doinks_for_damage, resolve_doinks_for_penta, resolve_doinks_for_vision,
-    resolve_doinks_for_kp, resolve_doinks_for_monsters
+    resolve_doinks_for_kp, resolve_doinks_for_monsters, resolve_doinks_for_cs
 ]
 
 RESOLVE_STATS_BET_FUNCS = [
@@ -266,7 +269,7 @@ class BettingHandler:
 
     def get_stats_return(self, target, stat_id):
         stat = BETTING_STATS[stat_id]
-        best_in_stat_count = self.database.get_stat(stat, True, target)[0]
+        best_in_stat_count = self.database.get_best_or_worst_stat(stat, target)[0]
         num_games = self.database.get_intfar_stats(target)[0]
         return best_in_stat_count, num_games
 

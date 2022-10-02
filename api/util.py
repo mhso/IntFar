@@ -33,14 +33,14 @@ DOINKS_REASONS = [
 ]
 
 STAT_COMMANDS = [
-    "kills", "deaths", "kda", "damage", "cs", "cs_per_min",
-    "gold", "kp", "vision_wards", "vision_score", "first_blood"
+    "kills", "deaths", "kda", "damage", "cs", "cs_per_min", "gold",
+    "kp", "vision_wards", "vision_score", "first_blood", "steals"
 ]
 
 STAT_QUANTITY_DESC = [
     ("most", "fewest"), ("fewest", "most"), ("highest", "lowest"), ("most", "least"),
     ("most", "least"), ("most", "lowest"), ("most", "least"), ("highest", "lowest"),
-    ("most", "fewest"), ("highest", "lowest"), ("most", "least")
+    ("most", "fewest"), ("highest", "lowest"), ("most", "least"), ("most", "least")
 ]
 
 MONTH_NAMES = [

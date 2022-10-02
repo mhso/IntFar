@@ -241,7 +241,7 @@ def get_game_stats(disc_id, database):
     best_stats_dict = {}
     for stat in api_util.STAT_COMMANDS:
         maximize = stat != "deaths"
-        best_or_worst_ever_id = database.get_most_extreme_stat(stat, True, maximize)[0]
+        best_or_worst_ever_id = database.get_most_extreme_stat(stat, maximize)[0]
         best_stats_dict[best_or_worst_ever_id] = best_stats_dict.get(best_or_worst_ever_id, 0) + 1
 
     most_best_stats = max(best_stats_dict.values())
@@ -257,9 +257,9 @@ def get_game_stats(disc_id, database):
             maximize = not ((stat != "deaths") ^ best)
             (stat_count,
              min_or_max_value,
-             _) = database.get_stat(stat, best, disc_id, maximize)
+             _) = database.get_best_or_worst_stat(stat, disc_id, maximize)
 
-            best_or_worst_ever_id = database.get_most_extreme_stat(stat, best, maximize)[0]
+            best_or_worst_ever_id = database.get_most_extreme_stat(stat, maximize)[0]
             stat_is_gold = best_or_worst_ever_id == disc_id
             if stat_is_gold:
                 if best:

@@ -154,37 +154,39 @@ def main():
             break
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "child":
-        # This runs the actual program. It runs in a subprocess
-        # if 'child' is given as an argument on the CLI.
-        main()
-        exit(0)
+    if len(sys.argv) > 1 and sys.argv[1] == "restartable":
+        # If 'restartable' is given as an argument, run a master process
+        # that starts the actual program in a child process and monitors it.
+        # If the child process exits with return code 2, restart it.
 
-    # Run a master process that starts the actual program in a child process and monitors it.
-    # If the child process exits with return code 2, restart it.
-    try:
-        while True:
-            # Start child process that runs the actual program.
-            process = subprocess.Popen([sys.executable, __file__, "child"])
+        try:
+            while True:
+                # Start child process that runs the actual program.
+                process = subprocess.Popen([sys.executable, __file__])
 
-            while process.poll() is None: # Wait for child process to exit.
+                while process.poll() is None: # Wait for child process to exit.
+                    sleep(0.1)
+
+                if process.returncode == 2: # Process requested a restart.
+                    sleep(1) # Sleep for a sec and restart while loop.
+                else:
+                    break # Process exited naturally, terminate program.
+
+        except KeyboardInterrupt:
+            # We have to handle interrupt signal differently on Linux vs. Windows.
+            if sys.platform == "linux":
+                sig = signal.SIGINT
+            else:
+                sig = signal.CTRL_C_EVENT
+        
+            # End child process and terminate program.
+            process.send_signal(sig)
+
+            # Wait for child process to exit properly.
+            while process.poll() is None:
                 sleep(0.1)
 
-            if process.returncode == 2: # Process requested a restart.
-                sleep(1) # Sleep for a sec and restart while loop.
-            else:
-                break # Process exited naturally, terminate program.
-
-    except KeyboardInterrupt:
-        # We have to handle interrupt signal differently on Linux vs. Windows.
-        if sys.platform == "linux":
-            sig = signal.SIGINT
-        else:
-            sig = signal.CTRL_C_EVENT
-    
-        # End child process and terminate program.
-        process.send_signal(sig)
-
-        # Wait for child process to exit properly.
-        while process.poll() is None:
-            sleep(0.1)
+    else:
+        # This runs the actual program. It runs in a subprocess
+        # if 'restartable' is given as an argument on the CLI.
+        main()

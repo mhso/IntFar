@@ -6,8 +6,56 @@ async def handle_stats_msg(client, message):
     response = "**--- Valid stats ---**\n```"
     response += valid_stats
     response += "\n```"
+    response += "You can use these stats with the following commands: "
+    response += "`!average [stat]`, `!best [stat]`, or `!worst [stat]`"
 
     await message.channel.send(response)
+
+async def handle_average_msg(client, message, stat, champ_id=None, disc_id=None):
+    if stat in api_util.STAT_COMMANDS: # Check if the requested stat is a valid stat.
+        if champ_id is not None:
+            champ_name = client.riot_api.get_champ_name(champ_id)
+
+        target_name = client.get_discord_nick(disc_id, message.guild.id)
+        avg_value = client.database.get_average_stat(stat, disc_id, champ_id)
+
+        # No games or no games on champ.
+        if avg_value is None:
+            response = f"{target_name} has not yet played any games "
+
+            if champ_id is not None:
+                response += f"on {champ_name} "
+
+            response += "{emote_perker_nono}"
+
+        elif stat == "first_blood":
+            formatted_value = f"{avg_value * 100:.2f}"
+
+            response = f"{target_name} gets first blood in **{formatted_value}%** of games "
+
+            if champ_id is not None:
+                response += f"when playing **{champ_name}** "
+
+            response += "{emote_poggers}"
+
+        else:
+            formatted_value = f"{avg_value:.2f}"
+            response = f"{target_name} averages **{formatted_value}** {stat} per game "
+
+            if champ_id is not None:
+                response += f"when playing **{champ_name}** "
+
+            else:
+                response += "over all his games "
+
+            response += "{emote_poggers}"
+
+        await message.channel.send(client.insert_emotes(response))
+
+    else:
+        response = f"Not a valid stat: '{stat}' "
+        response += client.insert_emotes("{emote_carole_fucking_baskin}")
+        await message.channel.send(response)
 
 async def handle_stat_msg(client, message, best, stat, target_id):
     """
@@ -23,10 +71,12 @@ async def handle_stat_msg(client, message, best, stat, target_id):
             best = stat == "deaths"
 
         quantity_type = 0 if best else 1
+
         # Check whether to find the max or min of some value, when returning
         # 'his most/lowest [stat] ever was ... Usually highest is best,
         # lowest is worse, except with deaths, where the opposite is the case.
         maximize = not ((stat != "deaths") ^ best)
+
         # Get a readable description, such as 'most deaths' or 'lowest kp'.
         quantifier = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type]
         if quantifier is not None:
@@ -44,12 +94,14 @@ async def handle_stat_msg(client, message, best, stat, target_id):
                 target_id,
                 min_or_max_value,
                 game_id
-            ) = client.database.get_most_extreme_stat(stat, best, maximize)
+            ) = client.database.get_most_extreme_stat(stat, maximize)
             recepient = client.get_discord_nick(target_id, message.guild.id)
         else:
-            (stat_count, # <- How many times the stat has occured.
+            (
+                stat_count, # <- How many times the stat has occured.
                 min_or_max_value, # <- Highest/lowest occurance of the stat value.
-                game_id) = client.database.get_stat(stat, best, target_id, maximize)
+                game_id
+            ) = client.database.get_best_or_worst_stat(stat, target_id, maximize)
             recepient = client.get_discord_nick(target_id, message.guild.id)
 
         game_summary = None
@@ -90,6 +142,7 @@ async def handle_stat_msg(client, message, best, stat, target_id):
                 response += f"**{min_or_max_value}** as {game_summary}"
 
         await message.channel.send(response)
+
     else:
         response = f"Not a valid stat: '{stat}' "
         response += client.insert_emotes("{emote_carole_fucking_baskin}")

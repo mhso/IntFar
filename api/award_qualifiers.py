@@ -159,7 +159,7 @@ def get_cool_timeline_events(data, config):
 
         for participant_id in frame_data["participantFrames"]:
             participant_data = frame_data["participantFrames"][participant_id]
-            disc_id = participant_dict.get(participant_id)
+            disc_id = participant_dict.get(int(participant_id))
             total_gold = participant_data["totalGold"]
             curr_gold = participant_data["currentGold"]
             our_team = (int(participant_id) > 5) ^ data["ourTeamLower"]
@@ -170,11 +170,15 @@ def get_cool_timeline_events(data, config):
             else:
                 enemy_total_gold += total_gold
 
-            if disc_id is not None and curr_gold > config.timeline_min_curr_gold:
+            if (
+                disc_id is not None
+                and curr_gold > config.timeline_min_curr_gold
+                and total_gold < config.timeline_min_total_gold
+            ):
                 # Player has enough current gold to warrant a mention.
                 # If this amount of gold is more than their previous max, save it.
                 curr_value_for_player = too_much_gold.get(disc_id, 0)
-                curr_value_for_player[disc_id] = max(curr_gold, curr_value_for_player)
+                too_much_gold[disc_id] = max(curr_gold, curr_value_for_player)
 
         gold_diff = our_total_gold - enemy_total_gold
         if gold_diff < 0: # Record max gold deficit during the game.
@@ -216,11 +220,11 @@ def intfar_by_kda(data, config):
     # Check if all Int-Far candidates are randos (not registered with Int-Far)
     all_intfars_randos = not any(potential_intfars)
 
-    if all_intfars_randos:
-        logger.info("Int-Far for low KDA goes to a random!")
-
     if potential_intfars == [] or all_intfars_randos:
         return (None, None)
+
+    if all_intfars_randos:
+        logger.info("Int-Far for low KDA goes to a random!")
 
     return (potential_intfars, lowest_kda)
 
@@ -250,11 +254,11 @@ def intfar_by_deaths(data, config):
     # Check if all Int-Far candidates are randos (not registered with Int-Far)
     all_intfars_randos = not any(potential_intfars)
 
-    if all_intfars_randos:
-        logger.info("Int-Far for many deaths goes to a random!")
-
     if potential_intfars == [] or all_intfars_randos:
         return (None, None)
+
+    if all_intfars_randos:
+        logger.info("Int-Far for many deaths goes to a random!")
 
     return (potential_intfars, highest_deaths)
 

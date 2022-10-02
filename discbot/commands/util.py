@@ -42,3 +42,13 @@ def extract_target_name(split, start_index, end_index=None, default="me"):
     if len(split) > start_index:
         return " ".join(split[start_index:end_index])
     return default
+
+def get_main_command(cmd):
+    if cmd in COMMANDS:
+        return COMMANDS[cmd]
+    
+    for possible_alias in COMMANDS:
+        if cmd in COMMANDS[possible_alias].aliases:
+            return COMMANDS[possible_alias]
+     
+    return None

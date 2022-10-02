@@ -60,6 +60,7 @@ class Config:
         self.timeline_min_deficit = 8000
         self.timeline_min_lead = 8000
         self.timeline_min_curr_gold = 4000
+        self.timeline_min_total_gold = 17000
 
         # ===== Int-Far of the Month =====
         self.ifotm_min_games = 10

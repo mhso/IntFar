@@ -90,13 +90,13 @@ class TestWrapper(TestRunner):
     @test
     def test_stat_queries(self):
         def most_extreme_stat_func():
-            self.database.get_most_extreme_stat("kills", True, True)
-            self.database.get_most_extreme_stat("first_blood", True, True)
+            self.database.get_most_extreme_stat("kills", True)
+            self.database.get_most_extreme_stat("first_blood", True)
         self.assert_no_exception(most_extreme_stat_func, "Get most extreme stat.")
 
         def get_stat_func():
-            self.database.get_stat("kills", True, MY_DISC_ID, True)
-            self.database.get_stat("first_blood", True, MY_DISC_ID, True)
+            self.database.get_best_or_worst_stat("kills", MY_DISC_ID, True)
+            self.database.get_best_or_worst_stat("first_blood", MY_DISC_ID, True)
         self.assert_no_exception(get_stat_func, "Get stat.")
 
         def get_total_winrate_func():

@@ -140,7 +140,7 @@ def get_feed_data(database, feed_length=10):
     for best in (True, False):
         for stat in api_util.STAT_COMMANDS[:-1]:
             maximize = not ((stat != "deaths") ^ best)
-            stat_id, stat_value, game_id = database.get_most_extreme_stat(stat, best, maximize)
+            stat_id, stat_value, game_id = database.get_most_extreme_stat(stat, maximize)
             if best:
                 best_stats_ever.append((stat, stat_id, stat_value, game_id))
             else:

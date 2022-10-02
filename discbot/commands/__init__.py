@@ -21,14 +21,16 @@ class TargetParam:
         self.default = default
         self.end_index = end_index
 
-    def extract_target_name(self, cmd_input, start_index):
-        end_index = len(cmd_input) if self.end_index is None else self.end_index
+    def extract_target_name(self, cmd_input, start_index, end_index):
         if len(cmd_input) > start_index:
             return " ".join(cmd_input[start_index:end_index])
+
         return self.default
 
     def get_target_id(self, arguments, index, client, author_id, guild_id, all_allowed):
-        target_name = self.extract_target_name(arguments, index)
+        end_index = len(arguments) if self.end_index is None else self.end_index
+        target_name = self.extract_target_name(arguments, index, end_index)
+
         if target_name is None:
             return None
 
@@ -51,6 +53,32 @@ class TargetParam:
             raise ValueError(msg)
 
         return target_id
+
+    def __str__(self):
+        return self.name
+
+class ChampionParam:
+    def __init__(self, name):
+        self.name = name
+
+    def get_champ_id(self, cmd_input, start_index, client):
+        index = start_index
+        name = ""
+        prev_champ_id = None
+
+        while index < len(cmd_input):
+            name = name + cmd_input[index]
+
+            champ_id = client.riot_api.try_find_champ(name)
+            if champ_id is None and prev_champ_id is not None:
+                return prev_champ_id, index - start_index
+
+            prev_champ_id = champ_id
+
+            name += " "
+            index += 1
+
+        return prev_champ_id, index - start_index
 
     def __str__(self):
         return self.name
@@ -93,12 +121,14 @@ class Command:
             return self.parser(client, args)
 
         parsed_args = []
-        for index, param in enumerate(self.mandatory_params + self.optional_params):
+        index = 0
+        for param in self.mandatory_params + self.optional_params:
             if isinstance(param, TargetParam): # Parameter targetting a person.
                 value = param.get_target_id( # Get Discord ID of targetted person.
                     args, index, client, message.author.id,
                     message.guild.id, self.target_all
                 )
+
                 # If we are targetting ourselves, but are not registered, send an error msg.
                 if not user_is_registered and self.access_level == "self" and value == author_id:
                     await message.channel.send(
@@ -106,9 +136,20 @@ class Command:
                         "to target yourself with this command."
                     )
                     return None
+
                 parsed_args.append(value)
+                index += 1
+
+            elif isinstance(param, ChampionParam):
+                champ_id, consumed_params = param.get_champ_id(args, index, client)
+                if champ_id is not None:
+                    index += consumed_params
+
+                parsed_args.append(champ_id)
+
             elif index < len(args): # Regular parameter.
                 parsed_args.append(args[index])
+                index += 1
 
         return parsed_args
 
@@ -315,6 +356,20 @@ def initialize_commands():
     doinks_criteria_name = "doinks_criteria"
     doinks_criteria_desc = "Show the different criterias needed for acquiring a doink."
     register_command(doinks_criteria_name, doinks_criteria_desc, handle_doinks_criteria_msg)
+
+    # average command
+    average_name = "average"
+    average_desc = (
+        "Show the average value for a stat for you (or someone else). "
+        "Fx. `!average kda` to see your average KDA over all games "
+        "or `average kda jhin` to see your average KDA on Jhin."
+    )
+    register_command(
+        average_name, average_desc, handle_average_msg, False, "self",
+        mandatory_params=[RegularParam("stat")],
+        optional_params=[ChampionParam("champion"), TargetParam("person")],
+        aliases=["avg"]
+    )
 
     # best command
     best_name = "best"
@@ -597,6 +652,16 @@ def initialize_commands():
     )
     register_command(
         random_nochest_name, random_nochest_desc, handle_random_nochest,
+        False, "all", optional_params=[TargetParam("person")]
+    )
+
+    # best nochest command
+    best_nochest_name = "best_nochest"
+    best_nochest_desc = (
+        "Get the highest winrate champ that you have no yet earned a chest on."
+    )
+    register_command(
+        best_nochest_name, best_nochest_desc, handle_best_nochest,
         False, "all", optional_params=[TargetParam("person")]
     )
 

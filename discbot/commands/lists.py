@@ -182,3 +182,39 @@ async def handle_random_nochest(client, message, target_id=None):
         response += f"**{champ_name}**"
 
     await message.channel.send(client.insert_emotes(response))
+
+async def handle_best_nochest(client, message, target_id=None):
+    """
+    Handler for 'best_nochest' command. Finds the champion with the highest winrate
+    for the given player where no chest has yet been obtained.
+    """
+    summ_data = client.database.summoner_from_discord_id(target_id)
+    champion_mastery_data = client.riot_api.get_champion_mastery(summ_data[2][0])
+
+    # Filter champs with no chest granted.
+    no_chest_champs = []
+    for mastery_data in champion_mastery_data:
+        if not mastery_data["chestGranted"]:
+            no_chest_champs.append(mastery_data["championId"])
+
+    if len(no_chest_champs) == 0: # Chests have been earned on every champ.
+        response = "You have already earned a chest on every champ {emote_woahpikachu}"
+    else:
+        # Get highest winrate of all the champs with no chest gained.
+        result = client.database.get_min_or_max_winrate_champ(
+            target_id, True, no_chest_champs, min_games=3
+        )
+
+        if result is None:
+            response = "No champs found with enough games where you don't have a chest :("
+
+        else:
+            winrate, games, champ_id = result
+
+            champ_name = client.riot_api.get_champ_name(champ_id)
+
+            response = f"Highest winrate champ that you have not earned a chest on:\n"
+            response += f"**{champ_name}**\n"
+            response += f"(**{winrate}%** wins in **{games}** games)"
+
+    await message.channel.send(client.insert_emotes(response))

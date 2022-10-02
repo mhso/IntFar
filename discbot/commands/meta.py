@@ -79,7 +79,8 @@ async def handle_usage_msg(client, message, command):
         await message.channel.send(f"Not a valid command: '{command}'.")
         return
 
-    cmd_obj = commands_util.COMMANDS[command]
+    # Get main command (if it is an alias)
+    cmd_obj = commands_util.get_main_command(command)
     response = f"Usage: `{cmd_obj}`\n"
     response += cmd_obj.desc
 
@@ -104,7 +105,7 @@ async def handle_uptime_msg(client, message):
 
 async def handle_status_msg(client, message):
     """
-    Gather meta stats about this bot and write them to Discord.
+    Gather meta stats about Int-Far and write them to Discord.
     """
     response = f"**Uptime:** {get_uptime(client.time_initialized)}\n"
 
@@ -208,6 +209,11 @@ async def handle_profile_msg(client, message, target_id):
     await message.channel.send(response)
 
 async def handle_verify_msg(client, message):
+    """
+    Handler for 'website_verify' command. Generates a unique URL that when accessed
+    verifies a user and allows them to interact with the Int-Far website. This URL is
+    then sent via. a Discord DM to the invoker of the command.
+    """
     client_secret = client.database.get_client_secret(message.author.id)
     url = f"https://mhooge.com/intfar/verify/{client_secret}"
     response_dm = "Go to this link to verify yourself (totally not a virus):\n"
@@ -225,6 +231,7 @@ async def handle_verify_msg(client, message):
 
     await message.channel.send(client.insert_emotes(response_server))
 
+    # Send DM to the user
     dm_sent = await client.send_dm(response_dm, message.author.id)
     if not dm_sent:
         await message.channel.send(

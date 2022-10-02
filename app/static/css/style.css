@@ -4,8 +4,9 @@
 }
 
 body {
-    /*background-color: #353535;*/
-    background: linear-gradient(to right bottom, rgb(83, 83, 83) 25%, rgb(50, 57, 66) 50%, rgb(32, 32, 34) 100%);
+    background-color: rgb(17, 17, 17);
+    background-image: url(../img/background.jpg);
+    background-attachment: fixed;
     color: rgb(228, 228, 228);
     overflow-x: hidden;
     margin: 0;

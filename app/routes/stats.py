@@ -14,7 +14,7 @@ def get_stats(database):
 
             (best_or_worst_ever_id,
              best_or_worst_ever,
-             _) = database.get_most_extreme_stat(stat, best, maximize)
+             _) = database.get_most_extreme_stat(stat, maximize)
 
             user_data = discord_request(
                 "func", ["get_discord_nick", "get_discord_avatar"],

@@ -926,7 +926,7 @@ class DiscordClient(discord.Client):
 
             # This person now has the most tokens of all users!
             response_bets += f"{max_tokens_name} now has the most {tokens_name} of everyone! "
-            response_bets += "***HAIL TO THE KING!!!***\n"
+            response_bets += "***HAIL TO THE KING, BABY!!!*** :crown:\n"
 
         if any_bets:
             response += response_bets
@@ -1301,7 +1301,7 @@ class DiscordClient(discord.Client):
             final_intfar_data,
             ties,
             ties_msg
-        ) = award_qualifiers.get_intfar(relevant_stats, self.config)
+        ) = award_qualifiers.get_intfar(relevant_stats, filtered_stats, self.config)
 
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
 
@@ -1378,12 +1378,6 @@ class DiscordClient(discord.Client):
                     self.active_game[guild_id]["id"], filtered_stats,
                     self.users_in_game.get(guild_id), guild_id
                 )
-
-                timestamp = filtered_stats[0][1]["timestamp"] // 1000
-                if is_lan_ongoing(timestamp, guild_id):
-                    # Saved LAN stats (if LAN is active).
-                    logger.info("LAN is active! Saving LAN stats...")
-                    self.database.save_lan_stats(self.active_game[guild_id]["id"], filtered_stats)
 
                 self.database.create_backup()
                 logger.info("Game over! Stats were saved succesfully.")

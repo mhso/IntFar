@@ -356,7 +356,9 @@ def get_relevant_stats(all_users, users_in_game, game_info):
                 player_disc_id = disc_id
                 break
 
-        our_team = participant_data["teamId"]
+        if player_disc_id is not None:
+            our_team = participant_data["teamId"]
+
         combined_stats = participant_data
         combined_stats["lane"] = participant_data["teamPosition"]
         combined_stats["timestamp"] = game_info["gameCreation"]

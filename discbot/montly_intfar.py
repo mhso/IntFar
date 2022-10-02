@@ -58,25 +58,31 @@ class MonthlyIntfar:
         tie_count = 0
         if pct_1st == pct_2nd == pct_3rd and intfars_1st == intfars_2nd == intfars_3rd:
             tie_count = 3
+
         elif pct_1st == pct_2nd and intfars_1st == intfars_2nd:
             tie_count = 2
+
         if tie_count == 0: # Int-Far #1 and Int-Far #2 values are distinct.
             winner_str = f"--- {nickname_1st}!!! ---\n"
             desc_str = f"He has inted in {pct_desc_1st} of his games this month!!!\n"
             desc_str += "You deserve this: :first_place: \n"
             desc_str += "You will also receive a badge of shame on Discord {emote_main}\n\n"
             runner_up_str = "Runner up goes to "
+
             if pct_2nd == pct_3rd and intfars_2nd == intfars_3rd: # Int-Far #2 and Int-Far #3 values are equal.
                 runner_up_str += f"both {nickname_2nd} and {nickname_3rd} "
                 runner_up_str += f"for a tied {pct_desc_2nd} of games where they were Int-Far!\n"
                 runner_up_str += "You both get one of these: :second_place: :second_place: \n"
+
             else: # All three Int-Far values are distinct.
                 runner_up_str += f"{nickname_2nd} for being almost as bad with "
                 runner_up_str += f"{pct_desc_2nd} of games being Int-Far!\n"
                 runner_up_str += "Take this medal for your troubles: :second_place: \n\n"
                 runner_up_str += f"Finally, {nickname_3rd} gets a :third_place: for "
                 runner_up_str += f"a bad-but-not-as-terrible {pct_desc_3rd} of inted games! \n"
+
             desc_str += runner_up_str
+
         if tie_count == 2: # Int-Far #1 and Int-Far #2 values are equal.
             winner_str += f"--- {nickname_1st} **AND** {nickname_2nd}!!! ---\n"
             desc_str = f"They are both equally terrible with a tied {pct_desc_1st} "
@@ -86,6 +92,7 @@ class MonthlyIntfar:
             desc_str += f"Second place goes to {nickname_3rd} for inting in {pct_desc_3rd} "
             desc_str += "of his games! Take this, my boi: :second_place: \n"
             winners = 2
+
         if tie_count == 3: # Int-Far values for all three 'winners' are equal.
             winner_str += f"--- {nickname_1st}, {nickname_2nd} **AND** {nickname_3rd}!!! ---\n"
             desc_str = f"They are ALL equally terrible with a tied {pct_desc_1st} "

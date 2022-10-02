@@ -116,7 +116,7 @@ class TestFuncs:
         print(response)
 
     def test_timeline(self):
-        game_id = 5826515143
+        game_id = 6010114516
         game_data = self.riot_api.get_game_details(game_id)
         timeline_data = self.riot_api.get_game_timeline(game_id)
         relevant = get_relevant_stats(self.database.summoners, [], game_data)[0]
@@ -131,8 +131,20 @@ class TestFuncs:
         for filename in files:
             normalize_sound_volume(filename)
 
-    def test_random_player_intfar(self):
-        pass
+    def test_stuffs(self):
+        count_me = 0
+        counts = {}
+        with open("stsfas.txt") as fp:
+            for line in fp:
+                split = line[1:-2].split(",")
+                if split[2].strip() == "267401734513491969":
+                    count_me += 1
+
+                    champ_id = split[1].strip()
+                    new_count = counts.get(champ_id, 0) + 1
+                    counts[champ_id] = new_count
+
+        print(max(list(counts.items()), key=lambda x: x[1]))
 
 PARSER = argparse.ArgumentParser()
 

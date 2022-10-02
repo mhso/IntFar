@@ -94,7 +94,7 @@ class TestMock(DiscordClient):
                         )
                         response = records_response + response
                 except Exception:
-                    logger.bind(game_id=game_id).error(
+                    logger.bind(game_id=game_id).exception(
                         f"Error when saving stats for {game_id}. Probably already exists."
                     )
                     continue
