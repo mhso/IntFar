@@ -208,3 +208,66 @@ class TestWrapper(TestRunner):
 
         print(intfar_response)
         print(response)
+
+    @test
+    def test_current_game_streak(self):
+        disc_id = 267401734513491969
+
+        def insert_game(database, game_id, win):
+            query_games = f"""
+                INSERT INTO games (game_id, win)
+                VALUES (?, ?)
+            """
+            query_participants = f"""
+                INSERT INTO participants (game_id, disc_id, champ_id)
+                VALUES (?, ?, 202)
+            """
+
+            database.execute_query(query_games, game_id, win)
+            database.execute_query(query_participants, game_id, disc_id)
+
+        with Database(self.config) as database:
+            database.clear_tables()
+
+            streak = database.get_current_win_or_loss_streak(1, disc_id)
+            self.assert_equals(streak, 1, "Win streak is 1 at start")
+    
+            query_summoners = f"""
+                INSERT INTO registered_summoners (disc_id, summ_name, summ_id, secret)
+                VALUES (?, 'Senile Felines', '1337', '42')
+            """
+            database.execute_query(query_summoners, disc_id)
+
+            game_id = 0
+
+            # Test a 3 game win streak
+            for _ in range(2):
+                insert_game(database, game_id, 1)
+                game_id += 1
+
+            streak = database.get_current_win_or_loss_streak(disc_id, True)
+            self.assert_equals(streak, 3, "Win streak is 3")
+
+            # Test 4 game win streak
+            insert_game(database, game_id, 1)
+            streak = database.get_current_win_or_loss_streak(disc_id, True)
+            self.assert_equals(streak, 4, "Win streak is 4")
+
+            game_id += 1
+
+            # Insert loss, test 1 game win streak
+            insert_game(database, game_id, 0)
+            streak = database.get_current_win_or_loss_streak(disc_id, True)
+            self.assert_equals(streak, 1, "Win streak is 1 after loss")
+
+            streak = database.get_current_win_or_loss_streak(disc_id, False)
+            self.assert_equals(streak, 2, "Loss streak is 2")
+
+            game_id += 1
+
+            for _ in range(3):
+                insert_game(database, game_id, 0)
+                game_id += 1
+
+            streak = database.get_current_win_or_loss_streak(disc_id, False)
+            self.assert_equals(streak, 5, "Loss streak is 5")

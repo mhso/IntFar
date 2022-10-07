@@ -54,7 +54,7 @@ def listen_for_request(disc_client, event_loop):
                                     command_type=command_type,
                                     command=command,
                                     params=params
-                                ).error(f"Exception during Discord request")
+                                ).exception(f"Exception during Discord request")
 
                                 result = None
 

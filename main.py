@@ -74,6 +74,7 @@ def main():
     conf = Config()
 
     env_desc = "DEVELOPMENT" if conf.env == "dev" else "PRODUCTION"
+
     logger.info(f"+++++ Running in {env_desc} mode +++++")
 
     if conf.env == "production":

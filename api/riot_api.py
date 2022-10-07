@@ -63,7 +63,7 @@ class RiotAPIClient:
             response_json = requests.get(url).json()
             return response_json[0]
         except requests.exceptions.RequestException:
-            logger.error("Exception when getting newest game version from Riot API!")
+            logger.exception("Exception when getting newest game version from Riot API!")
             return None
 
     def get_latest_champions_file(self):
@@ -78,7 +78,7 @@ class RiotAPIClient:
             json.dump(response_json, f_out)
             remove(old_file)
         except requests.exceptions.RequestException:
-            logger.error("Exception when getting newest champions.json file from Riot API.")
+            logger.exception("Exception when getting newest champions.json file from Riot API.")
 
     def get_champion_portraits(self):
         base_url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/img/champion"
@@ -101,7 +101,7 @@ class RiotAPIClient:
                             fp.write(chunk)
 
                 except requests.exceptions.RequestException:
-                    logger.error(f"Exception when getting champion portrait for {champ_name} from Riot API.")
+                    logger.exception(f"Exception when getting champion portrait for {champ_name} from Riot API.")
 
                 sleep(0.5)
 
@@ -126,7 +126,7 @@ class RiotAPIClient:
                             fp.write(chunk)
 
                 except requests.exceptions.RequestException:
-                    logger.error(f"Exception when getting champion splash for {champ_name} from Riot API.")
+                    logger.exception(f"Exception when getting champion splash for {champ_name} from Riot API.")
 
                 sleep(0.5)
 
@@ -152,7 +152,7 @@ class RiotAPIClient:
                             fp.write(chunk)
 
                 except requests.exceptions.RequestException:
-                    logger.error(f"Exception when getting champion data for {champ_name} from Riot API.")
+                    logger.exception(f"Exception when getting champion data for {champ_name} from Riot API.")
 
                 sleep(0.5)
 

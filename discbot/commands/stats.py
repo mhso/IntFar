@@ -16,39 +16,51 @@ async def handle_average_msg(client, message, stat, champ_id=None, disc_id=None)
         if champ_id is not None:
             champ_name = client.riot_api.get_champ_name(champ_id)
 
-        target_name = client.get_discord_nick(disc_id, message.guild.id)
-        avg_value = client.database.get_average_stat(stat, disc_id, champ_id)
+        minimum_games = 10 if champ_id is None else 5
+        values = client.database.get_average_stat(stat, disc_id, champ_id, minimum_games)
 
-        # No games or no games on champ.
-        if avg_value is None:
-            response = f"{target_name} has not yet played any games "
+        for_all = disc_id is None
+        readable_stat = stat.replace("_", " ")
 
-            if champ_id is not None:
-                response += f"on {champ_name} "
+        response = ""
 
-            response += "{emote_perker_nono}"
+        for index, (disc_id, avg_value, games) in enumerate(values):
+            if for_all:
+                response += "- "
 
-        elif stat == "first_blood":
-            formatted_value = f"{avg_value * 100:.2f}"
+            target_name = client.get_discord_nick(disc_id, message.guild.id)
 
-            response = f"{target_name} gets first blood in **{formatted_value}%** of games "
+            if avg_value is None:
+                # No games or no games on the given champ.
+                response += f"{target_name} has not yet played at least {minimum_games} games "
 
-            if champ_id is not None:
-                response += f"when playing **{champ_name}** "
+                if champ_id is not None:
+                    response += f"on {champ_name} "
 
-            response += "{emote_poggers}"
+                response += "{emote_perker_nono}"
 
-        else:
-            formatted_value = f"{avg_value:.2f}"
-            response = f"{target_name} averages **{formatted_value}** {stat} per game "
+            elif stat == "first_blood":
+                percent = f"{avg_value * 100:.2f}"
+                response += f"{target_name} got first blood in **{percent}%** of **{games}** games "
 
-            if champ_id is not None:
-                response += f"when playing **{champ_name}** "
+                if champ_id is not None:
+                    response += f"when playing **{champ_name}** "
+
+                if not for_all:
+                    response += "{emote_poggers}"
 
             else:
-                response += "over all his games "
+                ratio = f"{avg_value:.2f}"
+                response += f"{target_name} averages **{ratio}** {readable_stat} in **{games}** games "
 
-            response += "{emote_poggers}"
+                if champ_id is not None:
+                    response += f"of playing **{champ_name}** "
+
+                if not for_all:
+                    response += "{emote_poggers}"
+
+            if index < len(values) - 1:
+                response += "\n"
 
         await message.channel.send(client.insert_emotes(response))
 

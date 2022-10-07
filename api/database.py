@@ -258,7 +258,7 @@ class Database(SQLiteDatabase):
             query = f"""
                 SELECT
                     COUNT(*),
-                    MAX(c),
+                    {aggregator}(c),
                     game_id
                 FROM (
                     SELECT
@@ -305,57 +305,82 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_average_stat(self, stat, disc_id, champ_id=None):
-        champ_condition = "AND p.champ_id=?" if champ_id is not None else ""
-        params = (
-            [disc_id, disc_id]
-            if champ_id is None
-            else [disc_id, champ_id, disc_id, champ_id]
-        )
+    def get_average_stat(self, stat, disc_id=None, champ_id=None, min_games=10):
+        params = []
+        player_condition = ""
+        champ_condition = ""
+
+        if champ_id is not None:
+            params = [champ_id, champ_id]
+            champ_condition = "WHERE p.champ_id=?"
+
+        if disc_id is not None:
+            params.append(disc_id)
+            player_condition = "AND played.disc_id=?"
 
         if stat == "first_blood":
             query = f"""
-                SELECT (first_bloods.c) / played.c
+                SELECT played.disc_id, first_bloods.c / played.c AS avg_val, CAST(played.c AS int)
                 FROM (
-                    SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                    SELECT g.first_blood, CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
                     FROM games AS g
                     INNER JOIN participants AS p
-                    ON p.game_id = g.game_id
-                    WHERE
-                        g.first_blood=?
-                        {champ_condition}
-                ) first_bloods,
+                        ON p.game_id = g.game_id
+                        AND p.disc_id = g.first_blood
+                    {champ_condition}
+                    GROUP BY g.first_blood
+                ) first_bloods
+                INNER JOIN
                 (
-                    SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                    SELECT p.disc_id, CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
                     FROM games AS g
                     LEFT JOIN participants p
                         ON g.game_id=p.game_id
-                    WHERE
-                        p.disc_id=?
-                        {champ_condition}
+                    {champ_condition}
+                    GROUP BY p.disc_id
                 ) played
+                    ON played.disc_id = first_bloods.first_blood
+                INNER JOIN registered_summoners AS rs
+                    ON rs.disc_id = played.disc_id
+                WHERE rs.active = 1
+                    AND played.c > {min_games}
+                    {player_condition}
+                GROUP BY played.disc_id
+                ORDER BY avg_val DESC
             """
 
         else:
             query = f"""
-                SELECT (SUM({stat}) / played.c)
-                FROM participants AS p,
+                SELECT played.disc_id, stat_values.s / played.c AS avg_val, CAST(played.c AS int)
+                FROM
                 (
-                    SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                    SELECT disc_id, SUM({stat}) AS s
+                    FROM participants AS p
+                    {champ_condition}
+                    GROUP BY p.disc_id
+                ) stat_values
+                INNER JOIN
+                (
+                    SELECT disc_id, CAST(COUNT(DISTINCT g.game_id) as real) AS c
                     FROM games AS g
                     LEFT JOIN participants p
                         ON g.game_id=p.game_id
-                    WHERE
-                        p.disc_id=?
-                        {champ_condition}
-                ) played
-                WHERE
-                    p.disc_id=?
                     {champ_condition}
+                    GROUP BY p.disc_id
+                ) played
+                    ON played.disc_id = stat_values.disc_id
+                INNER JOIN registered_summoners AS rs
+                    ON rs.disc_id = played.disc_id
+                WHERE rs.active = 1
+                    AND played.c > {min_games}
+                {player_condition}
+                GROUP BY played.disc_id
+                ORDER BY avg_val DESC
             """
 
         with self:
-            return self.execute_query(query, *params).fetchone()[0]
+            result = self.execute_query(query, *params).fetchall()
+            return result or [(disc_id, None, None)]
 
     def get_doinks_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
@@ -907,8 +932,10 @@ class Database(SQLiteDatabase):
                     count = 0
                 else:
                     count += 1
+
                 if count > max_count:
                     max_count = count
+
             return max_count
 
     def get_longest_no_intfar_streak(self, disc_id):
@@ -933,8 +960,10 @@ class Database(SQLiteDatabase):
                     count = 0
                 else:
                     count += 1
+
                 if count > max_count:
                     max_count = count
+
             return max_count
 
     def get_current_intfar_streak(self):
@@ -943,6 +972,7 @@ class Database(SQLiteDatabase):
             FROM games
             LEFT JOIN registered_summoners rs
                 ON intfar_id=rs.disc_id
+            WHERE rs.active
             GROUP BY game_id
             ORDER BY game_id DESC
         """
@@ -955,6 +985,59 @@ class Database(SQLiteDatabase):
                     return count, prev_intfar
 
             return len(int_fars), prev_intfar # All the Int-Fars is the current int-far!
+
+    def get_longest_win_or_loss_streak(self, disc_id, win):
+        query = """
+            SELECT g.win
+            FROM games AS g
+            INNER JOIN participants AS p
+                ON p.game_id = g.game_id
+            INNER JOIN registered_summoners AS rs
+                ON p.disc_id=rs.disc_id
+            WHERE p.disc_id=?
+                AND rs.active
+            GROUP BY g.game_id
+            ORDER BY g.game_id DESC
+        """
+
+        with self:
+            games = self.execute_query(query, disc_id).fetchall()
+
+            max_count = 0
+            count = 0
+            for row in games:
+                if win != row[0]:
+                    count = 0
+                else:
+                    count += 1
+
+                if count > max_count:
+                    max_count = count
+
+            return max_count
+
+    def get_current_win_or_loss_streak(self, disc_id, win):
+        query = """
+            SELECT g.win
+            FROM games AS g
+            INNER JOIN participants AS p
+                ON p.game_id = g.game_id
+            INNER JOIN registered_summoners AS rs
+                ON p.disc_id=rs.disc_id
+            WHERE p.disc_id=?
+                AND rs.active
+            GROUP BY g.game_id
+            ORDER BY g.game_id DESC
+        """
+
+        with self:
+            games = self.execute_query(query, disc_id).fetchall()
+
+            for count, row in enumerate(games, start=1):
+                if row[0] != win:
+                    return count
+
+            return len(games) + 1
 
     def get_max_intfar_details(self):
         query = """

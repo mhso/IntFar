@@ -110,6 +110,9 @@ async def handle_summary_msg(client, message, target_id):
     total_winrate = client.database.get_total_winrate(target_id)
     total_champs = len(client.riot_api.champ_ids)
 
+    longest_win_streak = client.database.get_longest_win_or_loss_streak(target_id, True)
+    longest_loss_streak = client.database.get_longest_win_or_loss_streak(target_id, False)
+
     best_champ_wr, best_champ_games, best_champ_id = client.database.get_min_or_max_winrate_champ(target_id, True)
     worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_winrate_champ(target_id, False)
 
@@ -122,8 +125,12 @@ async def handle_summary_msg(client, message, target_id):
     response = (
         f"{nickname} has played a total of **{games_played}** games " +
         f"(**{total_winrate:.1f}%** was won).\n" +
-        f"He has played **{champs_played}**/**{total_champs}** different champions.\n"
+        f"He has played **{champs_played}**/**{total_champs}** different champions.\n\n"
     )
+
+    response += f"His longest winning streak was **{longest_win_streak}** games.\n"
+    response += f"His longest loss streak was **{longest_loss_streak}** games.\n\n"
+
     # If person has not played a minimum of 5 games with any champions, skip champ winrate stats.
     if best_champ_wr is not None and worst_champ_wr is not None and best_champ_id != worst_champ_id:
         best_champ_name = client.riot_api.get_champ_name(best_champ_id)
@@ -149,7 +156,7 @@ async def handle_summary_msg(client, message, target_id):
             f"He performs best when playing with **{best_person_name}** (won " +
             f"**{best_person_wr:.1f}%** of **{best_person_games}** games).\n" +
             f"He performs worst when playing with **{worst_person_name}** (won " +
-            f"**{worst_person_wr:.1f}%** of **{worst_person_games}** games).\n"
+            f"**{worst_person_wr:.1f}%** of **{worst_person_games}** games).\n\n"
         )
 
     # Get performance score for person.
@@ -158,7 +165,7 @@ async def handle_summary_msg(client, message, target_id):
     response += (
         f"The *Personally Evaluated Normalized Int-Far Score* for {nickname} is " +
         f"**{score:.2f}**/**10**\nThis ranks him at **{rank}**/**{num_scores}**."
-    )
+    )   
 
     await message.channel.send(response)
 

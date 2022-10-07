@@ -167,12 +167,12 @@ class Command:
 
         except ValueError as arg_exception:
             # Log error during command handling
-            logger.bind(input_list=input_list).error("Error when handling Discord command")
+            logger.bind(input_list=input_list).exception("Error when handling Discord command")
             await message.channel.send(client.insert_emotes(arg_exception.args[0]))
 
         except DBException:
             # Log database error during command handling
-            logger.bind(input_list=input_list).error("Database error when handling Discord command")
+            logger.bind(input_list=input_list).exception("Database error when handling Discord command")
 
             response = "Something went wrong when querying the database! "
             response += client.insert_emotes("{emote_fu}")
@@ -362,10 +362,11 @@ def initialize_commands():
     average_desc = (
         "Show the average value for a stat for you (or someone else). "
         "Fx. `!average kda` to see your average KDA over all games "
-        "or `average kda jhin` to see your average KDA on Jhin."
+        "or `average kda jhin` to see your average KDA on Jhin. "
+        "(Minimum 10 total games is required)"
     )
     register_command(
-        average_name, average_desc, handle_average_msg, False, "self",
+        average_name, average_desc, handle_average_msg, True, "self",
         mandatory_params=[RegularParam("stat")],
         optional_params=[ChampionParam("champion"), TargetParam("person")],
         aliases=["avg"]
@@ -662,7 +663,7 @@ def initialize_commands():
     )
     register_command(
         best_nochest_name, best_nochest_desc, handle_best_nochest,
-        False, "all", optional_params=[TargetParam("person")]
+        False, "self", optional_params=[TargetParam("person")]
     )
 
     # champ lists command

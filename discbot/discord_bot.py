@@ -4,7 +4,6 @@ from io import BytesIO
 from threading import Thread
 from time import time, sleep
 from math import ceil
-from traceback import print_exc
 from datetime import datetime
 
 import requests
@@ -19,7 +18,6 @@ from discbot import commands
 from discbot.commands.meta import handle_usage_msg
 from api import game_stats, bets, award_qualifiers
 from api.database import DBException
-from api.lan import is_lan_ongoing
 import discbot.commands.util as commands_util
 import api.util as api_util
 from ai.data import shape_predict_data
@@ -74,12 +72,16 @@ DOINKS_FLAVORS = [
     api_util.load_flavor_texts("doinks_cs")
 ]
 
-STREAK_FLAVORS = api_util.load_flavor_texts("streak")
+INTFAR_STREAK_FLAVORS = api_util.load_flavor_texts("intfar_streak")
+
+WIN_STREAK_FLAVORS = api_util.load_flavor_texts("win_streak")
+LOSS_STREAK_FLAVORS = api_util.load_flavor_texts("loss_streak")
 
 IFOTM_FLAVORS = api_util.load_flavor_texts("ifotm")
 
 def get_intfar_flavor_text(nickname, reason):
     flavor_text = INTFAR_FLAVOR_TEXTS[random.randint(0, len(INTFAR_FLAVOR_TEXTS)-1)]
+
     return flavor_text.replace("{nickname}", nickname).replace("{reason}", reason)
 
 def get_no_intfar_flavor_text():
@@ -87,6 +89,7 @@ def get_no_intfar_flavor_text():
 
 def replace_value(flavor_text, value, keyword="value"):
     quantifier = "" if isinstance(value, int) and value == 1 else "s"
+
     return flavor_text.replace("{" + keyword + "}", f"**{value}**").replace("{quantifier}", quantifier)
 
 def get_reason_flavor_text(value, reason):
@@ -100,21 +103,25 @@ def get_reason_flavor_text(value, reason):
     elif reason == "visionScore":
         flavor_values = LOWEST_VISION_FLAVORS
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
+
     return replace_value(flavor_text, value, reason)
 
 def get_honorable_mentions_flavor_text(index, value):
     flavor_values = HONORABLE_MENTIONS[index]
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
+
     return replace_value(flavor_text, value)
 
 def get_cool_stat_flavor_text(index, value):
     flavor_values = COOL_STATS[index]
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
+
     return replace_value(flavor_text, value)
 
 def get_timeline_events_flavor_text(index, value):
     flavor_values = TIMELINE_EVENTS[index]
     flavor_text = flavor_values[random.randint(0, len(flavor_values)-1)]
+
     return replace_value(flavor_text, value)
 
 def get_doinks_flavor_text(index, value):
@@ -126,9 +133,23 @@ def get_doinks_flavor_text(index, value):
 
     return replace_value(flavor_text, value)
 
-def get_streak_flavor_text(nickname, streak):
-    index = streak - 2 if streak - 2 < len(STREAK_FLAVORS) else len(STREAK_FLAVORS) - 1
-    return STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
+def get_game_streak_flavor_text(min_streak, nicknames, streak, win):
+    streak_flavors = WIN_STREAK_FLAVORS if win else LOSS_STREAK_FLAVORS
+    index = streak - min_streak if streak -min_streak < len(streak_flavors) else len(streak_flavors) - 1
+
+    quantifier = "is" if len(nicknames) == 1 else "are"
+    nicknames_str = ", ".join(nicknames)
+
+    return streak_flavors[index].replace(
+        "{nicknames}", nicknames_str
+    ).replace(
+        "{quantifier}", quantifier
+    ).replace("{streak}", str(streak))
+
+def get_intfar_streak_flavor_text(nickname, streak):
+    index = streak - 2 if streak - 2 < len(INTFAR_STREAK_FLAVORS) else len(INTFAR_STREAK_FLAVORS) - 1
+
+    return INTFAR_STREAK_FLAVORS[index].replace("{nickname}", nickname).replace("{streak}", str(streak))
 
 def get_ifotm_flavor_text(month):
     return IFOTM_FLAVORS[month - 1]
@@ -165,9 +186,7 @@ class DiscordClient(discord.Client):
         self.initialized = False
         self.last_message_time = {}
         self.last_command_time = {}
-        self.command_timeout_lengths = {
-            "play": 5
-        }
+        self.command_timeout_lengths = {}
         self.user_timeout_length = {}
         self.time_initialized = datetime.now()
 
@@ -175,7 +194,7 @@ class DiscordClient(discord.Client):
         try:
             return requests.post(f"https://mhooge.com:5000/intfar/{endpoint}", data=data)
         except requests.exceptions.RequestException:
-            logger.bind(endpoint=endpoint, data=data).error("Error ignored in send_game_update")
+            logger.bind(endpoint=endpoint, data=data).exception("Error ignored in send_game_update")
 
     async def send_predictions_timeline_image(self, image, guild_id):
         channel = self.channels_to_write[guild_id]
@@ -199,6 +218,7 @@ class DiscordClient(discord.Client):
             while time_slept < self.config.status_interval_ingame:
                 await asyncio.sleep(sleep_per_loop)
                 time_slept += sleep_per_loop
+
         except KeyboardInterrupt:
             return
 
@@ -304,10 +324,11 @@ class DiscordClient(discord.Client):
             except Exception as e:
                 game_id = self.active_game.get(guild_id, {}).get("id")
 
-                logger.bind(game_id=game_id).error("Exception after game was over!!!")
+                logger.bind(game_id=game_id).exception("Exception after game was over!!!")
 
                 # Send error message to Discord and re-raise exception.
                 await self.send_error_msg(guild_id)
+
                 raise e
 
         elif game_status == 0:
@@ -324,7 +345,7 @@ class DiscordClient(discord.Client):
             filtered_stats = game_stats.get_filtered_stats(relevant_stats)
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito pls).
-            logger.bind(game_id=game_info["gameId"]).error(
+            logger.bind(game_id=game_info["gameId"]).exception(
                 "Game data is not well formed!"
             )
 
@@ -354,6 +375,11 @@ class DiscordClient(discord.Client):
         if doinks_response is not None:
             response += "\n" + self.insert_emotes(doinks_response)
 
+        game_streak_response = self.get_win_loss_streak_data(filtered_stats, guild_id)
+
+        if game_streak_response is not None:
+            response += "\n" + game_streak_response
+
         await self.channels_to_write[guild_id].send(response)
 
         await asyncio.sleep(1)
@@ -374,7 +400,7 @@ class DiscordClient(discord.Client):
                 if timeline_response is not None:
                     response = timeline_response + "\n" + response
         except Exception:
-            print_exc()
+            logger.exception("Exception when getting timeline data")
 
         # Get other cool stats about players.
         cool_stats_response = self.get_cool_stats_data(filtered_stats, guild_id)
@@ -658,8 +684,8 @@ class DiscordClient(discord.Client):
                 try:
                     await member.avatar_url_as(format="png", size=size).save(path)
                     self.cached_avatars[key] = time_now
-                except (DiscordException, HTTPException, NotFound) as exc:
-                    logger.bind(disc_id=discord_id).error("Could not load Discord avatar")
+                except (DiscordException, HTTPException, NotFound):
+                    logger.bind(disc_id=discord_id).exception("Could not load Discord avatar")
                     path = default_avatar
 
             avatar_paths.append(path)
@@ -778,7 +804,7 @@ class DiscordClient(discord.Client):
 
     def insert_emotes(self, text):
         """
-        Finds all occurences of {emote_some_emote} in the given string and replaces it with
+        Finds all occurences of '{emote_some_emote}' in the given string and replaces it with
         the id of the actual emote matching 'some_emote'.
         """
         replaced = text
@@ -792,6 +818,12 @@ class DiscordClient(discord.Client):
                 emote += replaced[end_index]
                 end_index += 1
 
+                if end_index == len(replaced):
+                    # The closing brace for the emote could not be found
+                    raise ValueError(
+                        f"Could not find closing brace for emote in text: '{text}'"
+                    )
+
             emoji = self.get_emoji_by_name(emote)
             if emoji is None:
                 emoji = "" # Replace with empty string if emoji could not be found.
@@ -802,33 +834,67 @@ class DiscordClient(discord.Client):
         return replaced
 
     async def assign_top_tokens_role(self, old_holder, new_holder):
+        """
+        Asssign the 'goodest boi' role on Discord to a new person who now
+        has the most betting tokens of everyone.
+        """
         role_id = 750111830529146980
         nibs_guild = None
 
+        # Find the relevant Discord server where roles are assigned
         for guild in self.guilds:
             if guild.id == api_util.MAIN_GUILD_ID:
                 nibs_guild = guild
                 break
 
+        # Get the 'goodest-boi' role
         role = nibs_guild.get_role(role_id)
 
+        # Find the member who previously had the role and remove it from them
         old_head_honcho = nibs_guild.get_member(old_holder)
         if old_head_honcho is not None:
             await old_head_honcho.remove_roles(role)
 
+        # Find the member who should now have the role and add it to them
         new_head_honcho = nibs_guild.get_member(new_holder)
         if new_head_honcho is not None:
             await new_head_honcho.add_roles(role)
 
-    def resolve_bets(self, game_info, intfar, intfar_reason, doinks, guild_id):
+    def resolve_bets(
+        self,
+        game_info: list[tuple],
+        intfar: int,
+        intfar_reason: str,
+        doinks: list[int],
+        guild_id: int
+    ):
+        """
+        Resolves any active bets after a game has concluded and award points
+        to the players in the game and to players getting doinks.
+        The BettingHandler class is used to determine if bets are won or lost,
+        and how many points they should award.
+
+        :param game_info:       List containing a tuple of (discord_id, game_stats)
+                                for each Int-Far registered player on our team
+        :param intfar:          Discord ID of the Int-Far in the finished game.
+                                This is None if no one was Int-Far
+        :param intfar_reason:   String that encodes the reasons why a person was the
+                                Int-Far in the finished game. This is None if no one
+                                was Int-Far
+        :param doinks:          List of Discord IDs of people who got doinks
+        :param guild_id:        ID of the Discord server where the game took place
+        """
         game_won = game_info[0][1]["gameWon"]
         tokens_name = self.config.betting_tokens
-        tokens_gained = (self.config.betting_tokens_for_win
-                         if game_won
-                         else self.config.betting_tokens_for_loss)
+        tokens_gained = (
+            self.config.betting_tokens_for_win
+            if game_won
+            else self.config.betting_tokens_for_loss
+        )
 
         clash_multiplier = 1
 
+        # Check if we are playing clash. If so, points are worth more.
         if self.riot_api.is_clash(self.active_game[guild_id]["queue_id"]):
             clash_multiplier = self.config.clash_multiplier
             tokens_gained *= clash_multiplier
@@ -937,9 +1003,9 @@ class DiscordClient(discord.Client):
         """
         Play potential Int-Far and Doinks sounds after a game has finished.
 
-        :param intfar:  Discord ID of the person that is Int-Far (or None)
-        :param doinks:  List of Discord IDs of people who got doinks
-        :guild_id:      ID of the Discord server where the game took place
+        :param intfar:      Discord ID of the person that is Int-Far (or None)
+        :param doinks:      List of Discord IDs of people who got doinks
+        :param guild_id:    ID of the Discord server where the game took place
         """
         users_in_voice = self.get_users_in_voice()
         voice_state = None
@@ -985,7 +1051,7 @@ class DiscordClient(discord.Client):
 
         :param best_records:    A list of data for broken good records (fx. most kills)
         :param worst_records:   A list of data for broken bad records (fx. least gold)
-        :guild_id:              ID of the Discord server where the game took place
+        :param guild_id:        ID of the Discord server where the game took place
         """
         response = "=" * 38
 
@@ -1142,7 +1208,7 @@ class DiscordClient(discord.Client):
 
         return None if timeline_mentions == [] else self.insert_emotes(timeline_str)
 
-    def get_streak_msg(
+    def get_intfar_streak_msg(
         self,
         intfar_id: int,
         guild_id: int,
@@ -1178,7 +1244,7 @@ class DiscordClient(discord.Client):
             return None
 
         if intfar_id == prev_intfar: # Current Int-Far was also previous Int-Far.
-            return get_streak_flavor_text(current_mention, intfar_streak + 1)
+            return get_intfar_streak_flavor_text(current_mention, intfar_streak + 1)
 
         if intfar_streak > 1: # Previous Int-Far has broken his streak!
             return (f"Thanks to {current_nick}, the {intfar_streak} games Int-Far streak of " +
@@ -1267,7 +1333,7 @@ class DiscordClient(discord.Client):
 
         # Get message detailing whether current Int-Far is on an Int-Far streak,
         # or whether them getting Int-Far broken another persons streak
-        streak_msg = self.get_streak_msg(disc_id, guild_id, intfar_streak, prev_intfar)
+        streak_msg = self.get_intfar_streak_msg(disc_id, guild_id, intfar_streak, prev_intfar)
         if streak_msg is not None:
             message += "\n" + streak_msg
 
@@ -1289,9 +1355,11 @@ class DiscordClient(discord.Client):
         Returns who the Int-Far is (if any), what conditions they met, and a message
         describing why they got Int-Far.
 
-        :filtered_stats:    List containing a tuple of (discord_id, game_stats)
-                            for each player on our team (registered or not)
-        :guild_id:          ID of the Discord server where the game took place
+        :param relevant_stats:  List containing a tuple of (discord_id, game_stats)
+                                for each player on our team (registered or not)
+        :param filtered_stats:  Same as 'relevant_stats', but filtered to remove
+                                any players that are not registered with Int-Far
+        :param guild_id:        ID of the Discord server where the game took place
         """
         reason_keys = ["kda", "deaths", "kp", "visionScore"]
         reason_ids = ["0", "0", "0", "0"]
@@ -1339,7 +1407,7 @@ class DiscordClient(discord.Client):
                 response += "\n" + honorable_mention_text
 
             # Get info about a potential Int-Far streak the person is currently on.
-            streak_msg = self.get_streak_msg(None, guild_id, intfar_streak, prev_intfar)
+            streak_msg = self.get_intfar_streak_msg(None, guild_id, intfar_streak, prev_intfar)
             if streak_msg is not None:
                 response += "\n" + streak_msg
 
@@ -1352,6 +1420,14 @@ class DiscordClient(discord.Client):
         return final_intfar, reasons_str, response
 
     def get_doinks_data(self, filtered_stats, guild_id):
+        """
+        Gets data about the people who earned doinks in a game.
+        Returns a message describing who (if any) got doinks and why.
+
+        :param filtered_stats:  List containing a tuple of (discord_id, game_stats)
+                                for each Int-Far registered player on our team
+        :param guild_id:        ID of the Discord server where the game took place
+        """
         doinks_mentions, doinks = award_qualifiers.get_big_doinks(filtered_stats)
         redeemed_text = self.get_big_doinks_msg(doinks_mentions, guild_id)
 
@@ -1370,32 +1446,84 @@ class DiscordClient(discord.Client):
 
         return cool_events_msg
 
+    def get_win_loss_streak_data(self, filtered_stats, guild_id):
+        """
+        Get message describing the win/loss streak of all players in game
+        after it has concluded. Returns None if the streak is less than 3.
+        """
+        mentions_by_streak = {}
+        game_won = filtered_stats[0][1]["gameWon"]
+
+        for disc_id, _ in filtered_stats:
+            current_streak = self.database.get_current_win_or_loss_streak(disc_id, game_won)
+
+            if current_streak > self.config.stats_min_win_loss_streak:
+                mention = self.get_mention_str(disc_id, guild_id)
+                streak_list = mentions_by_streak.get(current_streak, [])
+                streak_list.append(mention)
+
+                mentions_by_streak[current_streak] = streak_list
+
+        response = ""
+
+        for streak in mentions_by_streak:
+            mention_list = mentions_by_streak[streak]
+
+            response += "\n" + get_game_streak_flavor_text(
+                self.config.stats_min_win_loss_streak, 
+                mention_list,
+                streak,
+                game_won
+            )
+
+        if response != "":
+            response = "=" * 38 + response
+
+        return self.insert_emotes(response) if response != "" else None
+
     def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks, guild_id):
-        if not self.config.testing:
-            try: # Save stats.
-                best_records, worst_records = self.database.record_stats(
-                    intfar_id, intfar_reason, doinks,
-                    self.active_game[guild_id]["id"], filtered_stats,
-                    self.users_in_game.get(guild_id), guild_id
-                )
+        """
+        Save all the stats after a finished game. This includes who was the Int-Far,
+        information about doinks, general information about the game, such as
+        duration, timestamp, and stats of players such as kills, gold earned, etc.
 
-                self.database.create_backup()
-                logger.info("Game over! Stats were saved succesfully.")
+        :param filtered_stats:  List containing a tuple of (discord_id, game_stats)
+                                for each Int-Far registered player on our team
+        :param intfar_id:       Discord ID of the user who is the Int-Far.
+                                This is None if no one was Int-Far
+        :param intfar_reason:   String that encodes the reasons why a person was the
+                                Int-Far in the finished game. This is None if no one
+                                was Int-Far
+        :param doinks:          Dictionary mapping discord IDs, for each player, to
+                                a list of doink criterias met for that player
+        :param guild_id:        ID of the Discord server where the game took place
+        """
+        try:
+            # Save stats to database.
+            best_records, worst_records = self.database.record_stats(
+                intfar_id, intfar_reason, doinks,
+                self.active_game[guild_id]["id"], filtered_stats,
+                self.users_in_game.get(guild_id), guild_id
+            )
 
-                return best_records, worst_records
+            # Create backup of database
+            self.database.create_backup()
+            logger.info("Game over! Stats were saved succesfully.")
 
-            except DBException as exception:
-                # Log error along with relevant variables.
-                game_id = self.active_game.get(guild_id, {}).get("id")
-                logger.bind(
-                    game_id=game_id,
-                    intfar_id=intfar_id,
-                    intfar_reason=intfar_reason,
-                    doinks=doinks,
-                    guild_id=guild_id
-                ).error("Game stats could not be saved!")
+            return best_records, worst_records
 
-                raise exception
+        except DBException as exception:
+            # Log error along with relevant variables.
+            game_id = self.active_game.get(guild_id, {}).get("id")
+            logger.bind(
+                game_id=game_id,
+                intfar_id=intfar_id,
+                intfar_reason=intfar_reason,
+                doinks=doinks,
+                guild_id=guild_id
+            ).exception("Game stats could not be saved!")
+
+            raise exception
 
     async def user_joined_voice(self, disc_id, guild_id, poll_immediately=False):
         guild_name = self.get_guild_name(guild_id)
@@ -1422,6 +1550,9 @@ class DiscordClient(discord.Client):
             self.polling_active[guild_id] = False
 
     async def remove_intfar_role(self, intfar_id, role_id):
+        """
+        Find the Int-Far of the Month Discord role for a user and remove it.
+        """
         nibs_guild = None
         for guild in self.guilds:
             if guild.id == api_util.MAIN_GUILD_ID:
@@ -1520,10 +1651,11 @@ class DiscordClient(discord.Client):
     async def polling_loop(self):
         """
         Incrementally polls for a few things.
-        Firstly, checks whether it's the first of the next month.
+        Firstly, checks whether it's the first day of the month.
         If so, the Int-Far of the previous month is announced.
         Secondly, once every day, the newest patch for League
-        is checked for, to see if any new champs have been released.
+        is checked for, to see if any new champs have been released
+        that we need to download data for.
         """
         ifotm_monitor = MonthlyIntfar(self.config.hour_of_ifotm_announce)
         logger.info("Starting Int-Far-of-the-month monitor... ")

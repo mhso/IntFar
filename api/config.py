@@ -55,6 +55,7 @@ class Config:
         self.stats_min_time_dead = 60 * 10
         self.stats_min_objectives_stolen = 1
         self.stats_min_turrets_killed = 7
+        self.stats_min_win_loss_streak = 3
 
         # ===== Noteworthy Timeline-related Stats Criterias =====
         self.timeline_min_deficit = 8000

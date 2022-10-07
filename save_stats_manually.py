@@ -65,6 +65,11 @@ class TestMock(DiscordClient):
             if doinks_response is not None:
                 response += "\n" + self.insert_emotes(doinks_response)
 
+            game_streak_response = self.get_win_loss_streak_data(filtered, guild_id)
+
+            if game_streak_response is not None:
+                response += "\n" + game_streak_response
+
             if self.loud and self.task == "all":
                 await self.send_message_unprompted(response, guild_id)
 

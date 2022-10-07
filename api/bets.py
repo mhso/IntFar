@@ -320,12 +320,15 @@ class BettingHandler:
             self, disc_id, bet_ids, amounts, events, bet_timestamp, targets, game_data
     ):
         game_id, intfar, intfar_reason, doinks, stats, clash_multiplier = game_data
+
         # Multiplier for betting on a specific person to do something. If more people are
         # in the game, the multiplier is higher.
         person_multiplier = len(stats)
         amount_multiplier = len(amounts)
+
         total_value = 0
         all_success = True
+
         for amount, event_id, target_id in zip(amounts, events, targets):
             success = False
     
@@ -364,7 +367,7 @@ class BettingHandler:
                     bet_id, game_id, timestamp, all_success, total_value
                 )
             except DBException:
-                logger.error("Database error during bet resolution!")
+                logger.exception("Database error during bet resolution!")
                 return
 
         if all_success:
@@ -491,7 +494,9 @@ class BettingHandler:
 
         try:
             balance = self.database.get_token_balance(disc_id)
-            running_cost = 0
+            running_cost = 0 # Total cost of the bet
+
+            # Run through betting amounts, events, target discord IDs, and target names
             for bet_amount, event, target, target_name in zip(amounts, events, targets, target_names):
                 valid, data = self.check_bet_validity(
                     disc_id, guild_id, bet_amount, game_timestamp, event,
@@ -501,8 +506,10 @@ class BettingHandler:
                 if not valid:
                     return (False, data, None)
 
+                # Unpack parsed amounts, betting event ID, current game duration, and betting description
                 amount, event_id, game_duration, bet_desc = data
 
+                # Ensure that no events and targets are bet on more than once
                 if (event_id, target) in used_events:
                     err_msg = self.get_bet_error_msg(bet_desc, "Duplicate Event.")
                     return (False, err_msg, None)
@@ -520,6 +527,8 @@ class BettingHandler:
 
                 bet_data.append((amount, event_id, target, return_readable, bet_desc))
 
+            # Run through the parsed bet data and generate a string describing
+            # the bet and the potential reward it could give
             for amount, event_id, bet_target, base_return, bet_desc in bet_data:
                 bet_id = self.database.make_bet(
                     disc_id, guild_id, event_id, amount,
@@ -530,7 +539,7 @@ class BettingHandler:
                     reward_equation += " + "
                 reward_equation += f"{amount} x {base_return}"
 
-                if bet_target is not None:
+                if bet_target is not None: # Multiplier for targetting specific player
                     reward_equation += " x [players_in_game]"
                     any_target = True
 
@@ -548,15 +557,17 @@ class BettingHandler:
                 target_names=target_names,
                 bet_data=bet_data,
                 ticket=ticket
-            ).error("Bet could not be placed")
+            ).exception("Bet could not be placed")
 
             return (False, "Bet was not placed: Database error occured :(", None)
 
+        # Show multiplier for betting on multiple events at once
         final_value *= len(amounts)
         if len(amounts) > 1:
             reward_equation = "(" + reward_equation
             reward_equation += f") x {len(amounts)}"
 
+        # Show point penalty if game is already started
         ratio_readable = round_digits(time_ratio)
         if game_duration > 0:
             reward_equation += f" x {ratio_readable}"
@@ -566,6 +577,7 @@ class BettingHandler:
         if any_target:
             reward_equation += " (minimum)\n"
 
+        # Describe why a penalty was given if game is underway
         if game_duration > 0:
             dt_start = datetime.fromtimestamp(game_timestamp)
             dt_now = datetime.fromtimestamp(time())
@@ -573,6 +585,7 @@ class BettingHandler:
             reward_equation += f"\n{ratio_readable} is a penalty for betting "
             reward_equation += f"{duration_fmt} after the game started."
 
+        # Describe why a multiplier was given for targetting a specific person
         if any_target:
             reward_equation += (
                 "[players_in_game] is a multiplier. " +
@@ -581,7 +594,6 @@ class BettingHandler:
             )
 
         bet_all = len(amounts) == 1 and amounts[0] == "all"
-
         response = self.get_bet_placed_text(bet_data, bet_all, game_duration, ticket)
 
         balance_resp = f"\nYour {tokens_name} balance is now `{format_tokens_amount(balance - running_cost)}`."
