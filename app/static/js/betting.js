@@ -182,7 +182,7 @@ function addEvent() {
     let deleteBtnData = document.createElement("td");
     let deleteBtn = document.createElement("button");
     deleteBtn.innerHTML = "&times;";
-    deleteBtn.classList.add("delete-btn");
+    deleteBtn.classList.add("bets-delete-btn");
     deleteBtn.classList.add("cooldown-btn");
     buttonCooldowns.push({
         btn: deleteBtn,
@@ -346,7 +346,7 @@ async function makeBet(submitBtn) {
             if (i == 0) {
                 let deleteBtn = document.createElement("button");
                 deleteBtn.innerHTML = "&times;";
-                deleteBtn.classList.add("delete-btn");
+                deleteBtn.classList.add("bets-delete-btn");
                 deleteBtn.classList.add("cooldown-btn");
                 buttonCooldowns.push({
                     btn: deleteBtn,

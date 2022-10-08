@@ -214,9 +214,9 @@ class Command:
 
         if params_str_2 != "":
             params_str_2 = " " + params_str_2
-        params_str = f"{params_str_1}{params_str_2}`"
+        params_str = f"{params_str_1}{params_str_2}"
 
-        return f"`!{cmd_str}{params_str}"
+        return f"!{cmd_str}{params_str}"
 
 def get_handler(cmd):
     cmd_name = cmd

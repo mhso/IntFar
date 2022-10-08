@@ -96,6 +96,7 @@ def get_payout():
     targets = data["targets"]
     guild_id = data["guildId"]
     players = 1
+
     try:
         players = int(data["players"])
     except ValueError:
@@ -127,6 +128,7 @@ def get_payout():
         "cost": api_util.format_tokens_amount(sum(int(x) for x in amounts_values)),
         "payout": api_util.format_tokens_amount(int(total_reward * len(amounts_values)))
     }
+
     return app_util.make_json_response(return_data, 200)
 
 @betting_page.route("/create", methods=["POST"])
@@ -135,6 +137,7 @@ def create_bet():
     database = flask.current_app.config["DATABASE"]
     betting_handler = flask.current_app.config["BET_HANDLER"]
     events = [int(x) for x in data["events"]]
+
     event_strs = []
     for event in events:
         for x in BETTING_IDS:
@@ -241,6 +244,7 @@ def delete_bet():
             f"Multi-bet with ticket ID {ticket} for {refunded_formatted} " +
             f"{tokens_name} successfully cancelled.\n"
         )
+
     disc_msg += f"Your {tokens_name} balance is now `{api_util.format_tokens_amount(new_balance)}`."
 
     app_util.discord_request("func", "send_message_unprompted", (disc_msg, guild_id))

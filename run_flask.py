@@ -12,6 +12,7 @@ def run_app(database, bet_handler, riot_api, config, bot_pipe):
     # Define URL routes
     routes = [
         Route("index", "start_page"),
+        Route("about", "about_page", "about"),
         Route("users", "user_page", "user"),
         Route("verify", "verify_page", "verify"),
         Route("betting", "betting_page", "betting"),

@@ -1,6 +1,20 @@
+/****************##############****************\
+|                    SHARED                    |
+\****************##############****************/
+
 @font-face {
     font-family: fancy;
     src: url(../fonts/Yellowtail-Regular.ttf);
+}
+
+@font-face {
+    font-family: tektur;
+    src: url(../fonts/TekturNarrow-Bold.ttf);
+}
+
+@font-face {
+    font-family: league;
+    src: url(../fonts/Friz_Quadrata_Bold.otf);
 }
 
 body {
@@ -99,24 +113,21 @@ table {
     animation: spin 2s linear infinite;
 }
 
-.betting-load-icon {
-    width: 26px;
-    height: 26px;
-    margin: 0 auto;
-    left: 42%;
-    top: 8%;
-}
-
 .bold {
     font-weight: 800;
 }
 
-.name {
-    color: rgb(41, 179, 167);
+.italic {
+    font-style: italic;
 }
 
-.feed-award {
-    color: gold;
+.emph {
+    font-weight: 800;
+    text-decoration: underline;
+}
+
+.name {
+    color: rgb(41, 179, 167);
 }
 
 .discord-avatar {
@@ -307,6 +318,10 @@ table {
     width: 100%;
 }
 
+.empty-list {
+    display: none;
+}
+
 .list-entry {
     margin: 0 auto;
     color: rgb(228, 228, 228);
@@ -317,6 +332,31 @@ table {
 .list-entry .discord-avatar {
     width: 48px;
     height: 48px;   
+}
+
+.list-entry > td > a:hover {
+    text-decoration: underline;
+}
+
+.list-entry > td > a {
+    color: rgb(228, 228, 228);
+    text-decoration: none;
+}
+
+.left {
+    float: left;
+}
+
+.right {
+    float: right;
+}
+
+/****************##############****************\
+|                     HOME                     |
+\****************##############****************/
+
+.feed-award {
+    color: gold;
 }
 
 #intfar-all {
@@ -412,6 +452,82 @@ table {
     padding: 5px;
 }
 
+/****************##############****************\
+|                     ABOUT                    |
+\****************##############****************/
+
+@keyframes bobbing_arrow {
+    0% {
+        transform: translateY(0);
+    }
+    100% {
+        transform: translateY(20px);
+    }
+}
+
+#about-wrapper {
+    text-align: center;
+    font-size: 18px;
+}
+
+#about-defintion-header {
+    font-weight: 800;
+    margin-bottom: 0;
+}
+
+.about-card {
+    background-color: #000000b3;
+    padding: 15px;
+    width: 620px;
+    margin: 0 auto;
+    margin-top: 0px;
+    margin-top: 50px;
+    border: 2px solid #3555ff;
+    border-radius: 15px;
+}
+
+#about-scroll-down {
+    margin-top: 90px;
+    font-family: tektur;
+    font-size: 3rem;
+    color: #ff8519;
+}
+
+#about-arrow-down {
+    width: 80px;
+    margin-top: 12px;
+    margin-bottom: 100px;
+
+    animation: bobbing_arrow 0.75s linear 0s infinite alternate both;
+}
+
+#about-card-commands {
+    width: 800px;
+}
+
+#about-commands {
+    font-size: 16px;
+    margin-top: 20px;
+    margin-bottom: 15px;
+}
+
+.commands-list-entry {
+    margin-bottom: 10px;
+}
+
+.commands-list-entry > td:first-of-type {
+    font-family: Consolas;
+}
+
+.paragraph-begin {
+    font-size: 24px;
+    font-weight: 800;
+}
+
+/****************##############****************\
+|                    VERIFY                    |
+\****************##############****************/
+
 #verify-wrapper {
     width: 300px;
     text-align: center;
@@ -438,22 +554,33 @@ table {
     border-radius: 5px;
 }
 
-#no-user-wrapper {
-    text-align: center;
-}
-
 .discord-command {
     background-color: black;
     font-family: Consolas;
 }
 
-.left {
-    float: left;
+/****************##############****************\
+|                  MISC PAGES                  |
+\****************##############****************/
+
+#error-page-wrapper {
+    margin-top: 5vh;
+    text-align: center;
 }
 
-.right {
-    float: right;
+#error-page-wrapper img {
+    height: 250px;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0px 5px 15px white);
 }
+
+#no-user-wrapper {
+    text-align: center;
+}
+
+/****************##############****************\
+|                   PROFILE                    |
+\****************##############****************/
 
 #profile-wrapper {
     text-align: center;
@@ -514,22 +641,71 @@ table {
     border-right: 2px dashed white;
 }
 
+.profile-simple-stats tr:nth-child(2) > td {
+    padding-top: 8px;
+}
+
+.profile-simple-stats td:first-child, .profile-simple-stats th:first-child {
+    text-align: left;
+}
+
+.profile-simple-stats td:nth-child(2), .profile-simple-stats th:nth-child(2) {
+    text-align: right;
+    font-weight: 800;
+}
+
+.profile-simple-stats td:last-child, .profile-simple-stats th:last-child {
+    text-align: right;
+    font-weight: 800;
+    
+}
+
+.profile-simple-stats td, .profile-simple-stats th {
+    padding-bottom: 2px;
+    padding-top: 2px;
+}
+
+#profile-bets .bets-list-entry > td:nth-child(1) {
+    width: 80%;
+    padding-right: 10px;
+}
+
+#profile-bets .bets-list-entry > td:nth-child(2) {
+    width: 5%;
+}
+
+#profile-bets .bets-list-entry > td:nth-child(3) {
+    width: 15%;
+}
+
+#profile-resolved-bets {
+    max-height: 750px;
+    overflow-y: auto;
+}
+
+.gold-stat {
+    color: gold;
+}
+
+.gold-description {
+    margin-top: 1rem;
+    font-style: italic;
+}
+
+/****************##############****************\
+|                   BETTING                    |
+\****************##############****************/
+
+.betting-load-icon {
+    width: 26px;
+    height: 26px;
+    margin: 0 auto;
+    left: 42%;
+    top: 8%;
+}
+
 #bets-lists-wrapper {
     margin-top: 15px;
-}
-
-.list-entry > td > a {
-    color: rgb(228, 228, 228);
-    text-decoration: none;
-}
-
-.undecorated-link {
-    color: rgb(228, 228, 228);
-    text-decoration: none;
-}
-
-.list-entry > td > a:hover {
-    text-decoration: underline;
 }
 
 .bets-list-avatar {
@@ -570,10 +746,6 @@ table {
     width: 5%;
 }
 
-.empty-list {
-    display: none;
-}
-
 .bet-main, .bet-single  {
     height: 40px;
     border-top: 1px solid white;
@@ -595,11 +767,6 @@ table {
     font-size: 20px;
     text-align: center;
     font-style: italic;
-}
-
-.emph {
-    font-weight: 800;
-    text-decoration: underline;
 }
 
 #make-bet-wrapper {
@@ -728,7 +895,7 @@ table {
     width: 30%;
 }
 
-.delete-btn {
+.bets-delete-btn {
     background-color: transparent;
     color: white;
     border: none;
@@ -742,68 +909,6 @@ table {
 .event-row > th, .event-row > td {
     text-align: center;
     padding: 5px 0;
-}
-
-.profile-simple-stats tr:nth-child(2) > td {
-    padding-top: 8px;
-}
-
-.profile-simple-stats td:first-child, .profile-simple-stats th:first-child {
-    text-align: left;
-}
-
-.profile-simple-stats td:nth-child(2), .profile-simple-stats th:nth-child(2) {
-    text-align: right;
-    font-weight: 800;
-}
-
-.profile-simple-stats td:last-child, .profile-simple-stats th:last-child {
-    text-align: right;
-    font-weight: 800;
-    
-}
-
-.profile-simple-stats td, .profile-simple-stats th {
-    padding-bottom: 2px;
-    padding-top: 2px;
-}
-
-#profile-bets .bets-list-entry > td:nth-child(1) {
-    width: 80%;
-    padding-right: 10px;
-}
-
-#profile-bets .bets-list-entry > td:nth-child(2) {
-    width: 5%;
-}
-
-#profile-bets .bets-list-entry > td:nth-child(3) {
-    width: 15%;
-}
-
-#profile-resolved-bets {
-    max-height: 750px;
-    overflow-y: auto;
-}
-
-.gold-stat {
-    color: gold;
-}
-
-.gold-description {
-    margin-top: 1rem;
-    font-style: italic;
-}
-
-#error-page-wrapper {
-    margin-top: 5vh;
-    text-align: center;
-}
-
-#error-page-wrapper img {
-    height: 250px;
-    margin-bottom: 1rem;
-    filter: drop-shadow(0px 5px 15px white);
 }
 
 .doinks-table-wrapper {
@@ -860,11 +965,10 @@ table {
     }
 }
 
-/*
-=========######==========
-|      Sound Stuff      |
-=========######==========
-*/
+/****************##############****************\
+|                  SOUNDBOARD                  |
+\****************##############****************/
+
 #upload-sound-form {
     font-size: 1.1rem;
 }
@@ -925,11 +1029,10 @@ table {
     padding: 4px 10px;
 }
 
-/*
-=========######==========
-|      List Stuff       |
-=========######==========
-*/
+/****************##############****************\
+|                     LISTS                    |
+\****************##############****************/
+
 #no-items-placeholder {
     margin-top: 15px;
     margin-bottom: 20px;
@@ -992,6 +1095,11 @@ table {
 
 .form-abort {
     background-color: #df1313;
+}
+
+.undecorated-link {
+    color: rgb(228, 228, 228);
+    text-decoration: none;
 }
 
 #list-view-header {

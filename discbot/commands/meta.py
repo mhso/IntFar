@@ -68,7 +68,7 @@ async def handle_commands_msg(client, message):
     for cmd in commands_util.COMMANDS:
         cmd_obj = commands_util.COMMANDS[cmd]
         if message.guild.id in cmd_obj.guilds:
-            cmd_str = f"{cmd_obj} - {cmd_obj.desc}"
+            cmd_str = f"`{cmd_obj}` - {cmd_obj.desc}"
             lines.append(cmd_str)
 
     await client.paginate(message.channel, lines, 0, 7, header)
@@ -110,7 +110,8 @@ async def handle_status_msg(client, message):
     response = f"**Uptime:** {get_uptime(client.time_initialized)}\n"
 
     (
-        games, earliest_game, games_won, longest_game_duration,
+        games, earliest_game, games_won, unique_game_guilds,
+        longest_game_duration,
         longest_game_time, users, doinks_games,
         total_doinks, intfars, games_ratios,
         intfar_ratios, intfar_multi_ratios
@@ -161,7 +162,7 @@ async def handle_status_msg(client, message):
     highest_payout_name = client.get_discord_nick(highest_payout_user, message.guild.id)
 
     response += f"--- Since **{earliest_time}** ---\n"
-    response += f"- **{games}** games have been played (**{pct_games_won:.1f}%** was won)\n"
+    response += f"- **{games}** games have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
     response += f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
     response += f"- **{users}** users have signed up\n"
     response += f"- **{intfars}** Int-Far awards have been given\n"

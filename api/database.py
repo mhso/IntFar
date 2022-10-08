@@ -530,16 +530,26 @@ class Database(SQLiteDatabase):
     def get_games_count(self, time_after=None, time_before=None, guild_id=None):
         delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id)
         delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "win", 1)
+        delim_str_3, params_3 = self.get_delimeter(time_after, time_before, guild_id)
 
         query = f"""
-            SELECT games.c, games.timestamp, wins.c FROM (
+            SELECT
+                games.c,
+                games.timestamp,
+                wins.c,
+                guilds.c
+            FROM (
                 SELECT COUNT(*) AS c, timestamp FROM games g{delim_str_1}
             ) games,
             (
                 SELECT COUNT(*) AS c FROM games{delim_str_2}
-            ) wins
+            ) wins,
+            (
+                SELECT COUNT(DISTINCT guild_id) AS c FROM games{delim_str_3}
+            ) guilds
         """
         params = params_2 if params_1 is None else params_1 + params_2
+        params = params if params_3 is None else params + params_3
 
         with self:
             return self.execute_query(query, *params).fetchone()

@@ -172,6 +172,7 @@ def parse_amount_str(amount_str, balance=None):
 
     try:
         return int(float(amount_str) * mult)
+
     except ValueError as e:
         if balance is not None:
             if amount_str[-1] == "%":
@@ -192,6 +193,7 @@ def generate_user_secret():
 
 def organize_intfar_stats(games_played, intfar_reason_ids):
     intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
+
     for reason_id in intfar_reason_ids:
         intfar_ids = [int(x) for x in reason_id[0]]
         for index, intfar_id in enumerate(intfar_ids):
@@ -202,15 +204,18 @@ def organize_intfar_stats(games_played, intfar_reason_ids):
         0 if games_played == 0
         else (len(intfar_reason_ids) / games_played) * 100
     )
+
     return games_played, len(intfar_reason_ids), intfar_counts, pct_intfar
 
 def organize_doinks_stats(doinks_reason_ids):
     doinks_counts = {x: 0 for x in range(len(DOINKS_REASONS))}
+
     for reason_id in doinks_reason_ids:
         intfar_ids = [int(x) for x in reason_id[0]]
         for index, intfar_id in enumerate(intfar_ids):
             if intfar_id == 1:
                 doinks_counts[index] += 1
+
     return doinks_counts
 
 def get_guild_abbreviation(guild_id):
@@ -272,6 +277,7 @@ def create_predictions_timeline_image():
 
         if index == 0:
             points.append((prev_x, prev_y, prev_prediction, prev_timestamp))
+
         points.append((curr_x, curr_y, prediction, timestamp))
 
     for index, (x, y, _, _) in enumerate(points[1:]):
