@@ -1,6 +1,5 @@
 import json
 import argparse
-import os
 from glob import glob
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -9,6 +8,7 @@ from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, riot_api, util
 from api.game_stats import get_relevant_stats, get_filtered_stats, get_filtered_timeline_stats
 from discbot.commands.util import ADMIN_DISC_ID
+from discbot.montly_intfar import MonthlyIntfar, MONTH_NAMES
 
 class TestFuncs:
     def __init__(self, config, database, riot_api):
@@ -145,6 +145,42 @@ class TestFuncs:
                     counts[champ_id] = new_count
 
         print(max(list(counts.items()), key=lambda x: x[1]))
+
+    def test_ifotm(self):
+        conf = config.Config()
+        monthly_monitor = MonthlyIntfar(conf.hour_of_ifotm_announce)
+        db_client = database.Database(conf)
+        month = monthly_monitor.time_at_announcement.month
+        prev_month = month - 1 if month != 1 else 12
+        month_name = MONTH_NAMES[prev_month-1]
+
+        details = db_client.get_intfars_of_the_month()
+
+        if details == []:
+            # No one has played enough games to quality for IFOTM this month
+            response = (
+                f"No one has played a minimum of {self.config.ifotm_min_games} games "
+                "this month, or those who do have no Int-Fars, so no Int-Far of the Month "
+                f"will be crowned for {month_name}. Dead game, I guess :("
+            )
+            print(response)
+            return
+
+        intfar_details = [
+            ("Disc ID: " + str(disc_id), games, intfars, ratio)
+            for (disc_id, games, intfars, ratio) in details
+        ]
+
+        intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n\n"
+        intro_desc += "*DRUM ROLL*\n\n"
+        desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
+        winners = [tupl[0] for tupl in details[:num_winners]]
+        desc += ":clap: :clap: :clap: :clap: :clap: \n"
+        desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
+        desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
+        print(intro_desc + desc)
+        print(winners)
+
 
 PARSER = argparse.ArgumentParser()
 

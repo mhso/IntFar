@@ -37,19 +37,23 @@ async def handle_intfar_msg(client, message, target_id):
             for reason_id, reason in enumerate(api_util.INTFAR_REASONS):
                 reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
 
-            longest_streak = client.database.get_longest_intfar_streak(disc_id)
-            streak_desc = f"His longest Int-Far streak was **{longest_streak}** "
-            streak_desc += "games in a row " + "{emote_suk_a_hotdok}\n"
+            longest_streak, date_ended = client.database.get_longest_intfar_streak(disc_id)
+            streak_desc = f"His longest Int-Far streak was **{longest_streak}** games in a row "
+            if date_ended is not None:
+                streak_desc += f"(ended **{date_ended}**) "
+            streak_desc += "{emote_suk_a_hotdok}\n"
 
-            longest_non_streak = client.database.get_longest_no_intfar_streak(disc_id)
-            no_streak_desc = "His longest streak of *not* being Int-Far was "
-            no_streak_desc += f"**{longest_non_streak}** games in a row " + "{emote_pog}\n"
+            longest_non_streak, date_ended = client.database.get_longest_no_intfar_streak(disc_id)
+            no_streak_desc = f"His longest streak of *not* being Int-Far was **{longest_non_streak}** games in a row "
+            if date_ended is not None:
+                no_streak_desc += f"(ended **{date_ended})** "
+            no_streak_desc += "{emote_pog}\n"
 
             relations_data = get_intfar_relation_stats(client, disc_id)[0]
             most_intfars_nick = client.get_discord_nick(relations_data[0], message.guild.id)
             relations_desc = f"He has inted the most when playing with {most_intfars_nick} "
-            relations_desc += f"where he inted {relations_data[2]} games ({relations_data[3]}% "
-            relations_desc += f"of {relations_data[1]} games)"
+            relations_desc += f"where he inted **{relations_data[2]}** games (out of a total **{relations_data[1]}** "
+            relations_desc += f"games played with this person, equal to **{relations_data[3]}%** of all games)"
             relations_desc += "{emote_smol_gual}"
 
             msg += ratio_desc + reason_desc + streak_desc + no_streak_desc + relations_desc

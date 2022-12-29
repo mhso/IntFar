@@ -260,6 +260,9 @@ class TestWrapper(TestRunner):
             streak = database.get_current_win_or_loss_streak(disc_id, True)
             self.assert_equals(streak, 1, "Win streak is 1 after loss")
 
+            prev_streak = database.get_current_win_or_loss_streak(disc_id, True, offset=1)
+            self.assert_equals(prev_streak, 3, "Prev streak was 3 wins after loss")
+
             streak = database.get_current_win_or_loss_streak(disc_id, False)
             self.assert_equals(streak, 2, "Loss streak is 2")
 
@@ -271,3 +274,8 @@ class TestWrapper(TestRunner):
 
             streak = database.get_current_win_or_loss_streak(disc_id, False)
             self.assert_equals(streak, 5, "Loss streak is 5")
+
+            insert_game(database, game_id, 1)
+
+            prev_streak = database.get_current_win_or_loss_streak(disc_id, False, offset=1)
+            self.assert_equals(prev_streak, 4, "Prev streak was 4 losses after win")

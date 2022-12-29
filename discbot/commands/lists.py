@@ -202,19 +202,23 @@ async def handle_best_nochest(client, message, target_id=None):
     else:
         # Get highest winrate of all the champs with no chest gained.
         result = client.database.get_min_or_max_winrate_champ(
-            target_id, True, no_chest_champs, min_games=3
+            target_id, True, no_chest_champs, return_top_n=5, min_games=3
         )
 
-        if result is None:
-            response = "No champs found with enough games where you don't have a chest :("
+        if result == []:
+            response = "No champs found with enough games, where you don't have a chest :("
 
         else:
-            winrate, games, champ_id = result
+            quantity_desc = f"These are the {len(result)} champs" if len(result) > 1 else "This is the champ"
+            response = (
+                f"{quantity_desc} with highest "
+                "winrate and no chest earned:"
+            )
 
-            champ_name = client.riot_api.get_champ_name(champ_id)
+            for winrate, games, champ_id in result:
+                champ_name = client.riot_api.get_champ_name(champ_id)
 
-            response = f"Highest winrate champ that you have not earned a chest on:\n"
-            response += f"**{champ_name}**\n"
-            response += f"(**{winrate}%** wins in **{games}** games)"
+                response += f"\n - **{champ_name}** "
+                response += f"(**{winrate:.1f}%** wins in **{games}** games)"
 
     await message.channel.send(client.insert_emotes(response))

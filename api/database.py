@@ -688,8 +688,8 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, disc_id, champ_id, disc_id, champ_id).fetchone()
 
-    def get_min_or_max_winrate_champ(self, disc_id, best, included_champs=None, min_games=10):
-        aggregate = "MAX" if best else "MIN"
+    def get_min_or_max_winrate_champ(self, disc_id, best, included_champs=None, return_top_n=1, min_games=10):
+        sort_order = "DESC" if best else "ASC"
         if included_champs is not None:
             champs_condition = (
                 f"AND played.champ_id IN (" +
@@ -701,7 +701,7 @@ class Database(SQLiteDatabase):
 
         query = f"""
             SELECT
-                {aggregate}(sub.wr),
+                sub.wr,
                 CAST(sub.gs as integer),
                 sub.champ
             FROM (
@@ -737,14 +737,19 @@ class Database(SQLiteDatabase):
                     AND played.c > {min_games}
                     {champs_condition}
             ) sub
+            ORDER BY sub.wr {sort_order}, sub.gs DESC
+            LIMIT {return_top_n}
         """
 
         with self:
-            result = self.execute_query(query, disc_id, disc_id).fetchone()
+            result = self.execute_query(query, disc_id, disc_id).fetchall()
+
+            if return_top_n == 1:
+                result = result[0]
 
             if result is None and min_games == 10:
                 # If no champs are found with min 10 games, try again with 5.
-                return self.get_champ_winrate(disc_id, best, min_games=5)
+                return self.get_min_or_max_winrate_champ(disc_id, best, included_champs, return_top_n, min_games=5)
 
             return result
 
@@ -912,10 +917,14 @@ class Database(SQLiteDatabase):
                 total_games = games_dict[disc_id]
 
                 if total_games < self.config.ifotm_min_games:
-                    # Disqualify people with less than 5 games played this month.
+                    # Disqualify people with less than 10 games played this month.
                     continue
 
                 intfars = intfar_dict.get(disc_id, 0)
+
+                if intfars == 0:
+                    # Disqualify people with no intfars this month.
+                    continue
 
                 pct_intfars.append(
                     (disc_id, total_games, intfars, (intfars / total_games) * 100)
@@ -925,7 +934,7 @@ class Database(SQLiteDatabase):
 
     def get_longest_intfar_streak(self, disc_id):
         query = """
-            SELECT intfar_id
+            SELECT intfar_id, timestamp
             FROM games
             LEFT JOIN registered_summoners rs
                 ON intfar_id=rs.disc_id
@@ -936,45 +945,59 @@ class Database(SQLiteDatabase):
         with self:
             int_fars = self.execute_query(query).fetchall()
             max_count = 0
+            timestamp_ended = None
             count = 0
-            for int_far in int_fars:
-                if int_far[0] is None or disc_id != int_far[0]:
+            for int_far, timestamp in int_fars:
+                if int_far is None or disc_id != int_far:
                     count = 0
                 else:
                     count += 1
 
                 if count > max_count:
                     max_count = count
+                    timestamp_ended = timestamp
 
-            return max_count
+            if timestamp_ended is not None:
+                timestamp_ended = datetime.fromtimestamp(timestamp_ended).strftime("%Y-%m-%d")
+
+            return max_count, timestamp_ended
 
     def get_longest_no_intfar_streak(self, disc_id):
         if not self.user_exists(disc_id):
             return 0
 
         query = """
-            SELECT intfar_id
+            SELECT intfar_id, timestamp
             FROM participants p
             LEFT JOIN games g
                 ON g.game_id=p.game_id
             WHERE p.disc_id=?
-            ORDER BY g.game_id
+            ORDER BY g.game_id ASC
         """
 
         with self:
             int_fars = self.execute_query(query, disc_id).fetchall()
             max_count = 0
+            timestamp_ended = None
             count = 0
-            for int_far in int_fars:
-                if disc_id == int_far[0]:
+            for int_far, timestamp in int_fars:
+                if disc_id == int_far:
                     count = 0
                 else:
                     count += 1
 
                 if count > max_count:
                     max_count = count
+                    timestamp_ended = timestamp
 
-            return max_count
+            if timestamp_ended is not None:
+                if timestamp_ended == timestamp:
+                    # Streak is ongoing
+                    timestamp_ended = None
+                else:
+                    timestamp_ended = datetime.fromtimestamp(timestamp_ended).strftime("%Y-%m-%d")
+
+            return max_count, timestamp_ended
 
     def get_current_intfar_streak(self):
         query = """
@@ -1026,7 +1049,7 @@ class Database(SQLiteDatabase):
 
             return max_count
 
-    def get_current_win_or_loss_streak(self, disc_id, win):
+    def get_current_win_or_loss_streak(self, disc_id, win, offset=0):
         query = """
             SELECT g.win
             FROM games AS g
@@ -1043,11 +1066,15 @@ class Database(SQLiteDatabase):
         with self:
             games = self.execute_query(query, disc_id).fetchall()
 
-            for count, row in enumerate(games, start=1):
+            count_offset = 1 if offset == 0 else 0
+
+            for count, row in enumerate(games[offset:], start=count_offset):
                 if row[0] != win:
                     return count
 
-            return len(games) + 1
+            total_offset = -offset if offset > 0 else 1
+
+            return len(games) + total_offset
 
     def get_max_intfar_details(self):
         query = """

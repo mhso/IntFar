@@ -38,18 +38,25 @@ class MonthlyIntfar:
         games_1st = intfar_details[0][1]
         intfars_1st = intfar_details[0][2]
         pct_1st = intfar_details[0][3]
-        nickname_2nd = intfar_details[1][0]
-        games_2nd = intfar_details[1][1]
-        intfars_2nd = intfar_details[1][2]
-        pct_2nd = intfar_details[1][3]
-        nickname_3rd = intfar_details[2][0]
-        games_3rd = intfar_details[2][1]
-        intfars_3rd = intfar_details[2][2]
-        pct_3rd = intfar_details[2][3]
-
         pct_desc_1st = self.get_pct_desc(games_1st, intfars_1st, pct_1st)
-        pct_desc_2nd = self.get_pct_desc(games_2nd, intfars_2nd, pct_2nd)
-        pct_desc_3rd = self.get_pct_desc(games_3rd, intfars_3rd, pct_3rd)
+
+        if len(intfar_details) > 1:
+            nickname_2nd = intfar_details[1][0]
+            games_2nd = intfar_details[1][1]
+            intfars_2nd = intfar_details[1][2]
+            pct_2nd = intfar_details[1][3]
+            pct_desc_2nd = self.get_pct_desc(games_2nd, intfars_2nd, pct_2nd)
+        else:
+            nickname_2nd, games_2nd, intfars_2nd, pct_2nd, pct_desc_2nd = None, None, None, None, None
+
+        if len(intfar_details) > 2:
+            nickname_3rd = intfar_details[2][0]
+            games_3rd = intfar_details[2][1]
+            intfars_3rd = intfar_details[2][2]
+            pct_3rd = intfar_details[2][3]
+            pct_desc_3rd = self.get_pct_desc(games_3rd, intfars_3rd, pct_3rd)
+        else:
+            nickname_3rd, games_3rd, intfars_3rd, pct_3rd, pct_desc_3rd = None, None, None, None, None
 
         winners = 1
 
@@ -66,31 +73,38 @@ class MonthlyIntfar:
             winner_str = f"--- {nickname_1st}!!! ---\n"
             desc_str = f"He has inted in {pct_desc_1st} of his games this month!!!\n"
             desc_str += "You deserve this: :first_place: \n"
-            desc_str += "You will also receive a badge of shame on Discord {emote_main}\n\n"
-            runner_up_str = "Runner up goes to "
+            desc_str += "You will also receive a badge of shame on Discord {emote_main}\n"
+            
+            if len(intfar_details) > 1:
+                runner_up_str = "\nRunner up goes to "
 
-            if pct_2nd == pct_3rd and intfars_2nd == intfars_3rd: # Int-Far #2 and Int-Far #3 values are equal.
-                runner_up_str += f"both {nickname_2nd} and {nickname_3rd} "
-                runner_up_str += f"for a tied {pct_desc_2nd} of games where they were Int-Far!\n"
-                runner_up_str += "You both get one of these: :second_place: :second_place: \n"
+                if pct_2nd == pct_3rd and intfars_2nd == intfars_3rd: # Int-Far #2 and Int-Far #3 values are equal.
+                    runner_up_str += f"both {nickname_2nd} and {nickname_3rd} "
+                    runner_up_str += f"for a tied {pct_desc_2nd} of games where they were Int-Far!\n"
+                    runner_up_str += "You both get one of these: :second_place: :second_place: \n"
 
-            else: # All three Int-Far values are distinct.
-                runner_up_str += f"{nickname_2nd} for being almost as bad with "
-                runner_up_str += f"{pct_desc_2nd} of games being Int-Far!\n"
-                runner_up_str += "Take this medal for your troubles: :second_place: \n\n"
-                runner_up_str += f"Finally, {nickname_3rd} gets a :third_place: for "
-                runner_up_str += f"a bad-but-not-as-terrible {pct_desc_3rd} of inted games! \n"
+                else: # All three Int-Far values are distinct.
+                    runner_up_str += f"{nickname_2nd} for being almost as bad with "
+                    runner_up_str += f"{pct_desc_2nd} of games being Int-Far!\n"
+                    runner_up_str += "Take this medal for your troubles: :second_place: \n"
 
-            desc_str += runner_up_str
+                    if len(intfar_details) > 2:
+                        runner_up_str += f"\nFinally, {nickname_3rd} gets a :third_place: for "
+                        runner_up_str += f"a bad-but-not-as-terrible {pct_desc_3rd} of inted games! \n"
+
+                desc_str += runner_up_str
 
         if tie_count == 2: # Int-Far #1 and Int-Far #2 values are equal.
             winner_str += f"--- {nickname_1st} **AND** {nickname_2nd}!!! ---\n"
             desc_str = f"They are both equally terrible with a tied {pct_desc_1st} "
             desc_str += "of games were they were Int-Far this month!!!\n"
             desc_str += "You both deserve this: :first_place: :first_place: \n"
-            desc_str += "You will also both receive a badge of shame on Discord {emote_main}\n\n"
-            desc_str += f"Second place goes to {nickname_3rd} for inting in {pct_desc_3rd} "
-            desc_str += "of his games! Take this, my boi: :second_place: \n"
+            desc_str += "You will also both receive a badge of shame on Discord {emote_main}\n"
+
+            if len(intfar_details) > 2:
+                desc_str += f"\nSecond place goes to {nickname_3rd} for inting in {pct_desc_3rd} "
+                desc_str += "of his games! Take this, my boi: :second_place: \n"
+
             winners = 2
 
         if tie_count == 3: # Int-Far values for all three 'winners' are equal.

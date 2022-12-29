@@ -24,7 +24,7 @@ async def handle_lan_msg(client, message):
     if games_stats is None:
         response = "No games have been played yet!"
     else:
-        games_played, first_game_timestamp, games_won = games_stats
+        games_played, first_game_timestamp, games_won, _ = games_stats
         pct_won = (games_won / games_played) * 100
 
         dt_start = datetime.fromtimestamp(first_game_timestamp)

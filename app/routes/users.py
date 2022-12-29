@@ -47,8 +47,8 @@ def get_intfar_data(disc_id, database):
     for reason_id, reason in enumerate(api_util.INTFAR_REASONS):
         criteria_stats.append((reason, intfar_counts[reason_id]))
 
-    longest_streak = database.get_longest_intfar_streak(disc_id)
-    longest_non_streak = database.get_longest_no_intfar_streak(disc_id)
+    longest_streak = database.get_longest_intfar_streak(disc_id)[0]
+    longest_non_streak = database.get_longest_no_intfar_streak(disc_id)[0]
 
     games_played, intfar_reason_ids = database.get_intfar_stats(disc_id, True)
     games_month, intfars_month, _, pct_month = api_util.organize_intfar_stats(games_played, intfar_reason_ids)

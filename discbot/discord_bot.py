@@ -77,6 +77,9 @@ INTFAR_STREAK_FLAVORS = api_util.load_flavor_texts("intfar_streak")
 WIN_STREAK_FLAVORS = api_util.load_flavor_texts("win_streak")
 LOSS_STREAK_FLAVORS = api_util.load_flavor_texts("loss_streak")
 
+BROKEN_WIN_STREAK_FLAVORS = api_util.load_flavor_texts("broken_win_streak")
+BROKEN_LOSS_STREAK_FLAVORS = api_util.load_flavor_texts("broken_loss_streak")
+
 IFOTM_FLAVORS = api_util.load_flavor_texts("ifotm")
 
 def get_intfar_flavor_text(nickname, reason):
@@ -135,7 +138,7 @@ def get_doinks_flavor_text(index, value):
 
 def get_game_streak_flavor_text(min_streak, nicknames, streak, win):
     streak_flavors = WIN_STREAK_FLAVORS if win else LOSS_STREAK_FLAVORS
-    index = streak - min_streak if streak -min_streak < len(streak_flavors) else len(streak_flavors) - 1
+    index = streak - min_streak if streak - min_streak < len(streak_flavors) else len(streak_flavors) - 1
 
     quantifier = "is" if len(nicknames) == 1 else "are"
     nicknames_str = ", ".join(nicknames)
@@ -144,6 +147,16 @@ def get_game_streak_flavor_text(min_streak, nicknames, streak, win):
         "{nicknames}", nicknames_str
     ).replace(
         "{quantifier}", quantifier
+    ).replace("{streak}", str(streak))
+
+def get_broken_game_streak_flavor_text(nicknames, streak, win):
+    streak_flavors = BROKEN_LOSS_STREAK_FLAVORS if win else BROKEN_WIN_STREAK_FLAVORS
+    flavor_text = streak_flavors[random.randint(0, len(streak_flavors)-1)]
+
+    nicknames_str = ", ".join(nicknames)
+
+    return flavor_text.replace(
+        "{nicknames}", nicknames_str
     ).replace("{streak}", str(streak))
 
 def get_intfar_streak_flavor_text(nickname, streak):
@@ -184,6 +197,7 @@ class DiscordClient(discord.Client):
         self.polling_active = {}
         self.test_guild = None
         self.initialized = False
+        self.event_listeners = {}
         self.last_message_time = {}
         self.last_command_time = {}
         self.command_timeout_lengths = {}
@@ -752,7 +766,7 @@ class DiscordClient(discord.Client):
     def get_all_emojis(self):
         for guild in self.guilds:
             if guild.id == api_util.MAIN_GUILD_ID:
-                return [emoji.url for emoji in guild.emojis]
+                return [(emoji.name, emoji.url) for emoji in guild.emojis]
 
         return None
 
@@ -790,6 +804,11 @@ class DiscordClient(discord.Client):
             return int(ratio_win * 100)
 
         return None
+
+    def add_event_listener(self, event, callback, *args):
+        listeners = self.event_listeners.get(event, [])
+        listeners.append((callback, args))
+        self.event_listeners[event] = listeners
 
     def try_get_user_data(self, name, guild_id):
         if name.startswith("<@"): # Mention string
@@ -1419,7 +1438,7 @@ class DiscordClient(discord.Client):
 
         return final_intfar, reasons_str, response
 
-    def get_doinks_data(self, filtered_stats, guild_id):
+    def get_doinks_data(self, filtered_stats: list[tuple[int, dict]], guild_id: int):
         """
         Gets data about the people who earned doinks in a game.
         Returns a message describing who (if any) got doinks and why.
@@ -1433,36 +1452,55 @@ class DiscordClient(discord.Client):
 
         return doinks, redeemed_text
 
-    def get_cool_stats_data(self, filtered_stats, guild_id):
+    def get_cool_stats_data(self, filtered_stats: list[tuple[int, dict]], guild_id: int):
         stat_mentions = award_qualifiers.get_cool_stats(filtered_stats, self.config)
         cool_stats_msg = self.get_cool_stats_msg(stat_mentions, guild_id)
 
         return cool_stats_msg
 
-    def get_cool_timeline_data(self, filtered_stats, timeline_data, guild_id):
+    def get_cool_timeline_data(
+        self,
+        filtered_stats: list[tuple[int, dict]],
+        timeline_data: dict,
+        guild_id: int
+    ):
         filtered_timeline = game_stats.get_filtered_timeline_stats(filtered_stats, timeline_data)
         timeline_mentions = award_qualifiers.get_cool_timeline_events(filtered_timeline, self.config)
         cool_events_msg = self.get_cool_timeline_msg(timeline_mentions, guild_id)
 
         return cool_events_msg
 
-    def get_win_loss_streak_data(self, filtered_stats, guild_id):
+    def get_win_loss_streak_data(self, filtered_stats: list[tuple[int, dict]], guild_id: int):
         """
         Get message describing the win/loss streak of all players in game
         after it has concluded. Returns None if the streak is less than 3.
+
+        :param filtered_stats:  List containing a tuple of (discord_id, game_stats)
+                                for each Int-Far registered player on our team
+        :param guild_id:        ID of the Discord server where the game took place
         """
         mentions_by_streak = {}
+        broken_streaks = {}
         game_won = filtered_stats[0][1]["gameWon"]
 
         for disc_id, _ in filtered_stats:
             current_streak = self.database.get_current_win_or_loss_streak(disc_id, game_won)
+            prev_streak = self.database.get_current_win_or_loss_streak(disc_id, not game_won) - 1
 
-            if current_streak > self.config.stats_min_win_loss_streak:
+            if current_streak >= self.config.stats_min_win_loss_streak:
+                # We are currently on a win/loss streak
                 mention = self.get_mention_str(disc_id, guild_id)
                 streak_list = mentions_by_streak.get(current_streak, [])
                 streak_list.append(mention)
+                mentions_by_streak[current_streak] = streak_list
 
                 mentions_by_streak[current_streak] = streak_list
+            elif prev_streak >= self.config.stats_min_win_loss_streak:
+                # We broke a win/loss streak
+                mention = self.get_mention_str(disc_id, guild_id)
+                streak_list = broken_streaks.get(prev_streak, [])
+                streak_list.append(mention)
+                broken_streaks[prev_streak] = streak_list
 
         response = ""
 
@@ -1470,7 +1508,16 @@ class DiscordClient(discord.Client):
             mention_list = mentions_by_streak[streak]
 
             response += "\n" + get_game_streak_flavor_text(
-                self.config.stats_min_win_loss_streak, 
+                self.config.stats_min_win_loss_streak,
+                mention_list,
+                streak,
+                game_won
+            )
+
+        for streak in broken_streaks:
+            mention_list = broken_streaks[streak]
+
+            response += "\n" + get_broken_game_streak_flavor_text(
                 mention_list,
                 streak,
                 game_won
@@ -1481,7 +1528,14 @@ class DiscordClient(discord.Client):
 
         return self.insert_emotes(response) if response != "" else None
 
-    def save_stats(self, filtered_stats, intfar_id, intfar_reason, doinks, guild_id):
+    def save_stats(
+        self,
+        filtered_stats: list[tuple[int, dict]],
+        intfar_id: int,
+        intfar_reason: str,
+        doinks: dict[int, str],
+        guild_id: int
+    ):
         """
         Save all the stats after a finished game. This includes who was the Int-Far,
         information about doinks, general information about the game, such as
@@ -1627,12 +1681,25 @@ class DiscordClient(discord.Client):
         month_name = api_util.MONTH_NAMES[prev_month-1]
 
         intfar_data = self.database.get_intfars_of_the_month()
-        intfar_details = [(self.get_mention_str(disc_id), games, intfars, ratio)
-                          for (disc_id, games, intfars, ratio) in intfar_data]
+
+        if intfar_data == []:
+            # No one has played enough games to quality for IFOTM this month
+            response = (
+                f"No one has played a minimum of {self.config.ifotm_min_games} games "
+                "this month, so no Int-Far of the Month will be crowned "
+                f"for {month_name}. Dead game, I guess :("
+            )
+            await self.channels_to_write[api_util.MAIN_GUILD_ID].send(response)
+            return
 
         intro_desc = get_ifotm_flavor_text(month) + "\n\n"
         intro_desc += f"Int-Far of the month for {month_name} is...\n"
         intro_desc += "***DRUM ROLL***\n"
+
+        intfar_details = [
+            (self.get_mention_str(disc_id), games, intfars, ratio)
+            for (disc_id, games, intfars, ratio) in intfar_data
+        ]
 
         desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
         desc += ":clap: :clap: :clap: :clap: :clap: \n"
@@ -1646,6 +1713,7 @@ class DiscordClient(discord.Client):
         # Assign Int-Far of the Month 'badge' (role) to the top Int-Far.
         current_month = monthly_monitor.time_at_announcement.month
         winners = [tupl[0] for tupl in intfar_data[:num_winners]]
+
         await self.assign_monthly_intfar_role(current_month, winners)
 
     async def polling_loop(self):
@@ -1682,7 +1750,6 @@ class DiscordClient(discord.Client):
         await self.declare_monthly_intfar(ifotm_monitor)
 
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
-
         asyncio.create_task(self.polling_loop())
 
     async def send_error_msg(self, guild_id):
@@ -1754,6 +1821,10 @@ class DiscordClient(discord.Client):
             elif guild.id == api_util.MY_GUILD_ID and self.config.env == "dev":
                 CHANNEL_IDS.append(guild.text_channels[0].id)
                 self.channels_to_write[guild.id] = guild.text_channels[0]
+
+        # Call any potential listeners on the 'onready' event
+        for (callback, args) in self.event_listeners.get("onready", []):
+            callback(*args)
 
         asyncio.create_task(self.polling_loop())
 

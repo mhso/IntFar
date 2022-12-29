@@ -205,7 +205,7 @@ def index():
         )
 
     avatars = app_util.discord_request("func", "get_discord_avatar", None)
-    if avatars != []:
+    if avatars:
         avatars = [
             flask.url_for("static", filename=avatar.replace("app/static/", ""))
             for avatar in avatars

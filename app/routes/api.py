@@ -25,7 +25,7 @@ def get_statistics():
             active_games = app_util.get_game_info()
 
             # Get total games played and won.
-            games_played, _, games_won = database.get_games_count()
+            games_played, _, games_won, _ = database.get_games_count()
             won_pct = float(f"{(games_won / games_played) * 100:.1f}")
 
             # Get total count of Int-Fars awarded.
