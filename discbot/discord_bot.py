@@ -1579,7 +1579,17 @@ class DiscordClient(discord.Client):
 
             raise exception
 
-    async def user_joined_voice(self, disc_id, guild_id, poll_immediately=False):
+    async def user_joined_voice(self, disc_id: int, guild_id: int, poll_immediately=False):
+        """
+        Called when a user joins a voice channel in a server.
+        Starts polling for active games whenever 2 or more people
+        are in the same voice channel.
+
+        :param disc_id:             Discord ID of the user that joined the channel
+        :param guild_id:            ID of the Discord server of the voice channel
+        :param poll_immediately:    Whether to start polling immediately,
+                                    or wait a bit
+        """
         guild_name = self.get_guild_name(guild_id)
         logger.debug(f"User joined voice in {guild_name}: {disc_id}")
         summoner_info = self.database.summoner_from_discord_id(disc_id)
@@ -1595,7 +1605,15 @@ class DiscordClient(discord.Client):
 
             logger.info(f"Active users in {guild_name}: {len(users_in_voice)}")
 
-    async def user_left_voice(self, disc_id, guild_id):
+    async def user_left_voice(self, disc_id: int, guild_id: int):
+        """
+        Called when a user leaves a voice channel in a server.
+        Stops polling for active games whenever 1 or less people
+        are in the same voice channel.
+
+        :param disc_id:             Discord ID of the user that joined the channel
+        :param guild_id:            ID of the Discord server of the voice channel
+        """
         guild_name = self.get_guild_name(guild_id)
         logger.debug(f"User left voice in {guild_name}: {disc_id}")
         users_in_voice = self.get_users_in_voice()[guild_id]

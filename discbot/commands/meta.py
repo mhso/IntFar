@@ -124,6 +124,9 @@ async def handle_status_msg(client, message):
     longest_game_fmt = api_util.format_duration(longest_game_start, longest_game_end)
     longest_game_date = datetime.fromtimestamp(longest_game_time).strftime("%Y-%m-%d")
 
+    sounds = client.audio_handler.get_sounds("alphabetical")
+    unique_owners = set(client.audio_handler.get_owners().values())
+
     pct_intfar = int((intfars / games) * 100)
     pct_doinks = int((doinks_games / games) * 100)
     earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
@@ -161,33 +164,36 @@ async def handle_status_msg(client, message):
     pct_bets_won = int((bets_won / total_bets) * 100)
     highest_payout_name = client.get_discord_nick(highest_payout_user, message.guild.id)
 
-    response += f"--- Since **{earliest_time}** ---\n"
-    response += f"- **{games}** games have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
-    response += f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
-    response += f"- **{users}** users have signed up\n"
-    response += f"- **{intfars}** Int-Far awards have been given\n"
-    response += f"- **{total_doinks}** {doinks_emote} have been earned\n"
-    response += f"- **{total_bets}** bets have been made (**{pct_bets_won}%** was won)\n"
-    response += f"- Bets were made in **{len(unique_guilds)}** different servers\n"
-    response += f"- **{api_util.format_tokens_amount(total_amount)}** {tokens_name} have been spent on bets\n"
-    response += f"- **{api_util.format_tokens_amount(total_payout)}** {tokens_name} have been won from bets\n"
-    response += f"- **{api_util.format_tokens_amount(highest_payout)}** {tokens_name} was the biggest single win, by **{highest_payout_name}**\n"
-    response += "--- Of all games played ---\n"
-    response += f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
-    response += f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
-    response += f"- **{games_ratios[0]}%** were as a duo\n"
-    response += f"- **{games_ratios[1]}%** were as a three-man\n"
-    response += f"- **{games_ratios[2]}%** were as a four-man\n"
-    response += f"- **{games_ratios[3]}%** were as a five-man stack\n"
-    response += "--- When Int-Fars were earned ---\n"
-    response += f"- **{intfar_ratios[0]:.1f}%** were for dying a ton\n"
-    response += f"- **{intfar_ratios[1]:.1f}%** were for having an awful KDA\n"
-    response += f"- **{intfar_ratios[2]:.1f}%** were for having a low KP\n"
-    response += f"- **{intfar_ratios[3]:.1f}%** were for having a low vision score\n"
-    response += f"- **{intfar_multi_ratios[0]:.1f}%** of Int-Fars met just one criteria\n"
-    response += f"- **{intfar_multi_ratios[1]:.1f}%** of Int-Fars met two criterias\n"
-    response += f"- **{intfar_multi_ratios[2]:.1f}%** of Int-Fars met three criterias\n"
-    response += f"- **{intfar_multi_ratios[3]:.1f}%** of Int-Fars swept and met all four criterias"
+    response += (
+        f"--- Since **{earliest_time}** ---\n"
+        f"- **{games}** games have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
+        f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
+        f"- **{users}** users have signed up\n"
+        f"- **{intfars}** Int-Far awards have been given\n"
+        f"- **{total_doinks}** {doinks_emote} have been earned\n"
+        f"- **{len(sounds)}** sounds have been uploaded by **{len(unique_owners)}** people\n"
+        f"- **{total_bets}** bets have been made (**{pct_bets_won}%** was won)\n"
+        f"- Bets were made in **{len(unique_guilds)}** different servers\n"
+        f"- **{api_util.format_tokens_amount(total_amount)}** {tokens_name} have been spent on bets\n"
+        f"- **{api_util.format_tokens_amount(total_payout)}** {tokens_name} have been won from bets\n"
+        f"- **{api_util.format_tokens_amount(highest_payout)}** {tokens_name} was the biggest single win, by **{highest_payout_name}**\n"
+        "--- Of all games played ---\n"
+        f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
+        f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
+        f"- **{games_ratios[0]}%** were as a duo\n"
+        f"- **{games_ratios[1]}%** were as a three-man\n"
+        f"- **{games_ratios[2]}%** were as a four-man\n"
+        f"- **{games_ratios[3]}%** were as a five-man stack\n"
+        "--- When Int-Fars were earned ---\n"
+        f"- **{intfar_ratios[0]:.1f}%** were for dying a ton\n"
+        f"- **{intfar_ratios[1]:.1f}%** were for having an awful KDA\n"
+        f"- **{intfar_ratios[2]:.1f}%** were for having a low KP\n"
+        f"- **{intfar_ratios[3]:.1f}%** were for having a low vision score\n"
+        f"- **{intfar_multi_ratios[0]:.1f}%** of Int-Fars met just one criteria\n"
+        f"- **{intfar_multi_ratios[1]:.1f}%** of Int-Fars met two criterias\n"
+        f"- **{intfar_multi_ratios[2]:.1f}%** of Int-Fars met three criterias\n"
+        f"- **{intfar_multi_ratios[3]:.1f}%** of Int-Fars swept and met all four criterias"
+    )
 
     await message.channel.send(response)
 

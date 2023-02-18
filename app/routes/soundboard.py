@@ -5,7 +5,7 @@ import shutil
 import flask
 from werkzeug.utils import secure_filename
 
-from api.audio_handler import get_available_sounds, SOUNDS_PATH
+from api.audio_handler import get_available_sounds, get_sound_owners, SOUNDS_PATH
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
@@ -22,15 +22,10 @@ def valid_filetype(filename):
 def valid_filename(filename):
     return filename.replace("\\", "/").split("/")[-1].split(".")[0] not in INVALID_FILE_NAMES
 
-def get_file_owners():
-    owner_file_path = os.path.join(UPLOAD_FOLDER, "owners.json")
-    with open(owner_file_path, encoding="utf-8") as fp:
-        return json.load(fp)
-
 def soundboard_template(success=False, status_msg=None):
     available_sounds = get_available_sounds()
 
-    file_owners = get_file_owners()
+    file_owners = get_sound_owners()
 
     sound_list = [(name, file_owners.get(name, False)) for name in available_sounds]
 
@@ -126,7 +121,7 @@ def delete():
         )
 
     filename = data["filename"]
-    file_owners = get_file_owners()
+    file_owners = get_sound_owners()
 
     if logged_in_user != ADMIN_DISC_ID and file_owners.get(filename) != logged_in_user:
         return soundboard_template(

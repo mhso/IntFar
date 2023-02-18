@@ -1,5 +1,6 @@
 from glob import glob
 import asyncio
+import json
 import os
 
 from discord import PCMVolumeTransformer
@@ -23,6 +24,11 @@ def get_available_sounds(ordering="alphabetical"):
         return sound_tuple[0]        
 
     return [sound_tuple[0] for sound_tuple in sorted(sounds, key=order_func)]
+
+def get_sound_owners():
+    owner_file_path = os.path.join(os.path.abspath(SOUNDS_PATH), "owners.json")
+    with open(owner_file_path, encoding="utf-8") as fp:
+        return json.load(fp)
 
 class AudioHandler: # Keep track of connection to voice channel.
     def __init__(self, config):
@@ -91,3 +97,6 @@ class AudioHandler: # Keep track of connection to voice channel.
             sounds.append(f"- `{sound}`")
 
         return sounds
+    
+    def get_owners(self):
+        return get_sound_owners()
