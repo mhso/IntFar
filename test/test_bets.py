@@ -57,8 +57,15 @@ class TestWrapper(TestRunner):
         self.assert_equals(bet_timestamp, 0, "Bet timestamp.")
         self.assert_equals(targets[0], None, "Bet target.")
 
-        success, bet_value = self.bet_handler.resolve_bet(disc_id, bet_ids, amounts, event_ids,
-                                                     bet_timestamp, targets, game_data)
+        success, bet_value = self.bet_handler.resolve_bet(
+            disc_id,
+            bet_ids,
+            amounts,
+            bet_timestamp,
+            event_ids,
+            targets,
+            game_data
+        )
 
         base_return = self.db_client.get_base_bet_return(event_ids[0])
 
@@ -154,7 +161,13 @@ class TestWrapper(TestRunner):
         bet_ids, _, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
 
         success, bet_value = self.bet_handler.resolve_bet(
-            disc_id, bet_ids, amounts, event_ids, bet_timestamp, targets, game_data
+            disc_id,
+            bet_ids,
+            amounts,
+            bet_timestamp,
+            event_ids,
+            targets,
+            game_data
         )
 
         self.assert_equals(bet_value, 0, "Bet value.")
@@ -195,8 +208,15 @@ class TestWrapper(TestRunner):
 
         bet_ids, _, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
 
-        success, _ = self.bet_handler.resolve_bet(disc_id, bet_ids, amounts, event_ids,
-                                            bet_timestamp, targets, game_data)
+        success, _ = self.bet_handler.resolve_bet(
+            disc_id,
+            bet_ids,
+            amounts,
+            bet_timestamp,
+            event_ids,
+            targets,
+            game_data
+        )
 
         self.assert_true(success, "Bet was won.")
 
@@ -212,8 +232,13 @@ class TestWrapper(TestRunner):
         bet_ids, _, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
 
         success, _ = self.bet_handler.resolve_bet(
-            disc_id, bet_ids, amounts, event_ids,
-            bet_timestamp, targets, game_data
+            disc_id,
+            bet_ids,
+            amounts,
+            bet_timestamp,
+            event_ids,
+            targets,
+            game_data
         )
 
         self.assert_false(success, "Bet was lost.")
@@ -294,7 +319,13 @@ class TestWrapper(TestRunner):
         bet_ids, _, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
 
         success, _ = self.bet_handler.resolve_bet(
-            disc_id, bet_ids, amounts, event_ids, bet_timestamp, targets, game_data
+            disc_id,
+            bet_ids,
+            amounts,
+            bet_timestamp,
+            event_ids,
+            targets,
+            game_data
         )
 
         self.assert_true(success, "Bet was won.")
@@ -311,7 +342,13 @@ class TestWrapper(TestRunner):
         bet_ids, _, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
 
         success, _ = self.bet_handler.resolve_bet(
-            disc_id, bet_ids, amounts, event_ids, bet_timestamp, targets, game_data
+            disc_id,
+            bet_ids,
+            amounts,
+            bet_timestamp,
+            event_ids,
+            targets,
+            game_data
         )
 
         self.assert_false(success, "Bet was lost (there was Int-Far).")
@@ -328,7 +365,13 @@ class TestWrapper(TestRunner):
         bet_ids, _, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
 
         success, _ = self.bet_handler.resolve_bet(
-            disc_id, bet_ids, amounts, event_ids, bet_timestamp, targets, game_data
+            disc_id,
+            bet_ids,
+            amounts,
+            bet_timestamp,
+            event_ids,
+            targets,
+            game_data
         )
 
         self.assert_false(success, "Bet was lost (game lost).")
@@ -357,7 +400,13 @@ class TestWrapper(TestRunner):
         bet_ids, _, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
 
         success, value = self.bet_handler.resolve_bet(
-            disc_id, bet_ids, amounts, event_ids, bet_timestamp, targets, game_data
+            disc_id,
+            bet_ids,
+            amounts,
+            bet_timestamp,
+            event_ids,
+            targets,
+            game_data
         )
 
         self.assert_true(success, "Bet was won.")

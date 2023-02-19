@@ -11,6 +11,8 @@ from api import game_stats
 MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
 MINIMUM_BETTING_AMOUNT = 5
 
+# IDs that are saved to the database that each correspond
+# to an event that a user can bet on.
 BETTING_IDS = {
     "game_win": 0,
     "game_loss": 1,
@@ -35,6 +37,7 @@ BETTING_IDS = {
     "highest_kda": 20
 }
 
+# Types of bets. Some are handled the same, so they are grouped logically.
 BETTING_TYPES_INDICES = {
     "game": 0,
     "intfar": 2,
@@ -44,6 +47,7 @@ BETTING_TYPES_INDICES = {
     "stats": 17
 }
 
+# Textual descriptions of the different bets.
 BETTING_DESC = {
     0: "winning the game",
     1: "losing the game",
@@ -195,7 +199,15 @@ class BettingHandler:
     def award_tokens_for_playing(self, disc_id, tokens_gained):
         self.database.update_token_balance(disc_id, tokens_gained, True)
 
-    def get_bet_return_desc(self, bet_str, target_id, target_name):
+    def get_bet_return_desc(self, bet_str: str, target_id: int, target_name: str) -> str:
+        """
+        Get a description of the return value of a specific bet, if placed on
+        an event and optionally targetting a specific person.
+
+        :param bet_str:     The name of the event to place the bet on
+        :param target_id:   Discord ID of the person to target with the bet (or None)
+        :param target_name: Name of the person to target with the bet (or None)
+        """
         event_id = BETTING_IDS.get(bet_str)
         if event_id is None:
             return f"Invalid event to bet on: '{bet_str}'."
@@ -213,6 +225,7 @@ class BettingHandler:
             response += "(not just *anyone*), then the return will be further multiplied "
             response += "by how many people are in the game (2x return if 2 people are in "
             response += "the game, 3x return if 3 people, etc)."
+
         return response
 
     def get_intfar_return(self, target, is_intfar):
@@ -273,7 +286,14 @@ class BettingHandler:
         num_games = self.database.get_intfar_stats(target)[0]
         return best_in_stat_count, num_games
 
-    def get_dynamic_bet_return(self, event_id, target):
+    def get_dynamic_bet_return(self, event_id: int, target: int) -> int:
+        """
+        Get a value for how many tokens can be won by a bet on a given target.
+
+        :param event_id:    ID of the event to place the bet on
+        :param target:      Discord ID of person to target with the bet or None
+                            if the bet has no target
+        """
         if event_id > 1:
             count = 0
             num_games = 0
@@ -317,8 +337,35 @@ class BettingHandler:
         return value, base_return, ratio
 
     def resolve_bet(
-            self, disc_id, bet_ids, amounts, events, bet_timestamp, targets, game_data
-    ):
+        self,
+        disc_id: int,
+        bet_ids: list[int],
+        amounts: list[int],
+        bet_timestamp: int,
+        events: list[int],
+        targets: list[int],
+        game_data: tuple[int, int, str, dict[int, str], dict, list[tuple[int, dict]], int]
+    ) -> tuple[bool, int]:
+        """
+        Resolves the given bet for the given player. This determines whether the bet
+        was won or not, and awards the correct betting tokens if it was.
+
+        ### Parameters
+        :param disc_id:         Discord ID of the user who placed the bet
+        :param bet_ids:         List of database IDs of the placed bets
+        :param amounts:         List of amount of points that was placed on each bet
+        :param bet_timestamp:   How many seconds the game was underway when the bet
+                                was placed or None if game had not started
+        :param events:          List of events that the bet was placed on
+        :param targets:         List of user Discord IDs to target with each bet
+        :param target_names:    List of user names to target with each bet
+
+        ### Returns
+        :result:
+    
+        Tuple containing a boolean indicating whether the bet was won and an
+        integer indicating the total tokens won from the bet.
+        """
         game_id, intfar, intfar_reason, doinks, stats, clash_multiplier = game_data
 
         # Multiplier for betting on a specific person to do something. If more people are
@@ -349,9 +396,11 @@ class BettingHandler:
 
             all_success = all_success and success
 
-            bet_value = (self.get_bet_value(amount, event_id, bet_timestamp, target_id)[0]
-                         if success
-                         else 0)
+            bet_value = (
+                self.get_bet_value(amount, event_id, bet_timestamp, target_id)[0]
+                if success
+                else 0
+            )
 
             if target_id is not None:
                 bet_value = bet_value * person_multiplier
@@ -370,12 +419,26 @@ class BettingHandler:
                 logger.exception("Database error during bet resolution!")
                 return
 
-        if all_success:
+        if all_success: # Only award points if all bets were won
             self.database.update_token_balance(disc_id, total_value, True)
 
         return all_success, total_value
 
-    def get_bet_placed_text(self, data, all_in, duration, ticket=None):
+    def get_bet_placed_text(
+        self,
+        data: tuple[int, int, int, str, str],
+        all_in: bool,
+        duration: int,
+        ticket: int = None
+    ) -> str:
+        """
+        Get a string describing a bet that was placed.
+
+        :param data:        Tuple of relevant data about the bet
+        :param all_in:      Whether the user placing the bet bet all their tokens on it
+        :param duration:    How many seconds a current game is underway
+        :param ticket:      Ticket ID, only relevant if the bet is a multi-bet
+        """
         tokens_name = self.config.betting_tokens
 
         response = ""
@@ -413,9 +476,43 @@ class BettingHandler:
         return f"Bet was not placed: '{bet_desc}' - {error}"
 
     def check_bet_validity(
-            self, disc_id, guild_id, bet_amount, game_timestamp,
-            bet_str, balance, running_cost, bet_target, target_name, ticket
-    ):
+        self,
+        disc_id: int,
+        guild_id: int,
+        bet_amount: str,
+        game_timestamp: int,
+        bet_str: str,
+        balance: int,
+        running_cost: int,
+        bet_target: int,
+        target_name: str,
+        ticket: int
+    ) -> tuple[bool, str]:
+        """
+        Check whether a given bet is valid. This includes whether the correct values
+        are given for the bet, whether the bet is a duplicate, whether a game is too
+        far progressed to place the bet, and whether the user has enough tokens.
+
+        ### Parameters
+        :param disc_id:         Discord ID of the user placing the bet
+        :param guild_id:        ID of the Discord server in which the bet should be placed
+        :param bet_amount:      Amount of points to place on the bet
+        :param game_timestamp:  How many seconds the current game is underway (or None)
+                                if no game is currently ongoing
+        :param bet_str:         String describing which event to place the bet on
+        :param balance:         The amount of betting tokens the user has before the
+                                bet is placed
+        :param running_cost:    Cost of the bet in betting tokens
+        :param bet_target:      Discord ID of the user the bet targets (or None)
+        :param target_name:     Discord name of the user the bet targets (or None)
+
+        ### Returns
+        :result:
+    
+        Tuple containing a boolean indicating whether the bet is valid
+        and a string describing why it is not, if it isn't or a tuple of relevant
+        data about the bet, if it is.
+        """
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
         if event_id is None:
@@ -466,19 +563,36 @@ class BettingHandler:
 
         return (True, (amount, event_id, duration, bet_desc))
 
-    def place_bet(self, disc_id, guild_id, amounts, game_timestamp, events, targets, target_names):
+    def place_bet(
+        self,
+        disc_id: int,
+        guild_id: int,
+        amounts: list[str],
+        game_timestamp: int,
+        events: list[str],
+        targets: list[int],
+        target_names: list[str]
+    ) -> tuple[bool, str, tuple[int, int]]:
         """
-        Places one or more bets the best are valid
+        Place one or more bets if the best are valid
         and the user has enough points to afford them.
 
+        ### Parameters
         :param disc_id:         Discord ID of the user placing the bet
-        :param guild_id:        ID of the Discord server in which the should be placed
+        :param guild_id:        ID of the Discord server in which the bet should be placed
         :param amounts:         List of amount of points to bet for on each bet
         :param game_timestamp:  How many seconds the current game is underway (or None)
                                 if no game is currently ongoing
         :param events:          List of events to bet on
         :param targets:         List of user Discord IDs to target with each bet
         :param target_names:    List of user names to target with each bet
+
+        ### Returns
+        :result:
+    
+        Tuple containing a boolean indicating whether the bet was sucessully
+        placed, a string describing the bet, and a tuple of internal database
+        IDs of the bet, which are necessary if the bet should be cancelled.
         """
         tokens_name = self.config.betting_tokens
         ticket = None if len(amounts) == 1 else self.database.generate_ticket_id(disc_id)
@@ -602,7 +716,31 @@ class BettingHandler:
 
         return (True, response + reward_equation + balance_resp, (bet_id, ticket))
 
-    def delete_bet(self, disc_id, bet_id, ticket, game_timestamp):
+    def delete_bet(
+        self,
+        disc_id: int,
+        bet_id: int,
+        ticket: int,
+        game_timestamp: int
+    ) -> tuple[bool, tuple[int, int]]:
+        """
+        Delete a previously placed bet from the database and refund the amount
+        placed on the bet.
+
+        ### Parameters
+        :param disc_id:         Discord ID of the user who made the bet
+        :param bet_id:          Database ID of the bet that should be deleted (or None)
+        :param ticket:          Database ID of the multi-bet that should be deleted (or None)
+        :parma game_timestamp:  How many seconds the game was underway when the bet
+                                was placed or None if game had not started
+
+        ### Returns
+        :result:
+
+        Tuple containing a boolean indicating whether the bet was sucessully deleted
+        and a tuple containing the new token balance for the user after refunding
+        the bet and the amount refunded.
+        """
         if game_timestamp is not None: # Game has already started.
             return (False, "Bet was not cancelled: Game is underway!")
 
@@ -618,7 +756,34 @@ class BettingHandler:
 
         return (True, (new_balance, amount_refunded))
 
-    def cancel_bet(self, disc_id, guild_id, bet_str, game_timestamp, target_id, target_name):
+    def cancel_bet(
+        self,
+        disc_id: int,
+        guild_id: int,
+        bet_str: str,
+        game_timestamp: int,
+        target_id: int,
+        target_name: str
+    ) -> tuple[bool, str]:
+        """
+        Cancels a bet that has previously been placed if the game it was placed on
+        has not yet started.
+
+        ### Parameters
+        :param disc_id:         Discord ID of the user cancelling the bet
+        :param guild_id:        ID of the Discord server in which the bet was placed
+        :param bet_str:         String describing the bet that should be cancelled
+        :param game_timestamp:  How many seconds the current game is underway (or None)
+                                if no game is currently ongoing
+        :param target_id:       Discord ID of the user the bet was targetting (or None)
+        :param target_name:     Discord name of the user the bet was targetting (or None)
+
+        ### Returns
+        :result:
+    
+        Tuple containing a boolean indicating whether the bet was sucessully
+        cancelled and a string describing the bet that was cancelled.
+        """
         ticket = None
         event_id = BETTING_IDS.get(bet_str)
         tokens_name = self.config.betting_tokens
@@ -658,7 +823,28 @@ class BettingHandler:
     def get_gift_err_msg(self, err_msg):
         return f"Transfer failed: {err_msg}"
 
-    def give_tokens(self, disc_id, amount_str, receiver_id, receiver_name):
+    def give_tokens(
+        self,
+        disc_id: int,
+        amount_str: str,
+        receiver_id: int,
+        receiver_name: str
+    ) -> tuple[bool, str]:
+        """
+        Transfer a given amount of betting tokens from one user to another.
+
+        ### Parameters
+        :param disc_id:         Discord ID of the user giving the tokens
+        :param amount_str:      String describing the amount of tokens to give
+        :param receiver_id:     Discord ID of the user recieving the tokens
+        :param receiver_name:   Discord name of the user recieving the tokens
+
+        ### Returns
+        :result:
+    
+        Tuple containing a boolean indicating whether the tokens were sucessully
+        transferred and a string describing the transfer.
+        """
         amount = 0
         balance = 0
         tokens_name = self.config.betting_tokens
@@ -672,10 +858,12 @@ class BettingHandler:
         try:
             amount = parse_amount_str(amount_str.strip(), balance)
         except ValueError:
+            # String describing the amount to give was invalid
             err_msg = self.get_gift_err_msg(f"Invalid token amount: '{amount_str}'.")
             return (False, err_msg)
 
         if balance < amount:
+            # Sender does not have the specified amount of tokens to give
             err_msg = self.get_gift_err_msg(f"You do not have enough {tokens_name}.")
             return (False, err_msg)
 

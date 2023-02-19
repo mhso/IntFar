@@ -1,18 +1,65 @@
 import asyncio
 import requests
+from typing import Coroutine
 from time import sleep, time
 from datetime import datetime
 
 from mhooge_flask.logging import logger
 
 from api import game_stats
+from api.database import  Database
+from api.riot_api import RiotAPIClient
+from api.config import Config
 
 class GameMonitor:
-    def __init__(self, config):
-        self.config = config
-        self.polling_active = {}
+    GAME_STATUS_NOCHANGE = 0
+    GAME_STATUS_ACTIVE = 1
+    GAME_STATUS_ENDED = 2
+    POSTGAME_STATUS_ERROR = -1
+    POSTGAME_STATUS_OK = 0
+    POSTGAME_STATUS_CUSTOM_GAME = 1
+    POSTGAME_STATUS_MISSING = 2
+    POSTGAME_STATUS_DUPLICATE = 3
+    POSTGAME_STATUS_SOLO = 4
+    POSTGAME_STATUS_URF = 5
+    POSTGAME_STATUS_NOT_SR = 6
+    POSTGAME_STATUS_REMAKE = 7
 
-    def check_game_status(self, guild_id):
+    def __init__(self, config: Config, database: Database, riot_api: RiotAPIClient, game_over_callback: Coroutine):
+        """
+        Initialize the game monitor. This class handles the logic of polling for
+        games where any users registered to Int-Far are playing a game or is done with one.
+
+        :param config:              Config instance that holds all the configuration
+                                    options for Int-Far
+        :param database:            SQLiteDatabase instance that handles the logic
+                                    of interacting with the sqlite database
+        :param riot_api:            RiotAPIClient instance that handles the logic of
+                                    communicating with Riot Games' LoL API
+        :param game_over_callback:  asyncio Coroutine called when a game is finished
+        """
+        self.config = config
+        self.database = database
+        self.riot_api = riot_api
+        self.game_over_callback  = game_over_callback
+
+        self.polling_active = {}
+        self.active_game = {}
+        self.game_start = {}
+        self.users_in_game = {}
+        self.users_in_voice = {}
+
+    def check_game_status(self, guild_id: int, guild_name: str) -> int:
+        """
+        Check whether people that are active in voice channels are currently in a game.
+        Returns a status code that can be one of:
+         - GameMonitor.GAME_STATUS_NOCHANGE (0):    No change since we last checked
+         - GameMonitor.GAME_STATUS_ACTIVE   (1):    A new game has begun
+         - GameMonitor.GAME_STATUS_ENDED    (2):    Game is now over
+
+        :param guild_id:    ID of the Discord server where the game took place
+        :param guild_name:  Name of the Discord server where the game took place
+        """
         active_game = None
         active_game_start = None
         active_game_team = None
@@ -20,7 +67,7 @@ class GameMonitor:
 
         # First check if users are in the same game (or all are in no games).
         user_list = (
-            self.get_users_in_voice()[guild_id]
+            self.users_in_voice.get(guild_id, [])
             if self.users_in_game.get(guild_id) is None
             else self.users_in_game[guild_id]
         )
@@ -48,7 +95,7 @@ class GameMonitor:
 
                 sleep(0.5)
 
-            if game_for_summoner is not None:
+            if game_for_summoner is not None: # We found a game for the current player
                 game_ids.add(game_for_summoner["gameId"])
                 player_stats = game_stats.get_player_stats(game_for_summoner, summ_ids)
                 champ_id = player_stats["championId"]
@@ -57,14 +104,14 @@ class GameMonitor:
                 active_game = game_for_summoner
 
         if len(game_ids) > 1: # People are in different games.
-            return 0
+            return self.GAME_STATUS_NOCHANGE
 
         for player_data in users_in_current_game:
             champ_id = player_data[-1]
             # New champ has been released, that we don't know about.
             if self.riot_api.get_champ_name(champ_id) is None:
                 logger.warning(f"Champ ID is unknown: {champ_id}")
-                self.riot_api.get_latest_data()
+                self.riot_api.get_latest_data() # Get latest data about champions.
                 break
 
         if active_game is not None and self.active_game.get(guild_id) is None:
@@ -86,65 +133,77 @@ class GameMonitor:
                 "map_name": self.riot_api.get_map_name(active_game["mapId"]),
                 "game_type": active_game["gameType"],
                 "game_mode": active_game["gameMode"],
-                "game_guild_name": self.get_guild_name(guild_id),
+                "game_guild_name": guild_name,
             }
 
             self.game_start[guild_id] = active_game_start
             logger.debug(f"Game start datetime: {datetime.fromtimestamp(self.game_start[guild_id])}")
             self.users_in_game[guild_id] = users_in_current_game
 
-            return 1 # Game is now active.
+            return self.GAME_STATUS_ACTIVE # Game is now active.
 
         if active_game is None and self.active_game.get(guild_id) is not None:
-            return 2 # Game is over.
+            return self.GAME_STATUS_ENDED # Game is over.
 
-        return 0
+        return self.GAME_STATUS_NOCHANGE
 
-    async def poll_for_game_start(self, guild_id, guild_name, immediately=False):
-            self.polling_active[guild_id] = True
-            time_slept = 0
-            sleep_per_loop = 0.2
-            logger.info(f"People are active in {guild_name}! Polling for games...")
-
-            if not immediately:
-                try:
-                    while time_slept < self.config.status_interval_dormant:
-                        if not self.polling_is_active(guild_id): # Stop if people leave voice channels.
-                            self.polling_active[guild_id] = False
-                            logger.info(f"Polling is no longer active in {guild_name}.")
-                            return
-
-                        await asyncio.sleep(sleep_per_loop)
-                        time_slept += sleep_per_loop
-
-                except KeyboardInterrupt:
-                    self.polling_active[guild_id] = False
-                    return
-
-            game_status = self.check_game_status(guild_id)
-
-            if game_status == 1: # Game has started.
-                # Send update to Int-Far website that a game has started.
-                req_data = {
-                    "secret": self.config.discord_token,
-                    "guild_id": guild_id
-                }
-                req_data.update(self.active_game[guild_id])
-                self.send_game_update("game_started", req_data)
-
-                logger.info(f"Game is now active in {guild_name}, polling for game end...")
-
-                await self.poll_for_game_end(guild_id)
-
-            elif game_status == 0: # Sleep for a bit and check game status again.
-                await self.poll_for_game_start(guild_id)
-
-    async def poll_for_game_end(self, guild_id):
+    async def poll_for_game_start(self, guild_id: int, guild_name: str, immediately=False):
         """
-        This method is called periodically when a game is active.
-        When this method detects that the game is no longer active,
-        it calls the 'game_over' method, which determines who is the Int-Far,
-        who to give doinks to, etc.
+        Periodically poll the Riot Games League of Legends API to check if any users in
+        Discord voice channels have joined a game. Whenever that happens, we instead
+        switch to periodically polling for the game to end.
+
+        :param guild_id:    ID of the Discord server where we should poll for a game
+        :param guild_name:  Name of the Discord server where we should poll for a game
+        :param immediately: Whether to start polling immediately, or sleep for a bit first
+        """
+        self.polling_active[guild_id] = True
+        time_slept = 0
+        sleep_per_loop = 0.2
+        logger.info(f"People are active in {guild_name}! Polling for games...")
+
+        if not immediately:
+            try:
+                while time_slept < self.config.status_interval_dormant:
+                    if not self.polling_active.get(guild_id, False): # Stop if people leave voice channels.
+                        logger.info(f"Polling is no longer active in {guild_name}.")
+                        return
+
+                    await asyncio.sleep(sleep_per_loop)
+                    time_slept += sleep_per_loop
+
+            except KeyboardInterrupt:
+                self.polling_active[guild_id] = False
+                return
+
+        game_status = self.check_game_status(guild_id, guild_name)
+
+        if game_status == self.GAME_STATUS_ACTIVE: # Game has started.
+            # Send update to Int-Far website that a game has started.
+            req_data = {
+                "secret": self.config.discord_token,
+                "guild_id": guild_id
+            }
+            req_data.update(self.active_game[guild_id])
+            self._send_game_update("game_started", req_data)
+
+            logger.info(f"Game is now active in {guild_name}, polling for game end...")
+
+            await self.poll_for_game_end(guild_id, guild_name)
+
+        elif game_status == self.GAME_STATUS_NOCHANGE: # Sleep for a bit and check game status again.
+            await self.poll_for_game_start(guild_id)
+
+    async def poll_for_game_end(self, guild_id, guild_name):
+        """
+        When users are detected in an active game, this method polls the Riot Games
+        League of Legends API to check when the game is over.
+        When this is detected, the 'self.game_over_callback' method is called.
+
+        :param guild_id:    ID of the Discord server where we should poll
+                            for the end of the game
+        :param guild_name:  Name of the Discord server where we should poll
+                            for the end of the game
         """
         logger.info("Polling for game end...")
         time_slept = 0
@@ -157,8 +216,8 @@ class GameMonitor:
         except KeyboardInterrupt:
             return
 
-        game_status = self.check_game_status(guild_id)
-        if game_status == 2: # Game is over.
+        game_status = self.check_game_status(guild_id, guild_name)
+        if game_status == self.GAME_STATUS_ENDED: # Game is over.
             try:
                 game_id = self.active_game[guild_id]["id"]
 
@@ -189,85 +248,85 @@ class GameMonitor:
 
                 if custom_game: # Do nothing.
                     logger.info(f"Game was a custom game: {game_id}")
+                    status_code = self.POSTGAME_STATUS_CUSTOM_GAME
 
                 elif game_info is None: # Game info is still None after 3 retries.
                     # Log error
                     logger.bind(game_id=game_id, guild_id=guild_id).error(
                         "Game info is STILL None after 3 retries! Saving to missing games..."
                     )
-    
-                    self.database.save_missed_game(game_id, guild_id, int(time()))
-    
-                    # Send message pinging me about the error.
-                    mention_me = self.get_mention_str(commands_util.ADMIN_DISC_ID, guild_id)
-                    message_str = (
-                        "Riot API is being a dickfish again, not much I can do :shrug:\n"
-                        f"{mention_me} will add the game manually later."
-                    )
-
-                    await self.send_message_unprompted(message_str, guild_id)
+                    status_code = self.POSTGAME_STATUS_MISSING
 
                 elif self.database.game_exists(game_info["gameId"]):
+                    status_code = self.POSTGAME_STATUS_DUPLICATE
                     logger.warning(
                         "We triggered end of game stuff again... Strange!"
                     )
 
                 elif len(self.users_in_game[guild_id]) == 1:
-                    response = "Only one person in that game. "
-                    response += "no Int-Far will be crowned "
-                    response += "and no stats will be saved."
-                    await self.channels_to_write[guild_id].send(response)
+                    status_code = self.POSTGAME_STATUS_SOLO
 
                 elif self.riot_api.is_urf(game_info["gameMode"]):
-                    # Gamemode was URF. Don't save stats then.
-                    response = "That was an URF game {emote_poggers} "
-                    response += "no Int-Far will be crowned "
-                    response += "and no stats will be saved."
-                    await self.channels_to_write[guild_id].send(self.insert_emotes(response))
+                    # Gamemode was URF.
+                    status_code = self.POSTGAME_STATUS_URF
 
                 elif not self.riot_api.map_is_sr(game_info["mapId"]):
-                    # Game is not on summoners rift. Same deal.
-                    response = "That game was not on Summoner's Rift "
-                    response += "{emote_woahpikachu} no Int-Far will be crowned "
-                    response += "and no stats will be saved."
-                    await self.channels_to_write[guild_id].send(self.insert_emotes(response))
+                    # Game is not on summoners rift.
+                    status_code = self.POSTGAME_STATUS_NOT_SR
 
-                # Game was too short to count. Probably a remake.
                 elif game_info["gameDuration"] < self.config.min_game_minutes * 60:
-                    response = (
-                        "That game lasted less than 5 minutes " +
-                        "{emote_zinking} assuming it was a remake. " +
-                        "No stats are saved."
-                    )
-                    await self.channels_to_write[guild_id].send(self.insert_emotes(response))
+                    # Game was too short to count. Probably a remake.
+                    status_code = self.POSTGAME_STATUS_REMAKE
 
                 else:
-                    await self.game_over(game_info, guild_id)
+                    status_code = self.POSTGAME_STATUS_OK
 
-                # Send update to Int-Far website that game is over.
+                self.active_game[guild_id]["queue_id"] = game_info["queueId"]
+
+                # Print who was in the game, for sanity checks.
+                logger.debug(f"Users in game before: {self.users_in_game.get(guild_id)}")
+
+                # Send update to Int-Far website that the game is over.
                 req_data = {
                     "secret": self.config.discord_token,
                     "guild_id": guild_id, "game_id": game_id
                 }
-                self.send_game_update("game_ended", req_data)
+                self._send_game_update("game_ended", req_data)
+
+                # Call end-of-game callback
+                await self.game_over_callback(game_info, guild_id, status_code)
 
                 self.active_game[guild_id] = None
                 self.game_start[guild_id] = None
                 del self.users_in_game[guild_id] # Reset the list of users who are in a game.
+
                 asyncio.create_task(self.poll_for_game_start(guild_id))
 
             except Exception as e:
+                # Something went wrong when doing end-of-game stuff
                 game_id = self.active_game.get(guild_id, {}).get("id")
 
                 logger.bind(game_id=game_id).exception("Exception after game was over!!!")
 
-                # Send error message to Discord and re-raise exception.
-                await self.send_error_msg(guild_id)
+                await self.game_over_callback(None, guild_id, self.POSTGAME_STATUS_ERROR)
 
+                # Re-raise exception.
                 raise e
 
-        elif game_status == 0:
-            await self.poll_for_game_end(guild_id)
+        elif game_status == self.GAME_STATUS_NOCHANGE:
+            await self.poll_for_game_end(guild_id, guild_name)
+
+    def stop_polling(self, guild_id):
+        self.polling_active[guild_id] = False
+
+    def set_users_in_voice_channels(self, users, guild_id):
+        self.users_in_voice[guild_id] = users
+
+    def should_stop_polling(self, guild_id):
+        return len(self.users_in_voice.get(guild_id, [])) < 2 and self.polling_active.get(guild_id, False)
+
+    def should_poll(self, guild_id):
+        return len(self.users_in_voice.get(guild_id, [])) > 1 and not self.polling_active.get(guild_id, False)
 
     def _send_game_update(self, endpoint, data):
         try:
