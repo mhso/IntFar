@@ -85,7 +85,7 @@ class AudioHandler: # Keep track of connection to voice channel.
 
             if self.voice_stream is None:
                 # If no voice connection exists, make a new one.
-                self.voice_stream = await voice_channel.connect()
+                self.voice_stream = await voice_channel.connect(timeout=5)
 
                 await self.play_loop() # Play sounds in the queue.
 

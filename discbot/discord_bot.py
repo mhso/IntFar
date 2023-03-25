@@ -209,7 +209,8 @@ class DiscordClient(discord.Client):
                 guilds=True,
                 emojis=True,
                 reactions=True,
-                guild_messages=True
+                guild_messages=True,
+                message_content=True
             )
         )
         self.config = config
@@ -520,11 +521,13 @@ class DiscordClient(discord.Client):
         users_to_search = ([x[0] for x in self.database.summoners]
                            if discord_id is None
                            else [discord_id])
+
         avatar_paths = []
         for disc_id in users_to_search:
             member = self.get_member_safe(disc_id)
             if member is None:
                 avatar_paths.append(default_avatar)
+                continue
 
             key = f"{member.id}_{size}"
 
@@ -534,13 +537,14 @@ class DiscordClient(discord.Client):
             path = f"app/static/img/avatars/{member.id}_{size}.png"
             if time_now - caching_time > 3600:
                 try:
-                    await member.avatar_url_as(format="png", size=size).save(path)
+                    await member.display_avatar.with_format("png").with_size(size).save(path)
                     self.cached_avatars[key] = time_now
                 except (DiscordException, HTTPException, NotFound):
                     logger.bind(disc_id=discord_id).exception("Could not load Discord avatar")
                     path = default_avatar
 
             avatar_paths.append(path)
+
         return avatar_paths if discord_id is None else avatar_paths[0]
 
     def get_discord_id(self, nickname, guild_id=api_util.MAIN_GUILD_ID, exact_match=True):
@@ -1450,6 +1454,7 @@ class DiscordClient(discord.Client):
 
             if self.game_monitor.should_poll(guild_id):
                 logger.info("Polling is now active!")
+                self.game_monitor.polling_active[guild_id] = True
                 asyncio.create_task(
                     self.game_monitor.poll_for_game_start(guild_id, guild_name, poll_immediately)
                 )

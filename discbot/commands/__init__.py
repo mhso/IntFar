@@ -11,7 +11,7 @@ from discbot.commands.stats import *
 from discbot.commands.sounds import *
 from discbot.commands import util as commands_util
 from api.database import DBException
-from api.util import GUILD_IDS, GUILD_MAP
+from api.util import GUILD_IDS, GUILD_MAP, MY_GUILD_ID
 
 from mhooge_flask.logging import logger
 
@@ -100,7 +100,7 @@ class Command:
         self.handler = handler
         self.target_all = target_all
         self.access_level = access_level
-        self.guilds = guilds or GUILD_IDS
+        self.guilds = guilds or (GUILD_IDS + [MY_GUILD_ID])
         self.mandatory_params = mandatory_params
         self.optional_params = optional_params
         self.aliases = aliases

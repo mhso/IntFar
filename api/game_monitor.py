@@ -192,7 +192,7 @@ class GameMonitor:
             await self.poll_for_game_end(guild_id, guild_name)
 
         elif game_status == self.GAME_STATUS_NOCHANGE: # Sleep for a bit and check game status again.
-            await self.poll_for_game_start(guild_id)
+            await self.poll_for_game_start(guild_id, guild_name)
 
     async def poll_for_game_end(self, guild_id, guild_name):
         """
@@ -300,7 +300,7 @@ class GameMonitor:
                 self.game_start[guild_id] = None
                 del self.users_in_game[guild_id] # Reset the list of users who are in a game.
 
-                asyncio.create_task(self.poll_for_game_start(guild_id))
+                asyncio.create_task(self.poll_for_game_start(guild_id, guild_name))
 
             except Exception as e:
                 # Something went wrong when doing end-of-game stuff
