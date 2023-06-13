@@ -17,7 +17,8 @@ FILENAME_MAX_LENGTH = 24
 UPLOAD_FOLDER = os.path.abspath(SOUNDS_PATH)
 
 def valid_filetype(filename):
-    return "." in filename and filename.split(".")[1] in VALID_FILE_TYPES
+    split = filename.split(".")
+    return len(split) == 2 and split[1] in VALID_FILE_TYPES
 
 def valid_filename(filename):
     return filename.replace("\\", "/").split("/")[-1].split(".")[0] not in INVALID_FILE_NAMES
@@ -27,7 +28,7 @@ def soundboard_template(success=False, status_msg=None):
 
     file_owners = get_sound_owners()
 
-    sound_list = [(name, file_owners.get(name, False)) for name in available_sounds]
+    sound_list = [(name, ctime, file_owners.get(name, False)) for name, ctime in available_sounds]
 
     return app_util.make_template_context(
         "soundboard.html", upload_success=success,

@@ -23,7 +23,7 @@ async def handle_set_event_sound(client, message, sound, event):
     elif sound == "remove":
         client.database.remove_event_sound(message.author.id, event)
         response = f"Removed sound from triggering when getting {event_fmt}."
-    elif sound not in audio_handler.get_available_sounds():
+    elif audio_handler.is_valid_sound(sound):
         response = f"Invalid sound: `{sound}`. See `!sounds` for a list of valid sounds."
     else:
         client.database.set_event_sound(message.author.id, sound, event)
@@ -36,16 +36,23 @@ async def handle_set_event_sound(client, message, sound, event):
 
 async def handle_play_sound_msg(client, message, sound):
     voice_state = message.author.voice
-    success, status = await client.audio_handler.play_sound(voice_state, sound)
+    success, status = await client.audio_handler.play_sound(sound, voice_state, message)
 
     if not success:
+        await message.channel.send(client.insert_emotes(status))
+
+async def handle_skip_sound_msg(client, message):
+    voice_state = message.author.voice
+    status = await client.audio_handler.skip_sound(voice_state)
+
+    if status is not None:
         await message.channel.send(client.insert_emotes(status))
 
 async def handle_random_sound_msg(client, message):
     voice_state = message.author.voice
 
     sounds_list = audio_handler.get_available_sounds()
-    sound = sounds_list[random.randint(0, len(sounds_list)-1)]
+    sound = sounds_list[random.randint(0, len(sounds_list)-1)][0]
 
     await message.channel.send(f"Playing random sound: `{sound}`")
 

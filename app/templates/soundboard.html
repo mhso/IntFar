@@ -10,9 +10,21 @@
 
         <div id="soundboard-inner-wrapper">
             <h2>All Sounds</h2>
+
+            <div id="sounds-sort-wrapper">
+                <img id="sounds-sort-ascending" class="sounds-sort-order-button" src="{{ url_for('static', filename='img/arrow_down_2.png') }}">
+                <img id="sounds-sort-descending" class="sounds-sort-order-button" src="{{ url_for('static', filename='img/arrow_up_2.png') }}">
+                <button class="sounds-sort-button sounds-highlighted-sort-btn" onclick="sortSounds('alphabetical', this)">
+                    <img src="{{ url_for('static', filename='img/alphabetical.png') }}">
+                </button>
+                <button class="sounds-sort-button" onclick="sortSounds('chronological', this)">
+                    <img src="{{ url_for('static', filename='img/chronological.png') }}">
+                </button>
+            </div>
+
             <div class="all-sounds-wrapper">
-                {% for sound_file, owner_id in sounds %}
-                <div class="audio-player-wrapper">
+                {% for sound_file, ctime, owner_id in sounds %}
+                <div class="audio-player-wrapper" data-name="{{ sound_file }}" data-ctime="{{ ctime }}">
                     <h3>{{ sound_file }}</h3>
                     {% if logged_in_user %}
                     <audio controls>
@@ -49,5 +61,9 @@
             {% endif %}
         </div>
     </div>
+
+    <script src="{{ url_for('static', filename='js/soundboard.js') }}">
+
+    </script>
 </body>
 </html>

@@ -76,47 +76,47 @@ BETTING_STATS = [
     "kills", "damage", "kp", "kda"
 ]
 
-def get_dynamic_bet_desc(event_id, target_person=None):
+def get_dynamic_bet_desc(event_id: int, target_person: str=None):
     bet_desc = BETTING_DESC[event_id]
     if target_person is not None:
         bet_desc = bet_desc.replace("someone", target_person)
     return bet_desc
 
-def bet_requires_target(event_id):
+def bet_requires_target(event_id: int):
     return event_id > 15
 
-def bet_requires_no_target(event_id):
+def bet_requires_no_target(event_id: int):
     return event_id < 3
 
-def resolve_game_outcome(game_data, bet_on_win):
+def resolve_game_outcome(game_data: list[tuple[dict, int]], bet_on_win: bool):
     stats = game_data[0][1]
     return not (stats["gameWon"] ^ bet_on_win)
 
-def resolve_is_intfar(intfar, intfar_reason, target_id):
+def resolve_is_intfar(intfar, _, target_id: int):
     if target_id is None: # Bet was about whether anyone was Int-Far.
         return intfar is not None
     return intfar == target_id # Bet was about a specific person being Int-Far.
 
-def resolve_not_intfar(intfar, intfar_reason, target_id):
+def resolve_not_intfar(intfar, intfar_reason: str, _):
     return not resolve_is_intfar(intfar, intfar_reason, None)
 
-def intfar_by_reason(intfar, reason_str, target_id, reason):
+def intfar_by_reason(intfar, reason_str: str, target_id: int, reason_id: int):
     return (resolve_is_intfar(intfar, reason_str, target_id)
-            and reason_str[reason] == "1")
+            and reason_str[reason_id] == "1")
 
-def resolve_is_intfar_by_kda(intfar, intfar_reason, target_id):
+def resolve_is_intfar_by_kda(intfar, intfar_reason: str, target_id: int):
     return intfar_by_reason(intfar, intfar_reason, target_id, 0)
 
-def resolve_is_intfar_by_deaths(intfar, intfar_reason, target_id):
+def resolve_is_intfar_by_deaths(intfar, intfar_reason: str, target_id: int):
     return intfar_by_reason(intfar, intfar_reason, target_id, 1)
 
-def resolve_is_intfar_by_kp(intfar, intfar_reason, target_id):
+def resolve_is_intfar_by_kp(intfar, intfar_reason: str, target_id: int):
     return intfar_by_reason(intfar, intfar_reason, target_id, 2)
 
-def resolve_is_intfar_by_vision(intfar, intfar_reason, target_id):
+def resolve_is_intfar_by_vision(intfar, intfar_reason: str, target_id: int):
     return intfar_by_reason(intfar, intfar_reason, target_id, 3)
 
-def resolve_got_doinks(doinks, target_id):
+def resolve_got_doinks(doinks, target_id: int):
     if target_id is None:
         return len(doinks) > 0
     return target_id in doinks

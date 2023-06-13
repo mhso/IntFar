@@ -10,6 +10,7 @@ import discord
 from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
 
 from mhooge_flask.logging import logger
+from streamscape import Streamscape
 
 from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
@@ -25,7 +26,7 @@ from api.riot_api import RiotAPIClient
 from api.config import Config
 import discbot.commands.util as commands_util
 import api.util as api_util
-from ai.data import shape_predict_data
+#from ai.data import shape_predict_data
 
 MAIN_CHANNEL_ID = 730744358751567902
 
@@ -65,6 +66,8 @@ TIMELINE_EVENTS = [
     api_util.load_flavor_texts("timeline_throw"),
     api_util.load_flavor_texts("timeline_goldkeeper")
 ]
+
+LIFETIME_EVENTS = api_util.load_flavor_texts("lifetime_events")
 
 DOINKS_FLAVORS = [
     api_util.load_flavor_texts("doinks_kda"),
@@ -132,6 +135,9 @@ def get_timeline_events_flavor_text(index, value):
 
     return replace_value(flavor_text, value)
 
+def get_lifetime_flavor_text(index, value):
+    return replace_value(LIFETIME_EVENTS[index], value)
+
 def get_doinks_flavor_text(index, value):
     flavor_values = DOINKS_FLAVORS[index]
 
@@ -179,8 +185,6 @@ class DiscordClient(discord.Client):
             database: Database,
             betting_handler: BettingHandler,
             riot_api: RiotAPIClient,
-            audio_handler: AudioHandler,
-            shop_handler: ShopHandler,
             **kwargs
         ):
         """
@@ -217,9 +221,12 @@ class DiscordClient(discord.Client):
         self.database = database
         self.riot_api = riot_api
         self.betting_handler = betting_handler
-        self.audio_handler = audio_handler
-        self.shop_handler = shop_handler
-        
+
+        streamscape = Streamscape()
+        streamscape.run_forever()
+        self.audio_handler = AudioHandler(self.config, streamscape)
+        self.shop_handler = ShopHandler(self.config, self.database)
+
         self.ai_conn = kwargs.get("ai_pipe")
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
@@ -231,6 +238,7 @@ class DiscordClient(discord.Client):
             self.on_game_over
         )
         self.pagination_data = {}
+        self.audio_action_data = {}
         self.cached_avatars = {}
         self.channels_to_write = {}
         self.test_guild = None
@@ -401,27 +409,31 @@ class DiscordClient(discord.Client):
             )
             response = records_response + "\n" + response
 
+        lifetime_stats = self.get_lifetime_stats_data(filtered_stats, guild_id)
+        if lifetime_stats is not None:
+            response = lifetime_stats + "\n" + response
+
         await self.channels_to_write[guild_id].send(response)
 
         await self.play_event_sounds(intfar, doinks, guild_id)
 
-        if self.ai_conn is not None:
-            logger.info("Training AI Model with new game data.")
+        # if self.ai_conn is not None:
+        #     logger.info("Training AI Model with new game data.")
 
-            train_data = shape_predict_data(
-                self.database, self.riot_api, self.config, users_in_game
-            )
+        #     train_data = shape_predict_data(
+        #         self.database, self.riot_api, self.config, users_in_game
+        #     )
 
-            # Send train request to AI process and recieve result
-            self.ai_conn.send(
-                ("train", [train_data, filtered_stats[0][1]["gameWon"]])
-            )
-            loss, probability = self.ai_conn.recv()
+        #     # Send train request to AI process and recieve result
+        #     self.ai_conn.send(
+        #         ("train", [train_data, filtered_stats[0][1]["gameWon"]])
+        #     )
+        #     loss, probability = self.ai_conn.recv()
 
-            pct_win = int(probability * 100)
+        #     pct_win = int(probability * 100)
 
-            logger.debug(f"We had a {pct_win}% chance of winning.")
-            logger.debug(f"Training Loss: {loss}.")
+        #     logger.debug(f"We had a {pct_win}% chance of winning.")
+        #     logger.debug(f"Training Loss: {loss}.")
 
         if self.config.generate_predictions_img:
             predictions_img = None
@@ -909,7 +921,7 @@ class DiscordClient(discord.Client):
                 if doinks_sound is not None:
                     sounds_to_play.append(doinks_sound)
 
-            await self.audio_handler.play_sound(voice_state, sounds_to_play)
+            await self.audio_handler.play_sound(sounds_to_play, voice_state)
 
     def get_beaten_records_msg(
         self,
@@ -1079,6 +1091,26 @@ class DiscordClient(discord.Client):
             timeline_str += event_str
 
         return None if timeline_mentions == [] else self.insert_emotes(timeline_str)
+
+    def get_lifetime_stats_msg(self, lifetime_mentions, guild_id):
+        stats_str = "=" * 38 + "\n"
+        any_stats = False
+
+        for disc_id in lifetime_mentions:
+            user_str = ""
+
+            if lifetime_mentions[disc_id] != []:
+                prefix = "\n" if any_stats else ""
+                user_str = f"{prefix}{self.get_mention_str(disc_id, guild_id)} "
+                any_stats = True
+
+            for (count, (stat_index, stat_value)) in enumerate(lifetime_mentions[disc_id]):
+                prefix = " **and** " if count > 0 else ""
+                user_str += prefix + get_lifetime_flavor_text(stat_index, stat_value)
+
+            stats_str += user_str
+
+        return None if not any_stats else self.insert_emotes(stats_str)
 
     def get_intfar_streak_msg(
         self,
@@ -1322,6 +1354,12 @@ class DiscordClient(discord.Client):
         cool_events_msg = self.get_cool_timeline_msg(timeline_mentions, guild_id)
 
         return cool_events_msg
+
+    def get_lifetime_stats_data(self, filtered_stats, guild_id):
+        lifetime_mentions = award_qualifiers.get_lifetime_stats(filtered_stats, self.database)
+        lifetime_msg = self.get_lifetime_stats_msg(lifetime_mentions, guild_id)
+
+        return lifetime_msg
 
     def get_win_loss_streak_data(self, filtered_stats: list[tuple[int, dict]], guild_id: int):
         """
@@ -1699,7 +1737,9 @@ class DiscordClient(discord.Client):
 
         # Call any potential listeners on the 'onready' event
         for (callback, args) in self.event_listeners.get("onready", []):
-            callback(*args)
+            evaluated = callback(*args)
+            if asyncio.iscoroutine(evaluated):
+                await evaluated
 
         asyncio.create_task(self.polling_loop())
 
@@ -1740,11 +1780,11 @@ class DiscordClient(discord.Client):
         if not last_chunk:
             await message.add_reaction("▶")
 
-    async def on_raw_reaction_add(self, react_info):
+    async def on_raw_reaction_add(self, react_event):
         seconds_max = 60 * 60 * 12
-        messages_to_remove = []
 
-        # Clean up old messages.
+        # Clean up old pagination messages.
+        messages_to_remove = []
         for message_id in self.pagination_data:
             created_at = self.pagination_data[message_id]["message"].created_at
             if time() - created_at.timestamp() > seconds_max:
@@ -1753,22 +1793,70 @@ class DiscordClient(discord.Client):
         for message_id in messages_to_remove:
             del self.pagination_data[message_id]
 
-        message_id = react_info.message_id
+        # Clean up old audio control reacts
+        messages_to_remove = []
+        for message_id in self.audio_action_data:
+            created_at = self.audio_action_data[message_id]["timestamp"]
+            if time() - created_at > seconds_max:
+                messages_to_remove.append(message_id)
+
+        for message_id in messages_to_remove:
+            del self.audio_action_data[message_id]
+
+        message_id = react_event.message_id
         if (
-            react_info.event_type == "REACTION_ADD"
-            and react_info.member != self.user
-            and message_id in self.pagination_data 
-            and react_info.emoji.name in ("▶", "◀")
-            and self.pagination_data[message_id]["message"].created_at
+            react_event.event_type == "REACTION_ADD"
+            and react_event.member != self.user
         ):
-            message_data = self.pagination_data[message_id]
-            reaction_next = react_info.emoji.name == "▶"
-            new_chunk = message_data["chunk"] + 1 if reaction_next else message_data["chunk"] - 1
-            await self.paginate(
-                message_data["message"].channel, message_data["data"],
-                new_chunk, message_data["lines"], message_data["header"],
-                message_data["footer"], message_data["message"]
-            )
+            if (message_id in self.pagination_data 
+                and react_event.emoji.name in ("▶", "◀")
+                and self.pagination_data[message_id]["message"].created_at
+            ):
+                message_data = self.pagination_data[message_id]
+                reaction_next = react_event.emoji.name == "▶"
+                new_chunk = message_data["chunk"] + 1 if reaction_next else message_data["chunk"] - 1
+                await self.paginate(
+                    message_data["message"].channel, message_data["data"],
+                    new_chunk, message_data["lines"], message_data["header"],
+                    message_data["footer"], message_data["message"]
+                )
+            elif (
+                self.audio_handler.playback_msg is not None
+                and message_id == self.audio_handler.playback_msg.id
+                and react_event.emoji.name in self.audio_handler.AUDIO_CONTROL_EMOJIS
+            ):
+                channel = self.get_channel(react_event.channel_id)
+                if message_id not in self.audio_action_data:
+                    self.audio_action_data[message_id] = {
+                        "timestamp": time(),
+                        "users": {}
+                    }
+
+                self.audio_action_data[message_id]["users"][react_event.member.id] = react_event.emoji
+                await self.audio_handler.audio_control_pressed(react_event.emoji, react_event.member, channel)
+
+    async def on_raw_reaction_remove(self, react_event):
+        """
+        Trigger the same actions in audio_handler when a user adds a reaction
+        as when they remove an reaction that corresponds to an audio player action.
+        """
+        message_id = react_event.message_id
+        user_id = react_event.user_id
+        if (
+            user_id != self.user.id
+            and self.audio_handler.playback_msg is not None
+            and message_id == self.audio_handler.playback_msg.id
+            and message_id in self.audio_action_data
+            and react_event.emoji.name in self.audio_handler.AUDIO_CONTROL_EMOJIS
+        ):
+            if (
+                user_id in self.audio_action_data[message_id]["users"]
+                and react_event.emoji == self.audio_action_data[message_id]["users"][user_id]
+            ):
+                del self.audio_action_data[message_id]["users"][user_id]
+                channel = self.get_channel(react_event.channel_id)
+                member = self.get_member_safe(user_id, react_event.guild_id)
+                await self.audio_handler.audio_control_pressed(react_event.emoji, member, channel)
 
     async def send_dm(self, text, disc_id):
         user = self.get_user(disc_id)
@@ -1861,9 +1949,14 @@ class DiscordClient(discord.Client):
             elif before.channel is not None and after.channel is None: # User left.
                 await self.user_left_voice(member.id, member.guild.id)
 
-def run_client(config, database, betting_handler, riot_api, audio_handler, shop_handler, ai_pipe, main_pipe, flask_pipe):
+def run_client(config, database, betting_handler, riot_api, ai_pipe, main_pipe, flask_pipe):
     client = DiscordClient(
-        config, database, betting_handler, riot_api, audio_handler,
-        shop_handler, ai_pipe=ai_pipe, main_pipe=main_pipe, flask_pipe=flask_pipe
+        config,
+        database,
+        betting_handler,
+        riot_api,
+        ai_pipe=ai_pipe,
+        main_pipe=main_pipe,
+        flask_pipe=flask_pipe
     )
     client.run(config.discord_token)

@@ -1,0 +1,4 @@
+just played his {value}th game with Int-Far! {emote_poggers}
+just won his {value}th game with Int-Far! {emote_pog}
+just got his {value}th Int-Far award! Kinda cringe {emote_sadbuttrue}
+has now smoked a total of {value} doinks! {emote_big_doinks}

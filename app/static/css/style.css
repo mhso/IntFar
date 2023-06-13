@@ -1019,6 +1019,41 @@ table {
     margin-bottom: 20px;
 }
 
+#sounds-sort-wrapper {
+    position: relative;
+}
+
+.sounds-sort-button {
+    padding: 4px 6px;
+    border: solid 2px white;
+    width: 38px;
+    height: 38px;
+    background-color: transparent;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.sounds-sort-button > img {
+    width: 100%;
+    height: auto;
+    vertical-align: top;
+}
+
+.sounds-highlighted-sort-btn {
+    border-color: aquamarine;
+}
+
+.sounds-sort-order-button {
+    position: absolute;
+    height: 32px;
+    right: calc(50% + 46px);
+    top: 4px;
+}
+
+#sounds-sort-descending {
+    display: none;
+}
+
 .audio-delete-btn {
     background-color: black;
     color: white;

@@ -9,6 +9,7 @@ from api import award_qualifiers, config, database, riot_api, util
 from api.game_stats import get_relevant_stats, get_filtered_stats, get_filtered_timeline_stats
 from discbot.commands.util import ADMIN_DISC_ID
 from discbot.montly_intfar import MonthlyIntfar, MONTH_NAMES
+from discbot.discord_bot import DiscordClient
 
 class TestFuncs:
     def __init__(self, config, database, riot_api):
@@ -181,23 +182,55 @@ class TestFuncs:
         print(intro_desc + desc)
         print(winners)
 
+    def test_lifetime_stats(self):
+        id_dave = 115142485579137029
+        id_murt = 172757468814770176
+        id_thomas = 219497453374668815
+        id_me = 267401734513491969
+        id_mads = 331082926475182081
+        data = [
+            (id_dave, None),
+            (id_murt, None),
+            (id_thomas, None),
+            (id_me, None),
+            (id_mads, None),
+        ]
+        lifetime_stats = award_qualifiers.get_lifetime_stats(data, self.database)
+        print(lifetime_stats)
 
-PARSER = argparse.ArgumentParser()
+    def test_games_count(self):
+        games_count_me = self.database.get_games_count(115142485579137029)
+        games_count_all = self.database.get_games_count()
+        print(games_count_me)
+        print(games_count_all)
 
-CONFIG = config.Config()
-DATABASE = database.Database(CONFIG)
-RIOT_API = riot_api.RiotAPIClient(CONFIG)
+    async def play_sound(self, sound, client):
+        user = client.get_member_safe(267401734513491969, 512363920044982272)
+        await client.audio_handler.play_sound(user.voice, sound)
 
-TEST_RUNNER = TestFuncs(CONFIG, DATABASE, RIOT_API)
-FUNCS = [
-    func.replace("test_", "")
-    for func in TEST_RUNNER.__dir__() if func.startswith("test_")
-]
+    def test_pyppeteer_stream(self):
+        url = "https://www.youtube.com/watch?v=esdTLuEtwNM"
+        client = DiscordClient(CONFIG, DATABASE, None, RIOT_API)
+        client.add_event_listener("onready", self.play_sound, url, client)
+        client.run(CONFIG.discord_token)
 
-PARSER.add_argument("func", choices=FUNCS)
+if __name__ == "__main__":
+    PARSER = argparse.ArgumentParser()
 
-ARGS = PARSER.parse_args()
+    CONFIG = config.Config()
+    DATABASE = database.Database(CONFIG)
+    RIOT_API = riot_api.RiotAPIClient(CONFIG)
 
-FUNC_TO_RUN = TEST_RUNNER.__getattribute__(f"test_{ARGS.func}")
+    TEST_RUNNER = TestFuncs(CONFIG, DATABASE, RIOT_API)
+    FUNCS = [
+        func.replace("test_", "")
+        for func in TEST_RUNNER.__dir__() if func.startswith("test_")
+    ]
 
-FUNC_TO_RUN()
+    PARSER.add_argument("func", choices=FUNCS)
+
+    ARGS = PARSER.parse_args()
+
+    FUNC_TO_RUN = TEST_RUNNER.__getattribute__(f"test_{ARGS.func}")
+
+    FUNC_TO_RUN()

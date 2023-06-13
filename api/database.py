@@ -527,29 +527,45 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, *params).fetchall()
 
-    def get_games_count(self, time_after=None, time_before=None, guild_id=None):
-        delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id)
-        delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "win", 1)
-        delim_str_3, params_3 = self.get_delimeter(time_after, time_before, guild_id)
+    def get_games_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id, prefix="AND")
+        delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, prefix="AND")
 
         query = f"""
+            WITH game_cte AS (
+                SELECT p.game_id, p.disc_id, g.guild_id, g.win, g.timestamp
+                FROM games g
+                INNER JOIN participants p
+                ON p.game_id = g.game_id
+                INNER JOIN registered_summoners rs
+                ON rs.disc_id = p.disc_id
+                WHERE rs.active = 1
+                {delim_str_1}
+                {delim_str_2}
+            )
             SELECT
                 games.c,
-                games.timestamp,
+                games.t,
                 wins.c,
                 guilds.c
             FROM (
-                SELECT COUNT(*) AS c, timestamp FROM games g{delim_str_1}
+                SELECT
+                    COUNT(DISTINCT game_id) AS c,
+                    MIN(timestamp) AS t
+                FROM game_cte
             ) games,
             (
-                SELECT COUNT(*) AS c FROM games{delim_str_2}
+                SELECT COUNT(DISTINCT game_id) AS c
+                FROM game_cte
+                WHERE win = 1
             ) wins,
             (
-                SELECT COUNT(DISTINCT guild_id) AS c FROM games{delim_str_3}
+                SELECT COUNT(DISTINCT guild_id) AS c
+                FROM game_cte
             ) guilds
         """
+
         params = params_2 if params_1 is None else params_1 + params_2
-        params = params if params_3 is None else params + params_3
 
         with self:
             return self.execute_query(query, *params).fetchone()

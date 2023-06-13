@@ -1,17 +1,15 @@
-import sys, subprocess, signal
 from time import sleep
 from multiprocessing import Process, Pipe
 from multiprocessing.connection import Connection
 
 from discord.opus import load_opus
 from mhooge_flask.logging import logger
+from mhooge_flask.restartable import restartable
 
 import run_flask
-from api.audio_handler import AudioHandler
 from api.bets import BettingHandler
 from api.config import Config
 from api.database import Database
-from api.shop import ShopHandler
 from api.riot_api import RiotAPIClient
 from ai import model
 from discbot import discord_bot
@@ -21,8 +19,6 @@ def start_discord_process(
     database: Database,
     betting_handler: BettingHandler,
     riot_api: RiotAPIClient,
-    audio_handler: AudioHandler,
-    shop_handler: ShopHandler,
     bot_end_ai: Connection,
     bot_end_flask: Connection
 ):
@@ -34,7 +30,7 @@ def start_discord_process(
         name="Discord Bot",
         target=discord_bot.run_client,
         args=(
-            config, database, betting_handler, riot_api, audio_handler, shop_handler, bot_end_ai, bot_end_us, bot_end_flask
+            config, database, betting_handler, riot_api, bot_end_ai, bot_end_us, bot_end_flask
         )
     )
     bot_process.start()
@@ -70,6 +66,7 @@ def start_ai_process(config):
 
     return ai_process, bot_end_ai
 
+@restartable
 def main():
     conf = Config()
 
@@ -84,8 +81,6 @@ def main():
 
     database_client = Database(conf)
     betting_handler = BettingHandler(conf, database_client)
-    shop_handler = ShopHandler(conf, database_client)
-    audio_handler = AudioHandler(conf)
     riot_api = RiotAPIClient(conf)
 
     # Start process with machine learning model
@@ -100,8 +95,7 @@ def main():
     logger.info("Starting Discord Client...")
 
     bot_process, our_end_bot = start_discord_process(
-        conf, database_client, betting_handler, riot_api,
-        audio_handler, shop_handler, our_end_ai, bot_end_flask
+        conf, database_client, betting_handler, riot_api, our_end_ai, bot_end_flask
     )
 
     while True:
@@ -121,8 +115,7 @@ def main():
                 ai_process, our_end_ai = start_ai_process(conf)
                 bot_process.kill()
                 bot_process, our_end_bot = start_discord_process(
-                    conf, database_client, betting_handler, riot_api,
-                    audio_handler, shop_handler, our_end_ai, bot_end_flask
+                    conf, database_client, betting_handler, riot_api, our_end_ai, bot_end_flask
                 )
 
             if flask_process.exitcode == 2 or bot_process.exitcode == 2:
@@ -155,39 +148,4 @@ def main():
             break
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "restartable":
-        # If 'restartable' is given as an argument, run a master process
-        # that starts the actual program in a child process and monitors it.
-        # If the child process exits with return code 2, restart it.
-
-        try:
-            while True:
-                # Start child process that runs the actual program.
-                process = subprocess.Popen([sys.executable, __file__])
-
-                while process.poll() is None: # Wait for child process to exit.
-                    sleep(0.1)
-
-                if process.returncode == 2: # Process requested a restart.
-                    sleep(1) # Sleep for a sec and restart while loop.
-                else:
-                    break # Process exited naturally, terminate program.
-
-        except KeyboardInterrupt:
-            # We have to handle interrupt signal differently on Linux vs. Windows.
-            if sys.platform == "linux":
-                sig = signal.SIGINT
-            else:
-                sig = signal.CTRL_C_EVENT
-        
-            # End child process and terminate program.
-            process.send_signal(sig)
-
-            # Wait for child process to exit properly.
-            while process.poll() is None:
-                sleep(0.1)
-
-    else:
-        # This runs the actual program. It runs in a subprocess
-        # if 'restartable' is given as an argument on the CLI.
-        main()
+    main()

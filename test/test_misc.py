@@ -53,7 +53,7 @@ class TestWrapper(TestRunner):
         betting_handler = BettingHandler(self.config, database)
 
         client = DiscordClient(self.config, database, betting_handler, riot_api, None, None)
-        client.active_game[guild_id] = {
+        client.game_monitor.active_game[guild_id] = {
             "id": data["gameId"],
             "start": 0,
             "map_id": data["mapId"],
@@ -62,7 +62,7 @@ class TestWrapper(TestRunner):
             "game_guild_name": "guild_name",
             "queue_id": data["queueId"]
         }
-        client.users_in_game[guild_id] = users_in_game
+        client.game_monitor.users_in_game[guild_id] = users_in_game
 
         intfar, intfar_reason, intfar_response = client.get_intfar_data(relevant_stats, filtered_stats, guild_id)
         doinks, doinks_response = client.get_doinks_data(filtered_stats, guild_id)
@@ -167,7 +167,7 @@ class TestWrapper(TestRunner):
         betting_handler = BettingHandler(self.config, database)
 
         client = DiscordClient(self.config, database, betting_handler, riot_api, None, None)
-        client.active_game[guild_id] = {
+        client.game_monitor.active_game[guild_id] = {
             "id": data["gameId"],
             "start": 0,
             "map_id": data["mapId"],
@@ -176,7 +176,7 @@ class TestWrapper(TestRunner):
             "game_guild_name": "guild_name",
             "queue_id": data["queueId"]
         }
-        client.users_in_game[guild_id] = users_in_game
+        client.game_monitor.users_in_game[guild_id] = users_in_game
 
         intfar, intfar_reason, intfar_response = client.get_intfar_data(
             relevant_stats,

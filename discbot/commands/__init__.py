@@ -425,7 +425,7 @@ def initialize_commands():
 
     # betting command
     betting_name = "betting"
-    betting_desc = "Show information about betting, as well as list of possible events to bet on."
+    betting_desc = "Show information about betting, as well as a list of possible events to bet on."
     register_command(betting_name, betting_desc, handle_betting_msg)
 
     # bet command
@@ -561,10 +561,17 @@ def initialize_commands():
 
     # play command
     play_name = "play"
-    play_desc = "Play a sound! (See `!sounds` for a list of them)."
+    play_desc = "Play a sound (or a youtube link)! (See `!sounds` for a list of sounds)."
     register_command(
         play_name, play_desc, handle_play_sound_msg,
         mandatory_params=[RegularParam("sound")]
+    )
+
+    # skip command
+    skip_name = "skip"
+    skip_desc = "Skip an active sound (if one is playing)."
+    register_command(
+        skip_name, skip_desc, handle_skip_sound_msg
     )
 
     # play_random command

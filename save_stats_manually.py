@@ -29,8 +29,8 @@ class MockChannel:
         await asyncio.sleep(0.1)
 
 class TestMock(DiscordClient):
-    def __init__(self, args, config, database, betting_handler, riot_api, audio_handler, shop_handler, **kwargs):
-        super().__init__(config, database, betting_handler, riot_api, audio_handler, shop_handler, **kwargs)
+    def __init__(self, args, config, database, betting_handler, riot_api, **kwargs):
+        super().__init__(config, database, betting_handler, riot_api, **kwargs)
         self.missing = args.missing
         self.game_id = args.game
         self.guild_to_use = GUILDS.get(args.guild)
@@ -48,16 +48,16 @@ class TestMock(DiscordClient):
             ids_to_save = [(self.game_id, self.guild_to_use)]
 
         for game_id, guild_id in ids_to_save:
-            self.active_game[guild_id] = {"id": game_id}
+            self.game_monitor.active_game[guild_id] = {"id": game_id}
             game_info = self.riot_api.get_game_details(game_id)
-            self.active_game[guild_id]["queue_id"] = game_info["queueId"]
+            self.game_monitor.active_game[guild_id]["queue_id"] = game_info["queueId"]
 
             relevant, users_in_game = get_relevant_stats(
                 self.database.summoners, [], game_info
             )
             filtered = get_filtered_stats(relevant)
 
-            self.users_in_game[guild_id] = users_in_game
+            self.game_monitor.users_in_game[guild_id] = users_in_game
 
             intfar, intfar_reason, response = self.get_intfar_data(relevant, filtered, guild_id)
 
@@ -179,11 +179,9 @@ database_client = Database(conf)
 logger.info("Starting Discord Client...")
 
 bet_client = BettingHandler(conf, database_client)
-audio_client = AudioHandler(conf)
-shop_client = ShopHandler(conf, database_client)
 ai_model = Model(conf)
 ai_model.load()
 
-client = TestMock(args, conf, database_client, bet_client, riot_api, audio_client, shop_client, ai_model=ai_model)
+client = TestMock(args, conf, database_client, bet_client, riot_api, ai_model=ai_model)
 
 client.run(conf.discord_token)
