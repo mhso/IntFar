@@ -179,6 +179,11 @@ def get_ifotm_flavor_text(month):
     return IFOTM_FLAVORS[month - 1]
 
 class DiscordClient(discord.Client):
+    """
+    Class that contains the logic for interacting with the dicscord.py API.
+    This includes reacting to messages, sending messages, getting data about users,
+    initializing game status polling, playing sounds, etc.
+    """
     def __init__(
             self,
             config: Config,
@@ -188,9 +193,7 @@ class DiscordClient(discord.Client):
             **kwargs
         ):
         """
-        Initialize the Discord client. This class contains the logic for interacting
-        with the Dicscord API, which includes sending messages, getting data about
-        users, playing sounds, etc.
+        Initialize the Discord client.
 
         :param config:          Config instance that holds all the configuration
                                 options for Int-Far
@@ -1338,6 +1341,9 @@ class DiscordClient(discord.Client):
         return doinks, redeemed_text
 
     def get_cool_stats_data(self, filtered_stats: list[tuple[int, dict]], guild_id: int):
+        """
+        Gets data about 
+        """
         stat_mentions = award_qualifiers.get_cool_stats(filtered_stats, self.config)
         cool_stats_msg = self.get_cool_stats_msg(stat_mentions, guild_id)
 

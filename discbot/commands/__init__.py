@@ -470,7 +470,7 @@ def initialize_commands():
 
     # bets command
     bets_name = "bets"
-    bets_desc = "See a description your (or someone else's) lifetime bets."
+    bets_desc = "See a description of your (or someone else's) lifetime bets."
     register_command(
         bets_name, bets_desc, handle_all_bets_msg, access_level="self",
         optional_params=[TargetParam("person")]
@@ -550,7 +550,7 @@ def initialize_commands():
 
     # intfar sound command
     intfar_sound_name = "intfar_sound"
-    intfar_sound_desc = "Set a sound to trigger when you are awarded Doinks."
+    intfar_sound_desc = "Set a sound to trigger when you are awarded Int-Far."
     async def intfar_sound_wrapper(client, message, sound=None):
         await handle_set_event_sound(client, message, sound, "intfar")
 
@@ -561,7 +561,7 @@ def initialize_commands():
 
     # play command
     play_name = "play"
-    play_desc = "Play a sound (or a youtube link)! (See `!sounds` for a list of sounds)."
+    play_desc = "Play a sound (or a youtube/soundcloud link)! (See `!sounds` for a list of sounds)."
     register_command(
         play_name, play_desc, handle_play_sound_msg,
         mandatory_params=[RegularParam("sound")]
@@ -569,7 +569,7 @@ def initialize_commands():
 
     # skip command
     skip_name = "skip"
-    skip_desc = "Skip an active sound (if one is playing)."
+    skip_desc = "Skip an active youtube/soundcloud sound (if one is playing)."
     register_command(
         skip_name, skip_desc, handle_skip_sound_msg
     )

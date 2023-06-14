@@ -101,6 +101,12 @@ class ClosableFFmpegPCMAudio(FFmpegPCMAudio):
                 return
 
 class AudioHandler:
+    """
+    Class that handles playing sound files or audio streams from YouTube or Soundcloud
+    through the Discord voice API.
+    Enables the queueing of multiple sounds that will be played in order and manages
+    control buttons for pausing, skipping, or stopping the playing of audio streams.
+    """
     EMOJI_PREV = "⏮️"
     EMOJI_PLAY = "⏯️"
     EMOJI_STOP = "⏹️"
@@ -117,7 +123,7 @@ class AudioHandler:
         self.playback_msg = None
         self.sound_queue = []
 
-    async def play_loop(self):
+    async def _play_loop(self):
         while self.sound_queue != []:
             sound_name, message, sound_type = self.sound_queue.pop(0)
 
@@ -163,7 +169,7 @@ class AudioHandler:
                     pipe=True,
                     before_options=f"-f s16le -ar {sample_rate} -ac 2"
                 )
-                volume = 0.3
+                volume = 0.2
                 self.playback_msg = await message.channel.send(self._get_playback_str())
                 for control_button in self.AUDIO_CONTROL_EMOJIS:
                     await self.playback_msg.add_reaction(control_button)
@@ -175,12 +181,13 @@ class AudioHandler:
             self.voice_stream.play(player)
             while self.voice_stream.is_playing():
                 await asyncio.sleep(0.5)
-                if message is not None:
+                if self.playback_msg is not None:
                     await self.playback_msg.edit(content=self._get_playback_str())
 
             await asyncio.sleep(0.5)
 
-            if message is not None:
+            if self.playback_msg is not None:
+                # Delete playback progress message
                 await self.playback_msg.delete()
 
             self.voice_stream.stop()
@@ -258,7 +265,7 @@ class AudioHandler:
                 # If no voice connection exists, make a new one.
                 self.voice_stream = await voice_channel.connect(timeout=5)
 
-                success, status = await self.play_loop() # Play sounds in the queue.
+                success, status = await self._play_loop() # Play sounds in the queue.
                 return success, status
 
             return True, None
@@ -282,6 +289,10 @@ class AudioHandler:
         return None
 
     async def audio_control_pressed(self, emoji, member, channel):
+        """
+        Called when a user reacts to the currently active playback status message
+        with a valid audio control emoji, such as play, pause, stop, or skip.
+        """
         if self.web_stream is not None and member.voice is not None:
             if emoji.name == self.EMOJI_NEXT:
                 await self.skip_sound(member.voice)
@@ -308,6 +319,12 @@ class AudioHandler:
         return get_sound_owners()
 
     def _get_playback_str(self):
+        """
+        Get a string describing the status and progress of the audio stream currently
+        being played. This string is posted and periodically updated by the bot in
+        the text channel where the sound was started from. The status includes the
+        title of the audio/video being played as well as progress and duration.
+        """
         duration = None
         if self.web_stream is not None and self.web_stream.duration is not None:
             duration = self.web_stream.duration
@@ -343,6 +360,7 @@ class AudioHandler:
         blue_blocks_str = ":blue_square:" * blue_blocks
         white_blocks_str = ":white_large_square:" * white_blocks
 
+        # Bring it all together. Format as a PHP code block for pretty colors
         return (
             "```php\n"
             f"{now_playing}\n"
