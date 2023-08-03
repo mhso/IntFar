@@ -61,7 +61,28 @@ async def handle_random_sound_msg(client, message):
     if not success:
         await message.channel.send(client.insert_emotes(status))
 
-async def handle_sounds_msg(client, message, ordering="alphabetical"):
+async def handle_search_msg(client, message, *search_args):
+    if not search_args:
+        return
+
+    search_str = " ".join(search_args)
+    success, data = client.audio_handler.get_youtube_suggestions(search_str, message)
+
+    if not success:
+        await message.channel.send(data)
+        return
+
+    response = f"Search results from YouTube for `{search_str}`:"
+    if data == []:
+        response += "\nNo results appear to be found :("
+    else:
+        for index, suggestion in enumerate(data, start=1):
+            response += f"\n- **{index}**: `{suggestion[0]}` - by *{suggestion[1]}*"
+
+    suggestions_msg = await message.channel.send(response)
+    client.audio_handler.youtube_suggestions_msg[message.guild.id] = suggestions_msg
+
+async def handle_sounds_msg(client, message, ordering="newest"):
     valid_orders = ["alphabetical", "oldest", "newest"]
 
     if ordering not in valid_orders:

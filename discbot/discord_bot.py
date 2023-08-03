@@ -185,13 +185,13 @@ class DiscordClient(discord.Client):
     initializing game status polling, playing sounds, etc.
     """
     def __init__(
-            self,
-            config: Config,
-            database: Database,
-            betting_handler: BettingHandler,
-            riot_api: RiotAPIClient,
-            **kwargs
-        ):
+        self,
+        config: Config,
+        database: Database,
+        betting_handler: BettingHandler,
+        riot_api: RiotAPIClient,
+        **kwargs
+    ):
         """
         Initialize the Discord client.
 
@@ -225,8 +225,7 @@ class DiscordClient(discord.Client):
         self.riot_api = riot_api
         self.betting_handler = betting_handler
 
-        streamscape = Streamscape()
-        streamscape.run_forever()
+        streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
         self.audio_handler = AudioHandler(self.config, streamscape)
         self.shop_handler = ShopHandler(self.config, self.database)
 
@@ -1810,6 +1809,7 @@ class DiscordClient(discord.Client):
             del self.audio_action_data[message_id]
 
         message_id = react_event.message_id
+        guild_id = react_event.guild_id
         if (
             react_event.event_type == "REACTION_ADD"
             and react_event.member != self.user
@@ -1827,8 +1827,8 @@ class DiscordClient(discord.Client):
                     message_data["footer"], message_data["message"]
                 )
             elif (
-                self.audio_handler.playback_msg is not None
-                and message_id == self.audio_handler.playback_msg.id
+                self.audio_handler.playback_msg.get(guild_id) is not None
+                and message_id == self.audio_handler.playback_msg[guild_id].id
                 and react_event.emoji.name in self.audio_handler.AUDIO_CONTROL_EMOJIS
             ):
                 channel = self.get_channel(react_event.channel_id)
@@ -1848,10 +1848,11 @@ class DiscordClient(discord.Client):
         """
         message_id = react_event.message_id
         user_id = react_event.user_id
+        guild_id = react_event.guild_id
         if (
             user_id != self.user.id
-            and self.audio_handler.playback_msg is not None
-            and message_id == self.audio_handler.playback_msg.id
+            and self.audio_handler.playback_msg.get(guild_id) is not None
+            and message_id == self.audio_handler.playback_msg[guild_id].id
             and message_id in self.audio_action_data
             and react_event.emoji.name in self.audio_handler.AUDIO_CONTROL_EMOJIS
         ):
@@ -1865,6 +1866,9 @@ class DiscordClient(discord.Client):
                 await self.audio_handler.audio_control_pressed(react_event.emoji, member, channel)
 
     async def send_dm(self, text, disc_id):
+        """
+        Send a private message to the user with the given Discord ID.
+        """
         user = self.get_user(disc_id)
         try:
             await user.send(content=text)

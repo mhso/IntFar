@@ -11,6 +11,12 @@ class Config:
         self.testing = False
         self.discord_token = auth["discordToken"]
         self.riot_key = auth["riotDevKey"] if self.use_dev_token else auth["riotAPIKey"]
+        self.youtube_key = auth["youtubeAPIKey"]
+        self.steam_2fa_code = None
+        self.steam_key = auth["steamAPIKey"]
+        self.steam_secrets = auth["steamSecrets"]
+        self.steam_username = auth["steamUsername"]
+        self.steam_password = auth["steamPassword"]
         self.env = auth["env"]
         self.database = "resources/database.db"
         self.generate_predictions_img = False

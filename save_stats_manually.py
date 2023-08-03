@@ -4,11 +4,9 @@ import argparse
 from mhooge_flask.logging import logger
 
 from api import award_qualifiers
-from api.audio_handler import AudioHandler
 from api.bets import BettingHandler
 from api.config import Config
 from api.database import Database
-from api.shop import ShopHandler
 from api.riot_api import RiotAPIClient
 from api.game_stats import get_relevant_stats, get_filtered_stats
 from api.util import GUILD_IDS, create_predictions_timeline_image

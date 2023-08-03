@@ -5,7 +5,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 from app.routes.soundboard import normalize_sound_volume
-from api import award_qualifiers, config, database, riot_api, util
+from api import award_qualifiers, config, database, riot_api, util, steam_api
 from api.game_stats import get_relevant_stats, get_filtered_stats, get_filtered_timeline_stats
 from discbot.commands.util import ADMIN_DISC_ID
 from discbot.montly_intfar import MonthlyIntfar, MONTH_NAMES
@@ -213,6 +213,18 @@ class TestFuncs:
         client = DiscordClient(CONFIG, DATABASE, None, RIOT_API)
         client.add_event_listener("onready", self.play_sound, url, client)
         client.run(CONFIG.discord_token)
+
+    def test_steam_api(self):
+        self.config.steam_2fa_code = input("Steam 2FA Code: ")
+
+        api_client = steam_api.SteamAPI(self.config)
+        match_token = "CSGO-6Pntd-wC8iV-ELKBc-bUcdG-pJGrL"
+
+        game_data = api_client.get_game_details(match_token)
+        with open("csgo_testdata.json", "w", encoding="utf-8") as fp:
+            json.dump(game_data, fp)
+
+        api_client.close()
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

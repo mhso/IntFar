@@ -1,6 +1,7 @@
 from time import sleep
 from multiprocessing import Process, Pipe
 from multiprocessing.connection import Connection
+from argparse import ArgumentParser
 
 from discord.opus import load_opus
 from mhooge_flask.logging import logger
@@ -68,7 +69,13 @@ def start_ai_process(config):
 
 @restartable
 def main():
+    parser = ArgumentParser()
+    parser.add_argument("steam_2fa_code", type=str)
+
+    args = parser.parse_args()
+
     conf = Config()
+    conf.steam_2fa_code = args.steam_2fa_code
 
     env_desc = "DEVELOPMENT" if conf.env == "dev" else "PRODUCTION"
 

@@ -255,7 +255,7 @@ def initialize_commands():
     # register command
     register_name = "register"
     register_desc = (
-        "Sign up for the Int-Far™ Tracker™ " +
+        "Sign up for the LoL Int-Far™ Tracker™ " +
         "by providing your summoner name."
     )
     register_command(
@@ -266,7 +266,7 @@ def initialize_commands():
     # unregister command
     unregister_name = "unregister"
     unregister_desc = (
-        "Leave the Int-Far™ Tracker™. You can re-join later with !register, " +
+        "Leave the LoL Int-Far™ Tracker™. You can re-join later with !register, " +
         "and your data will not be deleted."
     )
     register_command(
@@ -572,6 +572,16 @@ def initialize_commands():
     skip_desc = "Skip an active youtube/soundcloud sound (if one is playing)."
     register_command(
         skip_name, skip_desc, handle_skip_sound_msg
+    )
+
+    def parse_search_args(client, args):
+        return args
+
+    # search command
+    search_name = "search"
+    search_desc = "Search for a YouTube video to play as a sound."
+    register_command(
+        search_name, search_desc, handle_search_msg, parser=parse_search_args
     )
 
     # play_random command

@@ -125,7 +125,7 @@ async def handle_status_msg(client, message):
     longest_game_date = datetime.fromtimestamp(longest_game_time).strftime("%Y-%m-%d")
 
     sounds = client.audio_handler.get_sounds("alphabetical")
-    unique_owners = set(client.audio_handler.get_owners().values())
+    unique_owners = set(client.audio_handler.get_sound_owners().values())
 
     pct_intfar = int((intfars / games) * 100)
     pct_doinks = int((doinks_games / games) * 100)
