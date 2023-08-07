@@ -285,7 +285,8 @@ def get_relevant_stats_v4(all_users, users_in_game, game_info):
                 kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
                 damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
 
-                for disc_id, _, summ_ids in all_users:
+                for disc_id in all_users:
+                    summ_ids = all_users[disc_id]["summ_ids"]
                     if part_info["player"]["summonerId"] in summ_ids:
                         our_team = participant["teamId"]
                         combined_stats = participant["stats"]
@@ -351,8 +352,8 @@ def get_relevant_stats(all_users, users_in_game, game_info):
 
         player_disc_id = None
 
-        for disc_id, _, summ_ids in all_users:
-            if participant_data["summonerId"] in summ_ids:
+        for disc_id in all_users:
+            if participant_data["summonerId"] in all_users[disc_id]["summ_ids"]:
                 player_disc_id = disc_id
                 break
 

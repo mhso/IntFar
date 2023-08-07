@@ -16,7 +16,7 @@ _ENDPOINT = (
     "&knowncode=[match_token]"
 )
 
-class SteamAPI:
+class SteamAPIClient:
     _MATCH_TOKEN_DICT = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefhijkmnopqrstuvwxyz23456789"
     _MATCH_TOKEN_DICT_LEN = len(_MATCH_TOKEN_DICT)
 
@@ -36,7 +36,10 @@ class SteamAPI:
 
         self.cs_client.on("ready", self.handle_cs_started)
 
-        self.login()
+        if self.config.steam_2fa_code is not None:
+            self.login()
+        else:
+            logger.warning("No Steam 2FA code provided. Steam/CSGO functionality wont work!")
 
     def handle_steam_start(self):
         self.cs_client.launch()
@@ -73,11 +76,12 @@ class SteamAPI:
         return SteamAuthenticator(self.config.steam_secrets).get_code()
 
     def login(self):
-        self.steam_client.login(
-            self.config.steam_username,
-            self.config.steam_password,
-            two_factor_code=self.config.steam_2fa_code
-        )
+        if self.config.steam_2fa_code is not None:
+            self.steam_client.login(
+                self.config.steam_username,
+                self.config.steam_password,
+                two_factor_code=self.config.steam_2fa_code
+            )
 
     def close(self):
         if self.steam_client.logged_on:
@@ -89,7 +93,7 @@ class SteamAPI:
 
     def get_game_details(self, match_token):
         code_dict = sharecode.decode(match_token)
-        data = self.cs_client.request_full_match_info(
+        self.cs_client.request_full_match_info(
             code_dict["matchid"],
             code_dict["outcomeid"],
             code_dict["token"],

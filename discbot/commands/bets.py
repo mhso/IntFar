@@ -24,11 +24,13 @@ def get_bet_params(client, args):
     events = []
     targets = []
     index = 0
+
     while index < len(args):
         event = args[index+1]
         amount = args[index]
         if "&" in (event, amount):
             raise ValueError("Multi-bet input is formatted incorrectly!")
+
         target = None
         if index + 2 < len(args) and args[index+2] != "&":
             try:
@@ -39,9 +41,11 @@ def get_bet_params(client, args):
             index = end_index + 1
         else:
             index += 3
+
         amounts.append(amount)
         events.append(event)
         targets.append(target)
+
     return [amounts, events, targets]
 
 async def handle_make_bet_msg(client, message, amounts, events, targets):

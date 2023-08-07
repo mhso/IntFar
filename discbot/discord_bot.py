@@ -23,6 +23,7 @@ from api.bets import BettingHandler
 from api.audio_handler import AudioHandler
 from api.shop import ShopHandler
 from api.riot_api import RiotAPIClient
+from api.steam_api import SteamAPIClient
 from api.config import Config
 import discbot.commands.util as commands_util
 import api.util as api_util
@@ -222,10 +223,12 @@ class DiscordClient(discord.Client):
         )
         self.config = config
         self.database = database
-        self.riot_api = riot_api
         self.betting_handler = betting_handler
+        self.riot_api = riot_api
+        self.steam_api = SteamAPIClient(self.config)
+        self.steam_api.login()
 
-        streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
+        streamscape = None#Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
         self.audio_handler = AudioHandler(self.config, streamscape)
         self.shop_handler = ShopHandler(self.config, self.database)
 
@@ -653,9 +656,10 @@ class DiscordClient(discord.Client):
 
     def get_ai_prediction(self, guild_id):
         if self.ai_conn is not None and guild_id in self.game_monitor.users_in_game:
-            input_data = shape_predict_data(
-                self.database, self.riot_api, self.config, self.game_monitor.users_in_game[guild_id]
-            )
+            # input_data = shape_predict_data(
+            #     self.database, self.riot_api, self.config, self.game_monitor.users_in_game[guild_id]
+            # )
+            input_data = None
             self.ai_conn.send(("predict", [input_data]))
             ratio_win = self.ai_conn.recv()
             return int(ratio_win * 100)
@@ -672,11 +676,11 @@ class DiscordClient(discord.Client):
             start_index = 3 if name[2] == "!" else 2
             return int(name[start_index:-1])
 
-        user_data = self.database.discord_id_from_summoner(name, exact_match=False)
-        if user_data is None: # Summoner name gave no result, try Discord name.
+        discord_id = self.database.discord_id_from_ingame_name(name, "lol", exact_match=False)
+        if discord_id is None: # Summoner name gave no result, try Discord name.
             return self.get_discord_id(name, guild_id, exact_match=False)
 
-        return user_data[0]
+        return discord_id
 
     def insert_emotes(self, text):
         """
@@ -1959,14 +1963,19 @@ class DiscordClient(discord.Client):
             elif before.channel is not None and after.channel is None: # User left.
                 await self.user_left_voice(member.id, member.guild.id)
 
-def run_client(config, database, betting_handler, riot_api, ai_pipe, main_pipe, flask_pipe):
+    async def close(self):
+        super().close()
+
+        self.steam_api.close()
+
+def run_client(config, database, betting_handler, riot_api, ai_pipe, flask_pipe, main_pipe):
     client = DiscordClient(
         config,
         database,
         betting_handler,
         riot_api,
         ai_pipe=ai_pipe,
+        flask_pipe=flask_pipe,
         main_pipe=main_pipe,
-        flask_pipe=flask_pipe
     )
     client.run(config.discord_token)

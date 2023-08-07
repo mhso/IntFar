@@ -143,7 +143,7 @@ def get_logged_in_user(database, user_id):
 
     users = database.get_all_registered_users()
     for tup in users:
-        if get_hashed_secret(tup[3]) == user_id:
+        if get_hashed_secret(tup[1]) == user_id:
             return tup[0]
 
     return None

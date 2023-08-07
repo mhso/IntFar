@@ -10,6 +10,11 @@ import numpy as np
 MAIN_GUILD_ID = 619073595561213953
 MY_GUILD_ID  = 512363920044982272
 
+SUPPORTED_GAMES = {
+    "lol": "League of Legends", "csgo":
+    "Counter Strike: Global Offenstive"
+}
+
 GUILD_IDS = [ # List of ids of guilds that Int-Far is active in.
     MAIN_GUILD_ID, 347488541397483543, 803987403932172359, MY_GUILD_ID
 ]

@@ -217,7 +217,7 @@ class TestFuncs:
     def test_steam_api(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
 
-        api_client = steam_api.SteamAPI(self.config)
+        api_client = steam_api.SteamAPIClient(self.config)
         match_token = "CSGO-6Pntd-wC8iV-ELKBc-bUcdG-pJGrL"
 
         game_data = api_client.get_game_details(match_token)

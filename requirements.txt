@@ -5,5 +5,7 @@ flask-cors==3.0.10
 PyNaCl==1.5.0
 python-dateutil==2.8.2
 requests==2.31.0
+steam==1.4.4
+csgo==1.0.0
 -e ../scripts/mhooge_flask/
 -e ../scripts/streamscape/

@@ -6,7 +6,7 @@ async def handle_doinks_msg(client, message, target_id):
         doinks_reason_ids = client.database.get_doinks_stats(disc_id)
         total_doinks = client.database.get_doinks_count(disc_id)[1]
         doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
-        champ_id, champ_count = client.database.get_champ_with_most_doinks(disc_id)
+        champ_id, champ_count = client.database.get_league_champ_with_most_doinks(disc_id)
         champ_name = client.riot_api.get_champ_name(champ_id)
         msg = f"{person_to_check} has earned {total_doinks} " + "{emote_Doinks}"
         if expanded and total_doinks > 0:

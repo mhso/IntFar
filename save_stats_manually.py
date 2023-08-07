@@ -30,7 +30,8 @@ class TestMock(DiscordClient):
     def __init__(self, args, config, database, betting_handler, riot_api, **kwargs):
         super().__init__(config, database, betting_handler, riot_api, **kwargs)
         self.missing = args.missing
-        self.game_id = args.game
+        self.game = args.game
+        self.game_id = args.game_id
         self.guild_to_use = GUILDS.get(args.guild)
         self.task = args.task if not self.missing else "all"
         self.loud = not args.silent if not self.missing else False
@@ -51,7 +52,7 @@ class TestMock(DiscordClient):
             self.game_monitor.active_game[guild_id]["queue_id"] = game_info["queueId"]
 
             relevant, users_in_game = get_relevant_stats(
-                self.database.summoners, [], game_info
+                self.database.users["lol"], [], game_info
             )
             filtered = get_filtered_stats(relevant)
 
@@ -154,7 +155,8 @@ class TestMock(DiscordClient):
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--missing", action="store_true")
-parser.add_argument("--game", type=int)
+parser.add_argument("--game_id", type=int)
+parser.add_argument("--game", type=str)
 parser.add_argument("--guild", type=str, choices=GUILDS)
 parser.add_argument("--task", type=str, choices=("all", "bets", "stats", "train"))
 parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))

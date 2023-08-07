@@ -183,7 +183,7 @@ def get_data(lan_info):
         longest_game = api_util.format_duration(longest_game_start, longest_game_end)
 
         # Latest game.
-        latest_game_data, latest_doinks_data = database.get_latest_game(
+        latest_game_data, latest_doinks_data = database.get_latest_league_game(
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id

@@ -17,7 +17,7 @@ async def handle_average_msg(client, message, stat, champ_id=None, disc_id=None)
             champ_name = client.riot_api.get_champ_name(champ_id)
 
         minimum_games = 10 if champ_id is None else 5
-        values = client.database.get_average_stat(stat, disc_id, champ_id, minimum_games)
+        values = client.database.get_average_stat_league(stat, disc_id, champ_id, minimum_games)
 
         for_all = disc_id is None
         readable_stat = stat.replace("_", " ")
@@ -138,7 +138,7 @@ async def handle_stat_msg(client, message, best, stat, target_id):
                 if game_summary is not None:
                     response += f"\nHe got this as {game_summary}"
         else:
-            champ_id, champ_count = client.database.get_champ_count_for_stat(
+            champ_id, champ_count = client.database.get_league_champ_count_for_stat(
                 stat, best, target_id
             )
             champ_name = client.riot_api.get_champ_name(champ_id)

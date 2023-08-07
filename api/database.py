@@ -8,7 +8,7 @@ from mhooge_flask.logging import logger
 from mhooge_flask.database import SQLiteDatabase
 
 from api import game_stats
-from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, STAT_COMMANDS
+from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, STAT_COMMANDS, SUPPORTED_GAMES
 
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
@@ -19,114 +19,135 @@ class Database(SQLiteDatabase):
         self.config = config
         super().__init__(self.config.database, "resources/schema.sql", False)
 
-        self.summoners = []
+        self.users = {
+            game: {} for game in SUPPORTED_GAMES
+        }
 
         # Populate summoner names and ids lists with currently registered summoners.
         users = self.get_all_registered_users()
+        users = dict(map(lambda game: self._group_users(users[game])))
 
-        user_entries = {x[0]: ([], []) for x in users}
-        for disc_id, summ_name, summ_id, _ in users:
-            user_entries[disc_id][0].append(summ_name)
-            user_entries[disc_id][1].append(summ_id)
+        self.users["lol"] = self._group_users(users, ingame_name=2, ingame_id=3)
+        self.users["csgo"] = self._group_users(users, ingame_name=4, ingame_id=5, match_auth_codes=6)
 
-        for k, v in user_entries.items():
-            self.summoners.append((k, v[0], v[1]))
+    def _group_users(self, user_data, **params):
+        user_entries = {}
+        for user in user_data:
+            disc_id = user[0]
 
-        self.summoners.sort(key=lambda x: x[0])
+            if disc_id not in user_entries:
+                user_entries[disc_id] = {}
 
-    def user_exists(self, discord_id):
-        for disc_id, _, _ in self.summoners:
-            if discord_id == disc_id:
-                return True
-        return False
+            for param_name in params:
+                if param_name not in user_entries[disc_id]:
+                    user_entries[disc_id][param_name] = []
 
-    def get_registered_user(self, summ_name):
-        query = """
-            SELECT disc_id, summ_name, summ_id
-            FROM registered_summoners 
-            WHERE summ_name=?
-        """
+                user_entries[disc_id][param_name].append(user[params[param_name]])
 
-        with self:
-            return self.execute_query(query, summ_name).fetchone()
+        return user_entries
+
+    def _get_participants_table(self, game):
+        return f"participants_{game}"
+    
+    def _get_users_table(self, game):
+        return f"users_{game}"
+
+    def user_exists(self, discord_id, game):
+        return discord_id in self.users[game]
 
     def get_all_registered_users(self):
-        query = """
-            SELECT
-                disc_id,
-                summ_name,
-                summ_id,
-                secret 
-            FROM registered_summoners
-            WHERE active=1
-        """
-
         with self:
-            return self.execute_query(query).fetchall()
+            query = "SELECT disc_id, secret FROM users"
+            basic_user_info = self.execute_query(query).fetchall()
+            basic_info_dict = {x[0]: x for x in basic_user_info}
+
+            games_user_info = {}
+            for game in SUPPORTED_GAMES:
+                query = f"SELECT * FROM users_{game}"
+                values = self.execute_query(query).fetchall()
+                for row in values:
+                    disc_id = row[0]
+                    active = row[-1]
+                    if not active:
+                        continue
+
+                    user_info = basic_info_dict[disc_id]
+                    user_game_info = user_info + row[1:-1]
+                    games_user_info[game] = user_game_info
+
+        return games_user_info
 
     def get_client_secret(self, disc_id):
-        query = "SELECT secret FROM registered_summoners WHERE disc_id=?"
+        query = "SELECT secret FROM users WHERE disc_id=?"
 
         with self:
             return self.execute_query(query, disc_id).fetchone()[0]
 
     def get_user_from_secret(self, secret):
-        query = "SELECT disc_id FROM registered_summoners WHERE secret=?"
+        query = "SELECT disc_id FROM users WHERE secret=?"
 
         with self:
             return self.execute_query(query, secret).fetchone()[0]
 
-    def add_user(self, summ_name, summ_id, discord_id):
+    def add_user(self, discord_id, game, **game_params):
         status = ""
+        game_table = self._get_users_table(game)
         try:
             with self:
-                summ_info = self.summoner_from_discord_id(discord_id)
+                new_user = not any(self.user_exists(discord_id, game_name) for game_name in self.users)
+                if new_user:
+                    # User has never signed up for any game before
+                    query = "INSERT INTO users(disc_id, secret, reports) VALUES (?, ?, ?)"
+                    secret = generate_user_secret()
+                    self.execute_query(query, discord_id, secret, 0)
 
-                query = "SELECT * FROM registered_summoners WHERE disc_id=? AND active=0"
+                user_info = self.users[game].get(discord_id)
+
+                query = f"SELECT * FROM {game_table} WHERE disc_id=? AND active=0"
                 is_inactive = self.execute_query(query, discord_id).fetchone() is not None
 
                 if is_inactive:
-                    query = "UPDATE registered_summoners SET active=1 WHERE disc_id=?"
+                    query = f"UPDATE {game_table} SET active=1 WHERE disc_id=?"
                     status = "Welcome back to the Int-Far:tm: Tracker:tm:, my lost son :hearts:"
 
-                    self.summoners.append((discord_id, [summ_name], [summ_id]))
+                    for param_name in game_params:
+                        self.users[game][discord_id][param_name].append(game_params[param_name])
+
                     self.execute_query(query, discord_id)
 
                 else:
-                    query = """
-                        INSERT INTO registered_summoners(
-                            disc_id,
-                            summ_name,
-                            summ_id,
-                            secret,
-                            reports,
-                            active
-                        ) VALUES (?, ?, ?, ?, ?, 1)
+                    game_user_name = game_params["ingame_name"]
+                    game_user_id = game_params["ingame_id"]
+
+                    parameter_list = ["disc_id"] + list(game_params.keys()) + ["active"]
+                    questionmarks = ", ".join("?" for _ in range(len(parameter_list) - 1))
+                    parameter_names = ",\n".join(parameter_list)
+                    query = f"""
+                        INSERT INTO {game_table} (
+                            {parameter_names}
+                        ) VALUES ({questionmarks}, 1)
                     """
 
-                    if summ_info is not None:
-                        _, summ_names, summ_ids = summ_info
-                        if len(summ_names) == 3:
+                    if user_info is not None:
+                        if sum(len(user_info.get(param_name, []) for param_name in game_params)) >= 3:
                             return (
                                 False,
                                 "Error: A maximum of three accounts can be registered for one person."
                             )
 
-                        summ_names.append(summ_name)
-                        summ_ids.append(summ_id)
-                        secret = self.get_client_secret(discord_id)
-                        status = f"Added smurf '{summ_name}' with  summoner ID '{summ_id}'."
+                        for param_name in game_params:
+                            user_info[param_name].append(game_params[param_name])
+
+                        status = f"Added smurf '{game_user_name}' with ID '{game_user_id}' for {SUPPORTED_GAMES[game]}."
                     else:
-                        self.summoners.append((discord_id, [summ_name], [summ_id]))
-                        secret = generate_user_secret()
-                        status = f"User '{summ_name}' with summoner ID '{summ_id}' succesfully added!"
+                        self.users[game][discord_id] = {param_name: [game_params[param_name]] for param_name in game_params}
+                        status = f"User '{game_user_name}' with ID '{game_user_id}' succesfully added for {SUPPORTED_GAMES[game]}!"
                         # Check if user has been registered before, and is now re-registering.
 
-                    self.execute_query(
-                        query, discord_id, summ_name, summ_id, secret, 0
-                    )
+                    values_list = [discord_id] + list(game_params.values())
+                    self.execute_query(query, *values_list)
 
-                    if summ_info is None:
+                    if new_user:
                         # Only create betting balance table if user is new.
                         query = "INSERT INTO betting_balance VALUES (?, ?)"
 
@@ -136,48 +157,40 @@ class Database(SQLiteDatabase):
             return (False, "A user with that summoner name is already registered!")
         return (True, status)
 
-    def remove_user(self, disc_id):
+    def remove_user(self, disc_id, game):
         with self:
-            query = "UPDATE registered_summoners SET active=0 WHERE disc_id=?"
+            query = f"UPDATE users_{game} SET active=0 WHERE disc_id=?"
             self.execute_query(query, disc_id)
 
-        new_summ_list = []
-        for discord_id, summ_names, summ_ids in self.summoners:
-            if discord_id != disc_id:
-                new_summ_list.append((discord_id, summ_names, summ_ids))
+        del self.users[disc_id]
 
-        self.summoners = new_summ_list
-
-    def discord_id_from_summoner(self, name, exact_match=True):
+    def discord_id_from_ingame_name(self, name, game, exact_match=True):
         matches = []
-        for disc_id, summ_names, summ_ids in self.summoners:
-            for (summ_name, summ_id) in zip(summ_names, summ_ids):
-                if exact_match and summ_name.lower() == name:
-                    return (disc_id, summ_name, summ_id)
-                elif not exact_match and name in summ_name.lower():
-                    matches.append((disc_id, summ_name, summ_id))
+        for disc_id in self.users[game]:
+            for ingame_name in self.users[disc_id]["ingame_name"]:
+                if exact_match and ingame_name.lower() == name:
+                    return disc_id
+                elif not exact_match and name in ingame_name.lower():
+                    matches.append(disc_id)
+
         return matches[0] if len(matches) == 1 else None
 
-    def summoner_from_discord_id(self, discord_id):
-        for disc_id, summ_names, summ_ids in self.summoners:
-            if disc_id == discord_id:
-                return (disc_id, summ_names, summ_ids)
+    def game_user_data_from_discord_id(self, discord_id, game):
+        return self.users[game].get(discord_id, None)
 
-        return None
-
-    def game_exists(self, game_id):
+    def game_exists(self, game_id, game):
         with self:
-            query = "SELECT game_id FROM games WHERE game_id=?"
-            return self.execute_query(query, game_id).fetchone() is not None
+            query = "SELECT game_id FROM games WHERE game_id=? AND game=?"
+            return self.execute_query(query, game_id, game).fetchone() is not None
 
-    def delete_game(self, game_id):
+    def delete_game(self, game_id, game):
         with self:
-            query_1 = "DELETE FROM games WHERE game_id=?"
-            query_2 = "DELETE FROM participants WHERE game_id=?"
-            self.execute_query(query_1, game_id, commit=False)
+            query_1 = "DELETE FROM games WHERE game_id=? AND game=?"
+            query_2 = f"DELETE FROM participants_{game} WHERE game_id=?"
+            self.execute_query(query_1, game_id, game, commit=False)
             self.execute_query(query_2, game_id)
 
-    def get_latest_game(self, time_after=None, time_before=None, guild_id=None):
+    def get_latest_league_game(self, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
 
         query_games = f"SELECT MAX(timestamp), win, intfar_id, intfar_reason FROM games{delim_str}"
@@ -195,7 +208,10 @@ class Database(SQLiteDatabase):
             doinks_data = self.execute_query(query_doinks, *params).fetchall()
             return game_data, doinks_data
 
-    def get_most_extreme_stat(self, stat, maximize=True):
+    def get_most_extreme_stat(self, stat, game, maximize=True):
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+
         with self:
             aggregator = "MAX" if maximize else "MIN"
 
@@ -209,17 +225,18 @@ class Database(SQLiteDatabase):
                             first_blood,
                             Count(DISTINCT game_id) AS c
                         FROM
-                            games,
-                            registered_summoners AS rs
+                            games
+                        INNER JOIN {users_table} AS u
+                        ON u.disc_id = games.first_blood
                         WHERE
-                            rs.disc_id=first_blood
-                            AND rs.active=1 
+                            u.active = 1
+                            AND games.game = ?
                         GROUP BY first_blood
                             HAVING first_blood IS NOT NULL
                     ) sub
                 """
 
-                result = self.execute_query(query).fetchone()
+                result = self.execute_query(query, game).fetchone()
                 return result + (None,)
 
             query = f"""
@@ -227,15 +244,18 @@ class Database(SQLiteDatabase):
                     p.disc_id,
                     {aggregator}({stat}),
                     game_id
-                FROM participants AS p
-                JOIN registered_summoners AS rs
-                ON rs.disc_id = p.disc_id
-                WHERE rs.active=1
+                FROM {stats_table} AS p
+                JOIN {users_table} AS u
+                ON u.disc_id = p.disc_id
+                WHERE u.active = 1
             """
 
             return self.execute_query(query).fetchone()
 
-    def get_best_or_worst_stat(self, stat, disc_id, maximize=True):
+    def get_best_or_worst_stat(self, stat, disc_id, game, maximize=True):
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+
         with self:
             aggregator = "MAX" if maximize else "MIN"
 
@@ -245,14 +265,15 @@ class Database(SQLiteDatabase):
                     FROM games AS g
                     JOIN participants AS p
                     ON p.game_id = g.game_id
-                    JOIN registered_summoners AS rs
-                    ON rs.disc_id=p.disc_id
+                    INNER JOIN {users_table} AS u
+                    ON u.disc_id = p.disc_id
                     WHERE
-                        g.first_blood=?
-                        AND rs.active=1
+                        g.first_blood = ?
+                        AND g.game = ?
+                        AND u.active = 1
                 """
 
-                result = self.execute_query(query, disc_id).fetchone()
+                result = self.execute_query(query, disc_id, game).fetchone()
                 return result[0], None, None
 
             query = f"""
@@ -265,10 +286,10 @@ class Database(SQLiteDatabase):
                         {aggregator}({stat}) AS c,
                         p.game_id,
                         p.disc_id
-                    FROM participants p
-                    JOIN registered_summoners rs
-                    ON rs.disc_id=p.disc_id
-                    WHERE rs.active = 1
+                    FROM {stats_table} AS p
+                    JOIN {users_table} AS u
+                    ON u.disc_id = p.disc_id
+                    WHERE u.active = 1
                     GROUP BY game_id
                 ) sub
                 WHERE disc_id = ?
@@ -276,7 +297,10 @@ class Database(SQLiteDatabase):
 
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_champ_count_for_stat(self, stat, maximize, disc_id):
+    def get_league_champ_count_for_stat(self, stat, maximize, disc_id):
+        game = "lol"
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
         aggregator = "MAX" if maximize else "MIN"
 
         query = f"""
@@ -289,12 +313,14 @@ class Database(SQLiteDatabase):
                         {aggregator}({stat}) AS c,
                         p.champ_id,
                         p.disc_id
-                    FROM participants AS p
+                    FROM {stats_table} AS p
                     JOIN games AS g
                     ON g.game_id = p.game_id
-                    JOIN registered_summoners AS rs
-                    ON rs.disc_id=p.disc_id
-                    WHERE rs.active = 1
+                    JOIN {users_table} AS u
+                    ON u.disc_id = p.disc_id
+                    WHERE
+                        g.game = ?
+                        AND u.active = 1
                     GROUP BY p.game_id
                 ) sub
                 WHERE disc_id = ?
@@ -303,16 +329,19 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            return self.execute_query(query, disc_id).fetchone()
+            return self.execute_query(query, game, disc_id).fetchone()
 
-    def get_average_stat(self, stat, disc_id=None, champ_id=None, min_games=10):
+    def get_average_stat_league(self, stat, disc_id=None, champ_id=None, min_games=10):
+        game = "lol"
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
         params = []
         player_condition = ""
         champ_condition = ""
 
         if champ_id is not None:
             params = [champ_id, champ_id]
-            champ_condition = "WHERE p.champ_id=?"
+            champ_condition = "AND p.champ_id=?"
 
         if disc_id is not None:
             params.append(disc_id)
@@ -324,9 +353,10 @@ class Database(SQLiteDatabase):
                 FROM (
                     SELECT g.first_blood, CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
                     FROM games AS g
-                    INNER JOIN participants AS p
+                    INNER JOIN {stats_table} AS p
                         ON p.game_id = g.game_id
                         AND p.disc_id = g.first_blood
+                    WHERE g.game = '{game}'
                     {champ_condition}
                     GROUP BY g.first_blood
                 ) first_bloods
@@ -334,15 +364,16 @@ class Database(SQLiteDatabase):
                 (
                     SELECT p.disc_id, CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
                     FROM games AS g
-                    LEFT JOIN participants p
+                    LEFT JOIN {stats_table} AS p
                         ON g.game_id=p.game_id
+                    WHERE g.game = '{game}'
                     {champ_condition}
                     GROUP BY p.disc_id
                 ) played
                     ON played.disc_id = first_bloods.first_blood
-                INNER JOIN registered_summoners AS rs
-                    ON rs.disc_id = played.disc_id
-                WHERE rs.active = 1
+                INNER JOIN {users_table} AS u
+                    ON u.disc_id = played.disc_id
+                WHERE u.active = 1
                     AND played.c > {min_games}
                     {player_condition}
                 GROUP BY played.disc_id
@@ -355,23 +386,24 @@ class Database(SQLiteDatabase):
                 FROM
                 (
                     SELECT disc_id, SUM({stat}) AS s
-                    FROM participants AS p
-                    {champ_condition}
+                    FROM {stats_table} AS p
+                    {champ_condition.replace('AND', 'WHERE')}
                     GROUP BY p.disc_id
                 ) stat_values
                 INNER JOIN
                 (
                     SELECT disc_id, CAST(COUNT(DISTINCT g.game_id) as real) AS c
                     FROM games AS g
-                    LEFT JOIN participants p
-                        ON g.game_id=p.game_id
+                    LEFT JOIN {stats_table} AS p
+                        ON g.game_id = p.game_id
+                    WHERE g.game = '{game}'
                     {champ_condition}
                     GROUP BY p.disc_id
                 ) played
                     ON played.disc_id = stat_values.disc_id
-                INNER JOIN registered_summoners AS rs
-                    ON rs.disc_id = played.disc_id
-                WHERE rs.active = 1
+                INNER JOIN {users_table} AS u
+                    ON u.disc_id = played.disc_id
+                WHERE u.active = 1
                     AND played.c > {min_games}
                 {player_condition}
                 GROUP BY played.disc_id
@@ -382,16 +414,55 @@ class Database(SQLiteDatabase):
             result = self.execute_query(query, *params).fetchall()
             return result or [(disc_id, None, None)]
 
-    def get_doinks_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+    def get_doinks_count(
+        self,
+        game: str,
+        disc_id: int=None,
+        time_after: int=None,
+        time_before: int=None,
+        guild_id: int=None
+    ) -> tuple[int, int]:
+        """
+        Query the database for the total games where doinks were earned
+        as well doinks earned in total over all games.
+
+        ### Parameters
+
+        `:param game:`          Supported game to look for doinks for (fx. 'lol' for League of Legends)
+
+        `:param disc_id:`       Optional Discord ID to only include counts for a single person
+
+        `:param time_after:`    Optional UNIX timestamp to only include results after this point
+
+        `:param time_before:`   Optional UNIX timestamp to only include results before this point
+
+        `:param guild_id:`      Optional Discord guild ID to only include results of games played in that server
+
+        ### Returns
+        `tuple[int, int]`: Amount of games where doinks was played and amount of doinks earned in total
+        """
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
+        params = [game] + params
 
         query_doinks = f"""
             SELECT SUM(sub.doinks_games), SUM(sub.doinks_total) FROM (
                 SELECT COUNT(*) AS doinks_games, SUM(LENGTH(REPLACE(sub_2.doinks, '0', ''))) AS doinks_total FROM (
-                    SELECT DISTINCT p.game_id, p.disc_id, doinks, timestamp FROM participants AS p
-                    LEFT JOIN registered_summoners rs ON rs.disc_id=p.disc_id
-                    LEFT JOIN games g ON g.game_id = p.game_id
-                    WHERE doinks IS NOT NULL AND rs.active=1{delim_str}
+                    SELECT DISTINCT
+                        p.game_id,
+                        p.disc_id,
+                        doinks,
+                        timestamp
+                    FROM {stats_table} AS p
+                    LEFT JOIN {users_table} u
+                    ON u.disc_id = p.disc_id
+                    LEFT JOIN games g
+                    ON g.game_id = p.game_id
+                    WHERE
+                        g.game = ?
+                        AND doinks IS NOT NULL
+                        AND u.active=1{delim_str}
                 ) sub_2
                 GROUP BY sub_2.disc_id
             ) sub
@@ -401,49 +472,63 @@ class Database(SQLiteDatabase):
             doinks_games, doinks_total = self.execute_query(query_doinks, *params).fetchone()
             return doinks_games or 0, doinks_total or 0
 
-    def get_champ_with_most_doinks(self, disc_id):
+    def get_league_champ_with_most_doinks(self, disc_id):
+        stats_table = self._get_participants_table("lol")
         with self:
-            query = """
+            query = f"""
                 SELECT sub.champ_id, MAX(sub.c) FROM (
-                    SELECT COUNT(DISTINCT p.game_id) AS c, champ_id
-                    FROM participants p
-                    WHERE p.disc_id=? AND p.doinks IS NOT NULL
+                    SELECT
+                        COUNT(DISTINCT p.game_id) AS c,
+                        champ_id
+                    FROM {stats_table} p
+                    WHERE
+                        p.disc_id=?
+                        AND p.doinks IS NOT NULL
                     GROUP BY champ_id
                 ) sub
             """
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_max_doinks_details(self):
+    def get_max_doinks_details(self, game):
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+
         with self:
-            query = """
-                SELECT MAX(counts.c), counts.disc_id
+            query = f"""
+                SELECT 
+                    MAX(counts.c),
+                    counts.disc_id
                 FROM (
-                    SELECT p.disc_id, Count(*) as c
-                    FROM 
-                        participants as p, 
-                        registered_summoners as rs
+                    SELECT
+                        p.disc_id,
+                        COUNT(*) as c
+                    FROM
+                        {stats_table} as p, 
+                        {users_table} as u
                     WHERE
                         doinks IS NOT NULL
-                        AND rs.disc_id=p.disc_id
-                        AND rs.active=1
+                        AND u.disc_id = p.disc_id
+                        AND u.active = 1
                     GROUP BY p.disc_id
                 ) counts
             """
             return self.execute_query(query).fetchone()
 
-    def get_doinks_reason_counts(self):
-        query_doinks_multis = """
-            SELECT doinks
-            FROM
-                participants as p,
-                registered_summoners as rs
-            WHERE
-                doinks IS NOT NULL
-                AND rs.disc_id=p.disc_id
-                AND rs.active=1
-        """
+    def get_doinks_reason_counts(self, game):
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
 
         with self:
+            query_doinks_multis = f"""
+                SELECT doinks
+                FROM
+                    {stats_table} as p,
+                    {users_table} as u
+                WHERE
+                    doinks IS NOT NULL
+                    AND u.disc_id = p.disc_id
+                    AND u.active = 1
+            """
             doinks_reasons_data = self.execute_query(query_doinks_multis).fetchall()
 
             doinks_counts = [0 for _ in DOINKS_REASONS]
@@ -454,10 +539,10 @@ class Database(SQLiteDatabase):
 
             return doinks_counts
 
-    def get_game_ids(self):
-        query = "SELECT game_id FROM games"
+    def get_game_ids(self, game):
+        query = "SELECT game_id FROM games WHERE gmes.game = ?"
         with self:
-            return self.execute_query(query).fetchall()
+            return self.execute_query(query, game).fetchall()
 
     def get_recent_intfars_and_doinks(self):
         with self:

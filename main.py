@@ -1,6 +1,5 @@
 from time import sleep
 from multiprocessing import Process, Pipe
-from multiprocessing.connection import Connection
 from argparse import ArgumentParser
 
 from discord.opus import load_opus
@@ -12,17 +11,10 @@ from api.bets import BettingHandler
 from api.config import Config
 from api.database import Database
 from api.riot_api import RiotAPIClient
-from ai import model
+#from ai import model
 from discbot import discord_bot
 
-def start_discord_process(
-    config: Config,
-    database: Database,
-    betting_handler: BettingHandler,
-    riot_api: RiotAPIClient,
-    bot_end_ai: Connection,
-    bot_end_flask: Connection
-):
+def start_discord_process(*args):
     """
     Run Discord bot in a separate process.
     """
@@ -30,47 +22,40 @@ def start_discord_process(
     bot_process = Process(
         name="Discord Bot",
         target=discord_bot.run_client,
-        args=(
-            config, database, betting_handler, riot_api, bot_end_ai, bot_end_us, bot_end_flask
-        )
+        args=args + (bot_end_us,)
     )
     bot_process.start()
 
     return bot_process, our_end
 
-def start_flask_process(
-    config: Config,
-    database: Database,
-    betting_handler: BettingHandler,
-    riot_api: RiotAPIClient
-):
+def start_flask_process(*args):
     flask_end, bot_end_flask = Pipe()
     flask_process = Process(
         name="Flask Web App",
         target=run_flask.run_app,
         args=(
-            database, betting_handler, riot_api, config, flask_end
+            args + (flask_end,)
         )
     )
     flask_process.start()
 
     return flask_process, bot_end_flask
 
-def start_ai_process(config):
-    ai_end, bot_end_ai = Pipe()
-    ai_process = Process(
-        name="AI Model",
-        target=model.run_loop,
-        args=(config, ai_end)
-    )
-    ai_process.start()
+# def start_ai_process(config):
+#     ai_end, bot_end_ai = Pipe()
+#     ai_process = Process(
+#         name="AI Model",
+#         target=model.run_loop,
+#         args=(config, ai_end)
+#     )
+#     ai_process.start()
 
-    return ai_process, bot_end_ai
+#     return ai_process, bot_end_ai
 
 @restartable
 def main():
     parser = ArgumentParser()
-    parser.add_argument("steam_2fa_code", type=str)
+    parser.add_argument("--steam_2fa_code", type=str, default=None)
 
     args = parser.parse_args()
 
@@ -92,18 +77,15 @@ def main():
 
     # Start process with machine learning model
     # that trains in the background after each game.
-    ai_process, our_end_ai = start_ai_process(conf)
+    #ai_process, our_end_ai = start_ai_process(conf)
 
     logger.info("Starting Flask web app...")
-    flask_process, bot_end_flask = start_flask_process(
-        conf, database_client, betting_handler, riot_api
-    )
+    flask_args = [database_client, betting_handler, riot_api, conf]
+    flask_process, bot_end_flask = start_flask_process(*flask_args)
 
     logger.info("Starting Discord Client...")
-
-    bot_process, our_end_bot = start_discord_process(
-        conf, database_client, betting_handler, riot_api, our_end_ai, bot_end_flask
-    )
+    discord_args = [conf, database_client, betting_handler, riot_api, None, bot_end_flask]
+    bot_process, _ = start_discord_process(*discord_args)
 
     while True:
         try:
@@ -111,28 +93,21 @@ def main():
                 # 'Soft' reset processes.
                 logger.info("Restarting Flask process.")
 
-                flask_process, bot_end_flask = start_flask_process(
-                    conf,
-                    database_client,
-                    betting_handler,
-                    riot_api
-                )
-                ai_process.kill()
+                flask_process, bot_end_flask = start_flask_process(*flask_args)
+                #ai_process.kill()
 
-                ai_process, our_end_ai = start_ai_process(conf)
+                #ai_process, our_end_ai = start_ai_process(conf)
                 bot_process.kill()
-                bot_process, our_end_bot = start_discord_process(
-                    conf, database_client, betting_handler, riot_api, our_end_ai, bot_end_flask
-                )
+                bot_process, _ = start_discord_process(*discord_args)
 
             if flask_process.exitcode == 2 or bot_process.exitcode == 2:
                 # We have issued a restart command on Discord or the website to restart the program.
-                ai_process.kill()
+                #ai_process.kill()
                 flask_process.kill()
                 bot_process.kill()
 
                 # Wait for all subprocesses to exit.
-                processes = [ai_process, flask_process, bot_process]
+                processes = [flask_process, bot_process]
                 while all(p.is_alive() for p in processes):
                     sleep(0.5)
 
@@ -146,7 +121,7 @@ def main():
             logger.info("Stopping bot...")
             if bot_process.is_alive():
                 bot_process.kill()
-            ai_process.kill()
+            #ai_process.kill()
             flask_process.kill()
             break
 
