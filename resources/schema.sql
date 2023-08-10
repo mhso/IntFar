@@ -16,17 +16,27 @@ CREATE TABLE [users_csgo] (
     [match_auth_code] INTEGER,
     [active] INTEGER DEFAULT(1)
 );
-CREATE TABLE [games] (
-    [game_id] NVARCHAR(64) NOT NULL,
-    [game] NVARCHAR(64) NOT NULL,
+CREATE TABLE [games_lol] (
+    [game_id] NVARCHAR(64) PRIMARY KEY,
     [timestamp] INTEGER,
     [duration] INTEGER,
     [intfar_id] INTEGER,
     [intfar_reason] NVARCHAR(4),
-    [first_blood] INTEGER,
     [win] INTEGER(1),
-    [guild_id] INTEGER,
-    PRIMARY KEY (game_id, game)
+    [guild_id] INTEGER
+    [first_blood] INTEGER,
+);
+CREATE TABLE [games_csgo] (
+    [game_id] NVARCHAR(64) PRIMARY KEY,
+    [timestamp] INTEGER,
+    [duration] INTEGER,
+    [intfar_id] INTEGER,
+    [intfar_reason] NVARCHAR(4),
+    [win] INTEGER(1),
+    [guild_id] INTEGER
+    [map] NVARCHAR(32),
+    [rounds_t] INTEGER(4),
+    [rounds_ct] INTEGER(4),
 );
 CREATE TABLE [missed_games] (
     [game_id] NVARCHAR(64) NOT NULL,
@@ -38,17 +48,17 @@ CREATE TABLE [missed_games] (
 CREATE TABLE [participants_lol] (
     [game_id] NVARCHAR(64) NOT NULL,
     [disc_id] INTEGER NOT NULL,
-    [champ_id] INTEGER NOT NULL,
     [doinks] NVARCHAR(10),
     [kills] INTEGER,
     [deaths] INTEGER,
     [assists] INTEGER,
     [kda] REAL,
+    [kp] INTEGER,
+    [champ_id] INTEGER NOT NULL,
     [damage] INTEGER,
     [cs] INTEGER,
-    [cs_per_min] INTEGER,
+    [cs_per_min] REAL,
     [gold] INTEGER,
-    [kp] INTEGER,
     [vision_wards] INTEGER,
     [vision_score] INTEGER,
     [steals] INTEGER,

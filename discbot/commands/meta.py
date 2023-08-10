@@ -3,12 +3,29 @@ from datetime import datetime
 import api.util as api_util
 import discbot.commands.util as commands_util
 
-async def handle_register_msg(client, message, target_name):
+async def handle_lol_register_msg(client, message, target_name):
     if target_name is None:
         response = "You must supply a summoner name {emote_angry_gual}"
         await message.channel.send(client.insert_emotes(response))
     else:
-        status = await client.add_user(target_name, message.author.id, message.guild)
+        if client.database.user_exists(target_name):
+            status = "User with that summoner name is already registered."
+        
+        elif (summ_id := client.riot_api.get_summoner_id(target_name.replace(" ", "%20"))) is None:
+            status = f"Error: Invalid summoner name {client.get_emoji_by_name('PepeHands')}"
+
+        else:
+            discord_id = message.author.id
+
+            success, status = client.database.add_user(target_name, summ_id, discord_id)
+            if success:
+                users_in_voice = client.get_users_in_voice()
+                for guild_id in users_in_voice:
+                    for disc_id, _, _ in users_in_voice[guild_id]:
+                        if discord_id == disc_id: # User is already in voice channel.
+                            await client.user_joined_voice(disc_id, guild_id)
+                            break
+
         await message.channel.send(status)
 
 async def handle_unregister_msg(client, message):

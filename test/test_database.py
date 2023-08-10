@@ -103,14 +103,14 @@ class TestWrapper(TestRunner):
             self.database.get_total_winrate(MY_DISC_ID)
         self.assert_no_exception(get_total_winrate_func, "Get total winrate.")
 
-        def get_champ_winrate_func():
-            self.database.get_champ_winrate(MY_DISC_ID, 4)
-        self.assert_no_exception(get_champ_winrate_func, "Get champ winrate.")
+        def get_league_champ_winrate_func():
+            self.database.get_league_champ_winrate(MY_DISC_ID, 4)
+        self.assert_no_exception(get_league_champ_winrate_func, "Get champ winrate.")
 
-        def get_min_or_max_winrate_champ_func():
-            self.database.get_min_or_max_winrate_champ(MY_DISC_ID, True)
-            self.database.get_min_or_max_winrate_champ(MY_DISC_ID, False)
-        self.assert_no_exception(get_min_or_max_winrate_champ_func, "Get min or max winrate champ.")
+        def get_min_or_max_league_winrate_champ_func():
+            self.database.get_min_or_max_league_winrate_champ(MY_DISC_ID, True)
+            self.database.get_min_or_max_league_winrate_champ(MY_DISC_ID, False)
+        self.assert_no_exception(get_min_or_max_league_winrate_champ_func, "Get min or max winrate champ.")
 
 
     @test

@@ -259,7 +259,7 @@ def initialize_commands():
         "by providing your summoner name."
     )
     register_command(
-        register_name, register_desc, handle_register_msg,
+        register_name, register_desc, handle_lol_register_msg,
         mandatory_params=[RegularParam("summoner_name")]
     )
 

@@ -113,12 +113,12 @@ async def handle_summary_msg(client, message, target_id):
     longest_win_streak = client.database.get_longest_win_or_loss_streak(target_id, True)
     longest_loss_streak = client.database.get_longest_win_or_loss_streak(target_id, False)
 
-    best_champ_wr, best_champ_games, best_champ_id = client.database.get_min_or_max_winrate_champ(target_id, True)
-    worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_winrate_champ(target_id, False)
+    best_champ_wr, best_champ_games, best_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, True)
+    worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, False)
 
     if best_champ_id == worst_champ_id:
         # Person has not played 10 games with any champ. Try to get stats with 5 minimum games.
-        worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_winrate_champ(
+        worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_league_winrate_champ(
             target_id, False, min_games=5
         )
 
@@ -199,7 +199,7 @@ async def handle_winrate_msg(client, message, champ_name, target_id):
     if champ_id is None:
         response = f"Not a valid champion: `{champ_name}`."
     else:
-        winrate, games = client.database.get_champ_winrate(target_id, champ_id)
+        winrate, games = client.database.get_league_champ_winrate(target_id, champ_id)
         champ_name = client.riot_api.get_champ_name(champ_id)
         user_name = client.get_discord_nick(target_id, message.guild.id)
         if games == 0:

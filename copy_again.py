@@ -38,11 +38,9 @@ with database_client_1.get_connection() as db_1:
             disc_id = int(summ[0])
             db_2.cursor().execute("INSERT OR IGNORE INTO users_lol VALUES (?, ?, ?, ?)", (disc_id, summ[1], summ[2], summ[5]))
 
-        query = "INSERT INTO games VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        query = "INSERT INTO games_lol VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         for data in data_games:
-            game = "lol"
-            data = [data[0], game] + list(data[1:])
-            db_2.cursor().execute(query, tuple(data))
+            db_2.cursor().execute(query, data)
 
         query = (
             """

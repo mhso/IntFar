@@ -12,6 +12,9 @@
 ## Ændringer i database.py
 - Find alle referencer til 
 
+## Ændringer i stats for spil
+game_stats.py fil/klasse til hver spil?
+
 ## CSGO register page
 - Lav routing/db logic
 - Lav HTML
@@ -32,3 +35,34 @@
 - `get_max_doinks_details`: ❌
 - `get_doinks_reason_counts`: ❌
 - `get_game_ids`: ❌
+- `get_recent_intfars_and_doinks`: ❌
+- `get_games_results`: ❌
+- `get_games_count`: ❌
+- `get_longest_game`: ❌
+- `get_intfar_count`: ❌
+- `get_intfar_reason_counts`: ❌
+- `get_total_winrate`: ❌
+- `get_winrate_relation`: ❌
+- `get_meta_stats`: ❌
+- `get_intfars_of_the_month`: ❌
+- `get_longest_intfar_streak`: ❌
+- `get_longest_no_intfar_streak`: ❌
+- `get_current_intfar_streak`: ❌
+- `get_longest_win_or_loss_streak`: ❌
+- `get_current_win_or_loss_streak`: ❌
+- `get_max_intfar_details`: ❌
+- `get_intfar_stats`: ❌
+- `get_intfar_relations`: ❌
+- `get_doinks_stats`: ❌
+- `get_doinks_relations`: ❌
+- `get_performance_score`: ❌
+
+### Til discord_bot.py
+- `add_user`: ❌
+- `play_event_sounds`: ❌
+
+### Til game_stats.py
+- `get_stat_value`: ❌
+- `get_player_stats`: ❌
+- `get_finished_game_summary`: ❌
+- `get_active_game_summary`: ❌

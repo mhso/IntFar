@@ -201,7 +201,7 @@ async def handle_best_nochest(client, message, target_id=None):
         response = "You have already earned a chest on every champ {emote_woahpikachu}"
     else:
         # Get highest winrate of all the champs with no chest gained.
-        result = client.database.get_min_or_max_winrate_champ(
+        result = client.database.get_min_or_max_league_winrate_champ(
             target_id, True, no_chest_champs, return_top_n=5, min_games=3
         )
 

@@ -8,6 +8,8 @@ from mhooge_flask.logging import logger
 from mhooge_flask.database import SQLiteDatabase
 
 from api import game_stats
+from api.game_stats import GameStats
+from api.user import User
 from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, STAT_COMMANDS, SUPPORTED_GAMES
 
 class DBException(OperationalError, ProgrammingError):
@@ -25,12 +27,13 @@ class Database(SQLiteDatabase):
 
         # Populate summoner names and ids lists with currently registered summoners.
         users = self.get_all_registered_users()
-        users = dict(map(lambda game: self._group_users(users[game])))
+        params = {
+            "lol": ["ingame_name", "ingame_id"],
+            "csgo": ["ingame_name", "ingame_id", "match_auth_code"]
+        }
+        self.users: dict[int, User] = dict(map(lambda game: (game, self._group_users(users[game], *params[game])), users))
 
-        self.users["lol"] = self._group_users(users, ingame_name=2, ingame_id=3)
-        self.users["csgo"] = self._group_users(users, ingame_name=4, ingame_id=5, match_auth_codes=6)
-
-    def _group_users(self, user_data, **params):
+    def _group_users(self, user_data, *params):
         user_entries = {}
         for user in user_data:
             disc_id = user[0]
@@ -38,17 +41,20 @@ class Database(SQLiteDatabase):
             if disc_id not in user_entries:
                 user_entries[disc_id] = {}
 
-            for param_name in params:
+            for index, param_name in enumerate(params):
                 if param_name not in user_entries[disc_id]:
                     user_entries[disc_id][param_name] = []
 
-                user_entries[disc_id][param_name].append(user[params[param_name]])
+                user_entries[disc_id][param_name].append(user[index])
 
-        return user_entries
+        return {disc_id: User(**user_entries[disc_id]) for disc_id in user_entries}
+
+    def _get_games_table(self, game):
+        return f"games_{game}"
 
     def _get_participants_table(self, game):
         return f"participants_{game}"
-    
+
     def _get_users_table(self, game):
         return f"users_{game}"
 
@@ -89,7 +95,7 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, secret).fetchone()[0]
 
-    def add_user(self, discord_id, game, **game_params):
+    def add_user(self, game, discord_id, **game_params):
         status = ""
         game_table = self._get_users_table(game)
         try:
@@ -157,14 +163,14 @@ class Database(SQLiteDatabase):
             return (False, "A user with that summoner name is already registered!")
         return (True, status)
 
-    def remove_user(self, disc_id, game):
+    def remove_user(self, game, disc_id):
         with self:
             query = f"UPDATE users_{game} SET active=0 WHERE disc_id=?"
             self.execute_query(query, disc_id)
 
         del self.users[disc_id]
 
-    def discord_id_from_ingame_name(self, name, game, exact_match=True):
+    def discord_id_from_ingame_name(self, game, name, exact_match=True):
         matches = []
         for disc_id in self.users[game]:
             for ingame_name in self.users[disc_id]["ingame_name"]:
@@ -178,28 +184,38 @@ class Database(SQLiteDatabase):
     def game_user_data_from_discord_id(self, discord_id, game):
         return self.users[game].get(discord_id, None)
 
-    def game_exists(self, game_id, game):
+    def game_exists(self, game, game_id):
+        games_table = self._get_games_table(game)
+
         with self:
-            query = "SELECT game_id FROM games WHERE game_id=? AND game=?"
+            query = f"SELECT game_id FROM {games_table} WHERE game_id=?"
             return self.execute_query(query, game_id, game).fetchone() is not None
 
     def delete_game(self, game_id, game):
+        games_table = self._get_games_table(game)
+
         with self:
-            query_1 = "DELETE FROM games WHERE game_id=? AND game=?"
+            query_1 = f"DELETE FROM {games_table} WHERE game_id=?"
             query_2 = f"DELETE FROM participants_{game} WHERE game_id=?"
             self.execute_query(query_1, game_id, game, commit=False)
             self.execute_query(query_2, game_id)
 
     def get_latest_league_game(self, time_after=None, time_before=None, guild_id=None):
+        game = "lol"
+        games_table = self._get_games_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
 
-        query_games = f"SELECT MAX(timestamp), win, intfar_id, intfar_reason FROM games{delim_str}"
+        query_games = f"SELECT MAX(timestamp), win, intfar_id, intfar_reason FROM {games_table}{delim_str}"
         query_doinks = f"""
-            SELECT timestamp, disc_id, doinks FROM (
+            SELECT
+                timestamp,
+                disc_id,
+                doinks
+            FROM (
                SELECT MAX(timestamp) AS t
-               FROM games{delim_str}
-            ) sub_1, participants p
-            JOIN games g
+               FROM {games_table}{delim_str}
+            ) sub_1, participants AS p
+            JOIN {games_table} AS g
             ON p.game_id = g.game_id
             WHERE doinks IS NOT NULL AND timestamp = sub_1.t
         """
@@ -208,7 +224,8 @@ class Database(SQLiteDatabase):
             doinks_data = self.execute_query(query_doinks, *params).fetchall()
             return game_data, doinks_data
 
-    def get_most_extreme_stat(self, stat, game, maximize=True):
+    def get_most_extreme_stat(self, game, stat, maximize=True):
+        games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         users_table = self._get_users_table(game)
 
@@ -225,12 +242,10 @@ class Database(SQLiteDatabase):
                             first_blood,
                             Count(DISTINCT game_id) AS c
                         FROM
-                            games
+                            {games_table} AS g
                         INNER JOIN {users_table} AS u
-                        ON u.disc_id = games.first_blood
-                        WHERE
-                            u.active = 1
-                            AND games.game = ?
+                        ON u.disc_id = g.first_blood
+                        WHERE u.active = 1
                         GROUP BY first_blood
                             HAVING first_blood IS NOT NULL
                     ) sub
@@ -252,7 +267,8 @@ class Database(SQLiteDatabase):
 
             return self.execute_query(query).fetchone()
 
-    def get_best_or_worst_stat(self, stat, disc_id, game, maximize=True):
+    def get_best_or_worst_stat(self, game, stat, disc_id, maximize=True):
+        games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         users_table = self._get_users_table(game)
 
@@ -262,14 +278,13 @@ class Database(SQLiteDatabase):
             if stat == "first_blood":
                 query = f"""
                     SELECT Count(DISTINCT g.game_id)
-                    FROM games AS g
+                    FROM {games_table} AS g
                     JOIN participants AS p
                     ON p.game_id = g.game_id
                     INNER JOIN {users_table} AS u
                     ON u.disc_id = p.disc_id
                     WHERE
                         g.first_blood = ?
-                        AND g.game = ?
                         AND u.active = 1
                 """
 
@@ -299,6 +314,7 @@ class Database(SQLiteDatabase):
 
     def get_league_champ_count_for_stat(self, stat, maximize, disc_id):
         game = "lol"
+        games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         users_table = self._get_users_table(game)
         aggregator = "MAX" if maximize else "MIN"
@@ -314,13 +330,11 @@ class Database(SQLiteDatabase):
                         p.champ_id,
                         p.disc_id
                     FROM {stats_table} AS p
-                    JOIN games AS g
+                    JOIN {games_table} AS g
                     ON g.game_id = p.game_id
                     JOIN {users_table} AS u
                     ON u.disc_id = p.disc_id
-                    WHERE
-                        g.game = ?
-                        AND u.active = 1
+                    WHERE u.active = 1
                     GROUP BY p.game_id
                 ) sub
                 WHERE disc_id = ?
@@ -333,6 +347,7 @@ class Database(SQLiteDatabase):
 
     def get_average_stat_league(self, stat, disc_id=None, champ_id=None, min_games=10):
         game = "lol"
+        games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         users_table = self._get_users_table(game)
         params = []
@@ -341,7 +356,7 @@ class Database(SQLiteDatabase):
 
         if champ_id is not None:
             params = [champ_id, champ_id]
-            champ_condition = "AND p.champ_id=?"
+            champ_condition = "WHERE p.champ_id=?"
 
         if disc_id is not None:
             params.append(disc_id)
@@ -352,21 +367,19 @@ class Database(SQLiteDatabase):
                 SELECT played.disc_id, first_bloods.c / played.c AS avg_val, CAST(played.c AS int)
                 FROM (
                     SELECT g.first_blood, CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
-                    FROM games AS g
+                    FROM {games_table} AS g
                     INNER JOIN {stats_table} AS p
                         ON p.game_id = g.game_id
                         AND p.disc_id = g.first_blood
-                    WHERE g.game = '{game}'
                     {champ_condition}
                     GROUP BY g.first_blood
                 ) first_bloods
                 INNER JOIN
                 (
                     SELECT p.disc_id, CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
-                    FROM games AS g
+                    FROM {games_table} AS g
                     LEFT JOIN {stats_table} AS p
-                        ON g.game_id=p.game_id
-                    WHERE g.game = '{game}'
+                        ON g.game_id = p.game_id
                     {champ_condition}
                     GROUP BY p.disc_id
                 ) played
@@ -393,10 +406,9 @@ class Database(SQLiteDatabase):
                 INNER JOIN
                 (
                     SELECT disc_id, CAST(COUNT(DISTINCT g.game_id) as real) AS c
-                    FROM games AS g
+                    FROM {games_table} AS g
                     LEFT JOIN {stats_table} AS p
                         ON g.game_id = p.game_id
-                    WHERE g.game = '{game}'
                     {champ_condition}
                     GROUP BY p.disc_id
                 ) played
@@ -441,6 +453,7 @@ class Database(SQLiteDatabase):
         ### Returns
         `tuple[int, int]`: Amount of games where doinks was played and amount of doinks earned in total
         """
+        games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         users_table = self._get_users_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
@@ -455,13 +468,12 @@ class Database(SQLiteDatabase):
                         doinks,
                         timestamp
                     FROM {stats_table} AS p
-                    LEFT JOIN {users_table} u
+                    LEFT JOIN {users_table} AS u
                     ON u.disc_id = p.disc_id
-                    LEFT JOIN games g
+                    LEFT JOIN {games_table} AS g
                     ON g.game_id = p.game_id
                     WHERE
-                        g.game = ?
-                        AND doinks IS NOT NULL
+                        doinks IS NOT NULL
                         AND u.active=1{delim_str}
                 ) sub_2
                 GROUP BY sub_2.disc_id
@@ -501,10 +513,10 @@ class Database(SQLiteDatabase):
                 FROM (
                     SELECT
                         p.disc_id,
-                        COUNT(*) as c
+                        COUNT(*) AS c
                     FROM
-                        {stats_table} as p, 
-                        {users_table} as u
+                        {stats_table} AS p, 
+                        {users_table} AS u
                     WHERE
                         doinks IS NOT NULL
                         AND u.disc_id = p.disc_id
@@ -522,8 +534,8 @@ class Database(SQLiteDatabase):
             query_doinks_multis = f"""
                 SELECT doinks
                 FROM
-                    {stats_table} as p,
-                    {users_table} as u
+                    {stats_table} AS p,
+                    {users_table} AS u
                 WHERE
                     doinks IS NOT NULL
                     AND u.disc_id = p.disc_id
@@ -540,13 +552,18 @@ class Database(SQLiteDatabase):
             return doinks_counts
 
     def get_game_ids(self, game):
-        query = "SELECT game_id FROM games WHERE gmes.game = ?"
+        games_table = self._get_games_table(game)
+        query = f"SELECT game_id FROM {games_table}"
         with self:
             return self.execute_query(query, game).fetchall()
 
-    def get_recent_intfars_and_doinks(self):
+    def get_recent_intfars_and_doinks(self, game):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+
         with self:
-            query = """
+            query = f"""
                 SELECT
                     g.game_id,
                     timestamp,
@@ -554,16 +571,16 @@ class Database(SQLiteDatabase):
                     doinks,
                     intfar_id,
                     intfar_reason
-                FROM participants AS p
-                LEFT JOIN games g
+                FROM {stats_table} AS p
+                LEFT JOIN {games_table} AS g
                     ON p.game_id = g.game_id
-                LEFT JOIN registered_summoners rs
-                    ON p.disc_id=rs.disc_id
-                WHERE rs.active=1
+                LEFT JOIN {users_table} AS u
+                    ON p.disc_id = u.disc_id
+                WHERE u.active = 1
                 GROUP BY p.game_id, p.disc_id
                 ORDER BY timestamp ASC
             """
-            return self.execute_query(query).fetchall()
+            return self.execute_query(query, game).fetchall()
 
     def get_delimeter(self, time_after, time_before, guild_id, other_key=None, other_param=None, prefix=None):
         prefix = prefix if prefix is not None else "WHERE"
@@ -593,40 +610,59 @@ class Database(SQLiteDatabase):
 
         return delimiter, params
 
-    def get_recent_game_results(self, time_after=None, time_before=None, guild_id=None):
-        delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
-
-        query = f"SELECT win FROM games{delim_str} ORDER BY timestamp DESC"
-        with self:
-            return [x[0] for x in self.execute_query(query, *params).fetchall()]
-
-    def get_games_results(self, time_after=None, time_before=None, guild_id=None):
+    def get_recent_game_results(self, game, time_after=None, time_before=None, guild_id=None):
+        games_table = self._get_games_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
 
         query = f"""
-            SELECT win, timestamp
-            FROM games{delim_str}
+            SELECT win
+            FROM {games_table}
+            {delim_str}
+            ORDER BY timestamp DESC
+        """
+        with self:
+            return [x[0] for x in self.execute_query(query, *params).fetchall()]
+
+    def get_games_results(self, game, time_after=None, time_before=None, guild_id=None):
+        games_table = self._get_games_table(game)
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
+
+        query = f"""
+            SELECT
+                win,
+                timestamp
+            FROM {games_table}
+            {delim_str}
             ORDER BY timestamp
         """
 
         with self:
             return self.execute_query(query, *params).fetchall()
 
-    def get_games_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+    def get_games_count(self, game, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
         delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id, prefix="AND")
         delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, prefix="AND")
 
         query = f"""
             WITH game_cte AS (
-                SELECT p.game_id, p.disc_id, g.guild_id, g.win, g.timestamp
-                FROM games g
-                INNER JOIN participants p
+                SELECT
+                    p.game_id,
+                    p.disc_id,
+                    g.guild_id,
+                    g.win,
+                    g.timestamp
+                FROM {games_table} AS g
+                INNER JOIN {stats_table} AS p
                 ON p.game_id = g.game_id
-                INNER JOIN registered_summoners rs
-                ON rs.disc_id = p.disc_id
-                WHERE rs.active = 1
-                {delim_str_1}
-                {delim_str_2}
+                INNER JOIN {users_table} AS u
+                ON u.disc_id = p.disc_id
+                WHERE
+                    u.active = 1
+                    {delim_str_1}
+                    {delim_str_2}
             )
             SELECT
                 games.c,
@@ -655,48 +691,76 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, *params).fetchone()
 
-    def get_longest_game(self, time_after=None, time_before=None, guild_id=None):
+    def get_longest_game(self, game, time_after=None, time_before=None, guild_id=None):
+        games_table = self._get_games_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
-
-        query = f"SELECT MAX(duration), timestamp FROM games{delim_str}"
+        query = f"""
+            SELECT
+                MAX(duration),
+                timestamp
+            FROM {games_table}
+            {delim_str}
+        """
 
         with self:
             return self.execute_query(query, *params).fetchone()
 
-    def get_champs_played(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+    def get_league_champs_played(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        game = "lol"
+        games_table = self._get_games_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
+        query = f"""
+            SELECT COUNT(DISTINCT champ_id)
+            FROM participants AS p
+            JOIN {games_table} g
+                ON p.game_id = g.game_id
+                {delim_str}
+        """
 
         with self:
-            query = f"""
-                SELECT COUNT(DISTINCT champ_id)
-                FROM participants AS p
-                JOIN games g
-                    ON p.game_id = g.game_id{delim_str}
-            """
             return self.execute_query(query, *params).fetchone()[0]
 
     def get_champ_with_most_intfars(self, disc_id):
-        with self:
-            query = """
-                SELECT sub.champ_id, MAX(sub.c) FROM (
-                    SELECT COUNT(DISTINCT p.game_id) AS c, champ_id FROM games g
-                    JOIN participants p
-                    ON p.game_id=g.game_id AND g.intfar_id=p.disc_id
-                    WHERE g.intfar_id=? AND g.intfar_id IS NOT NULL
-                    GROUP BY champ_id
-                ) sub
-            """
-            return self.execute_query(query, disc_id).fetchone()
+        game = "lol"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        query = f"""
+            SELECT sub.champ_id, MAX(sub.c) FROM (
+                SELECT
+                    COUNT(DISTINCT p.game_id) AS c,
+                    champ_id FROM {games_table} AS g
+                JOIN {stats_table} AS p
+                ON p.game_id = g.game_id
+                    AND g.intfar_id = p.disc_id
+                WHERE
+                    g.intfar_id IS NOT NULL
+                    AND g.intfar_id = ?
+                GROUP BY champ_id
+            ) sub
+        """
 
-    def get_intfar_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        with self:
+            return self.execute_query(query, game, disc_id).fetchone()
+
+    def get_intfar_count(self, game, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        games_table = self._get_games_table(game)
+        users_table = self._get_users_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id, "AND")
 
         query_intfars = f"""
-            SELECT SUM(sub.intfars) FROM (
-                SELECT COUNT(*) AS intfars FROM (
-                   SELECT DISTINCT g.game_id, intfar_id FROM games AS g
-                   LEFT JOIN registered_summoners rs ON rs.disc_id=intfar_id
-                  WHERE intfar_id IS NOT NULL AND rs.active = 1{delim_str}
+            SELECT SUM(sub.intfars)
+            FROM (
+                SELECT COUNT(*) AS intfars
+                FROM (
+                    SELECT DISTINCT
+                        g.game_id,
+                        intfar_id
+                    FROM {games_table} AS g
+                    LEFT JOIN {users_table} u
+                    ON u.disc_id=intfar_id
+                  WHERE
+                    intfar_id IS NOT NULL
+                    AND u.active = 1{delim_str}
                 ) sub_2
                 GROUP BY sub_2.intfar_id
             ) sub
@@ -706,17 +770,23 @@ class Database(SQLiteDatabase):
             intfars = self.execute_query(query_intfars, *params).fetchone()
             return (intfars[0] if intfars is not None else 0) or 0
 
-    def get_intfar_reason_counts(self):
-        query_intfar_multis = """
+    def get_intfar_reason_counts(self, game):
+        games_table = self._get_games_table(game)
+        users_table = self._get_users_table(game)
+
+        query_intfar_multis = f"""
             SELECT intfar_reason
-            FROM games
-            LEFT JOIN registered_summoners rs
-                ON rs.disc_id=intfar_id
-            WHERE intfar_id IS NOT NULL AND rs.active=1
+            FROM {games_table}
+            LEFT JOIN {users_table} u
+                ON u.disc_id=intfar_id
+            WHERE
+                intfar_id IS NOT NULL
+                AND u.active=1
             GROUP BY game_id
         """
+
         with self:
-            intfar_multis_data = self.execute_query(query_intfar_multis).fetchall()
+            intfar_multis_data = self.execute_query(query_intfar_multis, game).fetchall()
 
             intfar_counts = [0, 0, 0, 0]
             intfar_multi_counts = {
@@ -735,28 +805,38 @@ class Database(SQLiteDatabase):
 
             return intfar_counts, intfar_multis
 
-    def get_total_winrate(self, disc_id):
-        query = """
+    def get_total_winrate(self, game, disc_id):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+
+        query = f"""
             SELECT (wins.c / played.c) * 100 FROM (
                 SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
-                FROM games AS g
-                LEFT JOIN participants p
-                    ON g.game_id=p.game_id
-                WHERE disc_id=? AND win=1
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
+                WHERE
+                    disc_id = ?
+                    AND win=1
             ) wins,
             (
                 SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
-                FROM games AS g
-                LEFT JOIN participants p
-                    ON g.game_id=p.game_id
-                WHERE disc_id=?
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
+                WHERE disc_id = ?
             ) played
         """
+    
         with self:
-            return self.execute_query(query, disc_id, disc_id).fetchone()[0]
+            return self.execute_query(query, game, disc_id, game, disc_id).fetchone()[0]
 
-    def get_champ_winrate(self, disc_id, champ_id):
-        query = """
+    def get_league_champ_winrate(self, disc_id, champ_id):
+        game = "lol"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+
+        query = f"""
             SELECT
                 (wins.c / played.c) * 100 AS wr,
                 played.c AS gs
@@ -764,32 +844,37 @@ class Database(SQLiteDatabase):
                 SELECT
                     CAST(COALESCE(COUNT(DISTINCT g.game_id), 0) as real) AS c,
                     champ_id
-                FROM games AS g
-                LEFT JOIN participants p
-                    ON g.game_id=p.game_id
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
                 WHERE
-                    disc_id=?
-                    AND champ_id=?
-                    AND win=1
+                    disc_id = ?
+                    AND champ_id = ?
+                    AND win = 1
             ) wins,
             (
                 SELECT
                     CAST(COUNT(DISTINCT g.game_id) as real) AS c,
                     champ_id
-                FROM games AS g
-                LEFT JOIN participants p
-                    ON g.game_id=p.game_id
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
                 WHERE
-                    disc_id=?
-                    AND champ_id=?
+                    disc_id = ?
+                    AND champ_id = ?
             ) played
             WHERE wins.champ_id = played.champ_id OR wins.champ_id IS NULL
         """
 
         with self:
-            return self.execute_query(query, disc_id, champ_id, disc_id, champ_id).fetchone()
+            params = [game, disc_id, champ_id] * 2
+            return self.execute_query(query, *params).fetchone()
 
-    def get_min_or_max_winrate_champ(self, disc_id, best, included_champs=None, return_top_n=1, min_games=10):
+    def get_min_or_max_league_winrate_champ(self, disc_id, best, included_champs=None, return_top_n=1, min_games=10):
+        game = "lol"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+
         sort_order = "DESC" if best else "ASC"
         if included_champs is not None:
             champs_condition = (
@@ -813,11 +898,12 @@ class Database(SQLiteDatabase):
                 FROM (
                     SELECT
                         CAST(COUNT(DISTINCT g.game_id) as real) AS c,
-                        champ_id FROM games AS g
-                    LEFT JOIN participants p 
-                        ON g.game_id=p.game_id
+                        champ_id
+                    FROM {games_table} AS g
+                    LEFT JOIN {stats_table} AS p 
+                        ON g.game_id = p.game_id
                     WHERE
-                        disc_id=?
+                        disc_id = ?
                         AND win=1
                     GROUP BY champ_id
                     ORDER BY champ_id
@@ -826,65 +912,72 @@ class Database(SQLiteDatabase):
                 SELECT
                     CAST(COUNT(DISTINCT g.game_id) as real) AS c,
                     champ_id
-                FROM games AS g
-                    LEFT JOIN participants p
-                        ON g.game_id=p.game_id
-                    WHERE disc_id=?
-                    GROUP BY champ_id
-                    ORDER BY champ_id
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
+                WHERE disc_id = ?
+                GROUP BY champ_id
+                ORDER BY champ_id
                ) played
                WHERE
                     wins.champ_id = played.champ_id
                     AND played.c > {min_games}
                     {champs_condition}
             ) sub
-            ORDER BY sub.wr {sort_order}, sub.gs DESC
+            ORDER BY
+                sub.wr {sort_order},
+                sub.gs DESC
             LIMIT {return_top_n}
         """
 
         with self:
-            result = self.execute_query(query, disc_id, disc_id).fetchall()
+            params = [game, disc_id] * 2
+            result = self.execute_query(query, *params).fetchall()
 
             if return_top_n == 1:
                 result = result[0]
 
             if result is None and min_games == 10:
                 # If no champs are found with min 10 games, try again with 5.
-                return self.get_min_or_max_winrate_champ(disc_id, best, included_champs, return_top_n, min_games=5)
+                return self.get_min_or_max_league_winrate_champ(disc_id, best, included_champs, return_top_n, min_games=5)
 
             return result
 
-    def get_winrate_relation(self, disc_id, best, min_games=10):
-        query_games = """
+    def get_winrate_relation(self, game, disc_id, best, min_games=10):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+
+        query_games = f"""
             SELECT
                 p2.disc_id,
                 Count(*) as c
             FROM
-                participants p1,
-                participants p2
+                {stats_table} p1,
+                {stats_table} p2
             WHERE
                 p1.disc_id != p2.disc_id
                 AND p1.game_id = p2.game_id
-                AND p1.disc_id=?
+                AND p1.disc_id = ?
             GROUP BY
                 p1.disc_id,
                 p2.disc_id
             ORDER BY c DESC
         """
-        query_wins = """
+        query_wins = f"""
             SELECT
                 p2.disc_id,
                 Count(*) as c
             FROM
-                games g,
-                participants p1,
-                participants p2
+                {games_table} AS g,
+                {stats_table} p1,
+                {stats_table} p2
             WHERE
                 p1.disc_id != p2.disc_id
                 AND g.game_id = p1.game_id
                 AND g.game_id = p2.game_id
                 AND p1.game_id = p2.game_id
-                AND p1.disc_id=? AND win=1
+                AND p1.disc_id = ?
+                AND win = 1
             GROUP BY
                 p1.disc_id,
                 p2.disc_id
@@ -894,7 +987,7 @@ class Database(SQLiteDatabase):
         with self:
             games_with_person = {}
             wins_with_person = {}
-            for part_id, wins in self.execute_query(query_wins, disc_id):
+            for part_id, wins in self.execute_query(query_wins, game, disc_id):
                 if disc_id == part_id or not self.user_exists(part_id):
                     continue
                 wins_with_person[part_id] = wins
@@ -917,20 +1010,24 @@ class Database(SQLiteDatabase):
 
             return func(winrate_with_person, key=lambda x: x[2])
 
-    def get_played_champs(self, disc_id):
+    def get_played_league_champs(self, disc_id):
+        game = "lol"
+        stats_table = self._get_participants_table(game)
+
         with self:
-            query = "SELECT DISTINCT champ_id FROM participants WHERE disc_id=?"
+            query = f"SELECT DISTINCT champ_id FROM {stats_table} WHERE disc_id=?"
             return self.execute_query(query, disc_id).fetchall()
 
-    def get_meta_stats(self):
-        query_persons = "SELECT Count(*) FROM participants as p GROUP BY game_id"
+    def get_meta_stats(self, game):
+        stats_table = self._get_participants_table(game)
+        query_persons = f"SELECT Count(*) FROM {stats_table} as p GROUP BY game_id"
 
         users = (len(self.summoners),)
         with self:
-            game_data = self.get_games_count()
-            longest_game = self.get_longest_game()
-            intfar_data = self.get_intfar_count()
-            doinks_data = self.get_doinks_count()
+            game_data = self.get_games_count(game)
+            longest_game = self.get_longest_game(game)
+            intfar_data = self.get_intfar_count(game)
+            doinks_data = self.get_doinks_count(game)
             persons_counts = self.execute_query(query_persons)
             persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
             for persons in persons_counts:
@@ -941,7 +1038,7 @@ class Database(SQLiteDatabase):
             fives_ratio = int((persons_count[5] / game_data[0]) * 100)
             games_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
 
-            intfar_counts, intfar_multis_counts = self.get_intfar_reason_counts()
+            intfar_counts, intfar_multis_counts = self.get_intfar_reason_counts(game)
             intfar_ratios = [(count / intfar_data) * 100 for count in intfar_counts]
             intfar_multis_ratios = [(count / intfar_data) * 100 for count in intfar_multis_counts]
 
@@ -969,32 +1066,34 @@ class Database(SQLiteDatabase):
         max_timestamp = int(curr_time.timestamp())
         return f"timestamp > {min_timestamp} AND timestamp < {max_timestamp}"
 
-    def get_intfars_of_the_month(self):
+    def get_intfars_of_the_month(self, game):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
         delim_str = self.get_monthly_delimiter()
 
         query_intfars = f"""
             SELECT intfar_id
-            FROM games g
-            LEFT JOIN registered_summoners rs
-                ON rs.disc_id=intfar_id
+            FROM {games_table} AS g
+            LEFT JOIN {users_table} AS u
+                ON u.disc_id = intfar_id
             WHERE
                 intfar_id IS NOT NULL
                 AND {delim_str}
-                AND rs.active=1
+                AND u.active = 1
             GROUP BY g.game_id
         """
         query_games = f"""
             SELECT p.disc_id
             FROM
-                games g,
-                participants p
-            LEFT JOIN
-            registered_summoners rs
-                ON rs.disc_id=p.disc_id
+                {games_table} AS g
+            LEFT JOIN {stats_table} AS p
+                ON g.game_id = p.game_id
+            LEFT JOIN {users_table} AS u
+                ON u.disc_id=p.disc_id
             WHERE
-                g.game_id=p.game_id
-                AND {delim_str}
-                AND rs.active=1
+                {delim_str}
+                AND u.active = 1
             GROUP BY
                 g.game_id,
                 p.disc_id
@@ -1033,18 +1132,20 @@ class Database(SQLiteDatabase):
 
             return sorted(pct_intfars, key=lambda x: (x[3], x[2]), reverse=True)
 
-    def get_longest_intfar_streak(self, disc_id):
-        query = """
-            SELECT intfar_id, timestamp
-            FROM games
-            LEFT JOIN registered_summoners rs
-                ON intfar_id=rs.disc_id
+    def get_longest_intfar_streak(self, game, disc_id):
+        games_table = self._get_games_table(game)
+
+        query = f"""
+            SELECT
+                intfar_id,
+                timestamp
+            FROM {games_table}
             GROUP BY game_id
             ORDER BY game_id
         """
 
         with self:
-            int_fars = self.execute_query(query).fetchall()
+            int_fars = self.execute_query(query, game).fetchall()
             max_count = 0
             timestamp_ended = None
             count = 0
@@ -1063,21 +1164,26 @@ class Database(SQLiteDatabase):
 
             return max_count, timestamp_ended
 
-    def get_longest_no_intfar_streak(self, disc_id):
+    def get_longest_no_intfar_streak(self, game, disc_id):
         if not self.user_exists(disc_id):
             return 0
 
-        query = """
-            SELECT intfar_id, timestamp
-            FROM participants p
-            LEFT JOIN games g
-                ON g.game_id=p.game_id
-            WHERE p.disc_id=?
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+
+        query = f"""
+            SELECT
+                intfar_id,
+                timestamp
+            FROM {stats_table} AS p
+            LEFT JOIN {games_table} AS g
+                ON g.game_id = p.game_id
+            WHERE p.disc_id = ?
             ORDER BY g.game_id ASC
         """
 
         with self:
-            int_fars = self.execute_query(query, disc_id).fetchall()
+            int_fars = self.execute_query(query, game, disc_id).fetchall()
             max_count = 0
             timestamp_ended = None
             count = 0
@@ -1100,19 +1206,22 @@ class Database(SQLiteDatabase):
 
             return max_count, timestamp_ended
 
-    def get_current_intfar_streak(self):
-        query = """
+    def get_current_intfar_streak(self, game):
+        games_table = self._get_games_table(game)
+        users_table = self._get_users_table(game)
+
+        query = f"""
             SELECT intfar_id
-            FROM games
-            LEFT JOIN registered_summoners rs
-                ON intfar_id=rs.disc_id
-            WHERE rs.active
+            FROM {games_table}
+            LEFT JOIN {users_table} AS u
+                ON intfar_id=u.disc_id
+            WHERE u.active = 1
             GROUP BY game_id
             ORDER BY game_id DESC
         """
 
         with self:
-            int_fars = self.execute_query(query).fetchall()
+            int_fars = self.execute_query(query, game).fetchall()
             prev_intfar = int_fars[0][0]
             for count, int_far in enumerate(int_fars[1:], start=1):
                 if int_far[0] is None or prev_intfar != int_far[0]:
@@ -1120,22 +1229,27 @@ class Database(SQLiteDatabase):
 
             return len(int_fars), prev_intfar # All the Int-Fars is the current int-far!
 
-    def get_longest_win_or_loss_streak(self, disc_id, win):
-        query = """
+    def get_longest_win_or_loss_streak(self, game, disc_id, win):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+
+        query = f"""
             SELECT g.win
-            FROM games AS g
-            INNER JOIN participants AS p
+            FROM {games_table} AS g
+            INNER JOIN {stats_table} AS p
                 ON p.game_id = g.game_id
-            INNER JOIN registered_summoners AS rs
-                ON p.disc_id=rs.disc_id
-            WHERE p.disc_id=?
-                AND rs.active
+            INNER JOIN {users_table} AS u
+                ON p.disc_id = u.disc_id
+            WHERE
+                p.disc_id = ?
+                AND u.active
             GROUP BY g.game_id
             ORDER BY g.game_id DESC
         """
 
         with self:
-            games = self.execute_query(query, disc_id).fetchall()
+            games = self.execute_query(query, game, disc_id).fetchall()
 
             max_count = 0
             count = 0
@@ -1150,22 +1264,27 @@ class Database(SQLiteDatabase):
 
             return max_count
 
-    def get_current_win_or_loss_streak(self, disc_id, win, offset=0):
-        query = """
+    def get_current_win_or_loss_streak(self, game, disc_id, win, offset=0):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+
+        query = f"""
             SELECT g.win
-            FROM games AS g
-            INNER JOIN participants AS p
+            FROM {games_table} AS g
+            INNER JOIN {stats_table} AS p
                 ON p.game_id = g.game_id
-            INNER JOIN registered_summoners AS rs
-                ON p.disc_id=rs.disc_id
-            WHERE p.disc_id=?
-                AND rs.active
+            INNER JOIN {users_table} AS u
+                ON p.disc_id = u.disc_id
+            WHERE
+                p.disc_id = ?
+                AND u.active
             GROUP BY g.game_id
             ORDER BY g.game_id DESC
         """
 
         with self:
-            games = self.execute_query(query, disc_id).fetchall()
+            games = self.execute_query(query, game, disc_id).fetchall()
 
             count_offset = 1 if offset == 0 else 0
 
@@ -1177,8 +1296,12 @@ class Database(SQLiteDatabase):
 
             return len(games) + total_offset
 
-    def get_max_intfar_details(self):
-        query = """
+    def get_max_intfar_details(self, game):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+
+        query = f"""
             SELECT
                 MAX(pcts.pct),
                 pcts.intboi
@@ -1190,7 +1313,7 @@ class Database(SQLiteDatabase):
                     SELECT
                         intfar_id,
                         CAST(Count(*) as real) as c
-                    FROM games
+                    FROM {games_table}
                     WHERE intfar_id IS NOT NULL
                     GROUP BY intfar_id
                 ) AS intfar_counts,
@@ -1198,31 +1321,31 @@ class Database(SQLiteDatabase):
                     SELECT
                         disc_id,
                         CAST(Count(*) as real) as c
-                    FROM participants
+                    FROM {stats_table}
                     GROUP BY disc_id
                 ) AS games_counts
                 WHERE
-                    intfar_id=disc_id
+                    intfar_id = disc_id
                     AND games_counts.c > 10
             ) AS pcts,
-            registered_summoners as rs
-            WHERE
-                rs.disc_id=pcts.intboi
-                AND rs.active=1
+            INNER JOIN {users_table} AS u
+            WHERE u.active = 1
         """
 
         with self:
-            return self.execute_query(query).fetchone()
+            return self.execute_query(query, game).fetchone()
 
-    def get_intfar_stats(self, disc_id, monthly=False, time_after=None, time_before=None, guild_id=None):
+    def get_intfar_stats(self, game, disc_id, monthly=False, time_after=None, time_before=None, guild_id=None):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
         params_1 = []
         params_2 = []
 
         if monthly:
             monthly_delim = self.get_monthly_delimiter()
             if disc_id is not None:
-                delim_str_1 = f" WHERE disc_id=? AND {monthly_delim}"
-                delim_str_2 = f" WHERE intfar_id=? AND {monthly_delim}"
+                delim_str_1 = f" WHERE disc_id = ? AND {monthly_delim}"
+                delim_str_2 = f" WHERE intfar_id = ? AND {monthly_delim}"
                 params_1 = [disc_id]
                 params_2 = [disc_id]
             else:
@@ -1234,15 +1357,17 @@ class Database(SQLiteDatabase):
 
         query_total = f"""
             SELECT Count(*)
-            FROM games AS g
-            JOIN participants p
-                ON g.game_id = p.game_id{delim_str_1}
+            FROM {games_table} AS g
+            JOIN {stats_table} AS p
+                ON g.game_id = p.game_id
+            WHERE {delim_str_1}
         """
         query_intfar = f"""
             SELECT intfar_reason
-            FROM games g
-            JOIN participants p 
-                ON g.game_id=p.game_id{delim_str_2}
+            FROM {games_table} AS g
+            JOIN {stats_table} AS p 
+                ON g.game_id = p.game_id
+            WHERE {delim_str_2}
             GROUP BY g.game_id
         """
 
@@ -1251,34 +1376,37 @@ class Database(SQLiteDatabase):
             intfar_games = self.execute_query(query_intfar, *params_2).fetchall()
             return total_games, intfar_games
 
-    def get_intfar_relations(self, disc_id):
-        query_games = """
+    def get_intfar_relations(self, game, disc_id):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+
+        query_games = f"""
             SELECT
                 p2.disc_id,
-                Count(*) as c
+                COUNT(*) AS c
             FROM
-                participants p1,
-                participants p2
+                {stats_table} AS p1,
+                {stats_table} AS p2
             WHERE
                 p1.disc_id != p2.disc_id
                 AND p1.game_id = p2.game_id
-                AND p1.disc_id=?
+                AND p1.disc_id = ?
             GROUP BY
                 p1.disc_id,
                 p2.disc_id
             ORDER BY c DESC
         """
-        query_intfars = """
+        query_intfars = f"""
             SELECT
                 disc_id,
-                Count(*) as c
+                COUNT(*) AS c
             FROM
-                games g,
-                participants p
+                {games_table} AS g,
+                {stats_table} AS p
             WHERE
                 intfar_id IS NOT NULL
-                AND g.game_id=p.game_id
-                AND intfar_id=?
+                AND g.game_id = p.game_id
+                AND intfar_id = ?
             GROUP BY disc_id
             ORDER BY c DESC
         """
@@ -1287,7 +1415,7 @@ class Database(SQLiteDatabase):
             games_with_person = {}
             intfars_with_person = {}
 
-            for part_id, intfars in self.execute_query(query_intfars, disc_id):
+            for part_id, intfars in self.execute_query(query_intfars, game, disc_id):
                 if disc_id == part_id or not self.user_exists(part_id):
                     continue
                 intfars_with_person[part_id] = intfars
@@ -1298,54 +1426,59 @@ class Database(SQLiteDatabase):
 
             return games_with_person, intfars_with_person
 
-    def get_doinks_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+    def get_doinks_stats(self, game, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
 
         query = f"""
             SELECT doinks
-            FROM participants AS p
-            LEFT JOIN registered_summoners rs
-                ON rs.disc_id=p.disc_id
-            LEFT JOIN games g
+            FROM {stats_table} AS p
+            LEFT JOIN {users_table} AS u
+                ON u.disc_id = p.disc_id
+            LEFT JOIN {games_table} AS g
                 ON p.game_id = g.game_id
             WHERE
                 doinks IS NOT NULL
-                AND rs.active=1{delim_str}
+                AND u.active = 1
+                {delim_str}
             GROUP BY g.game_id
         """
 
         with self:
             return self.execute_query(query, *params).fetchall()
 
-    def get_doinks_relations(self, disc_id):
-        query_games = """
+    def get_doinks_relations(self, game, disc_id):
+        stats_table = self._get_participants_table(game)
+        query_games = f"""
             SELECT
                 p2.disc_id,
                 Count(*) as c
             FROM
-                participants p1,
-                participants p2
+                {stats_table} p1,
+                {stats_table} p2
             WHERE
                 p1.disc_id != p2.disc_id
                 AND p1.game_id = p2.game_id
-                AND p1.disc_id=?
+                AND p1.disc_id = ?
             GROUP BY
                 p1.disc_id,
                 p2.disc_id
             ORDER BY c DESC
         """
-        query_doinks = """
+        query_doinks = f"""
             SELECT
                 p2.disc_id,
                 Count(*) as c
             FROM
-                participants p1,
-                participants p2
+                {stats_table} p1,
+                {stats_table} p2
             WHERE
                 p1.disc_id != p2.disc_id
                 AND p1.game_id = p2.game_id
                 AND p1.doinks IS NOT NULL
-                AND p1.disc_id=?
+                AND p1.disc_id = ?
             GROUP BY
                 p1.disc_id,
                 p2.disc_id
@@ -1367,7 +1500,10 @@ class Database(SQLiteDatabase):
 
             return games_with_person, doinks_with_person
 
-    def get_performance_score(self, disc_id=None):
+    def get_performance_score(self, game, disc_id=None):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
         intfar_weight = 1
         doinks_weight = 1
         winrate_weight = 2
@@ -1383,13 +1519,13 @@ class Database(SQLiteDatabase):
 
         query_select = f"   SELECT played.disc_id AS user, {equation} AS score FROM "
 
-        query_subs = """
+        query_subs = f"""
                 (
                     SELECT
                         CAST(COUNT(DISTINCT g.game_id) AS real) AS c,
                         disc_id
-                    FROM games g
-                    JOIN participants p
+                    FROM {games_table} AS g
+                    JOIN {stats_table} AS p
                         ON g.game_id = p.game_id
                     GROUP BY disc_id
                 ) played,
@@ -1397,8 +1533,8 @@ class Database(SQLiteDatabase):
                     SELECT
                         CAST(COUNT(DISTINCT g.game_id) AS real) AS c,
                         disc_id
-                    FROM games g
-                    JOIN participants p
+                    FROM {games_table} AS g
+                    JOIN {stats_table} AS p
                         ON g.game_id = p.game_id
                     WHERE win=1
                     GROUP BY disc_id
@@ -1407,7 +1543,7 @@ class Database(SQLiteDatabase):
                     SELECT
                         CAST(COUNT(*) AS real) AS c,
                         intfar_id
-                    FROM games
+                    FROM {games_table} AS g
                     GROUP BY intfar_id
                 ) intfars,
                 (
@@ -1419,7 +1555,7 @@ class Database(SQLiteDatabase):
                             DISTINCT game_id,
                             doinks,
                             disc_id
-                        FROM participants
+                        FROM {stats_table}
                         WHERE doinks IS NOT NULL
                     ) doinks_sub
                     GROUP BY doinks_sub.disc_id
@@ -1432,9 +1568,9 @@ class Database(SQLiteDatabase):
                     AND wins.disc_id = doinks.disc_id
                     AND intfars.intfar_id = doinks.disc_id
             ) sub
-            LEFT JOIN registered_summoners rs
-                ON sub.user = rs.disc_id
-            WHERE active=1
+            LEFT JOIN {users_table} AS u
+                ON sub.user = u.disc_id
+            WHERE u.active = 1
             GROUP BY sub.user
             ORDER BY sub.score DESC
         """
@@ -1456,7 +1592,7 @@ class Database(SQLiteDatabase):
 
             return score, rank+1, len(performance_scores)
 
-    def get_stat_data(self, stat_key, stat_name, data, reverse_order=False, total_kills=0):
+    def get_stat_data(self, stat_key, stat_name, data: GameStats, reverse_order=False, total_kills=0):
         (
             min_stat_id, min_stat,
             max_stat_id, max_stat
@@ -1481,7 +1617,7 @@ class Database(SQLiteDatabase):
 
         return min_stat_id, min_stat, max_stat_id, max_stat, best_ever, best_ever_id, worst_ever, worst_ever_id
 
-    def record_stats(self, intfar_id, intfar_reason, doinks, game_id, data, users_in_game, guild_id):
+    def record_stats(self, parsed_game_stats: GameStats):
         kills_by_our_team = data[0][1]["kills_by_team"]
         timestamp = data[0][1]["timestamp"] // 1000
         duration = data[0][1]["gameDuration"]

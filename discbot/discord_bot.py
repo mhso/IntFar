@@ -17,7 +17,11 @@ from discbot.app_listener import listen_for_request
 from discbot import commands
 from discbot.commands.meta import handle_usage_msg
 from api import game_stats, bets, award_qualifiers
+from api.game_data import get_stat_parser
+from api.game_stats import GameStats
 from api.game_monitor import GameMonitor
+from api.game_monitoring.lol import LoLGameMonitor
+from api.game_monitoring.csgo import CSGOGameMonitor
 from api.database import DBException, Database
 from api.bets import BettingHandler
 from api.audio_handler import AudioHandler
@@ -228,7 +232,7 @@ class DiscordClient(discord.Client):
         self.steam_api = SteamAPIClient(self.config)
         self.steam_api.login()
 
-        streamscape = None#Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
+        streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
         self.audio_handler = AudioHandler(self.config, streamscape)
         self.shop_handler = ShopHandler(self.config, self.database)
 
@@ -236,12 +240,11 @@ class DiscordClient(discord.Client):
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
 
-        self.game_monitor = GameMonitor(
-            self.config,
-            self.database,
-            self.riot_api,
-            self.on_game_over
-        )
+        self.game_monitors: dict[str, GameMonitor] = {
+            "lol": LoLGameMonitor(self.config, self.database, self.riot_api, self.on_lol_game_over),
+            #"csgo": CSGOGameMonitor(self.config, self.database, self.riot_api, self.on_csgo_game_over),
+        }
+
         self.pagination_data = {}
         self.audio_action_data = {}
         self.cached_avatars = {}
@@ -263,7 +266,7 @@ class DiscordClient(discord.Client):
             file = discord.File(b_io, filename="predictions.png")
             await channel.send("Odds of winning throughout the game:", file=file)
 
-    async def on_game_over(self, game_info: dict, guild_id: int, status_code: int):
+    async def on_lol_game_over(self, game_info: dict, guild_id: int, status_code: int):
         """
         Callback called by the game monitor when a game is finished.
 
@@ -272,12 +275,14 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         :param status_code: Integer that describes the status of the finished game
         """
-        if status_code == self.game_monitor.POSTGAME_STATUS_ERROR:
+        game_monitor: LoLGameMonitor = self.game_monitors["lol"]
+
+        if status_code == game_monitor.POSTGAME_STATUS_ERROR:
             # Something went terribly wrong when handling the end of game logic
             # Send error message to Discord to indicate things went bad.
             await self.send_error_msg(guild_id)
 
-        if status_code == self.game_monitor.POSTGAME_STATUS_MISSING:
+        if status_code == game_monitor.POSTGAME_STATUS_MISSING:
             self.database.save_missed_game(game_info["gameId"], guild_id, int(time()))
 
             # Send message pinging me about the error.
@@ -289,27 +294,27 @@ class DiscordClient(discord.Client):
 
             await self.send_message_unprompted(message_str, guild_id)
 
-        elif status_code == self.game_monitor.POSTGAME_STATUS_SOLO:
+        elif status_code == game_monitor.POSTGAME_STATUS_SOLO:
             response = "Only one person in that game. "
             response += "no Int-Far will be crowned "
             response += "and no stats will be saved."
             await self.channels_to_write[guild_id].send(response)
 
-        elif status_code == self.game_monitor.POSTGAME_STATUS_URF:
+        elif status_code == game_monitor.POSTGAME_STATUS_URF:
             # Gamemode was URF. Don't save stats then.
             response = "That was an URF game {emote_poggers} "
             response += "no Int-Far will be crowned "
             response += "and no stats will be saved."
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
-        elif status_code == self.game_monitor.POSTGAME_STATUS_NOT_SR:
+        elif status_code == game_monitor.POSTGAME_STATUS_NOT_SR:
             # Game is not on summoners rift. Same deal.
             response = "That game was not on Summoner's Rift "
             response += "{emote_woahpikachu} no Int-Far will be crowned "
             response += "and no stats will be saved."
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
     
-        elif status_code == self.game_monitor.POSTGAME_STATUS_REMAKE:
+        elif status_code == game_monitor.POSTGAME_STATUS_REMAKE:
             # Game was too short, most likely a remake.
             response = (
                 "That game lasted less than 5 minutes " +
@@ -318,10 +323,10 @@ class DiscordClient(discord.Client):
             )
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
         
-        elif status_code == self.game_monitor.POSTGAME_STATUS_OK:
-            await self.handle_game_over(game_info, guild_id)
+        elif status_code == game_monitor.POSTGAME_STATUS_OK:
+            await self.handle_game_over("lol", game_info, guild_id)
 
-    async def handle_game_over(self, game_info: dict, guild_id: int):
+    async def handle_game_over(self, game: str, game_info: dict, guild_id: int):
         """
         Called when a game is over and is valid. Handles all the post-game mentions
         about the intfar, doinks, bets, etc. and handles inserting all the stats
@@ -332,10 +337,8 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         """
         try: # Get formatted stats that are relevant for the players in the game.
-            relevant_stats, users_in_game = game_stats.get_relevant_stats(
-                self.database.summoners, self.game_monitor.users_in_game.get(guild_id), game_info
-            )
-            filtered_stats = game_stats.get_filtered_stats(relevant_stats)
+            stat_parser = get_stat_parser(game, game_info, self.database.users)
+            parsed_game_stats = stat_parser.parse_data()
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito pls).
             logger.bind(game_id=game_info["gameId"]).exception(
@@ -346,10 +349,10 @@ class DiscordClient(discord.Client):
             await self.send_error_msg(guild_id)
             raise exc
 
-        self.game_monitor.users_in_game[guild_id] = users_in_game
-        logger.debug(f"Users in game after: {users_in_game}")
+        self.game_monitors[game].users_in_game[guild_id] = parsed_game_stats.players_in_game
+        logger.debug(f"Users in game after: {parsed_game_stats.players_in_game}")
 
-        if self.riot_api.is_clash(self.game_monitor.active_game[guild_id]["queue_id"]):
+        if self.riot_api.is_clash(self.game_monitors[game].active_game[guild_id]["queue_id"]):
             # Game was played as part of a clash tournament, so it awards more betting tokens.
             multiplier = self.config.clash_multiplier
             await self.channels_to_write[guild_id].send(
@@ -358,19 +361,15 @@ class DiscordClient(discord.Client):
             )
 
         # Determine who was the Int-Far (if anyone was).
-        intfar, intfar_reason, response = self.get_intfar_data(
-            relevant_stats,
-            filtered_stats,
-            guild_id
-        )
+        intfar, intfar_reason, response = self.get_intfar_data(parsed_game_stats)
 
         # Determine who was awarded doinks.
-        doinks, doinks_response = self.get_doinks_data(filtered_stats, guild_id)
+        doinks, doinks_response = self.get_doinks_data(parsed_game_stats.filtered_player_stats, guild_id)
         if doinks_response is not None:
             response += "\n" + self.insert_emotes(doinks_response)
 
         # Get data about win or loss streaks.
-        game_streak_response = self.get_win_loss_streak_data(filtered_stats, guild_id)
+        game_streak_response = self.get_win_loss_streak_data(parsed_game_stats.filtered_player_stats, guild_id)
         if game_streak_response is not None:
             response += "\n" + game_streak_response
 
@@ -380,7 +379,7 @@ class DiscordClient(discord.Client):
     
         # Resolve any active bets made on the game.
         response, max_tokens_id, new_max_tokens_id = self.resolve_bets(
-            filtered_stats, intfar, intfar_reason, doinks, guild_id
+            parsed_game_stats.filtered_player_stats, intfar, intfar_reason, doinks, guild_id
         )
 
         if max_tokens_id != new_max_tokens_id: # Assign new 'goodest_boi' title.
@@ -391,7 +390,7 @@ class DiscordClient(discord.Client):
             timeline_data = self.riot_api.get_game_timeline(game_info["gameId"])
             if timeline_data is not None:
                 timeline_response = self.get_cool_timeline_data(
-                    filtered_stats, timeline_data, guild_id
+                    parsed_game_stats.filtered_player_stats, timeline_data, guild_id
                 )
                 if timeline_response is not None:
                     response = timeline_response + "\n" + response
@@ -399,14 +398,12 @@ class DiscordClient(discord.Client):
             logger.exception("Exception when getting timeline data")
 
         # Get other cool stats about players.
-        cool_stats_response = self.get_cool_stats_data(filtered_stats, guild_id)
+        cool_stats_response = self.get_cool_stats_data(parsed_game_stats.filtered_player_stats, guild_id)
         if cool_stats_response is not None:
             response = cool_stats_response + "\n" + response
 
         # Save data from the game to the database.
-        best_records, worst_records = self.save_stats(
-            filtered_stats, intfar, intfar_reason, doinks, guild_id
-        )
+        best_records, worst_records = self.save_stats(parsed_game_stats)
 
         if best_records != [] or worst_records != []:
             records_response = self.get_beaten_records_msg(
@@ -414,7 +411,7 @@ class DiscordClient(discord.Client):
             )
             response = records_response + "\n" + response
 
-        lifetime_stats = self.get_lifetime_stats_data(filtered_stats, guild_id)
+        lifetime_stats = self.get_lifetime_stats_data(parsed_game_stats.filtered_player_stats, guild_id)
         if lifetime_stats is not None:
             response = lifetime_stats + "\n" + response
 
@@ -442,7 +439,7 @@ class DiscordClient(discord.Client):
 
         if self.config.generate_predictions_img:
             predictions_img = None
-            for disc_id, _, _, _ in users_in_game:
+            for disc_id in parsed_game_stats.players_in_game:
                 if commands_util.ADMIN_DISC_ID == disc_id:
                     predictions_img = api_util.create_predictions_timeline_image()
                     break
@@ -450,30 +447,8 @@ class DiscordClient(discord.Client):
             if predictions_img is not None:
                 await self.send_predictions_timeline_image(predictions_img, guild_id)
 
-    def user_is_registered(self, summ_name: str) -> bool:
-        for _, names, _ in self.database.summoners:
-            if summ_name in names:
-                return True
-        return False
-
-    async def add_user(self, summ_name: str, discord_id: int, guild_id: int) -> str:
-        if self.user_is_registered(summ_name):
-            return "User with that summoner name is already registered."
-        summ_id = self.riot_api.get_summoner_id(summ_name.replace(" ", "%20"))
-        if summ_id is None:
-            return f"Error: Invalid summoner name {self.get_emoji_by_name('PepeHands')}"
-        success, status = self.database.add_user(summ_name, summ_id, discord_id)
-        if success:
-            users_in_voice = self.get_users_in_voice()
-            for guild_id in users_in_voice:
-                for disc_id, _, _ in users_in_voice[guild_id]:
-                    if discord_id == disc_id: # User is already in voice channel.
-                        await self.user_joined_voice(disc_id, guild_id)
-                        break
-        return status
-
     def get_game_start(self, guild_id):
-        return self.game_monitor.game_start.get(guild_id)
+        return self.game_monitor.active_game.get(guild_id, {}).get("start", None)
 
     def get_active_game(self, guild_id):
         return self.game_monitor.active_game.get(guild_id)
@@ -642,15 +617,20 @@ class DiscordClient(discord.Client):
         return None
 
     def get_users_in_voice(self):
-        users_in_voice = {guild_id: [] for guild_id in api_util.GUILD_IDS}
+        users_in_voice = {
+            guild_id: {game: {} for game in api_util.SUPPORTED_GAMES}
+            for guild_id in api_util.GUILD_IDS
+        }
+
         for guild in self.guilds:
             if guild.id in api_util.GUILD_IDS:
                 for channel in guild.voice_channels:
                     members_in_voice = channel.members
                     for member in members_in_voice:
-                        user_info = self.database.summoner_from_discord_id(member.id)
-                        if user_info is not None:
-                            users_in_voice[guild.id].append(user_info)
+                        for game in api_util.SUPPORTED_GAMES:
+                            user_info = self.database.game_user_data_from_discord_id(game, member.id)
+                            if user_info is not None:
+                                users_in_voice[guild.id][game][member.id] = user_info
 
         return users_in_voice
 
@@ -684,7 +664,7 @@ class DiscordClient(discord.Client):
 
     def insert_emotes(self, text):
         """
-        Finds all occurences of '{emote_some_emote}' in the given string and replaces it with
+        Finds all occurrences of '{emote_some_emote}' in the given string and replaces it with
         the id of the actual emote matching 'some_emote'.
         """
         replaced = text
@@ -889,7 +869,7 @@ class DiscordClient(discord.Client):
 
         return response, max_tokens_holder, new_max_tokens_holder
 
-    async def play_event_sounds(self, intfar: int, doinks: list[int], guild_id: int):
+    async def play_event_sounds(self, intfar: int, doinks: list[int], game: str, guild_id: int):
         """
         Play potential Int-Far and Doinks sounds after a game has finished.
 
@@ -901,8 +881,8 @@ class DiscordClient(discord.Client):
         voice_state = None
 
         # Check if any users from the game are in a voice channel.
-        for user_data in self.game_monitor.users_in_game[guild_id]:
-            for voice_user_data in users_in_voice[guild_id]:
+        for user_data in self.game_monitors[game].users_in_game[guild_id]:
+            for voice_user_data in users_in_voice[guild_id][game]:
                 if user_data[0] == voice_user_data[0]:
                     # Get voice state for member in voice chat.
                     member = self.get_member_safe(user_data[0], guild_id)
@@ -1254,12 +1234,7 @@ class DiscordClient(discord.Client):
 
         return self.insert_emotes(message)
 
-    def get_intfar_data(
-        self,
-        relevant_stats: list[tuple],
-        filtered_stats: list[tuple],
-        guild_id: int
-    ):
+    def get_intfar_data(self, parsed_game_stats: GameStats):
         """
         Determines whether a person in a finished game should be crowned Int-Far.
         Returns who the Int-Far is (if any), what conditions they met, and a message
@@ -1279,7 +1254,11 @@ class DiscordClient(discord.Client):
             final_intfar_data,
             ties,
             ties_msg
-        ) = award_qualifiers.get_intfar(relevant_stats, filtered_stats, self.config)
+        ) = award_qualifiers.get_intfar(
+            parsed_game_stats.all_player_stats,
+            parsed_game_stats.filtered_player_stats,
+            self.config
+        )
 
         intfar_streak, prev_intfar = self.database.get_current_intfar_streak()
 
@@ -1304,20 +1283,20 @@ class DiscordClient(discord.Client):
                 full_ties_msg = "There are Int-Far ties! " + ties_msg + "\n"
 
             response = self.get_intfar_message(
-                final_intfar, guild_id, reason, full_ties_msg, intfar_streak, prev_intfar
+                final_intfar, parsed_game_stats.guild_id, reason, full_ties_msg, intfar_streak, prev_intfar
             )
 
         else: # No one was bad enough to be Int-Far.
             logger.info("No Int-Far that game!")
             response = get_no_intfar_flavor_text()
-            honorable_mentions = award_qualifiers.get_honorable_mentions(filtered_stats, self.config)
-            honorable_mention_text = self.get_honorable_mentions_msg(honorable_mentions, guild_id)
+            honorable_mentions = award_qualifiers.get_honorable_mentions(parsed_game_stats.filtered_player_stats, self.config)
+            honorable_mention_text = self.get_honorable_mentions_msg(honorable_mentions, parsed_game_stats.guild_id)
 
             if honorable_mention_text is not None:
                 response += "\n" + honorable_mention_text
 
             # Get info about a potential Int-Far streak the person is currently on.
-            streak_msg = self.get_intfar_streak_msg(None, guild_id, intfar_streak, prev_intfar)
+            streak_msg = self.get_intfar_streak_msg(None, parsed_game_stats.guild_id, intfar_streak, prev_intfar)
             if streak_msg is not None:
                 response += "\n" + streak_msg
 
@@ -1326,6 +1305,9 @@ class DiscordClient(discord.Client):
         reasons_str = "".join(reason_ids)
         if reasons_str == "0000":
             reasons_str = None
+
+        parsed_game_stats.intfar_id = final_intfar
+        parsed_game_stats.intfar_reason = reasons_str
 
         return final_intfar, reasons_str, response
 
@@ -1428,14 +1410,7 @@ class DiscordClient(discord.Client):
 
         return self.insert_emotes(response) if response != "" else None
 
-    def save_stats(
-        self,
-        filtered_stats: list[tuple[int, dict]],
-        intfar_id: int,
-        intfar_reason: str,
-        doinks: dict[int, str],
-        guild_id: int
-    ):
+    def save_stats(self, parsed_game_stats: GameStats):
         """
         Save all the stats after a finished game. This includes who was the Int-Far,
         information about doinks, general information about the game, such as
@@ -1454,11 +1429,7 @@ class DiscordClient(discord.Client):
         """
         try:
             # Save stats to database.
-            best_records, worst_records = self.database.record_stats(
-                intfar_id, intfar_reason, doinks,
-                self.game_monitor.active_game[guild_id]["id"], filtered_stats,
-                self.game_monitor.users_in_game.get(guild_id), guild_id
-            )
+            best_records, worst_records = self.database.record_stats(parsed_game_stats)
 
             # Create backup of database
             self.database.create_backup()
@@ -1496,15 +1467,17 @@ class DiscordClient(discord.Client):
 
         if summoner_info is not None:
             users_in_voice = self.get_users_in_voice()[guild_id]
-            self.game_monitor.set_users_in_voice_channels(users_in_voice, guild_id)
-            logger.debug("Summoner joined voice: " + summoner_info[1][0])
+            for game in users_in_voice:
+                game_monitor = self.game_monitors[game]
+                game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
+                logger.debug("Summoner joined voice: " + summoner_info[1][0])
 
-            if self.game_monitor.should_poll(guild_id):
-                logger.info("Polling is now active!")
-                self.game_monitor.polling_active[guild_id] = True
-                asyncio.create_task(
-                    self.game_monitor.poll_for_game_start(guild_id, guild_name, poll_immediately)
-                )
+                if game_monitor.should_poll(guild_id):
+                    logger.info(f"Polling is now active for {api_util.SUPPORTED_GAMES[game]}!")
+                    game_monitor.polling_active[guild_id] = True
+                    asyncio.create_task(
+                        game_monitor.poll_for_game_start(guild_id, guild_name, poll_immediately)
+                    )
 
             logger.info(f"Active users in {guild_name}: {len(users_in_voice)}")
 
@@ -1521,9 +1494,11 @@ class DiscordClient(discord.Client):
         logger.debug(f"User left voice in {guild_name}: {disc_id}")
 
         users_in_voice = self.get_users_in_voice()[guild_id]
-        self.game_monitor.set_users_in_voice_channels(users_in_voice, guild_id)
-        if self.game_monitor.should_stop_polling(guild_id):
-            self.game_monitor.stop_polling(guild_id)
+        for game in users_in_voice:
+            game_monitor = self.game_monitors[game]
+            game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
+            if game_monitor.should_stop_polling(guild_id):
+                game_monitor.stop_polling(guild_id)
 
     async def remove_intfar_role(self, intfar_id, role_id):
         """
