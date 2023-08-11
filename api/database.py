@@ -1675,22 +1675,25 @@ class Database(SQLiteDatabase):
 
         return beaten_records_best, beaten_records_worst
 
-    def save_missed_game(self, game_id, guild_id, timestamp):
-        query = "INSERT INTO missed_games VALUES (?, ?, ?)"
+    def save_missed_game(self, game, game_id, guild_id, timestamp):
+        query = "INSERT INTO missed_games VALUES (?, ?, ?, ?)"
         with self:
-            self.execute_query(query, game_id, guild_id, timestamp)
+            self.execute_query(query, game_id, game, guild_id, timestamp)
 
-    def get_missed_games(self):
-        query = "SELECT game_id, guild_id FROM missed_games"
+    def get_missed_games(self, game):
+        query = "SELECT game_id, guild_id FROM missed_games WHERE game = ?"
         with self:
-            return self.execute_query(query).fetchall()
+            return self.execute_query(query, game).fetchall()
 
-    def remove_missed_game(self, game_id):
-        query = "DELETE FROM missed_games WHERE game_id=?"
+    def remove_missed_game(self, game, game_id):
+        query = "DELETE FROM missed_games WHERE game_id=? AND game=?"
         with self:
-            self.execute_query(query, game_id)
+            self.execute_query(query, game_id, game)
 
-    def get_lan_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+    def get_league_lan_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        game = "lol"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_games_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
 
         query = f"""
@@ -1707,9 +1710,9 @@ class Database(SQLiteDatabase):
                 vision_wards,
                 vision_score,
                 steals
-            FROM participants
-            INNER JOIN games g
-            ON g.game_id = lan_stats.game_id
+            FROM {stats_table} AS p
+            INNER JOIN {games_table} AS g
+            ON g.game_id = p.game_id
             {delim_str}
         """
 
@@ -1745,7 +1748,9 @@ class Database(SQLiteDatabase):
                 return 0
             return curr_id[0] + 1
 
-    def get_bets(self, only_active, disc_id=None, guild_id=None):
+    def get_bets(self, game, only_active, disc_id=None, guild_id=None):
+        users_table = self._get_users_table(game)
+
         with self:
             query = """
                 SELECT
@@ -1763,10 +1768,10 @@ class Database(SQLiteDatabase):
             if not only_active:
                 query += ", result, payout"
 
-            query += """
+            query += f"""
                 FROM bets
-                LEFT JOIN registered_summoners rs
-                    ON rs.disc_id=better_id
+                LEFT JOIN {users_table} AS u
+                    ON u.disc_id = better_id
                 WHERE
             """
 
@@ -1777,13 +1782,18 @@ class Database(SQLiteDatabase):
 
             params = []
             if disc_id is not None:
-                query += " AND better_id=?"
+                query += " AND better_id = ?"
                 params.append(disc_id)
             if guild_id is not None:
-                query += " AND guild_id=?"
+                query += " AND guild_id = ?"
                 params.append(guild_id)
 
-            query += " AND rs.active=1 GROUP BY id ORDER by id"
+            query += f"""
+                AND u.active=1
+                AND game = '{game}'
+                GROUP BY id
+                ORDER by id
+            """
 
             data = self.execute_query(query, *params).fetchall()
 
@@ -1822,10 +1832,10 @@ class Database(SQLiteDatabase):
 
             return data_for_person if disc_id is None else data_for_person.get(disc_id)
 
-    def get_base_bet_return(self, event_id):
+    def get_base_bet_return(self, game, event_id):
         with self:
-            query = "SELECT max_return FROM betting_events WHERE id=?"
-            return self.execute_query(query, event_id).fetchone()[0]
+            query = "SELECT max_return FROM betting_events WHERE id=? AND game=?"
+            return self.execute_query(query, event_id, game).fetchone()[0]
 
     def get_token_balance(self, disc_id=None):
         with self:
@@ -1874,22 +1884,33 @@ class Database(SQLiteDatabase):
             query = f"UPDATE betting_balance SET tokens=tokens{sign_str}? WHERE disc_id=?"
             self.execute_query(query, amount, disc_id)
 
-    def get_bet_id(self, disc_id, guild_id, event_id, target=None, ticket=None):
+    def get_bet_id(self, game, disc_id, guild_id, event_id, target=None, ticket=None):
         with self:
             if ticket is None:
-                query = (
-                    "SELECT id FROM bets WHERE better_id=? " +
-                    "AND guild_id=? AND event_id=? "
-                )
-                query += "AND (target=? OR target IS NULL) "
-                query += "AND result=0"
-                params = [disc_id, guild_id, event_id, target]
+                query = """
+                    "SELECT id
+                    FROM bets
+                    WHERE
+                        better_id = ?
+                        AND guild_id = ?
+                        AND event_id = ?
+                        AND game = ?
+                        AND target=? OR target IS NULL)
+                        AND result = 0
+                """
+                params = [disc_id, guild_id, event_id, game, target]
             else:
-                query = (
-                    "SELECT id FROM bets WHERE better_id=? "
-                    "AND guild_id=? AND ticket=? AND result=0"
-                )
-                params = [disc_id, guild_id, ticket]
+                query = """
+                    SELECT id
+                    FROM bets
+                    WHERE
+                        better_id = ?
+                        AND guild_id = ?
+                        AND game = ?
+                        AND ticket = ?
+                        AND result = 0
+                """
+                params = [disc_id, guild_id, game, ticket]
 
             result = self.execute_query(query, *params).fetchone()
 
@@ -1905,11 +1926,12 @@ class Database(SQLiteDatabase):
 
             return None if result is None else result[0]
 
-    def make_bet(self, disc_id, guild_id, event_id, amount, game_duration, target_person=None, ticket=None):
+    def make_bet(self, game, disc_id, guild_id, event_id, amount, game_duration, target_person=None, ticket=None):
         query_bet = """
             INSERT INTO bets(
                 better_id,
                 guild_id,
+                game,
                 timestamp,
                 event_id,
                 amount,
@@ -1918,7 +1940,7 @@ class Database(SQLiteDatabase):
                 ticket,
                 result
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         with self:
@@ -1927,6 +1949,7 @@ class Database(SQLiteDatabase):
                 query_bet,
                 disc_id,
                 guild_id,
+                game,
                 0,
                 event_id,
                 amount,
@@ -1939,8 +1962,8 @@ class Database(SQLiteDatabase):
             return self.execute_query("SELECT last_insert_rowid()").fetchone()[0]
 
     def cancel_bet(self, bet_id, disc_id):
-        query_del = "DELETE FROM bets WHERE id=? AND better_id=? AND result=0"
-        query_amount = "SELECT amount FROM bets WHERE id=? AND better_id=? AND result=0"
+        query_del = "DELETE FROM bets WHERE id = ? AND better_id = ? AND result = 0"
+        query_amount = "SELECT amount FROM bets WHERE id = ? AND better_id = ? AND result = 0"
     
         with self:
             amount = self.execute_query(query_amount, bet_id, disc_id).fetchone()[0]
@@ -1986,15 +2009,14 @@ class Database(SQLiteDatabase):
             SELECT
                 disc_id,
                 reports
-            FROM registered_summoners
-            WHERE active=1
+            FROM users
         """
 
         with self:
             params = []
 
             if disc_id is not None:
-                query_select += "AND disc_id=? "
+                query_select += "AND disc_id = ? "
                 params = [disc_id]
             else:
                 query_select += "GROUP BY disc_id "
@@ -2008,8 +2030,7 @@ class Database(SQLiteDatabase):
             SELECT
                 MAX(reports),
                 disc_id
-            FROM registered_summoners
-            WHERE active=1
+            FROM users
         """
 
         with self:
@@ -2018,9 +2039,9 @@ class Database(SQLiteDatabase):
     def report_user(self, disc_id):
         query_update = """
             UPDATE
-                registered_summoners
-            SET reports=reports+1
-            WHERE disc_id=?
+                users
+            SET reports = reports + 1
+            WHERE disc_id = ?
         """
 
         with self:

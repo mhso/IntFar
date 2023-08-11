@@ -56,6 +56,13 @@ game_stats.py fil/klasse til hver spil?
 - `get_doinks_stats`: ❌
 - `get_doinks_relations`: ❌
 - `get_performance_score`: ❌
+- `save_missed_game`: ❌
+- `get_missed_games`: ❌
+- `remove_missed_game`: ❌
+- `get_bets`: ❌
+- `get_base_bet_return`: ❌
+- `get_bet_id?`: ❌
+- `make_bet`: ❌
 
 ### Til discord_bot.py
 - `add_user`: ❌

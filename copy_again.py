@@ -55,14 +55,14 @@ with database_client_1.get_connection() as db_1:
         for data in balances:
             db_2.cursor().execute(query, data)
 
-        query = "INSERT OR IGNORE INTO betting_events(id, max_return) VALUES (?, ?)"
+        query = "INSERT OR IGNORE INTO betting_events(id, game, max_return) VALUES (?, 'lol', ?)"
         for data in events:
             db_2.cursor().execute(query, data)
 
         query = (
-            "INSERT OR IGNORE INTO bets(id, better_id, guild_id, game_id, timestamp, event_id, "
+            "INSERT OR IGNORE INTO bets(id, better_id, guild_id, game_id, game, timestamp, event_id, "
             "amount, game_duration, target, ticket, result, payout) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "VALUES (?, ?, ?, ?, 'lol', ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         for data in bets:
             db_2.cursor().execute(query, data)

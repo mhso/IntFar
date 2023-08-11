@@ -352,7 +352,7 @@ class DiscordClient(discord.Client):
         self.game_monitors[game].users_in_game[guild_id] = parsed_game_stats.players_in_game
         logger.debug(f"Users in game after: {parsed_game_stats.players_in_game}")
 
-        if self.riot_api.is_clash(self.game_monitors[game].active_game[guild_id]["queue_id"]):
+        if game == "lol" and self.riot_api.is_clash(self.game_monitors[game].active_game[guild_id]["queue_id"]):
             # Game was played as part of a clash tournament, so it awards more betting tokens.
             multiplier = self.config.clash_multiplier
             await self.channels_to_write[guild_id].send(

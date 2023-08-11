@@ -107,7 +107,7 @@ def get_tilt_value(recent_games):
     return int((tilt_value / max_value) * 100), color
 
 def get_average_stats(database, lan_info):
-    all_stats = database.get_lan_stats(
+    all_stats = database.get_league_lan_stats(
         time_after=lan_info.start_time,
         time_before=lan_info.end_time,
         guild_id=lan_info.guild_id

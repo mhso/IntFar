@@ -89,6 +89,7 @@ CREATE TABLE [betting_balance] (
 );
 CREATE TABLE [betting_events] (
     [id] INTEGER PRIMARY KEY,
+    [game] NVARCHAR(64),
     [max_return] DECIMAL NOT NULL
 );
 CREATE TABLE [bets] (

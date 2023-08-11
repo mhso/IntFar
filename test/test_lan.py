@@ -41,11 +41,11 @@ class TestWrapper(TestRunner):
 
         #self.database.save_lan_stats(TEST_ID, filtered_stats)
 
-        saved_stats_all = self.database.get_lan_stats()
+        saved_stats_all = self.database.get_league_lan_stats()
 
         self.assert_true(saved_stats_all is not None, "Saved LAN stats all not None.")
 
-        saved_stats_single = self.database.get_lan_stats(267401734513491969)
+        saved_stats_single = self.database.get_league_lan_stats(267401734513491969)
         print(saved_stats_all)
         print(saved_stats_single)
 
