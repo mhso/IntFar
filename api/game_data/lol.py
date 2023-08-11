@@ -18,9 +18,14 @@ class LoLPlayerStats(PlayerStats):
     vision_score: int
     steals: int
     lane: str
+    role: str
+    pentakills: int
+    total_time_dead: int
+    turret_kills: int
+    inhibitor_kills: int
 
     def stats_to_save(self):
-        return super().stats_to_save() + [
+        return super().stats_to_save + [
             "champ_id",
             "damage",
             "cs",
@@ -45,11 +50,11 @@ class LoLGameStats(GameStats):
     enemy_herald_kills: int
 
     def stats_to_save(self):
-        return super().stats_to_save() + ["first_blood"]
+        return super().stats_to_save + ["first_blood"]
 
 class LoLGameStatsParser(GameStatsParser):
-    def __init__(self, data_dict, all_users, guild_id):
-        super().__init__(data_dict, all_users, guild_id)
+    def __init__(self, game, data_dict, all_users, guild_id):
+        super().__init__(game, data_dict, all_users, guild_id)
 
     def parse_data(self) -> GameStats:
         if "participantIdentities" in self.raw_data: # Old match v4 data.
@@ -94,7 +99,12 @@ class LoLGameStatsParser(GameStatsParser):
                                 vision_wards=participant["stats"]["visionWardsBoughtInGame"],
                                 vision_score=participant["stats"]["visionScore"],
                                 steals=participant["stats"]["objectivesStolen"],
-                                lane=participant["stats"]["role"]
+                                lane=participant["stats"]["role"],
+                                role=participant["stats"]["role"],
+                                pentakills=participant["stats"]["pentaKills"],
+                                total_time_dead=participant["stats"]["totalTimeSpentDead"],
+                                turret_kills=participant["stats"]["turretKills"],
+                                inhibitor_kills=participant["stats"]["inhibitorKills"]
                             )
                             player_stats.append((disc_id, stats_for_player))
 
@@ -131,10 +141,11 @@ class LoLGameStatsParser(GameStatsParser):
                 first_blood_id = disc_id
 
         return LoLGameStats(
+            game=self.game,
             game_id=self.raw_data["gameId"],
             timestamp=self.raw_data["gameCreation"],
             duration=int(self.raw_data["gameDuration"]),
-            win=game_win,
+            win=int(game_win),
             kills_by_our_team=kills_per_team[our_team],
             guild_id=self.guild_id,
             players_in_game=active_users,
@@ -191,7 +202,12 @@ class LoLGameStatsParser(GameStatsParser):
                 vision_wards=participant["visionWardsBoughtInGame"],
                 vision_score=participant["visionScore"],
                 steals=participant["objectivesStolen"],
-                lane=participant["role"]
+                lane=participant["lane"],
+                role=participant["role"],
+                pentakills=participant["pentaKills"],
+                total_time_dead=participant["totalTimeSpentDead"],
+                turret_kills=participant["turretKills"],
+                inhibitor_kills=participant["inhibitorKills"]
             )
 
             player_stats.append((player_disc_id, stats_for_player))
@@ -231,10 +247,11 @@ class LoLGameStatsParser(GameStatsParser):
                 first_blood_id = disc_id
 
         return LoLGameStats(
+            game=self.game,
             game_id=self.raw_data["gameId"],
             timestamp=self.raw_data["gameCreation"],
             duration=int(self.raw_data["gameDuration"]),
-            win=game_win,
+            win=int(game_win),
             kills_by_our_team=kills_per_team[our_team],
             guild_id=self.guild_id,
             players_in_game=active_users,

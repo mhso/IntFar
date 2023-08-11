@@ -18,7 +18,7 @@ from discbot import commands
 from discbot.commands.meta import handle_usage_msg
 from api import game_stats, bets, award_qualifiers
 from api.game_data import get_stat_parser
-from api.game_stats import GameStats
+from api.game_stats import GameStats, PlayerStats
 from api.game_monitor import GameMonitor
 from api.game_monitoring.lol import LoLGameMonitor
 from api.game_monitoring.csgo import CSGOGameMonitor
@@ -1311,7 +1311,7 @@ class DiscordClient(discord.Client):
 
         return final_intfar, reasons_str, response
 
-    def get_doinks_data(self, filtered_stats: list[tuple[int, dict]], guild_id: int):
+    def get_doinks_data(self, player_stats: list[PlayerStats], guild_id: int):
         """
         Gets data about the people who earned doinks in a game.
         Returns a message describing who (if any) got doinks and why.
@@ -1320,7 +1320,7 @@ class DiscordClient(discord.Client):
                                 for each Int-Far registered player on our team
         :param guild_id:        ID of the Discord server where the game took place
         """
-        doinks_mentions, doinks = award_qualifiers.get_big_doinks(filtered_stats)
+        doinks_mentions, doinks = award_qualifiers.get_big_doinks(player_stats)
         redeemed_text = self.get_big_doinks_msg(doinks_mentions, guild_id)
 
         return doinks, redeemed_text
@@ -1439,13 +1439,13 @@ class DiscordClient(discord.Client):
 
         except DBException as exception:
             # Log error along with relevant variables.
-            game_id = self.game_monitor.active_game.get(guild_id, {}).get("id")
+            game_id = self.game_monitors[game_id].active_game.get(parsed_game_stats.guild_id, {}).get("id")
             logger.bind(
                 game_id=game_id,
-                intfar_id=intfar_id,
-                intfar_reason=intfar_reason,
-                doinks=doinks,
-                guild_id=guild_id
+                intfar_id=parsed_game_stats.intfar_id,
+                intfar_reason=parsed_game_stats.intfar_reason,
+                doinks=[player_stats.doinks for player_stats in parsed_game_stats.filtered_player_stats],
+                guild_id=parsed_game_stats.guild_id
             ).exception("Game stats could not be saved!")
 
             raise exception

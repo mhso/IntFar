@@ -7,8 +7,7 @@ from mhooge_flask.logging import logger
 
 from mhooge_flask.database import SQLiteDatabase
 
-from api import game_stats
-from api.game_stats import GameStats
+from api.game_stats import GameStats, get_outlier_stat
 from api.user import User
 from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, STAT_COMMANDS, SUPPORTED_GAMES
 
@@ -1592,57 +1591,40 @@ class Database(SQLiteDatabase):
 
             return score, rank+1, len(performance_scores)
 
-    def get_stat_data(self, stat_key, stat_name, data: GameStats, reverse_order=False, total_kills=0):
+    def get_stat_data(self, parsed_game_stats: GameStats, stat: str, reverse_order=False):
         (
             min_stat_id, min_stat,
             max_stat_id, max_stat
-        ) = game_stats.get_outlier_stat(
-            data,
-            stat_key,
-            reverse_order=reverse_order,
-            total_kills=total_kills
+        ) = get_outlier_stat(
+            parsed_game_stats.filtered_player_stats,
+            stat,
+            reverse_order=reverse_order
         )
 
         (
             best_ever_id,
             best_ever,
             _
-        ) = self.get_most_extreme_stat(stat_name, stat_name != "deaths")
+        ) = self.get_most_extreme_stat(parsed_game_stats.game, stat, stat != "deaths")
 
         (
             worst_ever_id,
             worst_ever,
             _
-        ) = self.get_most_extreme_stat(stat_name, stat_name == "deaths")
+        ) = self.get_most_extreme_stat(parsed_game_stats.game, stat, stat == "deaths")
 
         return min_stat_id, min_stat, max_stat_id, max_stat, best_ever, best_ever_id, worst_ever, worst_ever_id
 
     def record_stats(self, parsed_game_stats: GameStats):
-        kills_by_our_team = data[0][1]["kills_by_team"]
-        timestamp = data[0][1]["timestamp"] // 1000
-        duration = data[0][1]["gameDuration"]
-
-        first_blood_id = None
-        for disc_id, stats in data:
-            if stats["firstBloodKill"]:
-                first_blood_id = disc_id
-                break
-
-        keys = [
-            "kills", "deaths", "assists", "kda", "totalDamageDealtToChampions",
-            "totalCs", "csPerMin", "goldEarned", "kp",
-            "visionWardsBoughtInGame", "visionScore", "objectivesStolen"
-        ]
-
         beaten_records_best = []
         beaten_records_worst = []
 
-        for key, stat in zip(keys, STAT_COMMANDS[:-1]):
-            reverse_order = key == "deaths"
+        for stat in parsed_game_stats.stats_to_save:
+            reverse_order = stat == "deaths"
             (
                 min_id, min_value, max_id, max_value,
                 prev_best, prev_best_id, prev_worst, prev_worst_id
-            ) = self.get_stat_data(key, stat, data, reverse_order, kills_by_our_team)
+            ) = self.get_stat_data(parsed_game_stats, stat, reverse_order)
 
             if reverse_order: # Stat is 'deaths'.
                 if min_value < prev_best: # Fewest deaths ever has been reached.
@@ -1655,66 +1637,41 @@ class Database(SQLiteDatabase):
                 elif min_value < prev_worst: # A new worst has been set for a stat.
                     beaten_records_worst.append((stat, min_value, min_id, prev_worst, prev_worst_id))
 
+        game_insert_str = ",\n".join(parsed_game_stats.stats_to_save)
+        game_insert_qms = ",".join(["?"] * len(parsed_game_stats.stats_to_save))
+
+        stats_insert_str = ",\n".join(parsed_game_stats.filtered_player_stats[0].stats_to_save)
+        stats_insert_qms = ",".join(["?"] * len(parsed_game_stats.filtered_player_stats[0].stats_to_save))
+
+        game_insert_values = [getattr(parsed_game_stats, stat) for stat in parsed_game_stats.stats_to_save]
+
+        games_table = self._get_games_table(parsed_game_stats.game)
+        stats_table = self._get_games_table(parsed_game_stats.game)
+
         with self:
-            query_game = """
-                INSERT INTO games(
-                    game_id,
-                    timestamp,
-                    duration,
-                    intfar_id,
-                    intfar_reason,
-                    first_blood,
-                    win,
-                    guild_id
+            query_game = f"""
+                INSERT INTO {games_table}(
+                    {game_insert_str}
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES ({game_insert_qms})
             """
 
-            win = 1 if data[0][1]["gameWon"] else 0
             self.execute_query(
-                query_game, game_id, timestamp, duration, intfar_id, intfar_reason, first_blood_id, win, guild_id
+                query_game, *game_insert_values
             )
 
-            query = """
-                INSERT INTO participants(
-                    game_id,
-                    disc_id,
-                    champ_id,
-                    doinks,
-                    kills,
-                    deaths,
-                    assists,
-                    kda,
-                    damage,
-                    cs,
-                    cs_per_min,
-                    gold,
-                    kp,
-                    vision_wards,
-                    vision_score,
-                    steals
+            query = f"""
+                INSERT INTO {stats_table}(
+                    {stats_insert_str}
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES ({stats_insert_qms})
             """
 
-            for user_data in users_in_game:
-                disc_id = user_data[0]
+            for player_stats in parsed_game_stats.filtered_player_stats:
+                stat_insert_values = [getattr(player_stats, stat) for stat in player_stats.stats_to_save]
+                logger.debug(f"Saving participant data:\n", stat_insert_values)
 
-                user_stats = None
-                for data_disc_id, stats in data:
-                    if data_disc_id == disc_id:
-                        user_stats = stats
-                        break
-
-                champ_id = user_data[-1]
-                doink = doinks.get(disc_id, None)
-                params = [game_id, disc_id, champ_id, doink]
-                for stat_key in keys:
-                    params.append(game_stats.get_stat_value(user_stats, stat_key, kills_by_our_team))
-
-                logger.debug(f"Saving participant data:\n", params)
-
-                self.execute_query(query, *params)
+                self.execute_query(query, *stat_insert_values)
 
         return beaten_records_best, beaten_records_worst
 
