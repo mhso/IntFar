@@ -6,11 +6,11 @@ from api.user import User
 class PlayerStats(ABC):
     game_id: int
     disc_id: int
-    doinks: int = None
     kills: int
     deaths: int
     assists: int
-    kills_by_team: field(init=False)
+    doinks: int = field(init=False)
+    kills_by_team: int = field(init=False)
 
     @property
     def kda(self) -> float:
@@ -41,6 +41,16 @@ class PlayerStats(ABC):
             "kda",
             "kp"
         ]
+    
+    @property
+    def stat_quantity_desc(self) -> dict[str, tuple[str, str]]:
+        return {
+            "kills": ("most", "fewest"),
+            "deaths": ("fewest", "most"),
+            "deaths": ("most", "fewest"),
+            "kda": ("highest", "lowest"),
+            "kp": ("highest", "lowest")
+        }
 
 @dataclass
 class GameStats(ABC):
@@ -48,14 +58,14 @@ class GameStats(ABC):
     game_id: int
     timestamp: int
     duration: int
-    intfar_id: int = None
-    intfar_reason: str = None
+    intfar_id: int = field(init=False)
+    intfar_reason: str = field(init=False)
     win: int
     kills_by_our_team: int
     guild_id: int
     players_in_game: list[tuple]
     all_player_stats: list[PlayerStats]
-    filtered_player_stats: field(init=False)
+    filtered_player_stats: list[PlayerStats] = field(init=False)
 
     @property
     def stats_to_save(self) -> list[str]:
@@ -190,34 +200,3 @@ def are_unfiltered_stats_well_formed(game_info):
                 keys_not_present.append((key_type, key))
 
     return keys_not_present
-
-def are_filtered_stats_well_formed(filtered_info):
-    stat_keys = [
-        "championId", "timestamp", "mapId", "gameDuration", "totalCs", "csPerMin"
-    ]
-    # for disc_id, stats in game_info:
-    #     pass
-
-def get_filtered_timeline_stats(filtered_game_stats, timeline_data):
-    """
-    Get interesting timeline related data. This pertains to data that
-    changes during the game, such as maximum gold deficit/lead of a team
-    during the course of the game.
-    """
-    puuid_map = {}
-
-    our_team_lower = True
-
-    for disc_id, stats in filtered_game_stats:
-        puuid = stats["puuid"]
-        for participant_data in timeline_data["participants"]:
-            if participant_data["puuid"] == puuid:
-                our_team_lower = participant_data["participantId"] <= 5
-                puuid_map[puuid] = disc_id
-                break
-
-    timeline_data["puuid_map"] = puuid_map
-    timeline_data["gameWon"] = filtered_game_stats[0][1]["gameWon"]
-    timeline_data["ourTeamLower"] = our_team_lower
-
-    return timeline_data

@@ -16,9 +16,11 @@ class MonthlyIntfar:
         # If today is the first day of the month and the time if before 14:00,
         # we should announce the Int-Far at the current month (and year).
         # Otherwise, we should announce it at the first day of the next month.
-        month_to_announce = (current_month
-                             if current_time.day == 1 and current_time.hour < hour_of_announce
-                             else next_month)
+        month_to_announce = (
+            current_month
+            if current_time.day == 1 and current_time.hour < hour_of_announce
+            else next_month
+        )
         year_to_announce = current_time.year if month_to_announce == current_month else next_year
         self.time_at_announcement = current_time.replace(
             year_to_announce, month_to_announce, 1, hour_of_announce, 0, 0, 0, self.cph_timezone
@@ -74,7 +76,7 @@ class MonthlyIntfar:
             desc_str = f"He has inted in {pct_desc_1st} of his games this month!!!\n"
             desc_str += "You deserve this: :first_place: \n"
             desc_str += "You will also receive a badge of shame on Discord {emote_main}\n"
-            
+
             if len(intfar_details) > 1:
                 runner_up_str = "\nRunner up goes to "
 

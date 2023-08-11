@@ -1,0 +1,3 @@
+playing with a blindfold on with {vision_score} vision score
+holding it down (POB style) with a vision score of {vision_score}
+loving enemy death brushes a bit too much with {vision_score} vision score

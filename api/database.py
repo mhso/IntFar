@@ -9,7 +9,7 @@ from mhooge_flask.database import SQLiteDatabase
 
 from api.game_stats import GameStats, get_outlier_stat
 from api.user import User
-from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, STAT_COMMANDS, SUPPORTED_GAMES
+from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, SUPPORTED_GAMES
 
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
@@ -68,6 +68,9 @@ class Database(SQLiteDatabase):
 
             games_user_info = {}
             for game in SUPPORTED_GAMES:
+                if game not in games_user_info:
+                    games_user_info[game] = []
+
                 query = f"SELECT * FROM users_{game}"
                 values = self.execute_query(query).fetchall()
                 for row in values:
@@ -78,7 +81,7 @@ class Database(SQLiteDatabase):
 
                     user_info = basic_info_dict[disc_id]
                     user_game_info = user_info + row[1:-1]
-                    games_user_info[game] = user_game_info
+                    games_user_info[game].append(user_game_info)
 
         return games_user_info
 

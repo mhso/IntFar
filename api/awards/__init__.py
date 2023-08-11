@@ -2,7 +2,7 @@ from glob import glob
 import importlib
 import os
 from api.util import SUPPORTED_GAMES
-from award_qualifiers import AwardQualifiers
+from api.award_qualifiers import AwardQualifiers
 
 _GAME_DATA_MODULES = map(lambda x: x.replace(".py", ""), glob("api/awards/*.py"))
 GAME_AWARD_HANDLERS: dict[str, AwardQualifiers] = {}
@@ -18,5 +18,5 @@ for module_name in _GAME_DATA_MODULES:
             GAME_AWARD_HANDLERS[module_key] = subclass
             break
 
-def get_stat_parser(game, config, parsed_game_data) -> AwardQualifiers:
-    return GAME_AWARD_HANDLERS[game](game, config, parsed_game_data)
+def get_awards_handler(game, config, parsed_game_stats) -> AwardQualifiers:
+    return GAME_AWARD_HANDLERS[game](config, parsed_game_stats)

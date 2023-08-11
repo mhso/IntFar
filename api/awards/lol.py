@@ -7,6 +7,90 @@ from api.game_stats import get_outlier
 from api.database import Database
 
 class LoLAwardQualifiers(AwardQualifiers):
+    @property
+    def intfar_reasons(self):
+        return ["kda", "deaths", "kp", "vision_score"]
+
+    @property
+    def all_flavor_texts(self):
+        return super().all_flavor_texts + [
+            "most_deaths",
+            "lowest_kda",
+            "lowest_kp",
+            "lowest_vision",
+            "mentions_no_vision_ward",
+            "mentions_low_damage",
+            "mentions_low_cs_min",
+            "mentions_no_epic_monsters",
+            "stats_time_spent_dead",
+            "stats_objectives_stolen",
+            "stats_turrets_killed",
+            "timeline_comeback",
+            "timeline_throw",
+            "timeline_goldkeeper",
+            "doinks_kda",
+            "doinks_kills",
+            "doinks_damage",
+            "doinks_penta",
+            "doinks_vision_score",
+            "doinks_kp",
+            "doinks_jungle",
+            "doinks_cs",
+        ]
+
+    @property
+    def intfar_flavor_texts(self):
+        return [
+            "most_deaths",
+            "lowest_kda",
+            "lowest_kp",
+            "lowest_vision",
+        ]
+
+    @property
+    def honorable_mentions_flavor_texts(self):
+        return [
+            "mentions_no_vision_ward",
+            "mentions_low_damage",
+            "mentions_low_cs_min",
+            "mentions_no_epic_monsters",
+        ]
+
+    @property
+    def cool_stats_flavor_texts(self):
+        return [
+            "stats_time_spent_dead",
+            "stats_objectives_stolen",
+            "stats_turrets_killed",
+        ]
+
+    @property
+    def doinks_flavor_texts(self):
+        return [
+            "doinks_kda",
+            "doinks_kills",
+            "doinks_damage",
+            "doinks_penta",
+            "doinks_vision_score",
+            "doinks_kp",
+            "doinks_jungle",
+            "doinks_cs",
+        ]
+    
+    @property
+    def timeline_flavor_texts(self):
+        return [
+            "timeline_comeback",
+            "timeline_throw",
+            "timeline_goldkeeper",
+        ]
+    
+    @property
+    def game_specific_flavors(self):
+        flavors = dict(super().game_specific_flavors) 
+        flavors["timeline"] = self.timeline_flavor_texts
+        return flavors
+
     def get_big_doinks(self):
         """
         Returns a string describing people who have been redeemed by playing
@@ -397,67 +481,68 @@ class LoLAwardQualifiers(AwardQualifiers):
 
         return final_intfar, intfar_data[final_intfar], ties, tie_desc
 
-def get_cool_timeline_events(timeline_data: dict, config: Config):
-    """
-    Returns a list of cool/embarrasing events that happened during the course of the game.
-    These events include:
-        - We lost the game after being up by more than 8k gold (the big throw)
-        - We won the game after being down by more than 8k gold (the epic comeback)
-        - Someone had more than 4000 gold at one point
-    """
-    # Dictionary that maps from participantId to disc_id
-    participant_dict = {
-        entry["participantId"]: timeline_data["puuid_map"].get(entry["puuid"])
-        for entry in timeline_data["participants"]
-    }
+    def get_cool_timeline_events(self, timeline_data: dict):
+        """
+        Returns a list of cool/embarrasing events that happened during the course of the game.
+        These events include:
+            - We lost the game after being up by more than 8k gold (the big throw)
+            - We won the game after being down by more than 8k gold (the epic comeback)
+            - Someone had more than 4000 gold at one point
+        """
+        # Dictionary that maps from participantId to disc_id
+        participant_dict = {
+            entry["participantId"]: timeline_data["puuid_map"].get(entry["puuid"])
+            for entry in timeline_data["participants"]
+        }
 
-    timeline_events = []
+        timeline_events = []
 
-    biggest_gold_lead = 0
-    biggest_gold_deficit = 0
-    too_much_gold = {}
+        biggest_gold_lead = 0
+        biggest_gold_deficit = 0
+        too_much_gold = {}
+        game_win = bool(self.parsed_game_stats.win)
 
-    # Calculate stats from timeline frames.
-    for frame_data in timeline_data["frames"]:
-        # Tally up our and ememy teams total gold during the game.
-        our_total_gold = 0
-        enemy_total_gold = 0
+        # Calculate stats from timeline frames.
+        for frame_data in timeline_data["frames"]:
+            # Tally up our and ememy teams total gold during the game.
+            our_total_gold = 0
+            enemy_total_gold = 0
 
-        for participant_id in frame_data["participantFrames"]:
-            participant_data = frame_data["participantFrames"][participant_id]
-            disc_id = participant_dict.get(int(participant_id))
-            total_gold = participant_data["totalGold"]
-            curr_gold = participant_data["currentGold"]
-            our_team = (int(participant_id) > 5) ^ timeline_data["ourTeamLower"]
+            for participant_id in frame_data["participantFrames"]:
+                participant_data = frame_data["participantFrames"][participant_id]
+                disc_id = participant_dict.get(int(participant_id))
+                total_gold = participant_data["totalGold"]
+                curr_gold = participant_data["currentGold"]
+                our_team = (int(participant_id) > 5) ^ timeline_data["ourTeamLower"]
 
-            # Add players gold to total for their team.
-            if our_team:
-                our_total_gold += total_gold
-            else:
-                enemy_total_gold += total_gold
+                # Add players gold to total for their team.
+                if our_team:
+                    our_total_gold += total_gold
+                else:
+                    enemy_total_gold += total_gold
 
-            if (
-                disc_id is not None
-                and curr_gold > config.timeline_min_curr_gold
-                and total_gold < config.timeline_min_total_gold
-            ):
-                # Player has enough current gold to warrant a mention.
-                # If this amount of gold is more than their previous max, save it.
-                curr_value_for_player = too_much_gold.get(disc_id, 0)
-                too_much_gold[disc_id] = max(curr_gold, curr_value_for_player)
+                if (
+                    disc_id is not None
+                    and curr_gold > self.config.timeline_min_curr_gold
+                    and total_gold < self.config.timeline_min_total_gold
+                ):
+                    # Player has enough current gold to warrant a mention.
+                    # If this amount of gold is more than their previous max, save it.
+                    curr_value_for_player = too_much_gold.get(disc_id, 0)
+                    too_much_gold[disc_id] = max(curr_gold, curr_value_for_player)
 
-        gold_diff = our_total_gold - enemy_total_gold
-        if gold_diff < 0: # Record max gold deficit during the game.
-            biggest_gold_deficit = max(abs(gold_diff), biggest_gold_deficit) 
-        else: # Record max gold lead during the game.
-            biggest_gold_lead = max(gold_diff, biggest_gold_lead)
+            gold_diff = our_total_gold - enemy_total_gold
+            if gold_diff < 0: # Record max gold deficit during the game.
+                biggest_gold_deficit = max(abs(gold_diff), biggest_gold_deficit) 
+            else: # Record max gold lead during the game.
+                biggest_gold_lead = max(gold_diff, biggest_gold_lead)
 
-    if biggest_gold_deficit > config.timeline_min_deficit and timeline_data["gameWon"]: # Epic comeback!
-        timeline_events.append((0, biggest_gold_deficit, None))
-    elif biggest_gold_lead > config.timeline_min_lead and not timeline_data["gameWon"]: # Huge throw...
-        timeline_events.append((1, biggest_gold_lead, None))
+        if biggest_gold_deficit > self.config.timeline_min_deficit and game_win: # Epic comeback!
+            timeline_events.append((0, biggest_gold_deficit, None))
+        elif biggest_gold_lead > self.config.timeline_min_lead and not game_win: # Huge throw...
+            timeline_events.append((1, biggest_gold_lead, None))
 
-    for disc_id in too_much_gold:
-        timeline_events.append((2, too_much_gold[disc_id], disc_id))
+        for disc_id in too_much_gold:
+            timeline_events.append((2, too_much_gold[disc_id], disc_id))
 
-    return timeline_events
+        return timeline_events

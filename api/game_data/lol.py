@@ -2,9 +2,8 @@ from datetime import datetime
 from dataclasses import dataclass
 import time
 
-from api.game_stats import GameStats
+from api.game_stats import GameStats, PlayerStats, GameStatsParser
 from api.riot_api import RiotAPIClient
-from game_stats import GameStats, PlayerStats, GameStatsParser
 from api.util import format_duration
 
 @dataclass
@@ -23,6 +22,7 @@ class LoLPlayerStats(PlayerStats):
     total_time_dead: int
     turret_kills: int
     inhibitor_kills: int
+    puuid: str
 
     def stats_to_save(self):
         return super().stats_to_save + [
@@ -35,6 +35,21 @@ class LoLPlayerStats(PlayerStats):
             "vision_score",
             "steals"
         ]
+
+    @property
+    def stat_quantity_desc(self):
+        stat_quantities = dict(super().stat_quantity_desc)
+        stat_quantities.update(
+            damage=("most", "least"),
+            cs=("most", "least"),
+            cs_per_min=("most", "least"),
+            gold=("most", "least"),
+            vision_wards=("most", "fewest"),
+            vision_score=("highest", "lowest"),
+            steals=("most", "least"),
+            first_blood=("most", "least")
+        )
+        return stat_quantities
 
 @dataclass
 class LoLGameStats(GameStats):
@@ -51,6 +66,29 @@ class LoLGameStats(GameStats):
 
     def stats_to_save(self):
         return super().stats_to_save + ["first_blood"]
+
+    def get_filtered_timeline_stats(self, timeline_data: dict):
+        """
+        Get interesting timeline related data. This pertains to data that
+        changes during the game, such as maximum gold deficit/lead of a team
+        during the course of the game.
+        """
+        puuid_map = {}
+
+        our_team_lower = True
+
+        for stats in self.filtered_player_stats:
+            puuid = stats.puuid
+            for participant_data in timeline_data["participants"]:
+                if participant_data["puuid"] == puuid:
+                    our_team_lower = participant_data["participantId"] <= 5
+                    puuid_map[puuid] = stats.disc_id
+                    break
+
+        timeline_data["puuid_map"] = puuid_map
+        timeline_data["ourTeamLower"] = our_team_lower
+
+        return timeline_data
 
 class LoLGameStatsParser(GameStatsParser):
     def __init__(self, game, data_dict, all_users, guild_id):
@@ -104,7 +142,8 @@ class LoLGameStatsParser(GameStatsParser):
                                 pentakills=participant["stats"]["pentaKills"],
                                 total_time_dead=participant["stats"]["totalTimeSpentDead"],
                                 turret_kills=participant["stats"]["turretKills"],
-                                inhibitor_kills=participant["stats"]["inhibitorKills"]
+                                inhibitor_kills=participant["stats"]["inhibitorKills"],
+                                puuid=participant["stats"]["puuid"]
                             )
                             player_stats.append((disc_id, stats_for_player))
 
@@ -207,7 +246,8 @@ class LoLGameStatsParser(GameStatsParser):
                 pentakills=participant["pentaKills"],
                 total_time_dead=participant["totalTimeSpentDead"],
                 turret_kills=participant["turretKills"],
-                inhibitor_kills=participant["inhibitorKills"]
+                inhibitor_kills=participant["inhibitorKills"],
+                puuid=participant["puuid"]
             )
 
             player_stats.append((player_disc_id, stats_for_player))

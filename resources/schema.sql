@@ -23,8 +23,8 @@ CREATE TABLE [games_lol] (
     [intfar_id] INTEGER,
     [intfar_reason] NVARCHAR(4),
     [win] INTEGER(1),
-    [guild_id] INTEGER
-    [first_blood] INTEGER,
+    [guild_id] INTEGER,
+    [first_blood] INTEGER
 );
 CREATE TABLE [games_csgo] (
     [game_id] NVARCHAR(64) PRIMARY KEY,
@@ -36,7 +36,7 @@ CREATE TABLE [games_csgo] (
     [guild_id] INTEGER
     [map] NVARCHAR(32),
     [rounds_t] INTEGER(4),
-    [rounds_ct] INTEGER(4),
+    [rounds_ct] INTEGER(4)
 );
 CREATE TABLE [missed_games] (
     [game_id] NVARCHAR(64) NOT NULL,

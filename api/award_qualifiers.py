@@ -1,14 +1,91 @@
 from abc import ABC, abstractmethod
+import random
 
 from api.game_stats import GameStats
 from api.config import Config
 from api.database import Database
+from api.util import load_flavor_texts
 
 class AwardQualifiers(ABC):
-    def __init__(self, game: str, config: Config, parsed_game_stats: GameStats):
-        self.game = game
+    def __init__(self, config: Config, parsed_game_stats: GameStats):
+        self.game = parsed_game_stats.game
+        self.guild_id = parsed_game_stats.guild_id
         self.config = config
         self.parsed_game_stats = parsed_game_stats
+        self.flavor_texts = self._load_flavor_texts()
+
+    @property
+    def all_flavor_texts(self) -> list[str]:
+        return [
+            "intfar",
+            "no_intfar",
+            "lifetime_events",
+            "intfar_streak",
+            "win_streak",
+            "loss_streak",
+            "broken_win_streak",
+            "broken_loss_streak",
+            "ifotm"
+        ]
+
+    @property
+    @abstractmethod
+    def intfar_reasons(self) -> list[str]:
+        ...
+
+    @property
+    @abstractmethod
+    def intfar_flavor_texts(self) -> list[str]:
+        ...
+
+    @property
+    @abstractmethod
+    def honorable_mentions_flavor_texts(self) -> list[str]:
+        ...
+
+    @property
+    @abstractmethod
+    def cool_stats_flavor_texts(self) -> list[str]:
+        ...
+
+    @property
+    @abstractmethod
+    def doinks_flavor_texts(self) -> list[str]:
+        ...
+
+    @property
+    def game_specific_flavors(self) -> list[str]:
+        return {
+            "intfar": self.intfar_flavor_texts,
+            "doinks": self.intfar_flavor_texts,
+            "honorable": self.intfar_flavor_texts,
+            "stats": self.intfar_flavor_texts,
+        }
+
+    def get_flavor_text(self, flavor: str, outer_index, inner_index=None, **params_to_replace) -> str:
+        if inner_index is not None:
+            flavor = self.game_specific_flavors[flavor]
+            outer_index = inner_index
+
+        flavor_choices = self.flavor_texts[flavor]
+
+        if outer_index == "random":
+            flavor_text = flavor_choices[random.randint(0, len(flavor_choices)-1)]
+        else:
+            flavor_text = flavor_choices[outer_index]
+
+        for key in params_to_replace:
+            if params_to_replace[key] is not None:
+                flavor_text = flavor_text.replace("{" + key + "}", str(params_to_replace[key]))
+
+        return flavor_text
+
+    def _load_flavor_texts(self) -> dict[str, str]:
+        flavor_text_dict = {}
+        for filename in self.all_flavor_texts:
+            flavor_text_dict[filename] = load_flavor_texts(filename, self.game)
+
+        return flavor_text_dict
 
     @abstractmethod
     def get_big_doinks(self) -> tuple[dict[int, list[tuple]], dict[int, str]]:
