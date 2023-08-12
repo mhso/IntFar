@@ -20,6 +20,14 @@ game_stats.py fil/klasse til hver spil?
 - Lav HTML
 - Lav CSS
 
+## Ting der skal laves for CSGO
+- Implementér `api/awards/csgo.py`
+- Implementér `api/bets/csgo.py`
+- Implementér `api/game_data/csgo.py`
+- Implementér `api/game_monitoring/csgo.py`
+- Implementér/kopier `resources/flavor_text/csgo`
+- Lav kopier af relevante commands
+
 ## Fix referencer
 ### Til database.py
 - `user_exists`: ❌

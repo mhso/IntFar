@@ -1,4 +1,5 @@
 from multiprocessing import Lock
+from multiprocessing.connection import Connection
 
 from mhooge_flask.logging import logger
 
@@ -7,8 +8,18 @@ from mhooge_flask.init import Route
 
 from app.util import before_request
 from app.routes import errors
+from api.database import Database
+from api.betting import BettingHandler
+from api.riot_api import RiotAPIClient
+from api.config import Config
 
-def run_app(database, bet_handler, riot_api, config, bot_pipe):
+def run_app(
+    database: Database,
+    bet_handlers: dict[str, BettingHandler],
+    riot_api: RiotAPIClient,
+    config: Config,
+    bot_pipe: Connection
+):
     # Define URL routes
     routes = [
         Route("index", "start_page"),
@@ -35,7 +46,7 @@ def run_app(database, bet_handler, riot_api, config, bot_pipe):
         database,
         propagate_exceptions=False,
         app_config=config,
-        bet_handler=bet_handler,
+        bet_handlers=bet_handlers,
         bot_conn=bot_pipe,
         logged_in_users={},
         riot_api=riot_api,

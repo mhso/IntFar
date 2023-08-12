@@ -2,7 +2,6 @@ from mhooge_flask.logging import logger
 
 from api.award_qualifiers import AwardQualifiers
 from api import util as api_util
-from api.config import Config
 from api.game_stats import get_outlier
 from api.database import Database
 
@@ -160,7 +159,6 @@ class LoLAwardQualifiers(AwardQualifiers):
                     format_str += ("1" if has_doinks_for_stats else "0")
 
                 formatted_mentions[stats.disc_id] = format_str
-                stats.doinks = format_str
 
         return mentions, formatted_mentions
 

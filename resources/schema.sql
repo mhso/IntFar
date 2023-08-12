@@ -87,11 +87,6 @@ CREATE TABLE [betting_balance] (
     [disc_id] INTEGER PRIMARY KEY,
     [tokens] INTEGER
 );
-CREATE TABLE [betting_events] (
-    [id] INTEGER PRIMARY KEY,
-    [game] NVARCHAR(64),
-    [max_return] DECIMAL NOT NULL
-);
 CREATE TABLE [bets] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
     [better_id] INTEGER NOT NULL,
@@ -99,7 +94,7 @@ CREATE TABLE [bets] (
     [game_id] NVARCHAR(64),
     [game] NVARCHAR(64),
     [timestamp] INTEGER NOT NULL,
-    [event_id] INTEGER NOT NULL,
+    [event_id] NVARCHAR(32) NOT NULL,
     [amount] INTEGER NOT NULL,
     [game_duration] INTEGER DEFAULT(0),
     [target] INTEGER,

@@ -9,7 +9,7 @@ class PlayerStats(ABC):
     kills: int
     deaths: int
     assists: int
-    doinks: int = field(init=False)
+    doinks: str = field(init=False)
     kills_by_team: int = field(init=False)
 
     @property
@@ -87,6 +87,13 @@ class GameStats(ABC):
             stat.kills_by_team = self.kills_by_our_team
 
         self.filtered_player_stats = list(filter(lambda x: x[0] is not None, self.all_player_stats))
+
+    def find_player_stats(self, disc_id: int, player_list: list[PlayerStats]):
+        for player_stats in player_list:
+            if player_stats.disc_id == disc_id:
+                return player_stats
+
+        return None
 
 class GameStatsParser(ABC):
     def __init__(self, game:str,  raw_data: dict, all_users: dict[int, User], guild_id: int):

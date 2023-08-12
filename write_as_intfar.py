@@ -2,7 +2,7 @@ import argparse
 import sys
 import io
 
-from api.bets import BettingHandler
+from api.betting import BettingHandler
 from api.config import Config
 from api.database import Database
 from api.riot_api import RiotAPIClient

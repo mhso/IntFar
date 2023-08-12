@@ -1,6 +1,6 @@
 from time import time
 from test.runner import TestRunner, test
-from api import bets
+from api import betting
 from api.database import Database
 from api.config import Config
 from api.util import format_tokens_amount
@@ -13,7 +13,7 @@ class TestWrapper(TestRunner):
         conf = Config()
         conf.database = "test.db"
         database_client = Database(conf)
-        bet_handler = bets.BettingHandler(conf, database_client)
+        bet_handler = betting.BettingHandler(conf, database_client)
         self.before_all(bet_handler=self.bet_handler, db_client=database_client)
 
     def before_test(self):
@@ -53,7 +53,7 @@ class TestWrapper(TestRunner):
 
         self.assert_equals(guild_id, g_id, "Guild ID.")
         self.assert_equals(amounts[0], int(bet_amount[0]), "Bet amount.")
-        self.assert_equals(event_ids[0], bets.BETTING_IDS[bet_str[0]], "Bet event ID.")
+        self.assert_equals(event_ids[0], betting.BETTING_IDS[bet_str[0]], "Bet event ID.")
         self.assert_equals(bet_timestamp, 0, "Bet timestamp.")
         self.assert_equals(targets[0], None, "Bet target.")
 
@@ -123,7 +123,7 @@ class TestWrapper(TestRunner):
 
         self.assert_false(success, "Bet not placed - Amount too low.")
 
-        timestamp_late = 60 * (bets.MAX_BETTING_THRESHOLD)
+        timestamp_late = 60 * (betting.MAX_BETTING_THRESHOLD)
         success, response, _ = self.bet_handler.place_bet(
             disc_id, guild_id, bet_amounts, timestamp_late,
             bet_strs, bet_targets, target_names
@@ -279,13 +279,13 @@ class TestWrapper(TestRunner):
 
         for runs in range(2):
             target = disc_id if runs == 1 else None
-            for index, event_name in enumerate(bets.BETTING_IDS):
+            for index, event_name in enumerate(betting.BETTING_IDS):
                 split = event_name.split("_")
                 test_name = " ".join(word.capitalize() for word in split)
                 if target is not None:
                     test_name += " w/ Target"
-                event_id = bets.BETTING_IDS[event_name]
-                index += (runs * len(bets.BETTING_IDS))
+                event_id = betting.BETTING_IDS[event_name]
+                index += (runs * len(betting.BETTING_IDS))
                 bet_return = self.bet_handler.get_dynamic_bet_return(event_id, target)
 
                 self.assert_equals(bet_return, expected_results[index], test_name)
@@ -450,10 +450,10 @@ class TestWrapper(TestRunner):
 
         all_bet_amounts = ["10", "20", "30", "15", "25", "7"]
         all_game_timestamp = [None, time()-30, time()-10000]
-        all_bet_strs = list(bets.BETTING_IDS.keys()) + ["game_win", "game_loss", "no_intfar"]
+        all_bet_strs = list(betting.BETTING_IDS.keys()) + ["game_win", "game_loss", "no_intfar"]
         all_bet_targets = []
         all_target_names = []
-        for event_id in bets.BETTING_IDS.values():
+        for event_id in betting.BETTING_IDS.values():
             if event_id < 3:
                 all_bet_targets.append([None])
                 all_target_names.append([None])

@@ -8,7 +8,7 @@ import flask
 
 import api.util as api_util
 import app.util as app_util
-from api.bets import get_dynamic_bet_desc
+from api.betting import get_dynamic_bet_desc
 from discbot.commands.util import ADMIN_DISC_ID
 
 start_page = flask.Blueprint("index", __name__, template_folder="templates")

@@ -1835,11 +1835,6 @@ class Database(SQLiteDatabase):
 
             return data_for_person if disc_id is None else data_for_person.get(disc_id)
 
-    def get_base_bet_return(self, game, event_id):
-        with self:
-            query = "SELECT max_return FROM betting_events WHERE id=? AND game=?"
-            return self.execute_query(query, event_id, game).fetchone()[0]
-
     def get_token_balance(self, disc_id=None):
         with self:
             query = "SELECT bb.tokens"

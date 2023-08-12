@@ -1,11 +1,15 @@
+from dataclasses import dataclass
 from time import time
 from datetime import datetime
 from traceback import print_exc
+from abc import ABC, abstractmethod
 
 from mhooge_flask.logging import logger
 
-from api.database import DBException
+from api.database import DBException, Database
+from api.config import Config
 from api.util import format_duration, round_digits, format_tokens_amount, parse_amount_str
+from api.game_stats import GameStats
 from api import game_stats
 
 MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
@@ -76,14 +80,101 @@ BETTING_STATS = [
     "kills", "damage", "kp", "kda"
 ]
 
-def get_dynamic_bet_desc(event_id: int, target_person: str=None):
-    bet_desc = BETTING_DESC[event_id]
-    if target_person is not None:
-        bet_desc = bet_desc.replace("someone", target_person)
-    return bet_desc
+TARGET_OPTIONAL = 0
+TARGET_REQUIRED = 1
+TARGET_INVALID = -1
+
+@dataclass
+class Bet:
+    event_id: str
+    description: str
+    target_required: int
+    base_return: float
+
+class BetResolver(ABC):
+    def __init__(self, bet: Bet, game_stats: GameStats, target_id: int=None):
+        self.bet = bet
+        self.game_stats = game_stats
+        self.target_id = target_id
+
+    @abstractmethod
+    def resolve_intfar_reason(self):
+        ...
+
+    @abstractmethod
+    def resolve_doinks_reason(self):
+        ...
+
+    @abstractmethod
+    def resolve_stats(self):
+        ...
+
+    def resolve_game_outcome(self):
+        bet_on_win = self.bet.event_id == "game_win"
+        return bool(self.game_stats.win) ^ bet_on_win
+
+    def resolve_has_intfar(self):
+        intfar = self.game_stats.intfar_id
+        if self.target_id is None: # Bet was about whether anyone was Int-Far.
+            return (intfar is None) ^ (self.bet.event_id == "intfar")
+
+        return intfar == self.target_id # Bet was about a specific person being Int-Far.
+
+    def resolve_was_doinks(self):
+        doinks = {
+            player_stats.disc_id: player_stats.doinks
+            for player_stats in self.game_stats.filtered_player_stats
+        }
+        if self.target_id is None:
+            return len(doinks) > 0
+
+        return self.target_id in doinks
+
+    @property
+    @abstractmethod
+    def should_resolve_with_intfar_reason(self) -> list[str]:
+        ...
+
+    @property
+    @abstractmethod
+    def should_resolve_with_doinks_reason(self) -> list[str]:
+        ...
+
+    @property
+    @abstractmethod
+    def should_resolve_with_stats(self) -> list[str]:
+        ...
+
+    @property
+    def should_resolve_with_game_outcome(self) -> list[str]:
+        return ["game_win", "game_loss"]
+
+    @property
+    def should_resolve_with_has_intfar(self) -> list[str]:
+        return ["no_intfar", "intfar"]
+
+    @property
+    def should_resolve_with_has_doinks(self) -> list[str]:
+        return ["doinks"]
+
+    def resolve_bet(self):
+        resolver_list = [
+            (self.should_resolve_with_game_outcome, self.resolve_game_outcome),
+            (self.should_resolve_with_has_intfar, self.resolve_has_intfar),
+            (self.should_resolve_with_has_doinks, self.resolve_was_doinks),
+            (self.should_resolve_with_intfar_reason, self.resolve_intfar_reason),
+            (self.should_resolve_with_doinks_reason, self.resolve_doinks_reason),
+            (self.should_resolve_with_stats, self.resolve_stats),
+        ]
+
+        for bet_list, resolver_func in resolver_list:
+            if self.bet.event_id in bet_list:
+                return resolver_func()
+
+        raise ValueError("Could not match bet with the proper resolver!")
 
 def bet_requires_target(event_id: int):
-    return event_id > 15
+    return event_id > 16
 
 def bet_requires_no_target(event_id: int):
     return event_id < 3
@@ -189,15 +280,101 @@ RESOLVE_STATS_BET_FUNCS = [
     resolve_most_kills, resolve_most_damage, resolve_highest_kp, resolve_highest_kda
 ]
 
-class BettingHandler:
-    def __init__(self, config, database):
+class BettingHandler(ABC):
+    def __init__(self, game: str, config: Config, database: Database):
+        self.game = game
         self.config = config
         self.database = database
+
         self.betting_tokens_for_win = config.betting_tokens_for_win
         self.betting_tokens_for_loss = config.betting_tokens_for_loss
 
+    @property
+    def all_bets(self) -> list[Bet]:
+        return [
+            Bet("game_win", "winning the game", TARGET_INVALID, 2),
+            Bet("game_loss", "losing the game", TARGET_INVALID, 2),
+            Bet("no_intfar", "no one being Int-Far", TARGET_INVALID, 2),
+            Bet("intfar", "someone being Int-Far", TARGET_OPTIONAL, 2),
+            Bet("doinks", "someone being awarded doinks", TARGET_OPTIONAL, 2),
+        ]
+
+    @abstractmethod
+    def get_bet_resolver(self, bet: Bet, game_stats: GameStats, target_id: int=None) -> BetResolver:
+        ...
+
+    def get_bet(self, event_id: str):
+        for bet in self.all_bets:
+            if bet.event_id == event_id:
+                return bet
+
+        return None
+
+    def get_intfar_return(self, bet: Bet, target_id: int):
+        is_intfar = bet.event_id == "intfar"
+        if target_id is None or not is_intfar:
+            games_total = self.database.get_games_count(self.game)[0]
+            intfars_total = self.database.get_intfar_count(self.game)
+            intfar_count = intfars_total if is_intfar else games_total - intfars_total
+            return intfar_count, games_total
+
+        games_played, intfar_reason_ids = self.database.get_intfar_stats(self.game, target_id)
+        return len(intfar_reason_ids), games_played
+
+    def get_intfar_reason_return(self, intfar_index: int, target_id: int):
+        reason_count = 0
+        num_games = 0
+        if target_id is None:
+            intfar_reason_ids = self.database.get_intfar_reason_counts(self.game)[0]
+            num_games = self.database.get_games_count(self.game)[0]
+            reason_count = intfar_reason_ids[intfar_index]
+        else:
+            num_games, intfar_reason_ids = self.database.get_intfar_stats(self.game, target_id)
+            for reason_id in intfar_reason_ids:
+                if reason_id[0][intfar_index] == "1":
+                    reason_count += 1
+
+        return reason_count, num_games
+
+    def get_doinks_return(self, target_id: int):
+        if target_id is None:
+            games_total = self.database.get_games_count(self.game)[0]
+            doinks_count = self.database.get_doinks_count(self.game)[0]
+            return doinks_count, games_total
+
+        games_played = self.database.get_games_count(self.game, target_id)[0]
+        doinks_count = self.database.get_doinks_count(self.game, target_id)[0]
+        return doinks_count, games_played
+
+    def get_doinks_reason_return(self, doinks_index: int, target_id: int):
+        reason_count = 0
+        num_games = 0
+        if target_id is None:
+            doinks_reason_ids = self.database.get_doinks_reason_counts(self.game)
+            num_games = self.database.get_games_count(self.game)[0]
+            reason_count = doinks_reason_ids[doinks_index]
+        else:
+            num_games = self.database.get_games_count(self.game, target_id)[0]
+            doinks_reason_ids = self.database.get_doinks_stats(self.game, target_id)
+            for reason_id in doinks_reason_ids:
+                if reason_id[0][doinks_index] == "1":
+                    reason_count += 1
+
+        return reason_count, num_games
+
+    def get_stats_return(self, stat, target_id):
+        best_in_stat_count = self.database.get_best_or_worst_stat(self.game, stat, target_id)[0]
+        num_games = self.database.get_intfar_stats(self.game, target_id)[0]
+        return best_in_stat_count, num_games
+
     def award_tokens_for_playing(self, disc_id, tokens_gained):
         self.database.update_token_balance(disc_id, tokens_gained, True)
+
+    def get_dynamic_bet_desc(self, event: str, target_person: str=None):
+        bet_desc = self.get_bet(event).description
+        if target_person is not None:
+            bet_desc = bet_desc.replace("someone", target_person)
+        return bet_desc
 
     def get_bet_return_desc(self, bet_str: str, target_id: int, target_name: str) -> str:
         """
@@ -208,18 +385,18 @@ class BettingHandler:
         :param target_id:   Discord ID of the person to target with the bet (or None)
         :param target_name: Name of the person to target with the bet (or None)
         """
-        event_id = BETTING_IDS.get(bet_str)
-        if event_id is None:
+        bet = self.get_bet(bet_str)
+        if bet is None:
             return f"Invalid event to bet on: '{bet_str}'."
 
-        event_desc = get_dynamic_bet_desc(event_id, target_name)
+        event_desc = self.get_dynamic_bet_desc(bet_str, target_name)
 
-        base_return = self.get_dynamic_bet_return(event_id, target_id)
+        base_return = self.get_dynamic_bet_return(bet, target_id)
         readable_return = round_digits(base_return)
 
         response = f"Betting on `{event_desc}` would return {readable_return} times your investment.\n"
         response += "If you bet after the game has started, the return will be lower.\n"
-        if event_id > 2:
+        if bet_str > 2:
             start = "If" if target_id is None else "Since"
             response += f"{start} you bet on this event happening to a *specific* person "
             response += "(not just *anyone*), then the return will be further multiplied "
@@ -228,65 +405,7 @@ class BettingHandler:
 
         return response
 
-    def get_intfar_return(self, target, is_intfar):
-        if target is None or not is_intfar:
-            games_total = self.database.get_games_count()[0]
-            intfars_total = self.database.get_intfar_count()
-            intfar_count = intfars_total if is_intfar else games_total - intfars_total
-            return intfar_count, games_total
-
-        games_played, intfar_reason_ids = self.database.get_intfar_stats(target)
-        return len(intfar_reason_ids), games_played
-
-    def get_intfar_reason_return(self, target, reason):
-        reason_count = 0
-        num_games = 0
-        if target is None:
-            intfar_reason_ids = self.database.get_intfar_reason_counts()[0]
-            num_games = self.database.get_games_count()[0]
-            reason_count = intfar_reason_ids[reason]
-        else:
-            num_games, intfar_reason_ids = self.database.get_intfar_stats(target)
-            for reason_id in intfar_reason_ids:
-                if reason_id[0][reason] == "1":
-                    reason_count += 1
-
-        return reason_count, num_games
-
-    def get_doinks_return(self, target):
-        if target is None:
-            games_total = self.database.get_games_count()[0]
-            doinks_count = self.database.get_doinks_count()[0]
-            return doinks_count, games_total
-
-        games_played = self.database.get_intfar_stats(target)[0]
-        doinks_count = self.database.get_doinks_count(target)[0]
-
-        return doinks_count, games_played
-
-    def get_doinks_reason_return(self, target, reason):
-        reason_count = 0
-        num_games = 0
-        if target is None:
-            doinks_reason_ids = self.database.get_doinks_reason_counts()
-            num_games = self.database.get_games_count()[0]
-            reason_count = doinks_reason_ids[reason]
-        else:
-            num_games = self.database.get_intfar_stats(target)[0]
-            doinks_reason_ids = self.database.get_doinks_stats(target)
-            for reason_id in doinks_reason_ids:
-                if reason_id[0][reason] == "1":
-                    reason_count += 1
-
-        return reason_count, num_games
-
-    def get_stats_return(self, target, stat_id):
-        stat = BETTING_STATS[stat_id]
-        best_in_stat_count = self.database.get_best_or_worst_stat(stat, target)[0]
-        num_games = self.database.get_intfar_stats(target)[0]
-        return best_in_stat_count, num_games
-
-    def get_dynamic_bet_return(self, event_id: int, target: int) -> int:
+    def get_dynamic_bet_return(self, bet: Bet, target_id: int) -> int:
         """
         Get a value for how many tokens can be won by a bet on a given target.
 
@@ -294,37 +413,35 @@ class BettingHandler:
         :param target:      Discord ID of person to target with the bet or None
                             if the bet has no target
         """
-        if event_id > 1:
-            count = 0
-            num_games = 0
-            if event_id < BETTING_TYPES_INDICES["intfar_reason"]:
-                count, num_games = self.get_intfar_return(target, event_id == 3)
-            elif event_id < BETTING_TYPES_INDICES["doinks"]:
-                count, num_games = self.get_intfar_reason_return(
-                    target, event_id - BETTING_TYPES_INDICES["intfar_reason"]
-                )
-            elif event_id == BETTING_TYPES_INDICES["doinks"]:
-                count, num_games = self.get_doinks_return(target)
-            elif event_id < BETTING_TYPES_INDICES["stats"]:
-                count, num_games = self.get_doinks_reason_return(
-                    target, event_id - BETTING_TYPES_INDICES["doinks_reason"]
-                )
-            elif event_id < len(BETTING_IDS):
-                count, num_games = self.get_stats_return(
-                    target, event_id - BETTING_TYPES_INDICES["stats"]
-                )
+        resolver = self.get_bet_resolver(bet, None, target_id)
 
-            if num_games == 0: # No games has been played for given target, ratio is 0.
-                return self.database.get_base_bet_return(event_id)
-            if count == 0: # Event never happened, set ratio to amount of games played.
-                return num_games
+        count = 0
+        num_games = 0
+        if bet.event_id in resolver.should_resolve_with_has_intfar:
+            count, num_games = self.get_intfar_return(bet, target_id)
+        elif bet.event_id in resolver.should_resolve_with_intfar_reason:
+            intfar_index = resolver.should_resolve_with_intfar_reason.index(bet.event_id)
+            count, num_games = self.get_intfar_reason_return(intfar_index, target_id)
+        elif bet.event_id in resolver.should_resolve_with_has_doinks:
+            count, num_games = self.get_doinks_return(target_id)
+        elif bet.event_id in resolver.should_resolve_with_doinks_reason:
+            doinks_index = resolver.should_resolve_with_doinks_reason.index(bet.event_id)
+            count, num_games = self.get_doinks_reason_return(doinks_index, target_id)
+        elif bet.event_id in resolver.should_resolve_with_stats:
+            stat_index = resolver.should_resolve_with_stats.index(bet.event_id)
+            stat = resolver.should_resolve_with_stats[stat_index].split("_")[1]
+            count, num_games = self.get_stats_return(stat, target_id)
 
-            return num_games / count
+        if num_games == 0: # No games has been played for given target, ratio is 0
+            return bet.base_return
+        if count == 0: # Event never happened, set ratio to amount of games played
+            return max(num_games, 1)
 
-        return self.database.get_base_bet_return(event_id)
+        return num_games / count
 
-    def get_bet_value(self, bet_amount, event_id, bet_timestamp, target):
-        base_return = self.get_dynamic_bet_return(event_id, target)
+    def get_bet_value(self, bet_amount: int, event_id: str, bet_timestamp: int, target_id: int):
+        bet = self.get_bet(event_id)
+        base_return = self.get_dynamic_bet_return(bet, target_id)
         if bet_timestamp <= 120: # Bet was made before game started, award full value.
             ratio = 1.0
         else: # Scale value with game time at which bet was made.
@@ -342,9 +459,10 @@ class BettingHandler:
         bet_ids: list[int],
         amounts: list[int],
         bet_timestamp: int,
-        events: list[int],
+        events: list[str],
         targets: list[int],
-        game_data: tuple[int, int, str, dict[int, str], dict, list[tuple[int, dict]], int]
+        game_stats: GameStats,
+        bet_multiplier: int
     ) -> tuple[bool, int]:
         """
         Resolves the given bet for the given player. This determines whether the bet
@@ -366,33 +484,18 @@ class BettingHandler:
         Tuple containing a boolean indicating whether the bet was won and an
         integer indicating the total tokens won from the bet.
         """
-        game_id, intfar, intfar_reason, doinks, stats, clash_multiplier = game_data
-
         # Multiplier for betting on a specific person to do something. If more people are
         # in the game, the multiplier is higher.
-        person_multiplier = len(stats)
+        person_multiplier = len(game_stats.filtered_player_stats)
         amount_multiplier = len(amounts)
 
         total_value = 0
         all_success = True
 
         for amount, event_id, target_id in zip(amounts, events, targets):
-            success = False
-    
-            if event_id in (0, 1): # The bet concerns winning or losing the game.
-                success = resolve_game_outcome(stats, event_id == 0)
-
-            elif event_id < BETTING_TYPES_INDICES["doinks"]: # The bet concerns someone being Int-Far for something.
-                resolve_func = RESOLVE_INTFAR_BET_FUNCS[event_id - BETTING_TYPES_INDICES["intfar"]]
-                success = resolve_func(intfar, intfar_reason, target_id)
-
-            elif event_id < BETTING_TYPES_INDICES["stats"]:
-                resolve_func = RESOLVE_DOINKS_BET_FUNCS[event_id - BETTING_TYPES_INDICES["doinks"]]
-                success = resolve_func(doinks, target_id)
-
-            elif event_id < len(BETTING_IDS):
-                resolve_func = RESOLVE_STATS_BET_FUNCS[event_id - BETTING_TYPES_INDICES["stats"]]
-                success = resolve_func(stats, target_id)
+            bet = self.get_bet(event_id)
+            resolver = self.get_bet_resolver(bet, game_stats, target_id)
+            success = resolver.resolve_bet()
 
             all_success = all_success and success
 
@@ -407,13 +510,13 @@ class BettingHandler:
 
             total_value += bet_value
 
-        total_value = total_value * amount_multiplier * clash_multiplier
+        total_value = total_value * amount_multiplier * bet_multiplier
         timestamp = int(time())
 
         for bet_id in bet_ids:
             try:
                 self.database.mark_bet_as_resolved(
-                    bet_id, game_id, timestamp, all_success, total_value
+                    bet_id, game_stats.game_id, timestamp, all_success, total_value
                 )
             except DBException:
                 logger.exception("Database error during bet resolution!")
@@ -522,7 +625,7 @@ class BettingHandler:
             bet_target = None
             target_name = None
 
-        bet_desc = get_dynamic_bet_desc(event_id, target_name)
+        bet_desc = self.get_dynamic_bet_desc(event_id, target_name)
 
         if bet_requires_target(event_id) and bet_target is None:
             err_msg = self.get_bet_error_msg(bet_desc, "A person is required as the 'target' of that bet.")
@@ -807,7 +910,7 @@ class BettingHandler:
 
             new_balance, amount_refunded = data
             if ticket is None:
-                bet_desc = get_dynamic_bet_desc(event_id, target_name)
+                bet_desc = self.get_dynamic_bet_desc(event_id, target_name)
                 response = (
                     f"Bet on `{bet_desc}` for {format_tokens_amount(amount_refunded)} " +
                     f"{tokens_name} successfully cancelled.\n"

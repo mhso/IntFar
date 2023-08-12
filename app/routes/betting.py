@@ -2,7 +2,7 @@ from time import time
 import flask
 import app.util as app_util
 import api.util as api_util
-from api.bets import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
+from api.betting import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
@@ -90,7 +90,7 @@ def home():
 @betting_page.route("/payout", methods=["POST"])
 def get_payout():
     data = flask.request.get_json()
-    betting_handler = flask.current_app.config["BET_HANDLER"]
+    betting_handler = flask.current_app.config["BET_HANDLERS"]
     events = data["events"]
     amounts = data["amounts"]
     targets = data["targets"]
@@ -135,7 +135,7 @@ def get_payout():
 def create_bet():
     data = flask.request.get_json()
     database = flask.current_app.config["DATABASE"]
-    betting_handler = flask.current_app.config["BET_HANDLER"]
+    betting_handler = flask.current_app.config["BET_HANDLERS"]
     events = [int(x) for x in data["events"]]
 
     event_strs = []
@@ -200,7 +200,7 @@ def create_bet():
 @betting_page.route("/delete", methods=["POST"])
 def delete_bet():
     data = flask.request.form
-    betting_handler = flask.current_app.config["BET_HANDLER"]
+    betting_handler = flask.current_app.config["BET_HANDLERS"]
     conf = flask.current_app.config["APP_CONFIG"]
 
     disc_id = data["disc_id"]

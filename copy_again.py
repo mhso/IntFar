@@ -1,6 +1,7 @@
 import os
 from api.database import Database
 from api.config import Config
+from api.betting import BETTING_IDS
 
 conf_1 = Config()
 
@@ -19,7 +20,6 @@ with database_client_1.get_connection() as db_1:
     participants = db_1.cursor().execute("SELECT game_id, disc_id, doinks, kills, deaths, assists, kda, kp, champ_id, damage, cs, cs_per_min, gold, vision_wards, vision_score, steals FROM participants").fetchall()
     summoners = db_1.cursor().execute("SELECT * FROM registered_summoners").fetchall()
     balances = db_1.cursor().execute("SELECT * FROM betting_balance").fetchall()
-    events = db_1.cursor().execute("SELECT * FROM betting_events").fetchall()
     bets = db_1.cursor().execute("SELECT * FROM bets").fetchall()
     shop_items = db_1.cursor().execute("SELECT * FROM shop_items").fetchall()
     owned_items = db_1.cursor().execute("SELECT * FROM owned_items").fetchall()
@@ -55,17 +55,15 @@ with database_client_1.get_connection() as db_1:
         for data in balances:
             db_2.cursor().execute(query, data)
 
-        query = "INSERT OR IGNORE INTO betting_events(id, game, max_return) VALUES (?, 'lol', ?)"
-        for data in events:
-            db_2.cursor().execute(query, data)
-
         query = (
             "INSERT OR IGNORE INTO bets(id, better_id, guild_id, game_id, game, timestamp, event_id, "
             "amount, game_duration, target, ticket, result, payout) "
             "VALUES (?, ?, ?, ?, 'lol', ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         for data in bets:
-            db_2.cursor().execute(query, data)
+            data = list(data)
+            data[6] = BETTING_IDS[data[6]]
+            db_2.cursor().execute(query, tuple(data))
 
         query = "INSERT INTO shop_items VALUES (?, ?, ?, ?)"
         for data in shop_items:

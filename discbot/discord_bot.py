@@ -16,16 +16,16 @@ from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
 from discbot import commands
 from discbot.commands.meta import handle_usage_msg
-from api import game_stats, bets, award_qualifiers
+from api import betting
 from api.award_qualifiers import AwardQualifiers
 from api.awards import get_awards_handler
 from api.game_data import get_stat_parser
-from api.game_stats import GameStats, PlayerStats
+from api.game_stats import GameStats
 from api.game_monitor import GameMonitor
 from api.game_monitoring.lol import LoLGameMonitor
 from api.game_monitoring.csgo import CSGOGameMonitor
 from api.database import DBException, Database
-from api.bets import BettingHandler
+from api.betting import BettingHandler
 from api.audio_handler import AudioHandler
 from api.shop import ShopHandler
 from api.riot_api import RiotAPIClient
@@ -53,26 +53,26 @@ class DiscordClient(discord.Client):
         self,
         config: Config,
         database: Database,
-        betting_handler: BettingHandler,
+        betting_handlers: dict[str, BettingHandler],
         riot_api: RiotAPIClient,
         **kwargs
     ):
         """
         Initialize the Discord client.
 
-        :param config:          Config instance that holds all the configuration
-                                options for Int-Far
-        :param database:        SQLiteDatabase instance that handles the logic
-                                of interacting with the sqlite database
-        :param betting_handler: BettingHandler instance that handles the logic
-                                of creating, resolving, and listing bets
-        :param riot_api:        RiotAPIClient instance that handles the logic of
-                                communicating with Riot Games' LoL API
-        :param audio_handler:   AudioHandler instance that handles the logic of
-                                listing and playing sounds through Discord
-        :param shop_handler:    ShopHandler instance that handles the logic of
-                                buying, selling, listing items for betting tokens
-        :param **kwargs:        Various keyword arguments.
+        :param config:              Config instance that holds all the configuration
+                                    options for Int-Far
+        :param database:            SQLiteDatabase instance that handles the logic
+                                    of interacting with the sqlite database
+        :param betting_handlers:    BettingHandler instance that handles the logic
+                                    of creating, resolving, and listing bets
+        :param riot_api:            RiotAPIClient instance that handles the logic of
+                                    communicating with Riot Games' LoL API
+        :param audio_handler:       AudioHandler instance that handles the logic of
+                                    listing and playing sounds through Discord
+        :param shop_handler:        ShopHandler instance that handles the logic of
+                                    buying, selling, listing items for betting tokens
+        :param **kwargs:            Various keyword arguments.
         """
         super().__init__(
             intents=discord.Intents(
@@ -87,7 +87,7 @@ class DiscordClient(discord.Client):
         )
         self.config = config
         self.database = database
-        self.betting_handler = betting_handler
+        self.betting_handlers = betting_handlers
         self.riot_api = riot_api
         self.steam_api = SteamAPIClient(self.config)
         self.steam_api.login()
@@ -241,9 +241,7 @@ class DiscordClient(discord.Client):
         await asyncio.sleep(1)
 
         # Resolve any active bets made on the game.
-        response, max_tokens_id, new_max_tokens_id = self.resolve_bets(
-            parsed_game_stats.filtered_player_stats, intfar, intfar_reason, doinks, guild_id
-        )
+        response, max_tokens_id, new_max_tokens_id = self.resolve_bets(parsed_game_stats)
 
         if max_tokens_id != new_max_tokens_id: # Assign new 'goodest_boi' title.
             await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
@@ -584,14 +582,7 @@ class DiscordClient(discord.Client):
         if new_head_honcho is not None:
             await new_head_honcho.add_roles(role)
 
-    def resolve_bets(
-        self,
-        game_info: list[tuple],
-        intfar: int,
-        intfar_reason: str,
-        doinks: list[int],
-        guild_id: int
-    ):
+    def resolve_bets(self, game_stats: GameStats):
         """
         Resolves any active bets after a game has concluded and award points
         to the players in the game and to players getting doinks.
@@ -608,7 +599,8 @@ class DiscordClient(discord.Client):
         :param doinks:          List of Discord IDs of people who got doinks
         :param guild_id:        ID of the Discord server where the game took place
         """
-        game_won = game_info[0][1]["gameWon"]
+        game_won = bool(game_stats.win)
+        guild_id = game_stats.guild_id
         tokens_name = self.config.betting_tokens
         tokens_gained = (
             self.config.betting_tokens_for_win
@@ -616,12 +608,12 @@ class DiscordClient(discord.Client):
             else self.config.betting_tokens_for_loss
         )
 
-        clash_multiplier = 1
+        bet_multiplier = 1
 
         # Check if we are playing clash. If so, points are worth more.
-        if self.riot_api.is_clash(self.game_monitor.active_game[guild_id]["queue_id"]):
-            clash_multiplier = self.config.clash_multiplier
-            tokens_gained *= clash_multiplier
+        if game_stats.game == "lol" and self.riot_api.is_clash(self.game_monitors["lol"].active_game[guild_id]["queue_id"]):
+            bet_multiplier = self.config.clash_multiplier
+            tokens_gained *= bet_multiplier
 
         game_desc = "Game won!" if game_won else "Game lost."
         response = (
@@ -630,26 +622,24 @@ class DiscordClient(discord.Client):
         )
         response_bets = "**\n--- Results of bets made that game ---**\n"
         max_tokens_holder = self.database.get_max_tokens_details()[1]
+        betting_handler = self.betting_handlers[game_stats.game]
 
         any_bets = False # Bool to indicate whether any bets were made.
-        for disc_id, _, _ in self.database.summoners:
-            user_in_game = False # See if the user corresponding to 'disc_id' was in-game.
-            for user_data in self.game_monitor.users_in_game.get(guild_id, []):
-                if disc_id == user_data[0]:
-                    user_in_game = True
-                    break
+        for disc_id in self.database.users[game_stats.game]:
+            # See if the user corresponding to 'disc_id' was in-game.
+            player_stats = game_stats.find_player_stats(disc_id, game_stats.filtered_player_stats)
 
             gain_for_user = 0
-            if user_in_game: # If current user was in-game, they gain tokens for playing.
+            if player_stats is not None: # If current user was in-game, they gain tokens for playing.
                 gain_for_user = tokens_gained
-                if disc_id in doinks: # If user was awarded doinks, they get more tokens.
-                    number_of_doinks = len(list(filter(lambda x: x == "1", doinks[disc_id])))
+                if player_stats.doinks is not None: # If user was awarded doinks, they get more tokens.
+                    number_of_doinks = sum(map(int, player_stats.doinks))
                     gain_for_user += (self.config.betting_tokens_for_doinks * number_of_doinks)
-    
-                self.betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
+
+                betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
             # Get list of active bets for the current user.
-            bets_made = self.database.get_bets(True, disc_id, guild_id)
+            bets_made = self.database.get_bets(player_stats.game, True, disc_id, guild_id)
             balance_before = self.database.get_token_balance(disc_id)
             tokens_earned = gain_for_user # Variable for tracking tokens gained for the user.
             tokens_lost = -1 # Variable for tracking tokens lost for the user.
@@ -664,22 +654,15 @@ class DiscordClient(discord.Client):
                 for bet_ids, _, _, amounts, events, targets, bet_timestamp, _, _ in bets_made:
                     any_bets = True
                     # Resolve current bet which the user made. Marks it as won/lost in database.
-                    bet_game_data = (
-                        self.game_monitor.active_game[guild_id]["id"],
-                        intfar,
-                        intfar_reason,
-                        doinks,
-                        game_info,
-                        clash_multiplier
-                    ) 
-                    bet_success, payout = self.betting_handler.resolve_bet(
+                    bet_success, payout = betting_handler.resolve_bet(
                         disc_id,
                         bet_ids,
                         amounts,
                         bet_timestamp,
                         events,
                         targets,
-                        bet_game_data
+                        game_stats,
+                        bet_multiplier
                     )
 
                     response_bets += " - "
@@ -689,7 +672,7 @@ class DiscordClient(discord.Client):
                         if target is not None:
                             person = self.get_discord_nick(target, guild_id)
 
-                        bet_desc = bets.get_dynamic_bet_desc(event, person)
+                        bet_desc = betting_handler.get_dynamic_bet_desc(event, person)
 
                         response_bets += f"`{bet_desc}`"
                         if index != len(amounts) - 1: # Bet was a multi-bet.
@@ -1199,6 +1182,8 @@ class DiscordClient(discord.Client):
         :param guild_id:        ID of the Discord server where the game took place
         """
         doinks_mentions, doinks = awards_handler.get_big_doinks()
+        for stats in awards_handler.parsed_game_stats.filtered_player_stats:
+            stats.doinks = doinks.get(stats.disc_id)
         redeemed_text = self.get_big_doinks_msg(awards_handler, doinks_mentions)
 
         return doinks, redeemed_text
@@ -1470,12 +1455,6 @@ class DiscordClient(discord.Client):
 
         if intfar_data == []:
             # No one has played enough games to quality for IFOTM this month
-            response = (
-                f"No one has played a minimum of {self.config.ifotm_min_games} games "
-                "this month, so no Int-Far of the Month will be crowned "
-                f"for {month_name}. Dead game, I guess :("
-            )
-            await self.channels_to_write[api_util.MAIN_GUILD_ID].send(response)
             return
 
         intro_desc = get_awards_handler(game, self.config, None).get_flavor_text("ifotm", month - 1) + "\n\n"
@@ -1533,7 +1512,8 @@ class DiscordClient(discord.Client):
 
             await asyncio.sleep(time_to_sleep)
 
-        await self.declare_monthly_intfar(ifotm_monitor)
+        for game in api_util.SUPPORTED_GAMES:
+            await self.declare_monthly_intfar(game, ifotm_monitor)
 
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
         asyncio.create_task(self.polling_loop())
@@ -1832,11 +1812,11 @@ class DiscordClient(discord.Client):
 
         self.steam_api.close()
 
-def run_client(config, database, betting_handler, riot_api, ai_pipe, flask_pipe, main_pipe):
+def run_client(config, database, betting_handlers, riot_api, ai_pipe, flask_pipe, main_pipe):
     client = DiscordClient(
         config,
         database,
-        betting_handler,
+        betting_handlers,
         riot_api,
         ai_pipe=ai_pipe,
         flask_pipe=flask_pipe,

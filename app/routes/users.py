@@ -1,7 +1,7 @@
 import flask
 import api.util as api_util
 from app.util import discord_request, make_template_context, format_bet_timestamp
-from api.bets import get_dynamic_bet_desc, BETTING_DESC
+from api.betting import get_dynamic_bet_desc, BETTING_DESC
 
 user_page = flask.Blueprint("users", __name__, template_folder="templates")
 

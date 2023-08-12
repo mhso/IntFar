@@ -4,7 +4,7 @@ import argparse
 from mhooge_flask.logging import logger
 
 from api import award_qualifiers
-from api.bets import BettingHandler
+from api.betting import BettingHandler
 from api.config import Config
 from api.database import Database
 from api.riot_api import RiotAPIClient

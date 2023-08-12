@@ -1,10 +1,10 @@
-from api import bets
+from api import betting
 import api.util as api_util
 from discbot.commands import util as commands_util
 from discbot.commands.meta import handle_usage_msg
 
 async def handle_betting_msg(client, message):
-    max_mins = bets.MAX_BETTING_THRESHOLD
+    max_mins = betting.MAX_BETTING_THRESHOLD
     tokens_name = client.config.betting_tokens
     response = "Betting usage: `!bet [amount] [event] (person)`\n"
     response += "This places a bet on the next (or current) match.\n"
@@ -13,8 +13,8 @@ async def handle_betting_msg(client, message):
     response += "minutes. Betting during a game returns a lower reward, based on "
     response += "how much time has passed in the game.\n"
     response += "**--- List of available events to bet on ---**\n"
-    for event_name, event_id in bets.BETTING_IDS.items():
-        event_desc = bets.BETTING_DESC[event_id]
+    for event_name, event_id in betting.BETTING_IDS.items():
+        event_desc = betting.BETTING_DESC[event_id]
         response += f"`{event_name}` - Bet on {event_desc}\n"
 
     await message.channel.send(response)
@@ -151,7 +151,7 @@ async def handle_active_bets_msg(client, message, target_id):
                         if target is not None:
                             person = client.get_discord_nick(target, message.guild.id)
 
-                        bet_desc = bets.get_dynamic_bet_desc(event, person)
+                        bet_desc = betting.get_dynamic_bet_desc(event, person)
                         bets_str += f"`{bet_desc}`"
                         if index != len(amounts) - 1:
                             bets_str += " & "
@@ -192,7 +192,7 @@ async def handle_all_bets_msg(client, message, target_id):
     most_often_event = 0
     max_event_count = 0
     winnings = 0
-    event_counts = {x: 0 for x in bets.BETTING_DESC}
+    event_counts = {x: 0 for x in betting.BETTING_DESC}
 
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
@@ -218,7 +218,7 @@ async def handle_all_bets_msg(client, message, target_id):
         pct_won = int((bets_won / len(all_bets)) * 100)
         pct_target = int((had_target / len(all_bets)) * 100)
         pct_during = int((during_game / len(all_bets)) * 100)
-        event_desc = bets.BETTING_DESC[most_often_event]
+        event_desc = betting.BETTING_DESC[most_often_event]
 
         response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
         response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
