@@ -24,8 +24,9 @@ class LoLPlayerStats(PlayerStats):
     inhibitor_kills: int
     puuid: str
 
-    def stats_to_save(self):
-        return super().stats_to_save + [
+    @classmethod
+    def STATS_TO_SAVE():
+        return super().STATS_TO_SAVE() + [
             "champ_id",
             "damage",
             "cs",
@@ -36,9 +37,9 @@ class LoLPlayerStats(PlayerStats):
             "steals"
         ]
 
-    @property
-    def stat_quantity_desc(self):
-        stat_quantities = dict(super().stat_quantity_desc)
+    @classmethod
+    def STAT_QUANTITY_DESC():
+        stat_quantities = dict(super().STAT_QUANTITY_DESC())
         stat_quantities.update(
             damage=("most", "least"),
             cs=("most", "least"),
@@ -64,8 +65,9 @@ class LoLGameStats(GameStats):
     enemy_dragon_kills: int
     enemy_herald_kills: int
 
-    def stats_to_save(self):
-        return super().stats_to_save + ["first_blood"]
+    @classmethod
+    def STATS_TO_SAVE():
+        return super().STATS_TO_SAVE() + ["first_blood"]
 
     def get_filtered_timeline_stats(self, timeline_data: dict):
         """

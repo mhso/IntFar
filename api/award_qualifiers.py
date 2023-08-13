@@ -14,8 +14,9 @@ class AwardQualifiers(ABC):
         self.parsed_game_stats = parsed_game_stats
         self.flavor_texts = self._load_flavor_texts()
 
-    @property
-    def all_flavor_texts(self) -> list[str]:
+    @classmethod
+    @abstractmethod
+    def ALL_FLAVOR_TEXTS(cls) -> list[str]:
         return [
             "intfar",
             "no_intfar",
@@ -28,43 +29,59 @@ class AwardQualifiers(ABC):
             "ifotm"
         ]
 
-    @property
+    @classmethod
     @abstractmethod
-    def intfar_reasons(self) -> list[str]:
+    def INTFAR_REASONS(cls) -> dict[str, str]:
         ...
 
-    @property
+    @classmethod
     @abstractmethod
-    def intfar_flavor_texts(self) -> list[str]:
+    def INTFAR_CRITERIAS(cls) -> dict[str, dict[str, float]]:
         ...
 
-    @property
+    @classmethod
     @abstractmethod
-    def honorable_mentions_flavor_texts(self) -> list[str]:
+    def INTFAR_CRITERIAS_DESC(cls) -> dict[str, list[str]]:
         ...
 
-    @property
+    @classmethod
     @abstractmethod
-    def cool_stats_flavor_texts(self) -> list[str]:
+    def DOINKS_REASONS(cls) -> dict[str, str]:
         ...
 
-    @property
+    @classmethod
     @abstractmethod
-    def doinks_flavor_texts(self) -> list[str]:
+    def INTFAR_FLAVOR_TEXTS(cls) -> list[str]:
         ...
 
-    @property
-    def game_specific_flavors(self) -> list[str]:
+    @classmethod
+    @abstractmethod
+    def HONORABLE_MENTIONS_FLAVOR_TEXTS(cls) -> list[str]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def COOL_STATS_FLAVOR_TEXTS(cls) -> list[str]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def DOINKS_FLAVOR_TEXTS(cls) -> list[str]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def GAME_SPECIFIC_FLAVORS(cls) -> list[str]:
         return {
-            "intfar": self.intfar_flavor_texts,
-            "doinks": self.intfar_flavor_texts,
-            "honorable": self.intfar_flavor_texts,
-            "stats": self.intfar_flavor_texts,
+            "intfar": cls.INTFAR_FLAVOR_TEXTS(),
+            "doinks": cls.DOINKS_FLAVOR_TEXTS(),
+            "honorable": cls.HONORABLE_MENTIONS_FLAVOR_TEXTS(),
+            "stats": cls.COOL_STATS_FLAVOR_TEXTS(),
         }
 
     def get_flavor_text(self, flavor: str, outer_index, inner_index=None, **params_to_replace) -> str:
         if inner_index is not None:
-            flavor = self.game_specific_flavors[flavor]
+            flavor = self.GAME_SPECIFIC_FLAVORS()[flavor]
             outer_index = inner_index
 
         flavor_choices = self.flavor_texts[flavor]
@@ -82,7 +99,7 @@ class AwardQualifiers(ABC):
 
     def _load_flavor_texts(self) -> dict[str, str]:
         flavor_text_dict = {}
-        for filename in self.all_flavor_texts:
+        for filename in self.ALL_FLAVOR_TEXTS():
             flavor_text_dict[filename] = load_flavor_texts(filename, self.game)
 
         return flavor_text_dict

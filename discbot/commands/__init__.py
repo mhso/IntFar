@@ -11,7 +11,7 @@ from discbot.commands.stats import *
 from discbot.commands.sounds import *
 from discbot.commands import util as commands_util
 from api.database import DBException
-from api.util import GUILD_IDS, GUILD_MAP, MY_GUILD_ID
+from api.util import GUILD_IDS, GUILD_MAP, MY_GUILD_ID, SUPPORTED_GAMES
 
 from mhooge_flask.logging import logger
 
@@ -83,6 +83,13 @@ class ChampionParam:
     def __str__(self):
         return self.name
 
+class GameParam:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
 class RegularParam:
     def __init__(self, name):
         self.name = name
@@ -146,6 +153,14 @@ class Command:
                     index += consumed_params
 
                 parsed_args.append(champ_id)
+
+            elif isinstance(param, GameParam):
+                if args[index] not in SUPPORTED_GAMES:
+                    valid_games = ", ".join(f"'{game}'" for game in SUPPORTED_GAMES)
+                    await message.channel.send(
+                        f"Invalid game '{args[index]}'. This command targets a specific "
+                        f"game which should be one of: {valid_games}."
+                    )
 
             elif index < len(args): # Regular parameter.
                 parsed_args.append(args[index])
@@ -255,28 +270,42 @@ def initialize_commands():
     # register command
     register_name = "register"
     register_desc = (
-        "Sign up for the LoL Int-Far™ Tracker™ " +
-        "by providing your summoner name."
+        "Sign up for the Int-Far™ Tracker™ for the given game " +
+        "by providing your ingame info. For LoL, this is just your summoner name. "
+        "For CSGO, this is your Steam account name, Steam ID, and match authentication "
+        "code (see https://help.steampowered.com/en/wizard/HelpWithGameIssue/?appid=730&issueid=128 for help)."
     )
     register_command(
-        register_name, register_desc, handle_lol_register_msg,
-        mandatory_params=[RegularParam("summoner_name")]
+        register_name,
+        register_desc,
+        handle_register_msg,
+        mandatory_params=[GameParam("game"), RegularParam("user_name")],
+        optional_params=[RegularParam("user_id"), RegularParam("extra_info")]
     )
 
     # unregister command
     unregister_name = "unregister"
     unregister_desc = (
-        "Leave the LoL Int-Far™ Tracker™. You can re-join later with !register, " +
-        "and your data will not be deleted."
+        "Leave the Int-Far™ Tracker™ for the given game. You can re-join later "
+        "with !register, and your data will not be deleted."
     )
     register_command(
-        unregister_name, unregister_desc, handle_unregister_msg, access_level="all"
+        unregister_name,
+        unregister_desc,
+        handle_unregister_msg,
+        access_level="all",
+        mandatory_params=[GameParam("game")]
     )
 
     # users command
     users_name = "users"
     users_desc = "List all users who are currently signed up for the Int-Far:tm: Tracker:tm:."
-    register_command(users_name, users_desc, handle_users_msg)
+    register_command(
+        users_name,
+        users_desc,
+        handle_users_msg,
+        optional_params=[GameParam("game")]
+    )
 
     # help command
     help_name = "help"
@@ -292,7 +321,9 @@ def initialize_commands():
     usage_name = "usage"
     usage_desc = "Show how to use a given command."
     register_command(
-        usage_name, usage_desc, handle_usage_msg,
+        usage_name,
+        usage_desc,
+        handle_usage_msg,
         mandatory_params=[RegularParam("command")]
     )
 
@@ -300,17 +331,22 @@ def initialize_commands():
     stats_name = "stats"
     stats_desc = "Show a list of available stat keywords to check."
     register_command(
-        stats_name, stats_desc, handle_stats_msg
+        stats_name, stats_desc, handle_stats_msg, mandatory_params=[GameParam("game")]
     )
 
     # intfar command.
     intfar_name = "intfar"
     intfar_desc = (
         "Show how many times you (or someone else) has been the Int-Far. " +
-        "`!intfar all` lists Int-Far stats for all users."
+        "`!intfar [game] all` lists Int-Far stats for all users for the given game."
     )
     register_command(
-        intfar_name, intfar_desc, handle_intfar_msg, True, "self",
+        intfar_name,
+        intfar_desc,
+        handle_intfar_msg,
+        True, 
+        "self",
+        mandatory_params=[GameParam("game")],
         optional_params=[TargetParam("person")]
     )
 
@@ -318,29 +354,41 @@ def initialize_commands():
     intfar_relations_name = "intfar_relations"
     intfar_relations_desc = "Show who you (or someone else) int the most games with."
     register_command(
-        intfar_relations_name, intfar_relations_desc, handle_intfar_relations_msg,
-        access_level="self", optional_params=[TargetParam("person")]
+        intfar_relations_name,
+        intfar_relations_desc,
+        handle_intfar_relations_msg,
+        access_level="self",
+        mandatory_params=[GameParam("game")],
+        optional_params=[TargetParam("person")]
     )
 
     # intfar criteria command
     intfar_criteria_name = "intfar_criteria"
     intfar_criteria_desc = (
         "List the things that need to happen for a person to get " +
-        "Int-Far because of a specific criteria. Fx. `!intfar_criteria kda`."
+        "Int-Far because of a specific criteria. Fx. `!intfar_criteria lol kda`."
     )
     register_command(
-        intfar_criteria_name, intfar_criteria_desc, handle_intfar_criteria_msg,
+        intfar_criteria_name,
+        intfar_criteria_desc,
+        handle_intfar_criteria_msg,
+        mandatory_params=[GameParam("game")],
         optional_params=[RegularParam("criteria")]
     )
 
     # doinks command
     doinks_name = "doinks"
     doinks_desc = (
-        "Show big doinks plays you (or someone else) did! " +
-        "`!doinks all` lists all doinks stats for all users."
+        "Show big doinks plays that you (or someone else) did! " +
+        "`!doinks [game] all` lists all doinks stats for all users for the given game."
     )
     register_command(
-        doinks_name, doinks_desc, handle_doinks_msg, True, "self",
+        doinks_name,
+        doinks_desc, 
+        handle_doinks_msg,
+        True,
+        "self",
+        mandatory_params=[GameParam("game")],
         optional_params=[TargetParam("person")]
     )
 
@@ -348,14 +396,23 @@ def initialize_commands():
     doinks_relations_name = "doinks_relations"
     doinks_relations_desc = "Show who you (or someone else) get Big Doinks the most with."
     register_command(
-        doinks_relations_name, doinks_relations_desc, handle_doinks_relations_msg,
-        access_level="self", optional_params=[TargetParam("person")]
+        doinks_relations_name,
+        doinks_relations_desc,
+        handle_doinks_relations_msg,
+        access_level="self",
+        mandatory_params=[GameParam("game")],
+        optional_params=[TargetParam("person")]
     )
 
     # doinks criteria command
     doinks_criteria_name = "doinks_criteria"
     doinks_criteria_desc = "Show the different criterias needed for acquiring a doink."
-    register_command(doinks_criteria_name, doinks_criteria_desc, handle_doinks_criteria_msg)
+    register_command(
+        doinks_criteria_name,
+        doinks_criteria_desc,
+        handle_doinks_criteria_msg,
+        mandatory_params=[GameParam("game")],
+    )
 
     # average command
     average_name = "average"

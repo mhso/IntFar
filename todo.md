@@ -9,11 +9,9 @@
 ## Ændringer i commands
 - Tilføj game som en parameter til mange commands
 
-## Ændringer i database.py
-- Find alle referencer til 
-
-## Ændringer i stats for spil
-game_stats.py fil/klasse til hver spil?
+## Ændringer i hjemmeside
+- Lav undersider for hvert spil
+- Ændr alt backend/endpoints til at være game-specific
 
 ## CSGO register page
 - Lav routing/db logic

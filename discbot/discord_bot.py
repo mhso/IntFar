@@ -224,7 +224,7 @@ class DiscordClient(discord.Client):
         awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
 
         # Determine who was the Int-Far (if anyone was).
-        intfar, intfar_reason, response = self.get_intfar_data(awards_handler)
+        intfar, response = self.get_intfar_data(awards_handler)
 
         # Determine who was awarded doinks.
         doinks, doinks_response = self.get_doinks_data(awards_handler)
@@ -309,14 +309,14 @@ class DiscordClient(discord.Client):
             if predictions_img is not None:
                 await self.send_predictions_timeline_image(predictions_img, guild_id)
 
-    def get_game_start(self, guild_id):
-        return self.game_monitor.active_game.get(guild_id, {}).get("start", None)
+    def get_game_start(self, game, guild_id):
+        return self.game_monitors[game].active_game.get(guild_id, {}).get("start", None)
 
-    def get_active_game(self, guild_id):
-        return self.game_monitor.active_game.get(guild_id)
+    def get_active_game(self, game, guild_id):
+        return self.game_monitors[game].active_game.get(guild_id)
 
-    def get_users_in_game(self, guild_id):
-        return self.game_monitor.users_in_game.get(guild_id)
+    def get_users_in_game(self, game, guild_id):
+        return self.game_monitors[game].users_in_game.get(guild_id)
 
     def get_mention_str(self, disc_id, guild_id=api_util.MAIN_GUILD_ID):
         """
@@ -1170,7 +1170,7 @@ class DiscordClient(discord.Client):
         awards_handler.parsed_game_stats.intfar_id = final_intfar
         awards_handler.parsed_game_stats.intfar_reason = reasons_str
 
-        return final_intfar, reasons_str, response
+        return final_intfar, response
 
     def get_doinks_data(self, awards_handler: AwardQualifiers):
         """

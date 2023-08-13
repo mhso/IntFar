@@ -8,19 +8,26 @@ from csgo.client import CSGOClient
 from csgo import sharecode
 from google.protobuf.json_format import MessageToJson
 
-_ENDPOINT = (
+from api.config import Config
+
+_ENDPOINT_NEXT_MATCH = (
     "https://api.steampowered.com/ICSGOPlayers_730/GetNextMatchSharingCode/v1"
     "?key=[key]"
     "&steamid=[steam_id]"
     "&steamidkey=[steam_id_key]"
     "&knowncode=[match_token]"
 )
+_ENDPOINT_PLAYER_SUMMARY = (
+    "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/"
+    "?key=[key]"
+    "&steamids=[steam_id]"
+)
 
 class SteamAPIClient:
     _MATCH_TOKEN_DICT = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefhijkmnopqrstuvwxyz23456789"
     _MATCH_TOKEN_DICT_LEN = len(_MATCH_TOKEN_DICT)
 
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.config = config
         self.logged_on_once = False
 
@@ -40,6 +47,44 @@ class SteamAPIClient:
             self.login()
         else:
             logger.warning("No Steam 2FA code provided. Steam/CSGO functionality wont work!")
+
+    def get_game_details(self, match_token):
+        code_dict = sharecode.decode(match_token)
+        self.cs_client.request_full_match_info(
+            code_dict["matchid"],
+            code_dict["outcomeid"],
+            code_dict["token"],
+        )
+        resp, = self.cs_client.wait_event('full_match_info')
+        as_json = json.loads(MessageToJson(resp))
+
+        return as_json
+
+    def get_next_sharecode(self, steam_id, game_code, match_token):
+        url = _ENDPOINT_NEXT_MATCH.replace(
+            "[key]", self.config.steam_key
+        ).replace(
+            "[steam_id]", steam_id
+        ).replace(
+            "[steam_id_key]", game_code
+        ).replace(
+            "[match_token]", match_token
+        )
+
+        return requests.get(url)
+
+    def validate_steam_id(self, steam_id):
+        url = _ENDPOINT_PLAYER_SUMMARY.replace(
+            "[key]", self.config.steam_key
+        ).replace(
+            "[steam_id]", str(steam_id)
+        )
+
+        response = requests.get(url)
+        if response.status_code != 200:
+            return False
+
+        return response.json().get("response", {}).get("players", []) != []
 
     def handle_steam_start(self):
         self.cs_client.launch()
@@ -90,28 +135,3 @@ class SteamAPIClient:
 
         if self.steam_client.connected:
             self.steam_client.disconnect()
-
-    def get_game_details(self, match_token):
-        code_dict = sharecode.decode(match_token)
-        self.cs_client.request_full_match_info(
-            code_dict["matchid"],
-            code_dict["outcomeid"],
-            code_dict["token"],
-        )
-        resp, = self.cs_client.wait_event('full_match_info')
-        as_json = json.loads(MessageToJson(resp))
-
-        return as_json
-
-    def get_next_sharecode(self, steam_id, game_code, match_token):
-        url = _ENDPOINT.replace(
-            "[key]", self.config.steam_key
-        ).replace(
-            "[steam_id]", steam_id
-        ).replace(
-            "[steam_id_key]", game_code
-        ).replace(
-            "[match_token]", match_token
-        )
-
-        return requests.get(url)

@@ -41,16 +41,6 @@ BETTING_IDS = {
     "highest_kda": 20
 }
 
-# Types of bets. Some are handled the same, so they are grouped logically.
-BETTING_TYPES_INDICES = {
-    "game": 0,
-    "intfar": 2,
-    "intfar_reason": 4,
-    "doinks": 8,
-    "doinks_reason": 9,
-    "stats": 17
-}
-
 # Textual descriptions of the different bets.
 BETTING_DESC = {
     0: "winning the game",
@@ -75,10 +65,6 @@ BETTING_DESC = {
     19: "someone having the highest kill participation",
     20: "someone having the highest KDA"
 }
-
-BETTING_STATS = [
-    "kills", "damage", "kp", "kda"
-]
 
 TARGET_OPTIONAL = 0
 TARGET_REQUIRED = 1
@@ -172,113 +158,6 @@ class BetResolver(ABC):
                 return resolver_func()
 
         raise ValueError("Could not match bet with the proper resolver!")
-
-def bet_requires_target(event_id: int):
-    return event_id > 16
-
-def bet_requires_no_target(event_id: int):
-    return event_id < 3
-
-def resolve_game_outcome(game_data: list[tuple[dict, int]], bet_on_win: bool):
-    stats = game_data[0][1]
-    return not (stats["gameWon"] ^ bet_on_win)
-
-def resolve_is_intfar(intfar, _, target_id: int):
-    if target_id is None: # Bet was about whether anyone was Int-Far.
-        return intfar is not None
-    return intfar == target_id # Bet was about a specific person being Int-Far.
-
-def resolve_not_intfar(intfar, intfar_reason: str, _):
-    return not resolve_is_intfar(intfar, intfar_reason, None)
-
-def intfar_by_reason(intfar, reason_str: str, target_id: int, reason_id: int):
-    return (resolve_is_intfar(intfar, reason_str, target_id)
-            and reason_str[reason_id] == "1")
-
-def resolve_is_intfar_by_kda(intfar, intfar_reason: str, target_id: int):
-    return intfar_by_reason(intfar, intfar_reason, target_id, 0)
-
-def resolve_is_intfar_by_deaths(intfar, intfar_reason: str, target_id: int):
-    return intfar_by_reason(intfar, intfar_reason, target_id, 1)
-
-def resolve_is_intfar_by_kp(intfar, intfar_reason: str, target_id: int):
-    return intfar_by_reason(intfar, intfar_reason, target_id, 2)
-
-def resolve_is_intfar_by_vision(intfar, intfar_reason: str, target_id: int):
-    return intfar_by_reason(intfar, intfar_reason, target_id, 3)
-
-def resolve_got_doinks(doinks, target_id: int):
-    if target_id is None:
-        return len(doinks) > 0
-    return target_id in doinks
-
-def resolve_doinks_by_reason(doinks, target_id, reason):
-    if target_id is not None:
-        return target_id in doinks and doinks[target_id][reason] == "1"
-    for disc_id in doinks:
-        if doinks[disc_id][reason] == "1":
-            return True
-    return False
-
-def resolve_doinks_for_kda(doinks, target_id):
-    return resolve_doinks_by_reason(doinks, target_id, 0)
-
-def resolve_doinks_for_kills(doinks, target_id):
-    return resolve_doinks_by_reason(doinks, target_id, 1)
-
-def resolve_doinks_for_damage(doinks, target_id):
-    return resolve_doinks_by_reason(doinks, target_id, 2)
-
-def resolve_doinks_for_penta(doinks, target_id):
-    return resolve_doinks_by_reason(doinks, target_id, 3)
-
-def resolve_doinks_for_vision(doinks, target_id):
-    return resolve_doinks_by_reason(doinks, target_id, 4)
-
-def resolve_doinks_for_kp(doinks, target_id):
-    return resolve_doinks_by_reason(doinks, target_id, 5)
-
-def resolve_doinks_for_monsters(doinks, target_id):
-    return resolve_doinks_by_reason(doinks, target_id, 6)
-
-def resolve_doinks_for_cs(doinks, target_id):
-    return resolve_doinks_by_reason(doinks, target_id, 7)
-
-def resolve_most_kills(game_data, target_id):
-    # Ties for most kills are NOT included. If more than one person has most kills, bet is lost.
-    most_kills_ties = game_stats.get_outlier(game_data, "kills", asc=False, include_ties=True)[0]
-    return target_id in most_kills_ties and len(most_kills_ties) == 1
-
-def resolve_most_damage(game_data, target_id):
-    # Ties for most damage is included. If more than one person has most dmg, bet is still won.
-    most_damage_ties = game_stats.get_outlier(game_data, "totalDamageDealtToChampions",
-                                              asc=False, include_ties=True)[0]
-    return target_id in most_damage_ties
-
-def resolve_highest_kp(game_data, target_id):
-    # Ties for highest kp is NOT included. If more than one person has highest kp, bet is lost.
-    highest_kp_ties = game_stats.get_outlier(game_data, "kp", asc=False, include_ties=True)[0]
-    return target_id in highest_kp_ties and len(highest_kp_ties) == 1
-
-def resolve_highest_kda(game_data, target_id):
-    # Ties for highets KDA is NOT included. If more than one person has highest KDA, bet is lost.
-    highest_kda_ties = game_stats.get_outlier(game_data, "kda", asc=False, include_ties=True)[0]
-    return target_id in highest_kda_ties and len(highest_kda_ties) == 1
-
-RESOLVE_INTFAR_BET_FUNCS = [
-    resolve_not_intfar, resolve_is_intfar, resolve_is_intfar_by_kda,
-    resolve_is_intfar_by_deaths, resolve_is_intfar_by_kp, resolve_is_intfar_by_vision
-]
-
-RESOLVE_DOINKS_BET_FUNCS = [
-    resolve_got_doinks, resolve_doinks_for_kda, resolve_doinks_for_kills,
-    resolve_doinks_for_damage, resolve_doinks_for_penta, resolve_doinks_for_vision,
-    resolve_doinks_for_kp, resolve_doinks_for_monsters, resolve_doinks_for_cs
-]
-
-RESOLVE_STATS_BET_FUNCS = [
-    resolve_most_kills, resolve_most_damage, resolve_highest_kp, resolve_highest_kda
-]
 
 class BettingHandler(ABC):
     def __init__(self, game: str, config: Config, database: Database):
@@ -476,7 +355,7 @@ class BettingHandler(ABC):
                                 was placed or None if game had not started
         :param events:          List of events that the bet was placed on
         :param targets:         List of user Discord IDs to target with each bet
-        :param target_names:    List of user names to target with each bet
+        :param game_stats:      Data about the completed game
 
         ### Returns
         :result:
@@ -527,9 +406,9 @@ class BettingHandler(ABC):
 
         return all_success, total_value
 
-    def get_bet_placed_text(
+    def _get_bet_placed_text(
         self,
-        data: tuple[int, int, int, str, str],
+        bet_data: tuple[int, int, int, str, str],
         all_in: bool,
         duration: int,
         ticket: int = None
@@ -537,7 +416,7 @@ class BettingHandler(ABC):
         """
         Get a string describing a bet that was placed.
 
-        :param data:        Tuple of relevant data about the bet
+        :param bet_data:    Tuple of relevant data about the bet
         :param all_in:      Whether the user placing the bet bet all their tokens on it
         :param duration:    How many seconds a current game is underway
         :param ticket:      Ticket ID, only relevant if the bet is a multi-bet
@@ -545,17 +424,17 @@ class BettingHandler(ABC):
         tokens_name = self.config.betting_tokens
 
         response = ""
-        if len(data) > 1:
+        if len(bet_data) > 1:
             response = "Multi-bet successfully placed! "
             response += "You bet on **all** the following happening:"
 
-            for amount, _, _, base_return, bet_desc in data:
+            for amount, _, _, base_return, bet_desc in bet_data:
                 response += f"\n - `{bet_desc}` for **{format_tokens_amount(amount)}** {tokens_name} "
                 response += f"(**{base_return}x** return)."
             response += f"\nThis bet uses the following ticket ID: **{ticket}**. "
             response += "You will need this ticket to cancel the bet.\n"
         else:
-            amount, _, _, base_return, bet_desc = data[0]
+            amount, _, _, base_return, bet_desc = bet_data[0]
             response = f"Bet succesfully placed: `{bet_desc}` for "
             if all_in:
                 capitalized = tokens_name[1:-1].upper()
@@ -575,7 +454,7 @@ class BettingHandler(ABC):
 
         return response
 
-    def get_bet_error_msg(self, bet_desc, error):
+    def _get_bet_error_msg(self, bet_desc, error):
         return f"Bet was not placed: '{bet_desc}' - {error}"
 
     def check_bet_validity(
@@ -616,19 +495,21 @@ class BettingHandler(ABC):
         and a string describing why it is not, if it isn't or a tuple of relevant
         data about the bet, if it is.
         """
-        event_id = BETTING_IDS.get(bet_str)
+        bet = self.get_bet(bet_str)
         tokens_name = self.config.betting_tokens
-        if event_id is None:
+        if bet is None:
             return (False, f"Bet was not placed: Invalid event to bet on: '{bet_str}'.")
 
-        if bet_requires_no_target(event_id):
+        event_id = bet_str
+
+        if bet.target_required == TARGET_INVALID:
             bet_target = None
             target_name = None
 
         bet_desc = self.get_dynamic_bet_desc(event_id, target_name)
 
-        if bet_requires_target(event_id) and bet_target is None:
-            err_msg = self.get_bet_error_msg(bet_desc, "A person is required as the 'target' of that bet.")
+        if bet.target_required == TARGET_REQUIRED and bet_target is None:
+            err_msg = self._get_bet_error_msg(bet_desc, "A person is required as the 'target' of that bet.")
             return (False, err_msg)
 
         min_amount = MINIMUM_BETTING_AMOUNT
@@ -637,18 +518,18 @@ class BettingHandler(ABC):
             amount = parse_amount_str(bet_amount.strip(), balance)
 
             if amount < min_amount: # Bet was for less than the minimum allowed amount.
-                err_msg = self.get_bet_error_msg(
+                err_msg = self._get_bet_error_msg(
                     bet_desc, f"Betting amount is too low. Must be minimum {min_amount}."
                 )
                 return (False, err_msg)
         except ValueError:
-            err_msg = self.get_bet_error_msg(bet_desc, f"Invalid bet amount: '{bet_amount}'.")
+            err_msg = self._get_bet_error_msg(bet_desc, f"Invalid bet amount: '{bet_amount}'.")
             return (False, err_msg)
 
         time_now = time()
         duration = 0 if game_timestamp is None else time_now - game_timestamp
         if duration > 60 * MAX_BETTING_THRESHOLD:
-            err_msg = self.get_bet_error_msg(
+            err_msg = self._get_bet_error_msg(
                 bet_desc,
                 "The game is too far progressed. You must place bet before " +
                 f"{MAX_BETTING_THRESHOLD} minutes in game."
@@ -656,12 +537,12 @@ class BettingHandler(ABC):
 
             return (False, err_msg)
 
-        if self.database.get_bet_id(disc_id, guild_id, event_id, bet_target, ticket) is not None:
-            err_msg = self.get_bet_error_msg(bet_desc, "Such a bet has already been made!")
+        if self.database.get_bet_id(self.game, disc_id, guild_id, event_id, bet_target, ticket) is not None:
+            err_msg = self._get_bet_error_msg(bet_desc, "Such a bet has already been made!")
             return (False, err_msg)
 
         if running_cost + amount > balance:
-            err_msg = self.get_bet_error_msg(bet_desc, f"You do not have enough {tokens_name}.")
+            err_msg = self._get_bet_error_msg(bet_desc, f"You do not have enough {tokens_name}.")
             return (False, err_msg)
 
         return (True, (amount, event_id, duration, bet_desc))
@@ -715,20 +596,20 @@ class BettingHandler(ABC):
 
             # Run through betting amounts, events, target discord IDs, and target names
             for bet_amount, event, target, target_name in zip(amounts, events, targets, target_names):
-                valid, data = self.check_bet_validity(
+                valid, data_or_error = self.check_bet_validity(
                     disc_id, guild_id, bet_amount, game_timestamp, event,
                     balance, running_cost, target, target_name, ticket
                 )
 
                 if not valid:
-                    return (False, data, None)
+                    return (False, data_or_error, None)
 
                 # Unpack parsed amounts, betting event ID, current game duration, and betting description
-                amount, event_id, game_duration, bet_desc = data
+                amount, event_id, game_duration, bet_desc = data_or_error
 
                 # Ensure that no events and targets are bet on more than once
                 if (event_id, target) in used_events:
-                    err_msg = self.get_bet_error_msg(bet_desc, "Duplicate Event.")
+                    err_msg = self._get_bet_error_msg(bet_desc, "Duplicate Event.")
                     return (False, err_msg, None)
 
                 used_events.add((event_id, target))
@@ -748,8 +629,14 @@ class BettingHandler(ABC):
             # the bet and the potential reward it could give
             for amount, event_id, bet_target, base_return, bet_desc in bet_data:
                 bet_id = self.database.make_bet(
-                    disc_id, guild_id, event_id, amount,
-                    game_duration, bet_target, ticket
+                    self.game,
+                    disc_id,
+                    guild_id,
+                    event_id,
+                    amount,
+                    game_duration,
+                    bet_target,
+                    ticket
                 )
 
                 if not first:
@@ -811,7 +698,7 @@ class BettingHandler(ABC):
             )
 
         bet_all = len(amounts) == 1 and amounts[0] == "all"
-        response = self.get_bet_placed_text(bet_data, bet_all, game_duration, ticket)
+        response = self._get_bet_placed_text(bet_data, bet_all, game_duration, ticket)
 
         balance_resp = f"\nYour {tokens_name} balance is now `{format_tokens_amount(balance - running_cost)}`."
 
@@ -888,7 +775,7 @@ class BettingHandler(ABC):
         cancelled and a string describing the bet that was cancelled.
         """
         ticket = None
-        event_id = BETTING_IDS.get(bet_str)
+        event_id = bet_str if self.get_bet(bet_str) is not None else None
         tokens_name = self.config.betting_tokens
         if event_id is None:
             try:
@@ -897,7 +784,7 @@ class BettingHandler(ABC):
                 return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
 
         try:
-            bet_id = self.database.get_bet_id(disc_id, guild_id, event_id, target_id, ticket)
+            bet_id = self.database.get_bet_id(self.game, disc_id, guild_id, event_id, target_id, ticket)
             if bet_id is None:
                 return (
                     False,
@@ -923,7 +810,7 @@ class BettingHandler(ABC):
             print_exc()
             return (False, "Bet was not cancelled: Database error occured :(")
 
-    def get_gift_err_msg(self, err_msg):
+    def _get_gift_err_msg(self, err_msg):
         return f"Transfer failed: {err_msg}"
 
     def give_tokens(
@@ -955,26 +842,26 @@ class BettingHandler(ABC):
             balance = self.database.get_token_balance(disc_id)
         except DBException:
             print_exc()
-            err_msg = self.get_gift_err_msg("Database error occured :(")
+            err_msg = self._get_gift_err_msg("Database error occured :(")
             return (False, err_msg)
 
         try:
             amount = parse_amount_str(amount_str.strip(), balance)
         except ValueError:
             # String describing the amount to give was invalid
-            err_msg = self.get_gift_err_msg(f"Invalid token amount: '{amount_str}'.")
+            err_msg = self._get_gift_err_msg(f"Invalid token amount: '{amount_str}'.")
             return (False, err_msg)
 
         if balance < amount:
             # Sender does not have the specified amount of tokens to give
-            err_msg = self.get_gift_err_msg(f"You do not have enough {tokens_name}.")
+            err_msg = self._get_gift_err_msg(f"You do not have enough {tokens_name}.")
             return (False, err_msg)
 
         try:
             self.database.give_tokens(disc_id, amount, receiver_id)
         except DBException:
             print_exc()
-            err_msg = self.get_gift_err_msg("Database error occured :(")
+            err_msg = self._get_gift_err_msg("Database error occured :(")
             return (False, err_msg)
 
         receiver_balance = self.database.get_token_balance(receiver_id)

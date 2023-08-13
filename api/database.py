@@ -1622,7 +1622,7 @@ class Database(SQLiteDatabase):
         beaten_records_best = []
         beaten_records_worst = []
 
-        for stat in parsed_game_stats.stats_to_save:
+        for stat in parsed_game_stats.STATS_TO_SAVE():
             reverse_order = stat == "deaths"
             (
                 min_id, min_value, max_id, max_value,
@@ -1640,13 +1640,13 @@ class Database(SQLiteDatabase):
                 elif min_value < prev_worst: # A new worst has been set for a stat.
                     beaten_records_worst.append((stat, min_value, min_id, prev_worst, prev_worst_id))
 
-        game_insert_str = ",\n".join(parsed_game_stats.stats_to_save)
-        game_insert_qms = ",".join(["?"] * len(parsed_game_stats.stats_to_save))
+        game_insert_str = ",\n".join(parsed_game_stats.STATS_TO_SAVE())
+        game_insert_qms = ",".join(["?"] * len(parsed_game_stats.STATS_TO_SAVE()))
 
-        stats_insert_str = ",\n".join(parsed_game_stats.filtered_player_stats[0].stats_to_save)
-        stats_insert_qms = ",".join(["?"] * len(parsed_game_stats.filtered_player_stats[0].stats_to_save))
+        stats_insert_str = ",\n".join(parsed_game_stats.filtered_player_stats[0].STATS_TO_SAVE())
+        stats_insert_qms = ",".join(["?"] * len(parsed_game_stats.filtered_player_stats[0].STATS_TO_SAVE()))
 
-        game_insert_values = [getattr(parsed_game_stats, stat) for stat in parsed_game_stats.stats_to_save]
+        game_insert_values = [getattr(parsed_game_stats, stat) for stat in parsed_game_stats.STATS_TO_SAVE()]
 
         games_table = self._get_games_table(parsed_game_stats.game)
         stats_table = self._get_games_table(parsed_game_stats.game)
@@ -1671,7 +1671,7 @@ class Database(SQLiteDatabase):
             """
 
             for player_stats in parsed_game_stats.filtered_player_stats:
-                stat_insert_values = [getattr(player_stats, stat) for stat in player_stats.stats_to_save]
+                stat_insert_values = [getattr(player_stats, stat) for stat in player_stats.STATS_TO_SAVE()]
                 logger.debug(f"Saving participant data:\n", stat_insert_values)
 
                 self.execute_query(query, *stat_insert_values)

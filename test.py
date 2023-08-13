@@ -6,8 +6,6 @@ from dateutil.relativedelta import relativedelta
 
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, riot_api, util, steam_api
-from api.awards.lol import LoLAwardQualifiers
-from api.game_stats import get_filtered_timeline_stats
 from discbot.commands.util import ADMIN_DISC_ID
 from discbot.montly_intfar import MonthlyIntfar, MONTH_NAMES
 from discbot.discord_bot import DiscordClient
@@ -227,11 +225,12 @@ class TestFuncs:
 
         api_client.close()
 
-    def test_flavor_texts(self):
-        awards_handler = LoLAwardQualifiers("lol", self.config, None)
-        print(awards_handler.get_flavor_text("intfar", 2, "random", kp=10))
-        print(awards_handler.get_flavor_text("intfar", "random", nickname="Gual"))
-        print(awards_handler.get_flavor_text("lifetime_events", 1, value=2000))
+    def test_steam_stuff(self):
+        api_client = steam_api.SteamAPIClient(self.config)
+        steam_id = 76561197970416015
+
+        validated = api_client.validate_steam_id(steam_id)
+        print(validated)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

@@ -6,13 +6,84 @@ from api.game_stats import get_outlier
 from api.database import Database
 
 class LoLAwardQualifiers(AwardQualifiers):
-    @property
-    def intfar_reasons(self):
-        return ["kda", "deaths", "kp", "vision_score"]
+    @classmethod
+    def INTFAR_REASONS():
+        return {
+            "kda": "Low KDA",
+            "deaths": "Many deaths",
+            "kp": "Low KP",
+            "vision_score": "Low Vision Score"
+        }
 
-    @property
-    def all_flavor_texts(self):
-        return super().all_flavor_texts + [
+    @classmethod
+    def INTFAR_CRITERIAS(cls):
+        return {
+            "kda": {
+                "lower_threshold": 1.3,
+                "death_criteria": 2
+            },
+            "deaths": {
+                "lower_threshold": 9,
+                "kda_criteria": 2.1
+            },
+            "kp": {
+                "lower_threshold": 20,
+                "takedowns_criteria": 10,
+                "structures_criteria": 2,
+                "deaths_criteria": 2
+            },
+            "vision_score": {
+                "lower_threshold": 11,
+                "kda_criteria": 3.0,
+                "secs_lower_threshold": 1200
+            }
+        }
+
+    @classmethod
+    def INTFAR_CRITERIAS_DESC(cls):
+        criterias = cls.INTFAR_CRITERIAS()
+        return {
+            "kda": [
+                "Having the lowest KDA of the people playing (including randoms)",
+                f"Having a KDA of less than {criterias['kda']['lower_threshold']}",
+                f"Having more than {criterias['kda']['death_criteria']} deaths",
+            ],
+            "deaths": [
+                "Having the most deaths of the people playing (including randoms)",
+                f"Having more than {criterias['deaths']['lower_threshold']} deaths",
+                f"Having less than {criterias['deaths']['kda_criteria']} KDA",
+            ],
+            "kp": [
+                "Having the lowest KP of the people playing",
+                f"Having a KP of less than {criterias['kp']['lower_threshold']}%",
+                f"Having less than {criterias['kp']['takedowns_criteria']} takedowns",
+                f"Having less than {criterias['kp']['structures_criteria']} structures destroyed",
+                f"Having more than {criterias['kp']['deaths_criteria']} deaths",
+            ],
+            "vision_score": [
+                "Having the lowest vision score of the people playing",
+                f"Having less than {criterias['vision_score']['lower_threshold']} vision score",
+                f"Having less than {criterias['vision_score']['kda_criteria']} KDA",
+                f"The game being longer than {criterias['vision_score']['secs_lower_threshold'] // 60} minutes",
+            ]
+        }
+
+    @classmethod
+    def DOINKS_REASONS(cls):
+        return {
+            "kda": "KDA larger than or equal to 10",
+            "kills": "20 kills or more",
+            "damage": "Half of the teams damage",
+            "penta": "Getting a pentakill",
+            "vision_score": "Vision score larger than 100",
+            "kp": "Kill participation over 80%",
+            "monsters": "Securing all epic monsters (and more than 3)",
+            "cs": "More than 8 cs/min"
+        }
+
+    @classmethod
+    def ALL_FLAVOR_TEXTS(cls):
+        return super().ALL_FLAVOR_TEXTS() + [
             "most_deaths",
             "lowest_kda",
             "lowest_kp",
@@ -37,8 +108,8 @@ class LoLAwardQualifiers(AwardQualifiers):
             "doinks_cs",
         ]
 
-    @property
-    def intfar_flavor_texts(self):
+    @classmethod
+    def INTFAR_FLAVOR_TEXTS(cls):
         return [
             "most_deaths",
             "lowest_kda",
@@ -46,8 +117,8 @@ class LoLAwardQualifiers(AwardQualifiers):
             "lowest_vision",
         ]
 
-    @property
-    def honorable_mentions_flavor_texts(self):
+    @classmethod
+    def HONORABLE_MENTIONS_FLAVOR_TEXTS(cls):
         return [
             "mentions_no_vision_ward",
             "mentions_low_damage",
@@ -55,16 +126,16 @@ class LoLAwardQualifiers(AwardQualifiers):
             "mentions_no_epic_monsters",
         ]
 
-    @property
-    def cool_stats_flavor_texts(self):
+    @classmethod
+    def COOL_STATS_FLAVOR_TEXTS(cls):
         return [
             "stats_time_spent_dead",
             "stats_objectives_stolen",
             "stats_turrets_killed",
         ]
 
-    @property
-    def doinks_flavor_texts(self):
+    @classmethod
+    def DOINKS_FLAVOR_TEXTS(cls):
         return [
             "doinks_kda",
             "doinks_kills",
@@ -75,19 +146,19 @@ class LoLAwardQualifiers(AwardQualifiers):
             "doinks_jungle",
             "doinks_cs",
         ]
-    
-    @property
-    def timeline_flavor_texts(self):
+
+    @classmethod
+    def TIMELINE_FLAVOR_TEXTS(cls):
         return [
             "timeline_comeback",
             "timeline_throw",
             "timeline_goldkeeper",
         ]
-    
-    @property
-    def game_specific_flavors(self):
-        flavors = dict(super().game_specific_flavors) 
-        flavors["timeline"] = self.timeline_flavor_texts
+
+    @classmethod
+    def GAME_SPECIFIC_FLAVORS(cls):
+        flavors = dict(super().GAME_SPECIFIC_FLAVORS()) 
+        flavors["timeline"] = cls.TIMELINE_FLAVOR_TEXTS()
         return flavors
 
     def get_big_doinks(self):
@@ -268,8 +339,10 @@ class LoLAwardQualifiers(AwardQualifiers):
             self.parsed_game_stats.all_player_stats, "kda", include_ties=True
         )
         lowest_kda = tied_stats[0].kda
-        kda_criteria = self.config.kda_lower_threshold
-        death_criteria = self.config.kda_death_criteria
+        criterias = self.INTFAR_CRITERIAS()["kda"]
+
+        kda_criteria = criterias["lower_threshold"]
+        death_criteria = criterias["death_criteria"]
 
         potential_intfars = []
         for intfar, stats in zip(tied_intfars, tied_stats):
@@ -300,8 +373,10 @@ class LoLAwardQualifiers(AwardQualifiers):
             self.parsed_game_stats.all_player_stats, "deaths", asc=False, include_ties=True
         )
         highest_deaths = tied_stats[0].deaths
-        death_criteria = self.config.death_lower_threshold
-        kda_criteria = self.config.death_kda_criteria
+        criterias = self.INTFAR_CRITERIAS()["deaths"]
+
+        death_criteria = criterias["lower_threshold"]
+        kda_criteria = criterias["kda_criteria"]
 
         potential_intfars = []
         for intfar, stats in zip(tied_intfars, tied_stats):
@@ -334,10 +409,12 @@ class LoLAwardQualifiers(AwardQualifiers):
             self.parsed_game_stats.filtered_player_stats, "kp", include_ties=True
         )
         lowest_kp = tied_stats[0].kp
-        kp_criteria = self.config.kp_lower_threshold
-        takedowns_criteria = self.config.kp_takedowns_criteria
-        structures_criteria = self.config.kp_structures_criteria
-        deaths_criteria = self.config.kp_deaths_criteria
+        criterias = self.INTFAR_CRITERIAS()["kp"]
+
+        kp_criteria = criterias["lower_threshold"]
+        takedowns_criteria = criterias["takedowns_criteria"]
+        structures_criteria = criterias["structures_criteria"]
+        deaths_criteria = criterias["deaths_criteria"]
 
         potential_intfars = []
         for intfar, stats in zip(tied_intfars, tied_stats):
@@ -366,7 +443,8 @@ class LoLAwardQualifiers(AwardQualifiers):
             - KDA being less than 3
         Returns None if none of these criteria matches a person.
         """
-        time_criteria = self.config.vision_secs_lower_threshold
+        criterias = self.INTFAR_CRITERIAS()["vision_score"]
+        time_criteria = criterias["secs_lower_threshold"]
 
         if self.parsed_game_stats.duration < time_criteria:
             # If game is less than 20 minutes, we don't give out Int-Far for vision score.
@@ -376,8 +454,9 @@ class LoLAwardQualifiers(AwardQualifiers):
             self.parsed_game_stats.filtered_player_stats, "vision_score", include_ties=True
         )
         lowest_score = tied_stats[0].vision_score
-        vision_criteria = self.config.vision_score_lower_threshold
-        kda_criteria = self.config.vision_kda_criteria
+
+        vision_criteria = criterias["lower_threshold"]
+        kda_criteria = criterias["kda_criteria"]
 
         potential_intfars = []
         for intfar, stats in zip(tied_intfars, tied_stats):

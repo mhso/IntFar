@@ -1,8 +1,9 @@
 import api.util as api_util
 from api import game_stats
+from api.game_data import get_stat_quantity_descriptions
 
-async def handle_stats_msg(client, message):
-    valid_stats = ", ".join("'" + cmd + "'" for cmd in api_util.STAT_COMMANDS)
+async def handle_stats_msg(client, message, game):
+    valid_stats = ", ".join(f"'{cmd}'" for cmd in get_stat_quantity_descriptions(game))
     response = "**--- Valid stats ---**\n```"
     response += valid_stats
     response += "\n```"

@@ -4,36 +4,77 @@ import api.util as api_util
 import discbot.commands.util as commands_util
 
 async def handle_lol_register_msg(client, message, target_name):
+    game = "lol"
     if target_name is None:
-        response = "You must supply a summoner name {emote_angry_gual}"
-        await message.channel.send(client.insert_emotes(response))
-    else:
-        if client.database.user_exists(target_name):
-            status = "User with that summoner name is already registered."
-        
-        elif (summ_id := client.riot_api.get_summoner_id(target_name.replace(" ", "%20"))) is None:
-            status = f"Error: Invalid summoner name {client.get_emoji_by_name('PepeHands')}"
+        status = "You must supply a summoner name {emote_angry_gual}"
+        return False, status
 
-        else:
-            discord_id = message.author.id
+    if client.database.user_exists(target_name, game):
+        status = "User with that summoner name is already registered."
+        return False, status
 
-            success, status = client.database.add_user(target_name, summ_id, discord_id)
-            if success:
-                users_in_voice = client.get_users_in_voice()
-                for guild_id in users_in_voice:
-                    for disc_id, _, _ in users_in_voice[guild_id]:
-                        if discord_id == disc_id: # User is already in voice channel.
-                            await client.user_joined_voice(disc_id, guild_id)
-                            break
+    elif (summ_id := client.riot_api.get_summoner_id(target_name.replace(" ", "%20"))) is None:
+        status = f"Error: Invalid summoner name {client.get_emoji_by_name('PepeHands')}"
+        return False, status
 
-        await message.channel.send(status)
+    return client.database.add_user(
+        game, message.author.id,
+        ingame_name=target_name,
+        ingame_id=summ_id
+    )
 
-async def handle_unregister_msg(client, message):
+async def handle_csgo_register_msg(client, message, target_name, steam_id=None, match_auth_code=None):
+    game = "csgo"
+    if target_name is None:
+        status = "You must supply a Steam account name {emote_angry_gual}"
+        return False, status
+    
+    if steam_id is None:
+        status = "You must supply a Steam ID {emote_angry_gual}"
+        return False, status
+    
+    if match_auth_code is None:
+        status = "You must supply a match authentication code {emote_angry_gual}"
+        return False, status
+
+    if client.database.user_exists(target_name, game):
+        status = "User with that Steam account name is already registered."
+        return False, status
+
+    elif client.steam_api.validate_steam_id(steam_id) is None:
+        status = f"Error: Invalid Steam ID {client.get_emoji_by_name('PepeHands')}"
+        return False, status
+
+    return client.database.add_user(
+        game, message.author.id,
+        ingame_name=target_name,
+        ingame_id=steam_id,
+        match_auth_code=match_auth_code
+    )
+
+async def handle_register_msg(client, message, game, target_name, *extra_args):
+    if game == "lol":
+        success, status = await handle_lol_register_msg(client, message, target_name)
+    elif game == "csgo":
+        success, status = await handle_csgo_register_msg(client, message, target_name, *extra_args)
+
+    if success:
+        users_in_voice = client.get_users_in_voice()
+        for guild_id in users_in_voice:
+            for disc_id in users_in_voice[guild_id][game]:
+                if message.author.id == disc_id: # User is already in voice channel.
+                    await client.user_joined_voice(disc_id, guild_id)
+                    break
+
+    await message.channel.send(client.insert_emotes(status))
+
+async def handle_unregister_msg(client, message, game):
     user_in_game = False
     for guild_id in api_util.GUILD_IDS:
-        for user_data in client.users_in_game.get(guild_id, []):
+        users_in_game = client.get_users_in_game(game, guild_id) or []
+        for disc_id in users_in_game:
             # If user is in game, unregistration is not allowed.
-            if user_data[0] == message.author.id:
+            if disc_id == message.author.id:
                 user_in_game = True
                 break
 
@@ -43,25 +84,32 @@ async def handle_unregister_msg(client, message):
             "(that would be cheating {emote_im_nat_kda_player_yo})"
         )
     else:
-        client.database.remove_user(message.author.id)
+        client.database.remove_user(game, message.author.id)
+        game_name = api_util.SUPPORTED_GAMES[game]
         response = (
-            "You are no longer registered to the Int-Far™ Tracker™ {emote_sadge} " +
+            f"You are no longer registered to the Int-Far™ Tracker™ for {game_name} " + "{emote_sadge} " +
             "Your games are no longer being tracked and your stats will not be shown. " +
             "However, your data has not been deleted and you can register again at any time."
         )
 
     await message.channel.send(client.insert_emotes(response))
 
-async def handle_users_msg(client, message):
+async def handle_users_msg(client, message, game=None):
     response = ""
-    for disc_id, summ_names, _ in client.database.summoners:
-        formatted_names = ", ".join(summ_names)
-        nickname = client.get_discord_nick(disc_id, message.guild.id)
-        response += f"- {nickname} ({formatted_names})\n"
-    if response == "":
-        response = "No lads are currently signed up {emote_nat_really_fine} but you can change this!!"
-    else:
-        response = "**--- Registered bois ---**\n" + response
+    games = api_util.SUPPORTED_GAMES if game is None else [game]
+    for game in games:
+        game_name = api_util.SUPPORTED_GAMES[game]
+        for disc_id in client.database.users[game]:
+            formatted_names = ", ".join(client.database.users[game][disc_id].ingame_name)
+            nickname = client.get_discord_nick(disc_id, message.guild.id)
+            response += f"\n- {nickname} ({formatted_names})"
+        if response == "":
+            response = (
+                f"No lads are currently signed up for {game_name} "
+                "{emote_nat_really_fine} but you can change this!!"
+            )
+        else:
+            response = f"**--- Registered bois for {game_name} ---**" + response
 
     await message.channel.send(client.insert_emotes(response))
 
@@ -69,10 +117,15 @@ async def handle_helper_msg(client, message):
     """
     Write the helper message to Discord.
     """
+    game_names = list(api_util.SUPPORTED_GAMES.values())
+    before_and = ", ".join(game_names[:-1])
+    after_and = game_names[-1]
+    games_desc = f"{before_and} and {after_and}"
+
     response = "I gotchu fam {emote_nazi}\n"
     response += "The Int-Far™ Tracker™ is a highly sophisticated bot "
-    response += "that watches when people in this server plays League, "
-    response += "and judges them harshly if they int too hard {emote_simp_but_closeup}\n"
+    response += f"that watches when people in this server plays {games_desc}, "
+    response += "and judges them harshly if they suck too hard {emote_simp_but_closeup}\n"
     response += "- Write `!commands` to see a list of available commands, and their usages\n"
     response += "- Write `!stats` to see a list of available stats to check\n"
     response += "- Write `!betting` to see a list of events to bet on and how to do so"

@@ -26,8 +26,8 @@ class PlayerStats(ABC):
 
         return int((float(self.kills + self.assists) / float(self.kills_by_team)) * 100.0)
 
-    @property
-    def stats_to_save(self) -> list[str]:
+    @classmethod
+    def STATS_TO_SAVE(cls) -> list[str]:
         """
         Defines which fields from this class should be saved in the database
         """
@@ -41,9 +41,9 @@ class PlayerStats(ABC):
             "kda",
             "kp"
         ]
-    
-    @property
-    def stat_quantity_desc(self) -> dict[str, tuple[str, str]]:
+
+    @classmethod
+    def STAT_QUANTITY_DESC(cls) -> dict[str, tuple[str, str]]:
         return {
             "kills": ("most", "fewest"),
             "deaths": ("fewest", "most"),
@@ -67,8 +67,8 @@ class GameStats(ABC):
     all_player_stats: list[PlayerStats]
     filtered_player_stats: list[PlayerStats] = field(init=False)
 
-    @property
-    def stats_to_save(self) -> list[str]:
+    @classmethod
+    def STATS_TO_SAVE(cls) -> list[str]:
         """
         Defines which fields from this class should be saved in the database
         """
