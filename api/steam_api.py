@@ -60,6 +60,9 @@ class SteamAPIClient:
 
         return as_json
 
+    def get_active_game(self, steam_id):
+        pass
+
     def get_next_sharecode(self, steam_id, game_code, match_token):
         url = _ENDPOINT_NEXT_MATCH.replace(
             "[key]", self.config.steam_key

@@ -418,13 +418,19 @@ def initialize_commands():
     average_name = "average"
     average_desc = (
         "Show the average value for a stat for you (or someone else). "
-        "Fx. `!average kda` to see your average KDA over all games "
-        "or `average kda jhin` to see your average KDA on Jhin. "
-        "(Minimum 10 total games is required)"
+        "Fx. `!average lol kda` to see your average KDA over all games. "
+        "This command accepts different parameters for different games. "
+        "For LoL, you can see KDA on champs (fx. `!average kda jhin`), "
+        "for CSGO, you can see KDA on maps (fx. `!average kda inferno`)."
+        "(Minimum 10 total games is required to get average KDA)"
     )
     register_command(
-        average_name, average_desc, handle_average_msg, True, "self",
-        mandatory_params=[RegularParam("stat")],
+        average_name,
+        average_desc,
+        handle_average_msg,
+        True,
+        "self",
+        mandatory_params=[GameParam("game"), RegularParam("stat")],
         optional_params=[ChampionParam("champion"), TargetParam("person")],
         aliases=["avg"]
     )
@@ -434,15 +440,20 @@ def initialize_commands():
     best_desc = (
         "Show how many times you (or someone else) " +
         "were the best in the specific stat. " +
-        "Fx. `!best kda` shows how many times you had the best KDA in a game. " +
-        "`!best [stat] all` shows what the best ever was for that stat, and who got it."
+        "Fx. `!best lol kda` shows how many times you had the best KDA in a LoL game. " +
+        "`!best [game] [stat] all` shows what the best ever was for that stat, and who got it."
     )
-    async def stats_best_wrapper(client, message, stat, target_id):
-        await handle_stat_msg(client, message, True, stat, target_id)
+    async def stats_best_wrapper(client, message, game, stat, target_id):
+        await handle_stat_msg(client, message, game, True, stat, target_id)
 
     register_command(
-        best_name, best_desc, stats_best_wrapper, True, "self",
-        mandatory_params=[RegularParam("stat")], optional_params=[TargetParam("person")],
+        best_name,
+        best_desc,
+        stats_best_wrapper,
+        True,
+        "self",
+        mandatory_params=[GameParam("game"), RegularParam("stat")],
+        optional_params=[TargetParam("person")],
         aliases=["most", "highest"]
     )
 
@@ -451,15 +462,21 @@ def initialize_commands():
     worst_desc = (
         "Show how many times you (or someone else) " +
         "were the worst at the specific stat. " +
-        "`!worst [stat] all` shows what the worst ever was for that stat, and who got it."
+        "Fx. `!worst lol kda` shows how many times you had the worst KDA in a LoL game. " +
+        "`!worst [game] [stat] all` shows what the worst ever was for that stat, and who got it."
     )
 
-    async def stats_worst_wrapper(client, message, stat, target_id):
-        await handle_stat_msg(client, message, False, stat, target_id)
+    async def stats_worst_wrapper(client, message, game, stat, target_id):
+        await handle_stat_msg(client, message, game, False, stat, target_id)
 
     register_command(
-        worst_name, worst_desc, stats_worst_wrapper, True, "self",
-        mandatory_params=[RegularParam("stat")], optional_params=[TargetParam("person")],
+        worst_name,
+        worst_desc,
+        stats_worst_wrapper,
+        True,
+        "self",
+        mandatory_params=[GameParam("game"), RegularParam("stat")],
+        optional_params=[TargetParam("person")],
         aliases=["least", "lowest", "fewest"]
     )
 
@@ -475,9 +492,12 @@ def initialize_commands():
 
     # game command
     game_name = "game"
-    game_desc = "See details about the league match the given person is in, if any."
+    game_desc = "See details about the match the given person is in, for the given game, if any."
     register_command(
-        game_name, game_desc, handle_game_msg, mandatory_params=[TargetParam("person")]
+        game_name,
+        game_desc,
+        handle_game_msg,
+        mandatory_params=[GameParam("game"), TargetParam("person")]
     )
 
     # betting command
@@ -493,7 +513,11 @@ def initialize_commands():
         "or `!bet 20 game_win & 30 no_intfar` (bet on game win *AND* no Int-Far)."
     )
     register_command(
-        bet_name, bet_desc, handle_make_bet_msg, access_level="all", parser=get_bet_params
+        bet_name,
+        bet_desc,
+        handle_make_bet_msg,
+        access_level="all",
+        parser=get_bet_params
     )
 
     # cancel bet command

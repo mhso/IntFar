@@ -46,10 +46,10 @@ def get_stat_parser(game, raw_data, all_users) -> GameStatsParser:
     return _GAME_STAT_PARSERS[game](game, raw_data, all_users)
 
 def get_stats_for_game(game) -> list[str]:
-    return _GAME_STATS_HOLDERS[game].STATS_TO_SAVE
+    return _GAME_STATS_HOLDERS[game].STATS_TO_SAVE()
 
 def get_stats_for_player(game) -> list[str]:
-    return _PLAYER_STATS_HOLDERS[game].STATS_TO_SAVE
+    return _PLAYER_STATS_HOLDERS[game].STATS_TO_SAVE()
 
 def get_stat_quantity_descriptions(game) -> dict[str, tuple[str, str]]:
-    return _PLAYER_STATS_HOLDERS[game].STAT_QUANTITY_DESC
+    return _PLAYER_STATS_HOLDERS[game].STAT_QUANTITY_DESC()

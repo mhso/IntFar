@@ -6,18 +6,20 @@ from discbot.commands.meta import handle_usage_msg
 async def handle_betting_msg(client, message):
     max_mins = betting.MAX_BETTING_THRESHOLD
     tokens_name = client.config.betting_tokens
-    response = "Betting usage: `!bet [amount] [event] (person)`\n"
-    response += "This places a bet on the next (or current) match.\n"
-    response += f"`!bet all [event] (person)` bets **all** your {tokens_name} on an event!\n"
+    response = "Betting usage: `!bet [game] [amount] [event] (person)`\n"
+    response += "This places a bet on the next (or current) match for the given game.\n"
+    response += f"`!bet [game] all [event] (person)` bets **all** your {tokens_name} on an event!\n"
     response += f"You can place a bet during a game, but it has to be done before {max_mins} "
     response += "minutes. Betting during a game returns a lower reward, based on "
     response += "how much time has passed in the game.\n"
-    response += "**--- List of available events to bet on ---**\n"
-    for event_name, event_id in betting.BETTING_IDS.items():
-        event_desc = betting.BETTING_DESC[event_id]
-        response += f"`{event_name}` - Bet on {event_desc}\n"
+    response += "**--- List of available events to bet on ---**"
 
-    await message.channel.send(response)
+    for game in api_util.SUPPORTED_GAMES:
+        game_response = response + f"\n\nFor **{api_util.SUPPORTED_GAMES[game]}**:"
+        for bet in client.betting_handlers[game].all_bets:
+            game_response += f"\n`{bet.event_id}` - Bet on {bet.description}"
+
+        await message.channel.send(game_response)
 
 def get_bet_params(client, args):
     amounts = []

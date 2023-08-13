@@ -6,6 +6,7 @@ from mhooge_flask.logging import logger
 
 from api import util as api_util
 from api import game_stats
+from api.game_data import get_stat_parser
 from discbot.commands import util as commands_util
 
 FLIRT_MESSAGES = {
@@ -13,36 +14,41 @@ FLIRT_MESSAGES = {
     "spanish": api_util.load_flavor_texts("flirt_spanish")
 }
 
-async def handle_game_msg(client, message, target_id):
-    summoner_ids = None
+async def handle_game_msg(client, message, game, target_id):
+    ingame_ids = None
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    for disc_id, _, summ_ids in client.database.summoners:
+    for disc_id in client.database.users[game]:
         if disc_id == target_id:
-            summoner_ids = summ_ids
+            ingame_ids = client.database.users[game][disc_id].ingame_id
             break
 
     response = ""
     game_data = None
-    active_summoner = None
-    for summ_id in summoner_ids:
-        game_data = client.riot_api.get_active_game(summ_id)
+    active_id = None
+    for ingame_id in ingame_ids:
+        if game == "lol":
+            api_client = client.riot_api
+        else:
+            api_client = client.steam_api
+
+        game_data = api_client.get_active_game(ingame_id)
+
         if game_data is not None:
-            active_summoner = summ_id
+            active_id = ingame_id
             break
         await asyncio.sleep(1)
 
     if game_data is not None:
+        stat_parser = get_stat_parser(game, game_data, client.database.users[game])
         response = f"{target_name} is "
-        summary, users_in_game = game_stats.get_active_game_summary(
-            game_data, active_summoner,
-            client.database.summoners, client.riot_api
-        )
+        summary = stat_parser.get_active_game_summary(active_id, api_client)
         response += summary
         active_guild = None
 
-        for guild_id in api_util.GUILD_IDS:
-            active_game = client.active_game.get(guild_id)
+        game_monitor = client.game_monitors[game]
+        for guild_id in game_monitor.active_game:
+            active_game = game_monitor.active_game.get(guild_id)
             if active_game is not None:
                 if active_game["id"] == game_data["gameId"]:
                     active_guild = guild_id

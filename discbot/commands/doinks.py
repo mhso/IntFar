@@ -31,7 +31,7 @@ async def handle_doinks_msg(client, message, game, target_id):
     response = ""
     if target_id is None: # Check doinks for everyone.
         messages = []
-        for disc_id in client.database.users:
+        for disc_id in client.database.users[game]:
             resp_str, doinks = get_doinks_stats(disc_id, expanded=False)
             messages.append((resp_str, doinks))
 

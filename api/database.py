@@ -428,6 +428,9 @@ class Database(SQLiteDatabase):
             result = self.execute_query(query, *params).fetchall()
             return result or [(disc_id, None, None)]
 
+    def get_csgo_map_count_for_stat(self, stat, maximize, disc_id):
+        pass
+
     def get_doinks_count(
         self,
         game: str,

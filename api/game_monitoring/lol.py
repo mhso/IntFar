@@ -7,7 +7,7 @@ from api.game_monitor import GameMonitor
 from api.database import  Database, User
 from api.riot_api import RiotAPIClient
 from api.config import Config
-from api import game_stats
+from api.game_data.lol import get_player_stats
 
 class LoLGameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 1
@@ -60,7 +60,7 @@ class LoLGameMonitor(GameMonitor):
 
             if game_for_summoner is not None: # We found a game for the current player
                 game_ids.add(game_for_summoner["gameId"])
-                player_stats = game_stats.get_player_stats(game_for_summoner, summ_ids)
+                player_stats = get_player_stats(game_for_summoner, summ_ids)
                 champ_id = player_stats["championId"]
                 active_game_team = player_stats["teamId"]
                 users_in_current_game[disc_id] = User([active_name], [active_id], champ_id=champ_id)

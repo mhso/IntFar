@@ -74,7 +74,7 @@ async def handle_intfar_msg(client, message, game, target_id):
     if target_id is None: # Check intfar stats for everyone.
         messages_all_time = []
         messages_monthly = []
-        for disc_id in client.database.users:
+        for disc_id in client.database.users[game]:
             resp_str_all_time, intfars, pct_all_time, _ = format_for_all(disc_id)
             resp_str_month, intfars_month, pct_month, games_played = format_for_all(disc_id, monthly=True)
 

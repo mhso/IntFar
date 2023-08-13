@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+
 from api.user import User
+from api.riot_api import RiotAPIClient
 
 @dataclass
 class PlayerStats(ABC):
@@ -82,6 +84,10 @@ class GameStats(ABC):
             "guild_id"
         ]
 
+    @abstractmethod
+    def get_finished_game_summary(self, disc_id: int) -> str:
+        ...
+
     def __post_init__(self):
         for stat in self.all_player_stats:
             stat.kills_by_team = self.kills_by_our_team
@@ -96,7 +102,7 @@ class GameStats(ABC):
         return None
 
 class GameStatsParser(ABC):
-    def __init__(self, game:str,  raw_data: dict, all_users: dict[int, User], guild_id: int):
+    def __init__(self, game: str, raw_data: dict, all_users: dict[int, User], guild_id: int):
         self.game = game
         self.raw_data = raw_data
         self.all_users = all_users
@@ -104,6 +110,10 @@ class GameStatsParser(ABC):
 
     @abstractmethod
     def parse_data(self) -> GameStats:
+        ...
+
+    @abstractmethod
+    def get_active_game_summary(self, active_id, api_client) -> str:
         ...
 
 def get_outlier(

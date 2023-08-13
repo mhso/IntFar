@@ -9,6 +9,7 @@ from api.util import format_duration
 @dataclass
 class LoLPlayerStats(PlayerStats):
     champ_id: int
+    champ_name: str
     damage: int
     cs: int
     cs_per_min: float
@@ -92,6 +93,31 @@ class LoLGameStats(GameStats):
 
         return timeline_data
 
+    def get_finished_game_summary(
+        self,
+        disc_id: int
+    ):
+        """
+        Get a brief text that summaries a player's performance in a finished game.
+
+        :param data:        Dictionary containing un-filtered data about a finished
+                            game fetched from Riot League API
+        :param summ_ids:    List of summoner ids belonging to a player,
+                            for which to get the summary for
+        :parma riot_api:    Riot API client instance
+        """
+        player_stats: LoLPlayerStats = self.find_player_stats(disc_id, self.filtered_player_stats)
+
+        date = datetime.fromtimestamp(self.timestamp / 1000.0).strftime("%Y/%m/%d")
+        dt_1 = datetime.fromtimestamp(time())
+        dt_2 = datetime.fromtimestamp(time() + self.duration)
+        fmt_duration = format_duration(dt_1, dt_2)
+
+        return (
+            f"{player_stats.champ_name} with a score of {player_stats.kills}/" +
+            f"{player_stats.deaths}/{player_stats.assists} on {date} in a {fmt_duration} long game"
+        )
+
 class LoLGameStatsParser(GameStatsParser):
     def __init__(self, game, data_dict, all_users, guild_id):
         super().__init__(game, data_dict, all_users, guild_id)
@@ -132,6 +158,7 @@ class LoLGameStatsParser(GameStatsParser):
                                 deaths=participant["stats"]["deaths"],
                                 assists=participant["stats"]["assists"],
                                 champ_id=participant["championId"],
+                                champ_name=participant["stats"]["championName"],
                                 damage=participant["stats"]["totalDamageDealtToChampions"],
                                 cs=participant["stats"]["neutralMinionsKilled"] + participant["stats"]["totalMinionsKilled"],
                                 cs_per_min=(participant["stats"]["totalCs"] / self.raw_data["gameDuration"]) * 60,
@@ -236,6 +263,7 @@ class LoLGameStatsParser(GameStatsParser):
                 deaths=participant["deaths"],
                 assists=participant["assists"],
                 champ_id=participant["championId"],
+                champ_name=participant["championName"],
                 damage=participant["totalDamageDealtToChampions"],
                 cs=participant["neutralMinionsKilled"] + participant["totalMinionsKilled"],
                 cs_per_min=(participant["totalCs"] / self.raw_data["gameDuration"]) * 60,
@@ -310,6 +338,46 @@ class LoLGameStatsParser(GameStatsParser):
             enemy_herald_kills=enemy_herald_kills,
         )
 
+    def get_active_game_summary(self, active_id, api_client):
+        """
+        Extract data about a currently active game.
+
+        :param data:    Data aquired from Riot's API about an active game
+        :active_id:     The summoner ID that we should extract data for in the game
+        :users:         List of users that are registered with Int-Far.
+                        Any user in the game not part of this list is filtered out
+        :riot_api       Riot API Client instance. Used to get champion name of the player
+        """
+        champions = {}
+        for participant in self.raw_data["participants"]:
+            for disc_id in self.all_users:
+                if participant["summonerId"] in self.all_users[disc_id].ingame_id:
+                    champ_id = participant["championId"]
+                    champ_played = api_client.get_champ_name(champ_id)
+                    if champ_played is None:
+                        champ_played = "Unknown Champ (Rito pls)"
+                    champions[participant["summonerId"]] = (participant["summonerName"], champ_played)
+
+        game_start = self.raw_data["gameStartTime"] / 1000
+        if game_start > 0:
+            now = time()
+            dt_1 = datetime.fromtimestamp(game_start)
+            dt_2 = datetime.fromtimestamp(now)
+            fmt_duration = format_duration(dt_1, dt_2) + " "
+        else:
+            fmt_duration = ""
+        game_mode = self.raw_data["gameMode"]
+
+        response = f"{fmt_duration}in a {game_mode} game, playing {champions[active_id][1]}.\n"
+        if len(champions) > 1:
+            response += "He is playing with:"
+            for other_id in champions:
+                if other_id != active_id:
+                    name, champ = champions[other_id]
+                    response += f"\n - {name} ({champ})"
+
+        return response
+
 def get_player_stats(data, summ_ids):
     """
     Get a specific player's stats from a dictionary of game data
@@ -335,76 +403,3 @@ def get_player_stats(data, summ_ids):
                 return participant_data
 
     return None
-
-def get_finished_game_summary(
-    data: dict,
-    summ_ids: list[str],
-    riot_api: RiotAPIClient
-):
-    """
-    Get a brief text that summaries a player's performance in a finished game.
-
-    :param data:        Dictionary containing un-filtered data about a finished
-                        game fetched from Riot League API
-    :param summ_ids:    List of summoner ids belonging to a player,
-                        for which to get the summary for
-    :parma riot_api:    Riot API client instance
-    """
-    stats = get_player_stats(data, summ_ids)
-
-    champ_played = riot_api.get_champ_name(stats["championId"])
-    if champ_played is None:
-        champ_played = "Unknown Champ (Rito pls)"
-
-    date = datetime.fromtimestamp(data["gameCreation"] / 1000.0).strftime("%Y/%m/%d")
-    duration = data["gameDuration"]
-    dt_1 = datetime.fromtimestamp(time())
-    dt_2 = datetime.fromtimestamp(time() + duration)
-    fmt_duration = format_duration(dt_1, dt_2)
-
-    return (
-        f"{champ_played} with a score of {stats['kills']}/" +
-        f"{stats['deaths']}/{stats['assists']} on {date} in a {fmt_duration} long game"
-    )
-
-def get_active_game_summary(data, summ_id, summoners, riot_api):
-    """
-    Extract data about a currently active game.
-
-    :param data:    Data aquired from Riot's API about an active game
-    :summ_id:       The summoner ID that we should extract data for in the game
-    :summoners:     List of summoners/users that are registered with Int-Far.
-                    Any summoners in the game not part of this list is filtered out
-    :riot_api       Riot API Client instance. Used to get champion name of the player
-    """
-    champions = {}
-    users_in_game = []
-    for participant in data["participants"]:
-        for disc_id, _, summoner_ids in summoners:
-            if participant["summonerId"] in summoner_ids:
-                champ_id = participant["championId"]
-                champ_played = riot_api.get_champ_name(champ_id)
-                if champ_played is None:
-                    champ_played = "Unknown Champ (Rito pls)"
-                champions[participant["summonerId"]] = (participant["summonerName"], champ_played)
-                users_in_game.append((disc_id, champ_id))
-
-    game_start = data["gameStartTime"] / 1000
-    if game_start > 0:
-        now = time()
-        dt_1 = datetime.fromtimestamp(game_start)
-        dt_2 = datetime.fromtimestamp(now)
-        fmt_duration = format_duration(dt_1, dt_2) + " "
-    else:
-        fmt_duration = ""
-    game_mode = data["gameMode"]
-
-    response = f"{fmt_duration}in a {game_mode} game, playing {champions[summ_id][1]}.\n"
-    if len(champions) > 1:
-        response += "He is playing with:"
-        for other_id in champions:
-            if other_id != summ_id:
-                name, champ = champions[other_id]
-                response += f"\n - {name} ({champ})"
-
-    return response, users_in_game
