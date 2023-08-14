@@ -18,5 +18,5 @@ for module_name in _BETTING_HANDLER_MODULES:
             _BETTING_HANDLERS[module_key] = subclass
             break
 
-def get_betting_handler(game) -> BettingHandler:
-    return _BETTING_HANDLERS[game](game)
+def get_betting_handler(game, config, database) -> BettingHandler:
+    return _BETTING_HANDLERS[game](game, config, database)

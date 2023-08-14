@@ -279,7 +279,7 @@ class DiscordClient(discord.Client):
 
         await self.channels_to_write[guild_id].send(response)
 
-        await self.play_event_sounds(intfar, doinks, guild_id)
+        await self.play_event_sounds(game, intfar, doinks, guild_id)
 
         # if self.ai_conn is not None:
         #     logger.info("Training AI Model with new game data.")
@@ -721,7 +721,7 @@ class DiscordClient(discord.Client):
 
         return response, max_tokens_holder, new_max_tokens_holder
 
-    async def play_event_sounds(self, intfar: int, doinks: list[int], game: str, guild_id: int):
+    async def play_event_sounds(self, game: str, intfar: int, doinks: list[int], guild_id: int):
         """
         Play potential Int-Far and Doinks sounds after a game has finished.
 
@@ -733,11 +733,11 @@ class DiscordClient(discord.Client):
         voice_state = None
 
         # Check if any users from the game are in a voice channel.
-        for user_data in self.game_monitors[game].users_in_game[guild_id]:
-            for voice_user_data in users_in_voice[guild_id][game]:
-                if user_data[0] == voice_user_data[0]:
+        for game_disc_id in self.game_monitors[game].users_in_game[guild_id]:
+            for voice_disc_id in users_in_voice[guild_id][game]:
+                if game_disc_id == voice_disc_id:
                     # Get voice state for member in voice chat.
-                    member = self.get_member_safe(user_data[0], guild_id)
+                    member = self.get_member_safe(game_disc_id, guild_id)
                     if member is None:
                         continue
 
@@ -749,13 +749,13 @@ class DiscordClient(discord.Client):
             sounds_to_play = []
 
             # Add Int-Far sound to queue (if it exists).
-            intfar_sound = self.database.get_event_sound(intfar, "intfar")
+            intfar_sound = self.database.get_event_sound(game, intfar, "intfar")
             if intfar_sound is not None:
                 sounds_to_play.append(intfar_sound)
 
             # Add each doinks sound to queue (if any exist).
             for disc_id in doinks:
-                doinks_sound = self.database.get_event_sound(disc_id, "doinks")
+                doinks_sound = self.database.get_event_sound(game, disc_id, "doinks")
                 if doinks_sound is not None:
                     sounds_to_play.append(doinks_sound)
 
@@ -989,7 +989,7 @@ class DiscordClient(discord.Client):
 
         if intfar_id is None:
             if intfar_streak > 1: # No one was Int-Far this game, but a streak was active.
-                for disc_id in self.game_monitors[awards_handler.game].users_in_game.get(guild_id, {}):
+                for disc_id in awards_handler.parsed_game_stats.filtered_player_stats:
                     if disc_id == prev_intfar:
                         return (
                             f"{prev_mention} has redeemed himself! " +

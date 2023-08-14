@@ -7,7 +7,7 @@ from mhooge_flask import init
 from mhooge_flask.init import Route
 
 from app.util import before_request
-from app.routes import errors
+from app.routes import errors as route_errors
 from api.database import Database
 from api.betting import BettingHandler
 from api.riot_api import RiotAPIClient
@@ -55,7 +55,7 @@ def run_app(
         user_count=0,
         conn_map={},
         conn_lock=Lock(),
-        max_content_length=1024 * 512, # 500 KB
+        max_content_length=1024 * 512, # 500 KB limit for uploaded sounds
         quiz_categories=set(),
         quiz_team_blue=True,
         exit_code=0
@@ -63,8 +63,8 @@ def run_app(
 
     # Misc. routing handling.
     web_app.before_request(before_request)
-    web_app.register_error_handler(500, errors.handle_internal_error)
-    web_app.register_error_handler(404, errors.handle_missing_page_error)
+    web_app.register_error_handler(500, route_errors.handle_internal_error)
+    web_app.register_error_handler(404, route_errors.handle_missing_page_error)
 
     ports_file = "../flask_ports.json"
 

@@ -73,7 +73,7 @@ def main():
     logger.info("Initializing database...")
 
     database_client = Database(conf)
-    betting_handlers = {game: get_betting_handler(game) for game in SUPPORTED_GAMES}
+    betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
     riot_api = RiotAPIClient(conf)
 
     # Start process with machine learning model
