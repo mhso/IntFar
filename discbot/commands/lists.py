@@ -1,6 +1,7 @@
 import random
 
 from api import lists
+from api.util import get_website_link
 
 async def handle_random_champ_msg(client, message, list_name=None):
     if list_name is None:
@@ -23,7 +24,7 @@ async def handle_random_champ_msg(client, message, list_name=None):
 
 async def handle_random_unplayed_msg(client, message):
     all_champs = set(client.riot_api.champ_names.keys())
-    played_champs = set(x[0] for x in client.database.get_played_champs(message.author.id))
+    played_champs = set(x[0] for x in client.database.get_played_league_champs(message.author.id))
 
     unplayed_champs = [client.riot_api.get_champ_name(champ) for champ in (all_champs - played_champs)]
     if len(unplayed_champs) == 0: # All champs have been played.
@@ -42,7 +43,7 @@ async def handle_champ_lists_msg(client, message, target_id=None):
     if lists == []:
         response = (
             "There are currently no champion lists. " +
-            "Create one at https://mhooge.com/intfar/lists/"
+            f"Create one at {get_website_link('lol')}/lists/"
         )
     else:
         if target_id is None:
@@ -59,7 +60,7 @@ async def handle_champ_lists_msg(client, message, target_id=None):
                 response += f" (by {owner_name})"
             response += "\n"
 
-        response += "\nSee which champs are in each list at https://mhooge.com/intfar/lists/ "
+        response += f"\nSee which champs are in each list at {get_website_link('lol')}/lists/ "
         response += "\nor with `!champs [list]`"
         response += "\nSelect a random champ from a list with `!random_champ [list]`"
 
@@ -87,7 +88,7 @@ async def handle_champs_msg(client, message, list_name):
             if len(champions) > max_champs:
                 champs_left = len(champions) - max_champs
                 response += f"\n- `(and {champs_left} more)`"
-                response += f"\nSee all the champs at: https://mhooge.com/intfar/lists/{list_id}"
+                response += f"\nSee all the champs at: {get_website_link('lol')}/lists/{list_id}"
 
             response += f"\nWrite `!random_champ {name}` to pick a random champ from this list."
 
@@ -163,8 +164,8 @@ async def handle_remove_champ(client, message, list_id, champ_ids):
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_random_nochest(client, message, target_id=None):
-    summ_data = client.database.summoner_from_discord_id(target_id)
-    champion_mastery_data = client.riot_api.get_champion_mastery(summ_data[2][0])
+    summ_data = client.database.game_user_data_from_discord_id(target_id, "lol")
+    champion_mastery_data = client.riot_api.get_champion_mastery(summ_data.ingame_id)
 
     # Filter champs with no chest granted.
     no_chest_champs = []
@@ -188,8 +189,8 @@ async def handle_best_nochest(client, message, target_id=None):
     Handler for 'best_nochest' command. Finds the champion with the highest winrate
     for the given player where no chest has yet been obtained.
     """
-    summ_data = client.database.summoner_from_discord_id(target_id)
-    champion_mastery_data = client.riot_api.get_champion_mastery(summ_data[2][0])
+    summ_data = client.database.game_user_data_from_discord_id(target_id, "lol")
+    champion_mastery_data = client.riot_api.get_champion_mastery(summ_data.ingame_id)
 
     # Filter champs with no chest granted.
     no_chest_champs = []

@@ -73,7 +73,7 @@ with database_client_1.get_connection() as db_1:
         for data in owned_items:
             db_2.cursor().execute(query, data)
 
-        query = "INSERT INTO event_sounds(disc_id, sound, event) VALUES (?, ?, ?)"
+        query = "INSERT INTO event_sounds(disc_id, game, sound, event) VALUES (?, 'lol', ?, ?)"
         for data in event_sounds:
             db_2.cursor().execute(query, data)
 

@@ -518,11 +518,16 @@ class DiscordClient(discord.Client):
             start_index = 3 if name[2] == "!" else 2
             return int(name[start_index:-1])
 
-        discord_id = self.database.discord_id_from_ingame_name(name, "lol", exact_match=False)
-        if discord_id is None: # Summoner name gave no result, try Discord name.
+        disc_id_candidates = set()
+        for game in api_util.SUPPORTED_GAMES:
+            discord_id = self.database.discord_id_from_ingame_name(game, name, exact_match=False)
+            if discord_id is not None:
+                disc_id_candidates.add(discord_id)
+
+        if len(disc_id_candidates) != 1: # Summoner name gave no unanimous result, try Discord name.
             return self.get_discord_id(name, guild_id, exact_match=False)
 
-        return discord_id
+        return disc_id_candidates.pop()
 
     def insert_emotes(self, text):
         """

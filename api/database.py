@@ -792,10 +792,14 @@ class Database(SQLiteDatabase):
 
         with self:
             intfar_multis_data = self.execute_query(query_intfar_multis, game).fetchall()
+            if intfar_multis_data == []:
+                return None, None
 
-            intfar_counts = [0, 0, 0, 0]
+            amount_intfars = len(intfar_multis_data[0][0])
+
+            intfar_counts = [0] * amount_intfars
             intfar_multi_counts = {
-                1: 0, 2: 0, 3: 0, 4: 0
+                i: 0 for i in range(1, intfar_counts + 1)
             }
             for reason in intfar_multis_data:
                 amount = 0
@@ -947,6 +951,9 @@ class Database(SQLiteDatabase):
                 return self.get_min_or_max_league_winrate_champ(disc_id, best, included_champs, return_top_n, min_games=5)
 
             return result
+
+    def get_csgo_map_winrate(self, disc_id, map_id):
+        pass # TODO: Implement
 
     def get_winrate_relation(self, game, disc_id, best, min_games=10):
         games_table = self._get_games_table(game)
@@ -2170,25 +2177,25 @@ class Database(SQLiteDatabase):
             query_balance = "UPDATE betting_balance SET tokens=100"
             self.execute_query(query_balance)
 
-    def get_event_sound(self, disc_id, event):
-        query = "SELECT sound FROM event_sounds WHERE disc_id=? AND event=?"
+    def get_event_sound(self, game, disc_id, event):
+        query = "SELECT sound FROM event_sounds WHERE disc_id=? AND game=? AND event=?"
 
         with self:
-            result = self.execute_query(query, disc_id, event).fetchone()
+            result = self.execute_query(query, disc_id, game, event).fetchone()
 
             return result[0] if result is not None else None
 
-    def set_event_sound(self, disc_id, sound, event):
-        query = "REPLACE INTO event_sounds(disc_id, sound, event) VALUES (?, ?, ?)"
+    def set_event_sound(self, game, disc_id, sound, event):
+        query = "REPLACE INTO event_sounds(disc_id, game, sound, event) VALUES (?, ?, ?, ?)"
 
         with self:
-            self.execute_query(query, disc_id, sound, event)
+            self.execute_query(query, disc_id, game, sound, event)
 
-    def remove_event_sound(self, disc_id, event):
-        query = "DELETE FROM event_sounds WHERE disc_id=? AND event=?"
+    def remove_event_sound(self, game, disc_id, event):
+        query = "DELETE FROM event_sounds WHERE disc_id=? AND game=? AND event=?"
 
         with self:
-            self.execute_query( query, disc_id, event)
+            self.execute_query( query, disc_id, game, event)
 
     def create_list(self, disc_id, name):
         query = "INSERT INTO champ_lists(name, owner_id) VALUES (?, ?)"

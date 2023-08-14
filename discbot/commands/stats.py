@@ -65,7 +65,7 @@ async def handle_average_msg_lol(client, message, stat, champ_id=None, disc_id=N
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_average_msg_csgo(client, message, stat, map=None, disc_id=None):
-    pass
+    await message.channel.send("Not implemented yet :O")
 
 async def handle_average_msg(client, message, game, stat, champ_or_map=None, disc_id=None):
     quantity_descs = get_stat_quantity_descriptions(game)

@@ -431,7 +431,7 @@ def initialize_commands():
         True,
         "self",
         mandatory_params=[GameParam("game"), RegularParam("stat")],
-        optional_params=[ChampionParam("champion"), TargetParam("person")],
+        optional_params=[ChampionParam("champion_or_map"), TargetParam("person")],
         aliases=["avg"]
     )
 
@@ -488,7 +488,12 @@ def initialize_commands():
     # status command
     status_name = "status"
     status_desc = "Show overall stats about Int-Far."
-    register_command(status_name, status_desc, handle_status_msg)
+    register_command(
+        status_name,
+        status_desc,
+        handle_status_msg,
+        mandatory_params=[GameParam("game")]
+    )
 
     # game command
     game_name = "game"
@@ -509,8 +514,8 @@ def initialize_commands():
     bet_name = "bet"
     bet_desc = (
         "Bet a specific amount of credits on one or more events happening " +
-        "in the current or next game. Fx. `!bet 100 game_win`, `!bet all intfar slurp` " +
-        "or `!bet 20 game_win & 30 no_intfar` (bet on game win *AND* no Int-Far)."
+        "in the current or next game. Fx. `!bet lol 100 game_win`, `!bet csgo all intfar slurp` " +
+        "or `!bet lol 20 game_win & 30 no_intfar` (bet on game win *AND* no Int-Far in a League game)."
     )
     register_command(
         bet_name,
@@ -528,8 +533,11 @@ def initialize_commands():
         "A bet can't be cancelled when a game has started."
     )   
     register_command(
-        cancel_bet_name, cancel_bet_desc, handle_cancel_bet_msg, access_level="all",
-        mandatory_params=[RegularParam("event/ticket")],
+        cancel_bet_name,
+        cancel_bet_desc,
+        handle_cancel_bet_msg,
+        access_level="all",
+        mandatory_params=[GameParam("game"), RegularParam("event/ticket")],
         optional_params=[TargetParam("person", None)]
     )
 
@@ -537,7 +545,10 @@ def initialize_commands():
     give_name = "give"
     give_desc = "Give good-boi points to someone."
     register_command(
-        give_name, give_desc, handle_give_tokens_msg, access_level="all",
+        give_name,
+        give_desc,
+        handle_give_tokens_msg,
+        access_level="all",
         mandatory_params=[RegularParam("amount"), TargetParam("person")]
     )
 
@@ -545,36 +556,50 @@ def initialize_commands():
     active_bets_name = "active_bets"
     active_bets_desc = "See a list of your (or someone else's) active bets."
     register_command(
-        active_bets_name, active_bets_desc, handle_active_bets_msg,
-        True, "self", optional_params=[TargetParam("person")]
+        active_bets_name,
+        active_bets_desc,
+        handle_active_bets_msg,
+        True,
+        "self",
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # bets command
     bets_name = "bets"
     bets_desc = "See a description of your (or someone else's) lifetime bets."
     register_command(
-        bets_name, bets_desc, handle_all_bets_msg, access_level="self",
-        optional_params=[TargetParam("person")]
+        bets_name,
+        bets_desc,
+        handle_all_bets_msg,
+        access_level="self",
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # betting tokens command
     betting_tokens_name = "betting_tokens"
     betting_tokens_desc = "See how many betting tokens you (or someone else) has."
     register_command(
-        betting_tokens_name, betting_tokens_desc, handle_token_balance_msg,
-        True, "self", optional_params=[TargetParam("person")],
-        aliases=["gbp"]
+        betting_tokens_name,
+        betting_tokens_desc,
+        handle_token_balance_msg,
+        True,
+        "self",
+        optional_params=[TargetParam("person")],
+        aliases=["gbp", "balance"]
     )
 
     # bet_return command
     bet_return_name = "bet_return"
     bet_return_disc = (
-        "See the return award of a specific betting " +
+        "See the return award of a specific betting "
         "event (targetting 'person', if given)."
     )
     register_command(
-        bet_return_name, bet_return_disc, handle_bet_return_msg,
-        access_level="self", mandatory_params=[RegularParam("event")],
+        bet_return_name,
+        bet_return_disc,
+        handle_bet_return_msg,
+        access_level="self",
+        mandatory_params=[GameParam("game"), RegularParam("event")],
         optional_params=[TargetParam("person", None)]
     )
 
@@ -585,10 +610,17 @@ def initialize_commands():
 
     # website profile command
     website_profile_name = "website_profile"
-    website_profile_desc = "Get a link to your (or someone else's) Int-Far profile."
+    website_profile_desc = (
+        "Get a link to your (or someone else's) Int-Far profile "
+        "for the given game."
+    )
     register_command(
-        website_profile_name, website_profile_desc, handle_profile_msg,
-        access_level="self", optional_params=[TargetParam("person")]
+        website_profile_name,
+        website_profile_desc,
+        handle_profile_msg,
+        access_level="self",
+        game=[GameParam("game")],
+        optional_params=[TargetParam("person")]
     )
 
     # website verify command
@@ -598,15 +630,20 @@ def initialize_commands():
         "verify and log you in on the Int-Far website."
     )
     register_command(
-        website_verify_name, website_verify_desc,
-        handle_verify_msg, access_level="all"
+        website_verify_name,
+        website_verify_desc,
+        handle_verify_msg,
+        access_level="all"
     )
 
     # report command
     report_name = "report"
     report_desc = "Report someone, f.x. if they are being a poon."
     register_command(
-        report_name, report_desc, handle_report_msg, access_level="all",
+        report_name,
+        report_desc,
+        handle_report_msg,
+        access_level="all",
         mandatory_params=[TargetParam("person")]
     )
 
@@ -614,37 +651,51 @@ def initialize_commands():
     report_name = "reports"
     report_desc = "See how many times someone (or yourself) has been reported."
     register_command(
-        report_name, report_desc, handle_see_reports_msg, True, "self",
+        report_name,
+        report_desc,
+        handle_see_reports_msg,
+        True,
+        "self",
         optional_params=[TargetParam("person")]
     )
 
     # doinks sound command
     doinks_sound_name = "doinks_sound"
-    doinks_sound_desc = "Set a sound to trigger when you are awarded Doinks."
-    async def doinks_sound_wrapper(client, message, sound=None):
-        await handle_set_event_sound(client, message, sound, "doinks")
+    doinks_sound_desc = "Set a sound to trigger when you are awarded Doinks in game."
+    async def doinks_sound_wrapper(client, message, game, sound=None):
+        await handle_set_event_sound(client, message, game, sound, "doinks")
 
     register_command(
-        doinks_sound_name, doinks_sound_desc, doinks_sound_wrapper,
-        access_level="all", optional_params=[RegularParam("sound")]
+        doinks_sound_name,
+        doinks_sound_desc,
+        doinks_sound_wrapper,
+        access_level="all",
+        mandatory_params=[GameParam("game")],
+        optional_params=[RegularParam("sound")]
     )
 
     # intfar sound command
     intfar_sound_name = "intfar_sound"
-    intfar_sound_desc = "Set a sound to trigger when you are awarded Int-Far."
-    async def intfar_sound_wrapper(client, message, sound=None):
-        await handle_set_event_sound(client, message, sound, "intfar")
+    intfar_sound_desc = "Set a sound to trigger when you are awarded Int-Far in a game."
+    async def intfar_sound_wrapper(client, message, game, sound=None):
+        await handle_set_event_sound(client, message, game, sound, "intfar")
 
     register_command(
-        intfar_sound_name, intfar_sound_desc, intfar_sound_wrapper,
-        access_level="all", optional_params=[RegularParam("sound")]
+        intfar_sound_name,
+        intfar_sound_desc,
+        intfar_sound_wrapper,
+        access_level="all",
+        mandatory_params=[GameParam("game")],
+        optional_params=[RegularParam("sound")]
     )
 
     # play command
     play_name = "play"
     play_desc = "Play a sound (or a youtube/soundcloud link)! (See `!sounds` for a list of sounds)."
     register_command(
-        play_name, play_desc, handle_play_sound_msg,
+        play_name,
+        play_desc,
+        handle_play_sound_msg,
         mandatory_params=[RegularParam("sound")]
     )
 
@@ -653,6 +704,13 @@ def initialize_commands():
     skip_desc = "Skip an active youtube/soundcloud sound (if one is playing)."
     register_command(
         skip_name, skip_desc, handle_skip_sound_msg
+    )
+
+    # stop command
+    stop_name = "stop"
+    stop_desc = "Stop playing any active youtube/soundcloud sound and clear the queue of upcoming sounds"
+    register_command(
+        stop_name, stop_desc, handle_stop_sound_msg
     )
 
     def parse_search_args(client, args):
@@ -674,7 +732,9 @@ def initialize_commands():
     sounds_name = "sounds"
     sounds_desc = "See a list of all possible sounds to play."
     register_command(
-        sounds_name, sounds_desc, handle_sounds_msg,
+        sounds_name,
+        sounds_desc,
+        handle_sounds_msg,
         optional_params=[RegularParam("ordering")]
     )
 
@@ -693,7 +753,10 @@ def initialize_commands():
         "given price (or cheapest if no price is given)."
     )
     register_command(
-        buy_name, buy_desc, handle_buy_msg, access_level="all",
+        buy_name,
+        buy_desc,
+        handle_buy_msg,
+        access_level="all",
         mandatory_params=[RegularParam("quantity"), RegularParam("item")]
     )
 
@@ -701,7 +764,10 @@ def initialize_commands():
     sell_name = "sell"
     sell_desc = "Add a listing in the shop for one or more copies of an item that you own."
     register_command(
-        sell_name, sell_desc, handle_sell_msg, access_level="all",
+        sell_name,
+        sell_desc,
+        handle_sell_msg,
+        access_level="all",
         mandatory_params=[RegularParam("quantity"), RegularParam("item"), RegularParam("price")]
     )
 
@@ -712,7 +778,10 @@ def initialize_commands():
         "the given number of items at the given price"
     )
     register_command(
-        cancel_sell_name, cancel_sell_desc, handle_cancel_sell_msg, access_level="all",
+        cancel_sell_name,
+        cancel_sell_desc,
+        handle_cancel_sell_msg,
+        access_level="all",
         mandatory_params=[RegularParam("quantity"), RegularParam("item"), RegularParam("price")]
     )
 
@@ -720,7 +789,10 @@ def initialize_commands():
     inventory_name = "inventory"
     inventory_desc = "List all the items that your or someone else owns."
     register_command(
-        inventory_name, inventory_desc, handle_inventory_msg, access_level="self",
+        inventory_name,
+        inventory_desc,
+        handle_inventory_msg,
+        access_level="self",
         optional_params=[TargetParam("person")]
     )
 
@@ -728,10 +800,12 @@ def initialize_commands():
     random_champ_name = "random_champ"
     random_champ_desc = (
         "Pick a random champion. If a list is given, only champs from this list is used. " +
-        "Champion lists can be created at https://mhooge.com/intfar/lists/"
+        f"Champion lists can be created at {api_util.get_website_link('lol')}/lists/"
     )
     register_command(
-        random_champ_name, random_champ_desc, handle_random_champ_msg,
+        random_champ_name,
+        random_champ_desc,
+        handle_random_champ_msg,
         optional_params=[RegularParam("list")]
     )
 
@@ -750,8 +824,12 @@ def initialize_commands():
         "Pick a random champion that you have not yet earned a chest on (from all champs)."
     )
     register_command(
-        random_nochest_name, random_nochest_desc, handle_random_nochest,
-        False, "all", optional_params=[TargetParam("person")]
+        random_nochest_name,
+        random_nochest_desc,
+        handle_random_nochest,
+        False,
+        "all",
+        optional_params=[TargetParam("person")]
     )
 
     # best nochest command
@@ -760,8 +838,12 @@ def initialize_commands():
         "Get the highest winrate champ that you have no yet earned a chest on."
     )
     register_command(
-        best_nochest_name, best_nochest_desc, handle_best_nochest,
-        False, "self", optional_params=[TargetParam("person")]
+        best_nochest_name,
+        best_nochest_desc,
+        handle_best_nochest,
+        False,
+        "self",
+        optional_params=[TargetParam("person")]
     )
 
     # champ lists command
@@ -770,7 +852,11 @@ def initialize_commands():
         "See a list of all champion lists, or those created by a specific person."
     )
     register_command(
-        champ_lists_name, champ_lists_desc, handle_champ_lists_msg, True, "self",
+        champ_lists_name,
+        champ_lists_desc,
+        handle_champ_lists_msg,
+        True,
+        "self",
         optional_params=[TargetParam("person", None)]
     )
 
@@ -778,7 +864,9 @@ def initialize_commands():
     champs_name = "champs"
     champs_desc = "See what champs are in a given champion list."
     register_command(
-        champs_name, champs_desc, handle_champs_msg,
+        champs_name,
+        champs_desc,
+        handle_champs_msg,
         mandatory_params=[RegularParam("list")]
     )
 
@@ -786,7 +874,10 @@ def initialize_commands():
     create_list_name = "create_list"
     create_list_desc = "Create a list of champions."
     register_command(
-        create_list_name, create_list_desc, handle_create_list_msg, access_level="all",
+        create_list_name,
+        create_list_desc,
+        handle_create_list_msg,
+        access_level="all",
         mandatory_params=[RegularParam("name")]
     )
 
@@ -797,7 +888,10 @@ def initialize_commands():
         "with comma-separated list. Fx. `!add_champ some_list aatrox, ahri, akali`"
     )
     register_command(
-        add_champ_name, add_champ_desc, handle_add_champs, access_level="all",
+        add_champ_name,
+        add_champ_desc,
+        handle_add_champs,
+        access_level="all",
         mandatory_params=[RegularParam("list"), RegularParam("champion(s)")],
         parser=parse_champs_params
     )
@@ -806,7 +900,10 @@ def initialize_commands():
     delete_list_name = "delete_list"
     delete_list_desc = "Delete a champion list that you own."
     register_command(
-        delete_list_name, delete_list_desc, handle_delete_list, access_level="all",
+        delete_list_name,
+        delete_list_desc,
+        handle_delete_list,
+        access_level="all",
         mandatory_params=[RegularParam("list")]
     )
 
@@ -817,7 +914,10 @@ def initialize_commands():
         "with comma-separated list. Fx. `!remove_champ some_list aatrox, ahri, akali`"
     )
     register_command(
-        remove_champ_name, remove_champ_desc, handle_remove_champ, access_level="all",
+        remove_champ_name,
+        remove_champ_desc,
+        handle_remove_champ,
+        access_level="all",
         mandatory_params=[RegularParam("list"), RegularParam("champion(s)")],
         parser=parse_champs_params
     )
@@ -828,7 +928,10 @@ def initialize_commands():
         "Show a summary of you or someone else's stats across all recorded games."
     )
     register_command(
-        summary_name, summary_desc, handle_summary_msg, access_level="self",
+        summary_name,
+        summary_desc,
+        handle_summary_msg,
+        access_level="self",
         optional_params=[TargetParam("person")]
     )
 
@@ -838,16 +941,27 @@ def initialize_commands():
         "Show you or someone else's Personally Evaluated Normalized Int Score."
     )
     register_command(
-        performance_name, performance_desc, handle_performance_msg, True, "self",
+        performance_name,
+        performance_desc,
+        handle_performance_msg,
+        True,
+        "self",
         optional_params=[TargetParam("person")]
     )
 
     # wr command
     wr_name = "wr"
-    wr_desc = "Show winrate info on a champion for you or someone else."
+    wr_desc = (
+        "Show you or someone else's winrate. This command accepts different parameters "
+        "for different games. For LoL you can see winrates on champions (f.x `!wr aphelios nønø`). "
+        "In CSGO you can see winrates on maps (f.x. `!wr cache`)."
+    )
     register_command(
-        wr_name, wr_desc, handle_winrate_msg, access_level="self",
-        mandatory_params=[RegularParam("champion")], optional_params=[TargetParam("person")],
+        wr_name, wr_desc,
+        handle_winrate_msg,
+        access_level="self",
+        mandatory_params=[GameParam("game"), RegularParam("champion_or_map")],
+        optional_params=[TargetParam("person")],
         aliases=["winrate"]
     )
 
@@ -860,8 +974,11 @@ def initialize_commands():
     lan_performance_name = "lan_performance"
     lan_performance_desc = "Show the performance of you (or someone else) at the current LAN."
     register_command(
-        lan_performance_name, lan_performance_desc, handle_lan_performance_msg,
-        access_level="all", optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+        lan_performance_name,
+        lan_performance_desc,
+        handle_lan_performance_msg,
+        access_level="all",
+        optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
     )
 
     lan_intfar_name = "lan_intfar"
@@ -869,8 +986,12 @@ def initialize_commands():
         "Show how many Int-Fars you (or someone else) has gotten at the current LAN."
     )
     register_command(
-        lan_intfar_name, lan_intfar_desc, handle_lan_intfar_msg,
-        True, "all", optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+        lan_intfar_name,
+        lan_intfar_desc,
+        handle_lan_intfar_msg,
+        True,
+        "all",
+        optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
     )
 
     lan_doinks_name = "lan_doinks"
@@ -878,8 +999,12 @@ def initialize_commands():
         "Show how many Doinks you (or someone else) has gotten at the current LAN."
     )
     register_command(
-        lan_doinks_name, lan_doinks_desc, handle_lan_doinks_msg,
-        True, "all", optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+        lan_doinks_name,
+        lan_doinks_desc,
+        handle_lan_doinks_msg,
+        True,
+        "all",
+        optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
     )
 
     # ===== CUTE COMMANDS =====
@@ -891,7 +1016,9 @@ def initialize_commands():
         await handle_flirtation_msg(client, message, "english")
 
     register_command(
-        intdaddy_name, intdaddy_desc, intdaddy_wrapper,
+        intdaddy_name,
+        intdaddy_desc,
+        intdaddy_wrapper,
         command_dict=commands_util.CUTE_COMMANDS
     )
 
@@ -902,7 +1029,9 @@ def initialize_commands():
         await handle_flirtation_msg(client, message, "spanish")
 
     register_command(
-        intpapi_name, intpapi_desc, intpapi_wrapper,
+        intpapi_name,
+        intpapi_desc,
+        intpapi_wrapper,
         command_dict=commands_util.CUTE_COMMANDS
     )
 
@@ -910,14 +1039,18 @@ def initialize_commands():
 
     # kick command
     register_command(
-        "kick", None, handle_kick_msg,
+        "kick",
+        None,
+        handle_kick_msg,
         mandatory_params=[TargetParam("person")],
         command_dict=commands_util.ADMIN_COMMANDS
     )
 
     # restart command
     register_command(
-        "restart", None, handle_restart_msg,
+        "restart",
+        None,
+        handle_restart_msg,
         command_dict=commands_util.ADMIN_COMMANDS
     )
 

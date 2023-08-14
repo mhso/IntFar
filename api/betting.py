@@ -777,6 +777,7 @@ class BettingHandler(ABC):
         ticket = None
         event_id = bet_str if self.get_bet(bet_str) is not None else None
         tokens_name = self.config.betting_tokens
+
         if event_id is None:
             try:
                 ticket = int(bet_str)

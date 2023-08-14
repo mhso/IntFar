@@ -104,9 +104,10 @@ CREATE TABLE [bets] (
 );
 CREATE TABLE [event_sounds] (
     [disc_id] INTEGER NOT NULL,
+    [game] NVARCHAR(64) NOT NULL,
     [sound] NVARCHAR(24) NOT NULL,
     [event] NVARCHAR(6) NOT NULL,
-    PRIMARY KEY (disc_id, event)
+    PRIMARY KEY (disc_id, game, event)
 );
 CREATE TABLE [shop_items] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,

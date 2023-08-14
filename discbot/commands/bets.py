@@ -25,7 +25,15 @@ def get_bet_params(client, args):
     amounts = []
     events = []
     targets = []
-    index = 0
+
+    if len(args) == 0:
+        return [None, [], [], []]
+
+    game = args[0]
+    if game not in api_util.SUPPORTED_GAMES:
+        raise ValueError("You need to supply a valid game to place the bet on.")
+
+    index = 1
 
     while index < len(args):
         event = args[index+1]
@@ -48,9 +56,9 @@ def get_bet_params(client, args):
         events.append(event)
         targets.append(target)
 
-    return [amounts, events, targets]
+    return [game, amounts, events, targets]
 
-async def handle_make_bet_msg(client, message, amounts, events, targets):
+async def handle_make_bet_msg(client, message, game, amounts, events, targets):
     if events == [] or amounts == [] or None in amounts or None in events:
         await handle_usage_msg(client, message, "bet")
         return
@@ -81,21 +89,31 @@ async def handle_make_bet_msg(client, message, amounts, events, targets):
         target_names.append(discord_name)
 
     with client.database:
-        response = client.betting_handler.place_bet(
-            message.author.id, message.guild.id, amounts,
-            client.game_start.get(message.guild.id), events,
-            target_ids, target_names
+        response = client.betting_handlers[game].place_bet(
+            message.author.id,
+            message.guild.id,
+            amounts,
+            client.get_game_start[game, message.guild.id],
+            events,
+            target_ids,
+            target_names
         )[1]
 
     await message.channel.send(response)
 
-async def handle_cancel_bet_msg(client, message, betting_event, target_id=None):
-    target_name = (None if target_id is None
-                    else client.get_discord_nick(target_id, message.guild.id))
+async def handle_cancel_bet_msg(client, message, game, betting_event, target_id=None):
+    target_name = (
+        None if target_id is None
+        else client.get_discord_nick(target_id, message.guild.id)
+    )
 
     response = client.betting_handler.cancel_bet(
-        message.author.id, message.guild.id, betting_event,
-        client.game_start.get(message.guild.id), target_id, target_name
+        message.author.id,
+        message.guild.id,
+        betting_event,
+        client.get_game_start[game, message.guild.id],
+        target_id,
+        target_name
     )[1]
 
     await message.channel.send(response)
@@ -119,9 +137,9 @@ async def handle_give_tokens_msg(client, message, amount, target_id):
 
     await message.channel.send(response)
 
-async def handle_active_bets_msg(client, message, target_id):
-    def get_bet_description(disc_id, single_person=True):
-        active_bets = client.database.get_bets(True, disc_id)
+async def handle_active_bets_msg(client, message, game=None, target_id=None):
+    def get_bet_description(game, disc_id, single_person=True):
+        active_bets = client.database.get_bets(game, True, disc_id)
         recepient = client.get_discord_nick(disc_id, message.guild.id)
 
         response = ""
@@ -153,7 +171,7 @@ async def handle_active_bets_msg(client, message, target_id):
                         if target is not None:
                             person = client.get_discord_nick(target, message.guild.id)
 
-                        bet_desc = betting.get_dynamic_bet_desc(event, person)
+                        bet_desc = client.betting_handlers[game].get_dynamic_bet_desc(event, person)
                         bets_str += f"`{bet_desc}`"
                         if index != len(amounts) - 1:
                             bets_str += " & "
@@ -168,24 +186,37 @@ async def handle_active_bets_msg(client, message, target_id):
 
     response = ""
 
-    if target_id is None:
-        any_bet = False
-        for disc_id, _, _ in client.database.summoners:
-            bets_for_person = get_bet_description(disc_id, False)
-            if bets_for_person is not None:
-                if any_bet:
-                    bets_for_person = "\n" + bets_for_person
-                response += bets_for_person
-                any_bet = True
-        if not any_bet:
-            response = "No one has any active bets."
-    else:
-        response = get_bet_description(target_id)
+    games_to_check = [game] if game is not None else api_util.SUPPORTED_GAMES
+    for game in games_to_check:
+        game_response = f"Bets for {api_util.SUPPORTED_GAMES[game]}"
+        if target_id is None:
+            # Check active bets for everyone
+            any_bet = False
+            for disc_id in client.database.users[game]:
+                bets_for_person = get_bet_description(game, disc_id, False)
+                if bets_for_person is not None:
+                    if any_bet:
+                        bets_for_person = "\n" + bets_for_person
+                    game_response += bets_for_person
+                    any_bet = True
+
+            if any_bet:
+                if response != "":
+                    game_response = "\n" + game_response
+
+                response += game_response
+
+        else:
+            # Check active bets for a single person 
+            response += game_response + get_bet_description(game, target_id)
+
+    if target_id is None and response == "":
+        response = "No one has any active bets."
 
     await message.channel.send(response)
 
-async def handle_all_bets_msg(client, message, target_id):
-    all_bets = client.database.get_bets(False, target_id)
+async def handle_all_bets_msg(client, message, game, target_id):
+    all_bets = client.database.get_bets(game, False, target_id)
     tokens_name = client.config.betting_tokens
     bets_won = 0
     had_target = 0
@@ -194,7 +225,8 @@ async def handle_all_bets_msg(client, message, target_id):
     most_often_event = 0
     max_event_count = 0
     winnings = 0
-    event_counts = {x: 0 for x in betting.BETTING_DESC}
+    betting_descs = {bet.event_id: bet.description for bet in client.betting_handlers[game].all_bets}
+    event_counts = {event_id: 0 for event_id in betting_descs}
 
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
@@ -210,6 +242,7 @@ async def handle_all_bets_msg(client, message, target_id):
                     most_often_event = event_id
                 if target is not None:
                     had_target += 1
+
             if result == 1:
                 bets_won += 1
                 winnings += payout if payout is not None else 0
@@ -220,7 +253,7 @@ async def handle_all_bets_msg(client, message, target_id):
         pct_won = int((bets_won / len(all_bets)) * 100)
         pct_target = int((had_target / len(all_bets)) * 100)
         pct_during = int((during_game / len(all_bets)) * 100)
-        event_desc = betting.BETTING_DESC[most_often_event]
+        event_desc = betting_descs[most_often_event]
 
         response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
         response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
@@ -258,11 +291,11 @@ async def handle_token_balance_msg(client, message, target_id):
 
     await message.channel.send(response)
 
-async def handle_bet_return_msg(client, message, betting_event, target_id=None):
+async def handle_bet_return_msg(client, message, game, betting_event, target_id=None):
     target_name = (
         None if target_id is None
         else client.get_discord_nick(target_id, message.guild.id)
     )
 
-    response = client.betting_handler.get_bet_return_desc(betting_event, target_id, target_name)
+    response = client.betting_handlers[game].get_bet_return_desc(betting_event, target_id, target_name)
     await message.channel.send(response)

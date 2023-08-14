@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import api.util as api_util
+from api.awards import get_intfar_reasons
 import discbot.commands.util as commands_util
 
 async def handle_lol_register_msg(client, message, target_name):
@@ -173,7 +174,7 @@ async def handle_uptime_msg(client, message):
     uptime_formatted = get_uptime(client.time_initialized)
     await message.channel.send(f"Int-Far™ Tracker™ has been online for {uptime_formatted}")
 
-async def handle_status_msg(client, message):
+async def handle_status_msg(client, message, game):
     """
     Gather meta stats about Int-Far and write them to Discord.
     """
@@ -185,7 +186,7 @@ async def handle_status_msg(client, message):
         longest_game_time, users, doinks_games,
         total_doinks, intfars, games_ratios,
         intfar_ratios, intfar_multi_ratios
-    ) = client.database.get_meta_stats()
+    ) = client.database.get_meta_stats(game)
 
     pct_games_won = (games_won / games) * 100
 
@@ -201,7 +202,7 @@ async def handle_status_msg(client, message):
     pct_doinks = int((doinks_games / games) * 100)
     earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
     doinks_emote = client.insert_emotes("{emote_Doinks}")
-    all_bets = client.database.get_bets(False)
+    all_bets = client.database.get_bets(game, False)
 
     tokens_name = client.config.betting_tokens
     bets_won = 0
@@ -234,11 +235,27 @@ async def handle_status_msg(client, message):
     pct_bets_won = int((bets_won / total_bets) * 100)
     highest_payout_name = client.get_discord_nick(highest_payout_user, message.guild.id)
 
+    intfar_reasons = get_intfar_reasons(game).values()
+
+    reason_ratio_msg = "\n".join(f"- **{count:.1f}% were for {reason}" for count, reason in zip(intfar_ratios, intfar_reasons))
+    count_literals = ["one", "two", "three", "four", "five", "six", "seven", "eight"]
+    def multi_criterias_msg(index, max_count):
+        if index == 1:
+            quantifier = f"met just {count_literals[index]} criteria"
+        elif index == max_count:
+            quantifier = f"swept and met all {count_literals[index]} criterias"
+        else:
+            quantifier = f"met {count_literals[index]} criterias"
+
+        return f"- **{intfar_multi_ratios[index-1]:.1f}% of Int-Fars {quantifier}"
+
+    reason_multi_ratio_msg = "\n".join(multi_criterias_msg(index, len(intfar_multi_ratios)) for index in len(range(1, intfar_multi_ratios+1)))
+
     response += (
         f"--- Since **{earliest_time}** ---\n"
-        f"- **{games}** games have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
+        f"- **{games}** games of {api_util.SUPPORTED_GAMES[game]} have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
         f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
-        f"- **{users}** users have signed up\n"
+        f"- **{users}** users have signed up for this game\n"
         f"- **{intfars}** Int-Far awards have been given\n"
         f"- **{total_doinks}** {doinks_emote} have been earned\n"
         f"- **{len(sounds)}** sounds have been uploaded by **{len(unique_owners)}** people\n"
@@ -255,14 +272,8 @@ async def handle_status_msg(client, message):
         f"- **{games_ratios[2]}%** were as a four-man\n"
         f"- **{games_ratios[3]}%** were as a five-man stack\n"
         "--- When Int-Fars were earned ---\n"
-        f"- **{intfar_ratios[0]:.1f}%** were for dying a ton\n"
-        f"- **{intfar_ratios[1]:.1f}%** were for having an awful KDA\n"
-        f"- **{intfar_ratios[2]:.1f}%** were for having a low KP\n"
-        f"- **{intfar_ratios[3]:.1f}%** were for having a low vision score\n"
-        f"- **{intfar_multi_ratios[0]:.1f}%** of Int-Fars met just one criteria\n"
-        f"- **{intfar_multi_ratios[1]:.1f}%** of Int-Fars met two criterias\n"
-        f"- **{intfar_multi_ratios[2]:.1f}%** of Int-Fars met three criterias\n"
-        f"- **{intfar_multi_ratios[3]:.1f}%** of Int-Fars swept and met all four criterias"
+        f"{reason_ratio_msg}\n"
+        f"{reason_multi_ratio_msg}"
     )
 
     await message.channel.send(response)
@@ -270,18 +281,19 @@ async def handle_status_msg(client, message):
 async def handle_website_msg(client, message):
     response = (
         "Check out the amazing Int-Far website {emote_smol_gual}\n" +
-        "https://mhooge.com/intfar\n" +
+        f"{api_util.get_website_link()}\n" +
         "Write `!website_verify` to sign in to the website, " +
-        "allowing you to create bets, see stats, upload sounds, and more!"
+        "allowing you to create bets, see stats, upload sounds, and more! "
+        "You can also more easily sign up for CSGO here!"
     )
 
     await message.channel.send(client.insert_emotes(response))
 
-async def handle_profile_msg(client, message, target_id):
+async def handle_profile_msg(client, message, game, target_id=None):
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    response = f"URL to {target_name}'s Int-Far profile:\n"
-    response += f"https://mhooge.com/intfar/user/{target_id}"
+    response = f"URL to {target_name}'s Int-Far profile for {api_util.SUPPORTED_GAMES[game]}:\n"
+    response += f"{api_util.get_website_link(game)}/user/{target_id}"
 
     await message.channel.send(response)
 
@@ -292,7 +304,7 @@ async def handle_verify_msg(client, message):
     then sent via. a Discord DM to the invoker of the command.
     """
     client_secret = client.database.get_client_secret(message.author.id)
-    url = f"https://mhooge.com/intfar/verify/{client_secret}"
+    url = f"{api_util.get_website_link()}/verify/{client_secret}"
     response_dm = "Go to this link to verify yourself (totally not a virus):\n"
     response_dm += url + "\n"
     response_dm += "This will enable you to interact with the Int-Far bot from "

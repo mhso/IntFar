@@ -115,11 +115,10 @@ class GameMonitor(ABC):
             # Send update to Int-Far website that a game has started.
             req_data = {
                 "secret": self.config.discord_token,
-                "game": self.game,
                 "guild_id": guild_id
             }
             req_data.update(self.active_game[guild_id])
-            self._send_game_update("game_started", req_data)
+            self._send_game_update("game_started", self.game, req_data)
 
             logger.info(f"Game of {self.game} is now active in {guild_name}, polling for game end...")
 
@@ -161,11 +160,10 @@ class GameMonitor(ABC):
                 # Send update to Int-Far website that the game is over.
                 req_data = {
                     "secret": self.config.discord_token,
-                    "game": self.game,
                     "guild_id": guild_id,
                     "game_id": game_id
                 }
-                self._send_game_update("game_ended", req_data)
+                self._send_game_update("game_ended", self.game, req_data)
 
                 # Call end-of-game callback
                 await self.game_over_callback(game_info, guild_id, status_code)
@@ -200,8 +198,8 @@ class GameMonitor(ABC):
     def should_poll(self, guild_id):
         return len(self.users_in_voice.get(guild_id, [])) > 1 and not self.polling_active.get(guild_id, False)
 
-    def _send_game_update(self, endpoint, data):
+    def _send_game_update(self, endpoint, game, data):
         try:
-            return requests.post(f"https://mhooge.com:5000/intfar/{endpoint}", data=data)
+            return requests.post(f"https://mhooge.com:5000/intfar/{game}/{endpoint}", data=data)
         except requests.exceptions.RequestException:
             logger.bind(endpoint=endpoint, data=data).exception(f"Error ignored in send_game_update for {self.game}")

@@ -341,6 +341,32 @@ class AudioHandler:
         # No active stream, do nothing
         return None
 
+    async def stop_sound(self, voice_state):
+        # Check if user is in a voice channel.
+        if voice_state is None:
+            err_msg = (
+                "You must be in a voice channel to stop sounds {emote_simp_but_closeup}"
+            )
+            return err_msg
+
+        guild_id = voice_state.channel.guild.id
+
+        # Check if a stream is active
+        if (web_stream := self.web_stream.get(guild_id)) is not None:
+            sound_quantifier = "sound" if len(self.sound_queue) == 1 else "sounds"
+            sound_queue = self.sound_queue.get(guild_id, [])
+            queue_len_str = (
+                "..." if sound_queue == []
+                else f" and clearing queue of **{len(sound_queue)}** other {sound_quantifier}..."
+            )
+            msg = f"Stopping sound{queue_len_str}"
+            del self.sound_queue[guild_id]
+            web_stream.stop()
+            return msg
+
+        # No active stream, do nothing
+        return None
+
     async def audio_control_pressed(self, emoji, member, channel):
         """
         Called when a user reacts to the currently active playback status message
@@ -350,21 +376,15 @@ class AudioHandler:
         if (web_stream := self.web_stream.get(guild_id)) is not None and member.voice is not None:
             if emoji.name == self.EMOJI_NEXT:
                 # Stop the active stream and skip to the next sound in the queue
-                await self.skip_sound(member.voice)
+                if (msg := await self.skip_sound(member.voice)) is not None:
+                    await channel.send(msg)
             elif emoji.name == self.EMOJI_PLAY:
                 # Pause or resume the active stream
                 web_stream.pause_or_play()
             elif emoji.name == self.EMOJI_STOP:
                 # Stop the active stream and empty the sound queue
-                sound_quantifier = "sound" if len(self.sound_queue) == 1 else "sounds"
-                sound_queue = self.sound_queue.get(guild_id, [])
-                queue_len_str = (
-                    "..." if sound_queue == []
-                    else f" and clearing queue of **{len(sound_queue)}** other {sound_quantifier}..."
-                )
-                await channel.send(f"Stopping sound{queue_len_str}")
-                del self.sound_queue[guild_id]
-                web_stream.stop()
+                if (msg := await self.stop_sound(member.voice)) is not None:
+                    await channel.send(msg)
 
     def get_sounds(self, ordering):
         sounds = []

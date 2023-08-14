@@ -4,6 +4,8 @@ from time import time
 import api.lan as lan_api
 import api.util as api_util
 
+_GAME = "lol"
+
 async def send_lan_not_started_msg(client, message):
     now_dt = datetime.now()
     lan_dt = datetime.fromtimestamp(lan_api.LAN_START_TIME)
@@ -18,7 +20,7 @@ async def handle_lan_msg(client, message):
 
     # General info about how the current LAN is going.
     games_stats = client.database.get_games_count(
-        time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
+        _GAME, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
     )
 
     if games_stats is None:
@@ -34,19 +36,19 @@ async def handle_lan_msg(client, message):
 
         duration = api_util.format_duration(dt_start, dt_now)
 
-        champs_played = client.database.get_champs_played(
+        champs_played = client.database.get_league_champs_played(
             time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
         )
 
         intfars = client.database.get_intfar_count(
-            time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
+            _GAME, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
         )
         doinks = client.database.get_doinks_count(
-            time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
+            _GAME, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
         )[1]
 
         longest_game_duration, longest_game_time = client.database.get_longest_game(
-            time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
+            _GAME, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
         )
         longest_game_start = datetime.fromtimestamp(longest_game_time)
         longest_game_end = datetime.fromtimestamp(longest_game_time + longest_game_duration)
@@ -119,7 +121,7 @@ def format_intfar(client, message, disc_id, expanded):
     person_to_check = client.get_discord_nick(disc_id, message.guild.id)
 
     games_played, intfar_reason_ids = client.database.get_intfar_stats(
-        disc_id, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
+        _GAME, disc_id, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
     )
     games_played, intfars, intfar_counts, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
 
@@ -158,10 +160,10 @@ def format_doinks(client, message, disc_id, expanded):
     person_to_check = client.get_discord_nick(disc_id, message.guild.id)
 
     doinks_reason_ids = client.database.get_doinks_stats(
-        disc_id, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
+        _GAME, disc_id, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
     )
     total_doinks = client.database.get_doinks_count(
-        disc_id, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
+        _GAME, disc_id, time_after=lan_api.LAN_START_TIME, time_before=lan_api.LAN_END_TIME, guild_id=lan_api.LAN_GUILD
     )[1]
     doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
 

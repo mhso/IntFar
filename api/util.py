@@ -239,6 +239,13 @@ def format_timestamp(timestamp):
 
     return f"{zero_pad(minutes)}:{zero_pad(seconds)}"
 
+def get_website_link(game=None):
+    base_url = "https://mhooge.com/intfar"
+    if game is None:
+        return base_url
+
+    return f"{base_url}/{game}"
+
 def create_predictions_timeline_image():
     filename = "resources/predictions_temp.json"
 

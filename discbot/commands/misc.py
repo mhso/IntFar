@@ -107,8 +107,8 @@ async def handle_flirtation_msg(client, message, language):
     mention = client.get_mention_str(message.author.id, message.guild.id)
     await message.channel.send(f"{mention} {flirt_msg}")
 
-async def handle_summary_msg(client, message, target_id):
-    # Shows an infographic about various stats a person has accrued.
+async def handle_lol_summary_msg(client, message, target_id):
+    # Shows information about various stats a person has accrued.
     nickname = client.get_discord_nick(target_id, message.guild.id)
     games_played = client.database.get_intfar_stats(target_id)[0]
     champs_played = client.database.get_champs_played(target_id)
@@ -175,10 +175,20 @@ async def handle_summary_msg(client, message, target_id):
 
     await message.channel.send(response)
 
-async def handle_performance_msg(client, message, target_id=None):
-    performance_data = client.database.get_performance_score(target_id)
+async def handle_csgo_summary_msg(client, message, target_id):
+    await message.channel.send("Not implemented yet :O")
+
+async def handle_summary_msg(client, message, game, target_id):
+    if game == "lol":
+        return await handle_lol_summary_msg(client, message, target_id)
+    elif game == "csgo":
+        return await handle_csgo_summary_msg(client, message, target_id)
+
+async def handle_performance_msg(client, message, game, target_id=None):
+    performance_data = client.database.get_performance_score(game, target_id)
+    game_name = api_util.SUPPORTED_GAMES[game]
     if target_id is None:
-        response = "*Personally Evaluated Normalized Int-Far Scores* for all users:"
+        response = f"*Personally Evaluated Normalized Int-Far Scores* for {game_name} for all users:"
         for score_id, score_value in performance_data:
             name = client.get_discord_nick(score_id, message.guild.id)
             response += f"\n- {name}: **{score_value:.2f}**"
@@ -187,7 +197,7 @@ async def handle_performance_msg(client, message, target_id=None):
         score, rank, num_scores = performance_data
 
         response = (
-            f"The *Personally Evaluated Normalized Int-Far Score* for {name} is " +
+            f"The *Personally Evaluated Normalized Int-Far Score* for {name} for {game_name} is " +
             f"**{score:.2f}**/**10**. This ranks him at **{rank}**/**{num_scores}**."
         )
 
@@ -200,17 +210,31 @@ async def handle_performance_msg(client, message, target_id=None):
 
     await message.channel.send(response)
 
-async def handle_winrate_msg(client, message, champ_name, target_id):
-    champ_id = client.riot_api.try_find_champ(champ_name)
-    if champ_id is None:
-        response = f"Not a valid champion: `{champ_name}`."
-    else:
-        winrate, games = client.database.get_league_champ_winrate(target_id, champ_id)
-        champ_name = client.riot_api.get_champ_name(champ_id)
+async def handle_winrate_msg(client, message, game, champ_or_map, target_id):
+    winrate = None
+    games = None
+    qualified_name = None
+
+    if game == "lol":
+        champ_id = client.riot_api.try_find_champ(champ_or_map)
+        if champ_id is None:
+            response = f"Not a valid champion: `{champ_or_map}`."
+        else:
+            winrate, games = client.database.get_league_champ_winrate(target_id, champ_id)
+            qualified_name = client.riot_api.get_champ_name(champ_id)
+    elif game == "csgo":
+        map_id = client.steam_api.try_find_map(champ_or_map)
+        if map_id is None:
+            response = f"Not a valid map: `{champ_or_map}`"
+        else:
+            winrate, games = client.database.get_csgo_map_winrate(target_id, map_id)
+            qualified_name = client.steam_api.get_map_name(map_id)
+
+    if winrate is not None:
         user_name = client.get_discord_nick(target_id, message.guild.id)
         if games == 0:
-            response = f"{user_name} has not played any games on {champ_name}."
+            response = f"{user_name} has not played any games on {qualified_name}."
         else:
-            response = f"{user_name} has a **{winrate:.2f}%** winrate with {champ_name} in **{int(games)}** games.\n"
+            response = f"{user_name} has a **{winrate:.2f}%** winrate on {qualified_name} in **{int(games)}** games.\n"
 
     await message.channel.send(response)

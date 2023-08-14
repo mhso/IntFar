@@ -1,32 +1,40 @@
 import random
 
 from api import audio_handler
+from api.util import SUPPORTED_GAMES, get_website_link
 
-async def handle_set_event_sound(client, message, sound, event):
+async def handle_set_event_sound(client, message, game, sound, event):
+    game_name = SUPPORTED_GAMES[game]
     response = ""
     event_fmt = "Int-Far" if event == "intfar" else "{emote_Doinks}"
+    event_fmt = f"{event_fmt} in {game_name}"
+
     if sound is None: # Get current set sound for event.
-        current_sound = client.database.get_event_sound(message.author.id, event)
+        current_sound = client.database.get_event_sound(game, message.author.id, event)
         example_cmd = f"!{event}_sound"
         if current_sound is None:
             response = (
                 f"You have not yet set a sound that triggers when getting {event_fmt}. " +
-                f"Do so by writing `{example_cmd} [sound]`" + " {emote_uwucat}\n" +
+                f"Do so by writing `{example_cmd} {game} [sound]`" + " {emote_uwucat}\n" +
                 "See a list of available sounds with `!sounds`"
             )
+
         else:
             response = (
                 f"You currently have `{current_sound}` as the sound that triggers " +
                 f"when getting {event_fmt} " + "{emote_Bitcoinect}\n" +
-                f"Use `{example_cmd} remove` to remove this sound."
+                f"Use `{example_cmd} {game} remove` to remove this sound."
             )
+
     elif sound == "remove":
-        client.database.remove_event_sound(message.author.id, event)
+        client.database.remove_event_sound(game, message.author.id, event)
         response = f"Removed sound from triggering when getting {event_fmt}."
+
     elif audio_handler.is_valid_sound(sound):
         response = f"Invalid sound: `{sound}`. See `!sounds` for a list of valid sounds."
+
     else:
-        client.database.set_event_sound(message.author.id, sound, event)
+        client.database.set_event_sound(game, message.author.id, sound, event)
         response = (
             f"The sound `{sound}` will now play when you get {event_fmt} " +
             "{emote_poggers}"
@@ -44,6 +52,13 @@ async def handle_play_sound_msg(client, message, sound):
 async def handle_skip_sound_msg(client, message):
     voice_state = message.author.voice
     status = await client.audio_handler.skip_sound(voice_state)
+
+    if status is not None:
+        await message.channel.send(client.insert_emotes(status))
+
+async def handle_stop_sound_msg(client, message):
+    voice_state = message.author.voice
+    status = await client.audio_handler.stop_sound(voice_state)
 
     if status is not None:
         await message.channel.send(client.insert_emotes(status))
@@ -93,6 +108,6 @@ async def handle_sounds_msg(client, message, ordering="newest"):
 
     sounds_list = client.audio_handler.get_sounds(ordering)
     header = "Available sounds:"
-    footer = "Upload your own at `https://mhooge.com/intfar/soundboard`!"
+    footer = f"Upload your own at `{get_website_link()}/soundboard`!"
 
     await client.paginate(message.channel, sounds_list, 0, 10, header, footer)
