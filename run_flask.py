@@ -8,6 +8,7 @@ from mhooge_flask.init import Route
 
 from app.util import before_request
 from app.routes import errors as route_errors
+from api.util import GUILD_IDS, SUPPORTED_GAMES
 from api.database import Database
 from api.betting import BettingHandler
 from api.riot_api import RiotAPIClient
@@ -21,20 +22,25 @@ def run_app(
     bot_pipe: Connection
 ):
     # Define URL routes
-    routes = [
-        Route("index", "start_page"),
+    static_routes = [
         Route("about", "about_page", "about"),
-        Route("users", "user_page", "user"),
         Route("verify", "verify_page", "verify"),
-        Route("betting", "betting_page", "betting"),
-        Route("doinks", "doinks_page", "doinks"),
-        Route("stats", "stats_page", "stats"),
         Route("soundboard", "soundboard_page", "soundboard"),
         Route("lan", "lan_page", "lan"),
-        Route("lists", "lists_page", "lists"),
+        Route("lists", "lists_page", "lol/lists"),
         Route("quiz", "quiz_page", "quiz"),
-        Route("api", "api_page", "api"),
     ]
+    game_routes = []
+    for game in SUPPORTED_GAMES:
+        game_route = Route("games", f"{game}_blueprint", game)
+        game_routes += [
+            Route("index", "start_page", parent_route=game_route),
+            Route("users", "user_page", "user", parent_route=game_route),
+            Route("betting", "betting_page", "betting", parent_route=game_route),
+            Route("doinks", "doinks_page", "doinks", parent_route=game_route),
+            Route("stats", "stats_page", "stats", parent_route=game_route),
+            Route("api", "api_page", "api", parent_route=game_route),
+        ]
 
     app_name = "intfar"
 
@@ -42,15 +48,16 @@ def run_app(
     web_app = init.create_app(
         app_name,
         "/intfar/",
-        routes,
+        static_routes + game_routes,
         database,
         propagate_exceptions=False,
         app_config=config,
         bet_handlers=bet_handlers,
         bot_conn=bot_pipe,
+        current_game="lol",
         logged_in_users={},
         riot_api=riot_api,
-        active_game={},
+        active_game={guild_id: {} for guild_id in GUILD_IDS},
         game_prediction={},
         user_count=0,
         conn_map={},

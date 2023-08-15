@@ -6,7 +6,7 @@ from hashlib import sha256
 from mhooge_flask.logging import logger
 import flask
 
-from api.util import GUILD_IDS
+from api.util import GUILD_IDS, SUPPORTED_GAMES
 from discbot.commands.util import ADMIN_DISC_ID
 
 def register_discord_connection():
@@ -24,6 +24,21 @@ def register_discord_connection():
 
     conn_map[sess_id] = new_conn
 
+def check_and_set_game():
+    base_url = flask.request.base_url
+    if base_url[-1] == "/":
+        base_url = base_url[:-1]
+
+    url_split = base_url.split("/")
+    if len(url_split) == 1:
+        return flask.redirect(f"{url_split}/lol")
+
+    game = url_split[1]
+    if game not in SUPPORTED_GAMES:
+        return 500, "Invalid"
+
+    flask.current_app.config["CURRENT_GAME"] = game
+
 def create_session_id():
     if "user_id" not in flask.session:
         flask.current_app.config["USER_COUNT"] = flask.current_app.config["USER_COUNT"] + 1
@@ -38,6 +53,9 @@ def ensure_https():
         return flask.redirect(url, code=code)
 
 def before_request():
+    if (resp := check_and_set_game() is not None):
+        return resp
+
     create_session_id()
     ensure_https()
 
@@ -112,15 +130,16 @@ def filter_hidden_games(active_games, logged_in_user):
             shown_games.append(data[:-1])
     return shown_games
 
-def get_game_info():
+def get_game_info(game):
     active_games = []
     for guild_id in GUILD_IDS:
-        active_game = flask.current_app.config["ACTIVE_GAME"].get(guild_id)
+        active_game = flask.current_app.config["ACTIVE_GAME"].get(guild_id, {}).get(game)
         if active_game is None:
-            active_game = discord_request("func", "get_active_game", guild_id)
+            active_game = discord_request("func", "get_active_game", [game, guild_id])
             if active_game is None:
                 continue
-            flask.current_app.config["ACTIVE_GAME"][guild_id] = active_game
+
+            flask.current_app.config["ACTIVE_GAME"][guild_id][game] = active_game
 
         active_game["game_duration"] = time() - active_game["start"]
         active_games.append(

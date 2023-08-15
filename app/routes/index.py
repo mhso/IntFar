@@ -8,7 +8,8 @@ import flask
 
 import api.util as api_util
 import app.util as app_util
-from api.betting import get_dynamic_bet_desc
+from api.awards import get_intfar_reasons, get_doinks_reasons
+from api.game_data import get_stat_quantity_descriptions
 from discbot.commands.util import ADMIN_DISC_ID
 
 start_page = flask.Blueprint("index", __name__, template_folder="templates")
@@ -37,9 +38,11 @@ def format_duration_approx(timestamp):
 
     return f"{duration} {metric} ago"
 
-def get_intfar_desc(game_data):
+def get_intfar_desc(game, game_data):
     _, _, disc_id, _, intfar_id, intfar_str = game_data
+    intfar_reasons = get_intfar_reasons(game).values()
     response_list = None
+
     if disc_id == intfar_id:
         name = app_util.discord_request("func", "get_discord_nick", disc_id)
         response_list = [
@@ -47,17 +50,20 @@ def get_intfar_desc(game_data):
             ("feed-award", "Int-Far"), ("regular", "for")
         ]
         count = 0
-        for i, c in enumerate(intfar_str):
-            if c == "1":
+        for reason, char in zip(intfar_reasons, intfar_str):
+            if char == "1":
                 if count != 0:
                     response_list.append(("regular", "and"))
-                response_list.append(("bold", api_util.INTFAR_REASONS[i]))
+                response_list.append(("bold", reason))
                 count += 1
+
     return response_list
 
-def get_doinks_desc(game_data):
+def get_doinks_desc(game, game_data):
     _, _, disc_id, doinks_str, _, _ = game_data
+    doinks_reasons = get_doinks_reasons(game).values()
     response_list = None
+
     if doinks_str is not None:
         name = app_util.discord_request("func", "get_discord_nick", disc_id)
         response_list = [
@@ -65,24 +71,25 @@ def get_doinks_desc(game_data):
             ("feed-award", "Big Doinks"), ("regular", "for")
         ]
         count = 0
-        for i, c in enumerate(doinks_str):
-            if c == "1":
+        for reason, char in zip(doinks_reasons, doinks_str):
+            if char == "1":
                 if count != 0:
                     response_list.append(("regular", "and"))
-                response_list.append(("bold", api_util.DOINKS_REASONS[i]))
+                response_list.append(("bold", reason))
                 count += 1
+
     return response_list
 
-def get_stat_desc(game_data, best_stats, worst_stats):
+def get_stat_desc(game, game_data, best_stats, worst_stats):
     game_id, _, disc_id, _, _, _ = game_data
     responses = []
+    stats = get_stat_quantity_descriptions(game)
     for i, stat_list in enumerate((best_stats, worst_stats)):
         for stat, person_id, stat_value, stat_game_id in stat_list:
             if stat_game_id == game_id and person_id == disc_id: # Best/worst stat was beaten.
-                stat_index = api_util.STAT_COMMANDS.index(stat)
                 stat_fmt = api_util.round_digits(stat_value)
                 stat_name_fmt = stat.replace("_", " ")
-                readable_stat = api_util.STAT_QUANTITY_DESC[stat_index][i] + " " + stat_name_fmt
+                readable_stat = stats[stat][i] + " " + stat_name_fmt
                 name = app_util.discord_request("func", "get_discord_nick", disc_id)
                 response_list = [
                     ("name", name), ("regular", "got the"), ("feed-award", readable_stat),
@@ -91,16 +98,17 @@ def get_stat_desc(game_data, best_stats, worst_stats):
                 responses.append(response_list)
     return responses
 
-def get_game_desc(game_data, best_stats, worst_stats):
+def get_game_desc(game, game_data, best_stats, worst_stats):
     duration = format_duration_approx(game_data[1])
     return (
-        get_intfar_desc(game_data),
-        get_doinks_desc(game_data),
-        get_stat_desc(game_data, best_stats, worst_stats),
+        get_intfar_desc(game, game_data),
+        get_doinks_desc(game, game_data),
+        get_stat_desc(game, game_data, best_stats, worst_stats),
         duration
     )
 
-def get_bet_desc(bet_data):
+def get_bet_desc(game, bet_data):
+    betting_handler = flask.current_app.config["BET_HANDLERS"][game]
     disc_id, _, guild_id, timestamp, amounts, events, targets, _, result, payout = bet_data
     disc_data = app_util.discord_request("func", ["get_discord_nick", "get_guild_name"], [disc_id, guild_id])
     name = disc_data[0]
@@ -117,15 +125,15 @@ def get_bet_desc(bet_data):
     for i, (event, target) in enumerate(zip(events, targets)):
         target_name = (None if target is None
                        else app_util.discord_request("func", "get_discord_nick", target))
-        dynamic_desc = get_dynamic_bet_desc(event, target_name)
+        dynamic_desc = betting_handler.get_dynamic_bet_desc(event, target_name)
         if i != 0:
             response_list.append(("regular", " and "))
         response_list.append(("bold", dynamic_desc))
 
     return response_list, format_duration_approx(timestamp)
 
-def get_feed_data(database, feed_length=10):
-    bets = database.get_bets(False)
+def get_feed_data(game, database, feed_length=10):
+    bets = database.get_bets(game, False)
 
     all_bets = []
     for disc_id in bets:
@@ -134,21 +142,24 @@ def get_feed_data(database, feed_length=10):
 
     all_bets.sort(key=lambda x: x[3])
 
-    all_game_data = database.get_recent_intfars_and_doinks()
+    all_game_data = database.get_recent_intfars_and_doinks(game)
     best_stats_ever = []
     worst_stats_ever = []
+
+    stats = get_stat_quantity_descriptions(game)
+
     for best in (True, False):
-        for stat in api_util.STAT_COMMANDS[:-1]:
+        for stat in stats:
             maximize = not ((stat != "deaths") ^ best)
-            stat_id, stat_value, game_id = database.get_most_extreme_stat(stat, maximize)
+            stat_id, stat_value, game_id = database.get_most_extreme_stat(game, stat, maximize)
             if best:
                 best_stats_ever.append((stat, stat_id, stat_value, game_id))
             else:
                 worst_stats_ever.append((stat, stat_id, stat_value, game_id))
 
     feed_data = []
-    bets_index = len(all_bets)-1
-    games_index = len(all_game_data)-1
+    bets_index = len(all_bets) - 1
+    games_index = len(all_game_data) - 1
 
     while len(feed_data) < feed_length:
         game_data = all_game_data[games_index]
@@ -168,26 +179,27 @@ def get_feed_data(database, feed_length=10):
 
             games_index -= 1
         else:
-            bet_desc, duration = get_bet_desc(bet_data)
+            bet_desc, duration = get_bet_desc(game, bet_data)
             if bet_desc is not None:
                 feed_data.append((bet_desc, duration))
             bets_index -= 1
 
     return feed_data
 
-@start_page.route('/')
-@start_page.route('/index')
+@start_page.route()
+@start_page.route("index")
 def index():
+    game = flask.current_app.config["CURRENT_GAME"]
     database = flask.current_app.config["DATABASE"]
     curr_month = api_util.current_month()
 
-    feed_descs = get_feed_data(database, feed_length=25)
+    feed_descs = get_feed_data(game, database, feed_length=25)
 
     intfar_all_data = []
     intfar_month_data = []
-    for disc_id, _, _ in database.summoners:
-        games_played, intfar_reason_ids = database.get_intfar_stats(disc_id)
-        games_played_monthly, intfar_reason_ids_monthly = database.get_intfar_stats(disc_id, True)
+    for disc_id in database.users[game]:
+        games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id)
+        games_played_monthly, intfar_reason_ids_monthly = database.get_intfar_stats(game, disc_id, True)
         pct_intfar = (
             0 if games_played == 0
             else len(intfar_reason_ids) / games_played * 100
@@ -225,18 +237,23 @@ def index():
     intfar_month_data.sort(key=lambda x: (x[3], x[4]), reverse=True)
 
     return app_util.make_template_context(
-        "index.html", curr_month=curr_month, feed_descs=feed_descs,
-        intfar_all=intfar_all_data, intfar_month=intfar_month_data
+        "index.html",
+        game=game,
+        curr_month=curr_month,
+        feed_descs=feed_descs,
+        intfar_all=intfar_all_data,
+        intfar_month=intfar_month_data
     )
 
-@start_page.route("/active_game", methods=["GET"])
+@start_page.route("active_game", methods=["GET"])
 def get_active_game_info():
+    game = flask.current_app.config["CURRENT_GAME"]
     logged_in_user = app_util.get_user_details()[0]
 
     if logged_in_user is None:
         return app_util.make_json_response("Error: You need to be verified to access this data.", 401)
 
-    json_response = app_util.get_game_info()
+    json_response = app_util.get_game_info(game)
 
     shown_games = app_util.filter_hidden_games(json_response, logged_in_user)
 
@@ -245,8 +262,9 @@ def get_active_game_info():
 
     return app_util.make_json_response(shown_games, 200)
 
-@start_page.route("/game_started", methods=["POST"])
+@start_page.route("game_started", methods=["POST"])
 def active_game_started():
+    game = flask.current_app.config["CURRENT_GAME"]
     data = flask.request.form
     conf = flask.current_app.config["APP_CONFIG"]
 
@@ -262,11 +280,12 @@ def active_game_started():
     saved_data["map_id"] = int(saved_data["map_id"])
     saved_data["guild_id"] = int(saved_data["guild_id"])
 
-    flask.current_app.config["ACTIVE_GAME"][saved_data["guild_id"]] = saved_data
+    flask.current_app.config["ACTIVE_GAME"][saved_data["guild_id"]][game] = saved_data
     return flask.make_response(("Success! Active game ID updated.", 200))
 
-@start_page.route("/game_ended", methods=["POST"])
+@start_page.route("game_ended", methods=["POST"])
 def active_game_ended():
+    game = flask.current_app.config["CURRENT_GAME"]
     data = flask.request.form
     conf = flask.current_app.config["APP_CONFIG"]
 
@@ -276,7 +295,7 @@ def active_game_ended():
     if secret != conf.discord_token:
         return flask.make_response(("Error: Unauthorized access.", 401))
 
-    flask.current_app.config["ACTIVE_GAME"][int(data["guild_id"])] = None
+    flask.current_app.config["ACTIVE_GAME"][int(data["guild_id"])][game] = None
 
     if flask.current_app.config["GAME_PREDICTION"].get(int(data["game_id"])) is not None:
         remove("resources/predictions_temp.json")

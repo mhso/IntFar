@@ -18,6 +18,16 @@
             <a href="{{ url_for('index.index') }}">
                 <button class="standard-btn">Go Home</button>
             </a>
+            {% elif error_code == 400 %}
+            <p>You provided an invalid game</p>
+            <img src="{{ url_for('static', filename='img/david.png') }}">
+            <br>
+            <a href="{{ url_for('index.index', game='lol') }}">
+                <button class="standard-btn">Go To League of Legends</button>
+            </a>
+            <a href="{{ url_for('index.index', game='csgo') }}">
+                <button class="standard-btn">Go To Counter Strike: Global Offensive</button>
+            </a>
             {% endif %}
         </div>
     </body>

@@ -8,9 +8,8 @@ from mhooge_flask.logging import logger
 
 from api.database import DBException, Database
 from api.config import Config
-from api.util import format_duration, round_digits, format_tokens_amount, parse_amount_str
+from api.util import format_duration, round_digits, format_tokens_amount, parse_amount_str, SUPPORTED_GAMES
 from api.game_stats import GameStats
-from api import game_stats
 
 MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
 MINIMUM_BETTING_AMOUNT = 5
@@ -422,11 +421,12 @@ class BettingHandler(ABC):
         :param ticket:      Ticket ID, only relevant if the bet is a multi-bet
         """
         tokens_name = self.config.betting_tokens
+        game_name = SUPPORTED_GAMES[self.game]
 
         response = ""
         if len(bet_data) > 1:
             response = "Multi-bet successfully placed! "
-            response += "You bet on **all** the following happening:"
+            response += f"You bet on **all** the following happening in a {game_name} game:"
 
             for amount, _, _, base_return, bet_desc in bet_data:
                 response += f"\n - `{bet_desc}` for **{format_tokens_amount(amount)}** {tokens_name} "
@@ -435,7 +435,7 @@ class BettingHandler(ABC):
             response += "You will need this ticket to cancel the bet.\n"
         else:
             amount, _, _, base_return, bet_desc = bet_data[0]
-            response = f"Bet succesfully placed: `{bet_desc}` for "
+            response = f"Bet succesfully placed: `{bet_desc}` in a {game_name} game for "
             if all_in:
                 capitalized = tokens_name[1:-1].upper()
                 response += f"***ALL YOUR {capitalized}, YOU MAD LAD!!!***\n"

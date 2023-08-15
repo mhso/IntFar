@@ -6,8 +6,9 @@ from api.betting import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
-def get_bets(database, only_active):
-    all_bets = database.get_bets(only_active)
+def get_bets(game, database, only_active):
+    bet_handler = flask.current_app.config["BET_HANDLERS"][game]
+    all_bets = database.get_bets(game, only_active)
     names = app_util.discord_request("func", "get_discord_nick", None)
     avatars = app_util.discord_request("func", "get_discord_avatar", None)
     avatars = [
@@ -23,7 +24,7 @@ def get_bets(database, only_active):
 
         for bet_ids, guild_id, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
             event_descs = [
-                (i, get_dynamic_bet_desc(e, names_dict.get(t)), api_util.format_tokens_amount(a))
+                (i, bet_handler.get_dynamic_bet_desc(e, names_dict.get(t)), api_util.format_tokens_amount(a))
                 for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
             ]
 
@@ -41,30 +42,34 @@ def get_bets(database, only_active):
 
     return presentable_data
 
-@betting_page.route('/')
+@betting_page.route("/")
 def home():
+    game = flask.current_app.config["CURRENT_GAME"]
     database = flask.current_app.config["DATABASE"]
-    resolved_bets = get_bets(database, False)
-    active_bets = get_bets(database, True)
+    betting_handler = flask.current_app.config["BET_HANDLERS"][game]
+
+    resolved_bets = get_bets(game, database, False)
+    active_bets = get_bets(game, database, True)
     logged_in_user = app_util.get_user_details()[0]
 
-    all_events = [(bet_id, bet_id.replace("_", " ").capitalize()) for bet_id in BETTING_IDS]
-    all_ids = [x[0] for x in database.summoners]
+    all_events = [(bet.event_id, bet.event_id.replace("_", " ").capitalize()) for bet in betting_handler.all_bets]
+    all_ids = list(database.users)
     all_names = app_util.discord_request("func", "get_discord_nick", None)
     all_avatars = app_util.discord_request("func", "get_discord_avatar", None)
     guild_names = app_util.discord_request("func", "get_guild_name", None)
 
+    user_token_balance = "?"
     all_balances = database.get_token_balance()
     all_token_balances = []
     for balance, disc_id in all_balances:
         index = all_ids.index(disc_id)
         name = all_names[index]
         avatar = flask.url_for("static", filename=all_avatars[index].replace("app/static/", ""))
-        all_token_balances.append((disc_id, name, api_util.format_tokens_amount(balance), avatar))
+        formatted_balance = api_util.format_tokens_amount(balance)
+        all_token_balances.append((disc_id, name, formatted_balance, avatar))
 
-    user_token_balance = "?"
-    if logged_in_user is not None:
-        user_token_balance = api_util.format_tokens_amount(database.get_token_balance(logged_in_user))
+        if logged_in_user is not None and disc_id == logged_in_user:
+            user_token_balance = formatted_balance
 
     all_guild_data = []
     if logged_in_user is not None:
@@ -78,8 +83,11 @@ def home():
         main_guild_id = api_util.MAIN_GUILD_ID
 
     return app_util.make_template_context(
-        "betting.html", resolved_bets=resolved_bets,
-        active_bets=active_bets, bet_events=all_events,
+        "betting.html",
+        game=game,
+        resolved_bets=resolved_bets,
+        active_bets=active_bets,
+        bet_events=all_events,
         targets=list(zip(all_ids, all_names)),
         token_balance=user_token_balance,
         all_token_balances=all_token_balances,
@@ -89,8 +97,10 @@ def home():
 
 @betting_page.route("/payout", methods=["POST"])
 def get_payout():
+    game = flask.current_app.config["CURRENT_GAME"]
     data = flask.request.get_json()
-    betting_handler = flask.current_app.config["BET_HANDLERS"]
+    betting_handler = flask.current_app.config["BET_HANDLERS"][game]
+
     events = data["events"]
     amounts = data["amounts"]
     targets = data["targets"]
@@ -102,7 +112,7 @@ def get_payout():
     except ValueError:
         pass
 
-    game_start = app_util.discord_request("func", "get_game_start", guild_id)
+    game_start = app_util.discord_request("func", "get_game_start", [game, guild_id])
     duration = 0 if game_start is None else time() - game_start
     if duration > 60 * MAX_BETTING_THRESHOLD:
         return app_util.make_json_response("Error: Game is too far progressed to create bet bet amount value.", 400)
@@ -118,7 +128,7 @@ def get_payout():
 
         amounts_values.append(amount)
 
-        value = betting_handler.get_bet_value(int(amount), int(event), duration, target)[0]
+        value = betting_handler.get_bet_value(int(amount), event, duration, target)[0]
         if target is not None:
             value *= players
 
@@ -133,16 +143,17 @@ def get_payout():
 
 @betting_page.route("/create", methods=["POST"])
 def create_bet():
+    game = flask.current_app.config["CURRENT_GAME"]
     data = flask.request.get_json()
     database = flask.current_app.config["DATABASE"]
-    betting_handler = flask.current_app.config["BET_HANDLERS"]
+    betting_handler = flask.current_app.config["BET_HANDLERS"][game]
     events = [int(x) for x in data["events"]]
 
     event_strs = []
     for event in events:
-        for x in BETTING_IDS:
-            if BETTING_IDS[x] == event:
-                event_strs.append(x)
+        for bet in betting_handler.all_bets:
+            if bet.event_id == event:
+                event_strs.append(bet.event_id)
                 break
 
     amounts = data["amounts"]
@@ -156,10 +167,16 @@ def create_bet():
     if disc_id is None or logged_in_user is None:
         return app_util.make_json_response("Error: You need to be logged in to place a bet.", 403)
 
-    game_start = app_util.discord_request("func", "get_game_start", guild_id)
+    game_start = app_util.discord_request("func", "get_game_start", [game, guild_id])
 
     success, response, placed_bet_data = betting_handler.place_bet(
-        int(disc_id), guild_id, amounts, game_start, event_strs, targets, target_names
+        int(disc_id),
+        guild_id,
+        amounts,
+        game_start,
+        event_strs,
+        targets,
+        target_names
     )
 
     if not success:
@@ -171,18 +188,22 @@ def create_bet():
     amounts = [api_util.parse_amount_str(amount) for amount in amounts]
 
     event_descs = [
-        [get_dynamic_bet_desc(e, t), a] for (e, t, a) in zip(events, target_names, amounts)
+        [betting_handler.get_dynamic_bet_desc(e, t), a] for (e, t, a) in zip(events, target_names, amounts)
     ]
 
     channel_name = app_util.discord_request("func", "get_channel_name", guild_id)
 
     bet_data = {
         "response": "Bet successfully placed!",
-        "name": logged_in_name, "events": event_descs,
+        "name": logged_in_name,
+        "events": event_descs,
         "bet_type": "single" if ticket is None else "multi",
-        "bet_id": bet_id, "ticket": ticket, "guild_id": guild_id,
+        "bet_id": bet_id,
+        "ticket": ticket,
+        "guild_id": guild_id,
         "guild_name": api_util.get_guild_abbreviation(int(guild_id)),
-        "channel_name": channel_name, "avatar": logged_in_avatar,
+        "channel_name": channel_name,
+        "avatar": logged_in_avatar,
         "betting_balance": new_balance
     }
 
@@ -199,8 +220,9 @@ def create_bet():
 
 @betting_page.route("/delete", methods=["POST"])
 def delete_bet():
+    game = flask.current_app.config["CURRENT_GAME"]
     data = flask.request.form
-    betting_handler = flask.current_app.config["BET_HANDLERS"]
+    betting_handler = flask.current_app.config["BET_HANDLERS"][game]
     conf = flask.current_app.config["APP_CONFIG"]
 
     disc_id = data["disc_id"]
@@ -214,7 +236,7 @@ def delete_bet():
     ticket = None if data["betType"] == "single" else int(data["betId"])
     bet_id = None if data["betType"] == "multi" else int(data["betId"])
 
-    game_start = app_util.discord_request("func", "get_game_start", guild_id)
+    game_start = app_util.discord_request("func", "get_game_start", [game, guild_id])
 
     success, cancel_data = betting_handler.delete_bet(int(disc_id), bet_id, ticket, game_start)
 
