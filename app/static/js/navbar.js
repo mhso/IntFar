@@ -4,8 +4,13 @@ var activeGamesData = [];
 var monitorInterval = null;
 var scrollIndex = 0;
 
-function getBaseURL() {
-    return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
+function getBaseURL(game=null) {
+    let base = window.location.protocol + "//" + window.location.hostname + "/intfar";
+    let port = ":" + window.location.port;
+    if (game != null) {
+        return base + "/" + game + port
+    }
+    return base + port;
 }
 
 function formatDuration(duration) {
@@ -82,11 +87,11 @@ function resizeNav() {
     wrapper.style.setProperty("height", navHeight + "px");
 }
 
-function startMonitor() {
+function startMonitor(game) {
     let delaySecs = 60;
     monitorInterval = setInterval(function() {
-        let baseUrl = getBaseURL();
-        $.ajax(baseUrl + "/intfar/active_game", {
+        let baseUrl = getBaseURL(game);
+        $.ajax(baseUrl + "/active_game", {
             method: "GET"
         }).then((objData) => {
             let data = JSON.parse(objData.response.split("'").join("\""));
@@ -193,7 +198,7 @@ function pollUntilAnswer(attempt=0, limit=20, waitTime=1000) {
 
     let timeBefore = Date.now();
 
-    $.ajax(baseUrl + "/intfar/heartbeat", {
+    $.ajax(baseUrl + "/heartbeat", {
         method: "GET",
         timeout: 1000
     }).then(() => {
@@ -234,7 +239,7 @@ function restartIntfar() {
     initBtn.style.display = "none";
     button.getElementsByClassName("admin-restart-waiting").item(0).style.display = "block";
 
-    $.ajax(baseUrl + "/intfar/restart", {
+    $.ajax(baseUrl + "/restart", {
         method: "POST"
     });
 

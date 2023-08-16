@@ -1,7 +1,7 @@
 import os
 from api.database import Database
 from api.config import Config
-from api.betting import BETTING_IDS
+from api.bets import get_betting_handler
 
 conf_1 = Config()
 
@@ -60,9 +60,12 @@ with database_client_1.get_connection() as db_1:
             "amount, game_duration, target, ticket, result, payout) "
             "VALUES (?, ?, ?, ?, 'lol', ?, ?, ?, ?, ?, ?, ?, ?)"
         )
+        betting_handler = get_betting_handler("lol", conf_1, database_client_1)
+        betting_ids = {bet.event_id: bet for bet in betting_handler.all_bets}
+
         for data in bets:
             data = list(data)
-            data[6] = BETTING_IDS[data[6]]
+            data[6] = betting_ids[data[6]]
             db_2.cursor().execute(query, tuple(data))
 
         query = "INSERT INTO shop_items VALUES (?, ?, ?, ?)"

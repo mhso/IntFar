@@ -6,7 +6,7 @@
 {% import "bets_list_entry.html" as betting_entry %}
 {% import "navbar.html" as navbar %}
 <body>
-    {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
+    {{ navbar.navbar(game, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
     <div id="profile-wrapper" class="container-flex">
         <img id="profile-avatar" class="discord-avatar" src="{{ avatar }}"><br>
         <h1>{{ nickname }}</h1>
@@ -127,7 +127,7 @@
                                 <th>%</th>
                             </tr>
                             {% for name, disc_id, games, intfars, pct, avatar in intfar_relations %}
-                                {{ intfar_entry.entry(disc_id, name, games, intfars, pct, avatar) }}
+                                {{ intfar_entry.entry(game, disc_id, name, games, intfars, pct, avatar) }}
                             {% endfor %}
                         </table>
                     </div>
@@ -167,7 +167,7 @@
                                 <th>%</th>
                             </tr>
                             {% for name, disc_id, games, doinks, pct, avatar in doinks_relations %}
-                                {{ intfar_entry.entry(disc_id, name, games, doinks, pct, avatar) }}
+                                {{ intfar_entry.entry(game, disc_id, name, games, doinks, pct, avatar) }}
                             {% endfor %}
                         </table>
                     </div>
@@ -220,7 +220,7 @@
                                 <th>Result</th>
                             </tr>
                             {% for date, events, result, payout in active_bets %}
-                                {{ betting_entry.entry(false, false, logged_in_user, false, false, false, events, result, payout, false) }}
+                                {{ betting_entry.entry(game, false, false, logged_in_user, false, false, false, events, result, payout, false) }}
                             {% endfor %}
                         </table>
                     </div>
@@ -237,7 +237,7 @@
                                 <th>Result</th>
                             </tr>
                             {% for date, events, result, payout in resolved_bets %}
-                                {{ betting_entry.entry(false, false, logged_in_user, false, false, false, events, result, payout, false) }}
+                                {{ betting_entry.entry(game, false, false, logged_in_user, false, false, false, events, result, payout, false) }}
                             {% endfor %}
                         </table>
                     </div>

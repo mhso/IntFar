@@ -5,7 +5,7 @@
     <div id="verify-wrapper">
         <h1>You are now verified!</h1>
         <img src="{{ url_for('static', filename='img/peberno.png') }}">
-        <a href="{{ url_for('index.index') }}"><button class="standard-btn">Home</button></a><a href="{{ url_for('users.user', disc_id=disc_id) }}"><button class="standard-btn">Profile</button></a>
+        <a href="{{ url_for('lol.index.index') }}"><button class="standard-btn">Home</button></a><a href="{{ url_for('lol.users.user', disc_id=disc_id) }}"><button class="standard-btn">Profile</button></a>
     </div>
 </body>
 </html>

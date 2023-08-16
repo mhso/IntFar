@@ -14,63 +14,12 @@ from api.game_stats import GameStats
 MAX_BETTING_THRESHOLD = 5 # The latest a bet can be made (in game-time in minutes)
 MINIMUM_BETTING_AMOUNT = 5
 
-# IDs that are saved to the database that each correspond
-# to an event that a user can bet on.
-BETTING_IDS = {
-    "game_win": 0,
-    "game_loss": 1,
-    "no_intfar": 2,
-    "intfar": 3,
-    "intfar_kda": 4,
-    "intfar_deaths": 5,
-    "intfar_kp": 6,
-    "intfar_vision": 7,
-    "doinks": 8,
-    "doinks_kda": 9,
-    "doinks_kills": 10,
-    "doinks_damage": 11,
-    "doinks_penta": 12,
-    "doinks_vision": 13,
-    "doinks_kp": 14,
-    "doinks_monsters": 15,
-    "doinks_cs": 16,
-    "most_kills": 17,
-    "most_damage": 18,
-    "most_kp": 19,
-    "highest_kda": 20
-}
-
-# Textual descriptions of the different bets.
-BETTING_DESC = {
-    0: "winning the game",
-    1: "losing the game",
-    2: "no one being Int-Far",
-    3: "someone being Int-Far",
-    4: "someone being Int-Far by low KDA",
-    5: "someone being Int-Far by many deaths",
-    6: "someone being Int-Far by low KP",
-    7: "someone being Int-Far by low vision score",
-    8: "someone being awarded doinks",
-    9: "someone being awarded doinks for high KDA",
-    10: "someone being awarded doinks for many kills",
-    11: "someone being awarded doinks for high damage",
-    12: "someone being awarded doinks for getting a pentakill",
-    13: "someone being awarded doinks for high vision score",
-    14: "someone being awarded doinks for high KP",
-    15: "someone being awarded doinks for securing all epic monsters",
-    16: "someone being awarded doinks for having more than 8 cs/min",
-    17: "someone getting the most kills",
-    18: "someone doing the most damage",
-    19: "someone having the highest kill participation",
-    20: "someone having the highest KDA"
-}
-
-TARGET_OPTIONAL = 0
-TARGET_REQUIRED = 1
-TARGET_INVALID = -1
-
 @dataclass
 class Bet:
+    TARGET_OPTIONAL = 0
+    TARGET_REQUIRED = 1
+    TARGET_INVALID = -1
+
     event_id: str
     description: str
     target_required: int
@@ -170,11 +119,11 @@ class BettingHandler(ABC):
     @property
     def all_bets(self) -> list[Bet]:
         return [
-            Bet("game_win", "winning the game", TARGET_INVALID, 2),
-            Bet("game_loss", "losing the game", TARGET_INVALID, 2),
-            Bet("no_intfar", "no one being Int-Far", TARGET_INVALID, 2),
-            Bet("intfar", "someone being Int-Far", TARGET_OPTIONAL, 2),
-            Bet("doinks", "someone being awarded doinks", TARGET_OPTIONAL, 2),
+            Bet("game_win", "winning the game", Bet.TARGET_INVALID, 2),
+            Bet("game_loss", "losing the game", Bet.TARGET_INVALID, 2),
+            Bet("no_intfar", "no one being Int-Far", Bet.TARGET_INVALID, 2),
+            Bet("intfar", "someone being Int-Far", Bet.TARGET_OPTIONAL, 2),
+            Bet("doinks", "someone being awarded doinks", Bet.TARGET_OPTIONAL, 2),
         ]
 
     @abstractmethod
@@ -502,13 +451,13 @@ class BettingHandler(ABC):
 
         event_id = bet_str
 
-        if bet.target_required == TARGET_INVALID:
+        if bet.target_required == Bet.TARGET_INVALID:
             bet_target = None
             target_name = None
 
         bet_desc = self.get_dynamic_bet_desc(event_id, target_name)
 
-        if bet.target_required == TARGET_REQUIRED and bet_target is None:
+        if bet.target_required == Bet.TARGET_REQUIRED and bet_target is None:
             err_msg = self._get_bet_error_msg(bet_desc, "A person is required as the 'target' of that bet.")
             return (False, err_msg)
 

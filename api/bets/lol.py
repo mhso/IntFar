@@ -1,4 +1,4 @@
-from api.betting import BettingHandler, BetResolver, Bet, TARGET_OPTIONAL, TARGET_REQUIRED
+from api.betting import BettingHandler, BetResolver, Bet
 from api.game_stats import GameStats, get_outlier
 
 class LoLBetResolver(BetResolver):
@@ -60,26 +60,26 @@ class LoLBetResolver(BetResolver):
     def should_resolve_with_stats(self):
         return ["most_kills", "most_damage", "most_kp", "highest_kda"]
 
-class LoLGameBets(BettingHandler):
+class LoLBettingHandler(BettingHandler):
     @property
     def all_bets(self):
         return super().all_bets + [
-            Bet("intfar_kda", "someone being Int-Far by low KDA", TARGET_OPTIONAL, 4),
-            Bet("intfar_deaths", "someone being Int-Far by many deaths", TARGET_OPTIONAL, 4),
-            Bet("intfar_kp", "someone being Int-Far by low KP", TARGET_OPTIONAL, 10),
-            Bet("intfar_vision", "someone being Int-Far by low vision score", TARGET_OPTIONAL, 5),
-            Bet("doinks_kda", "someone being awarded doinks for high KDA", TARGET_OPTIONAL, 7.5),
-            Bet("doinks_kills", "someone being awarded doinks for many kills", TARGET_OPTIONAL, 10),
-            Bet("doinks_damage", "someone being awarded doinks for high damage", TARGET_OPTIONAL, 150),
-            Bet("doinks_penta", "someone being awarded doinks for getting a pentakill", TARGET_OPTIONAL, 100),
-            Bet("doinks_vision", "someone being awarded doinks for high vision score", TARGET_OPTIONAL, 25),
-            Bet("doinks_kp", "someone being awarded doinks for high KP", TARGET_OPTIONAL, 40),
-            Bet("doinks_monsters", "someone being awarded doinks for securing all epic monsters", TARGET_OPTIONAL, 50),
-            Bet("doinks_cs", "someone being awarded doinks for having more than 8 cs/min", TARGET_OPTIONAL, 10),
-            Bet("most_kills", "someone getting the most kills", TARGET_REQUIRED, 1),
-            Bet("most_damage", "someone doing the most damage", TARGET_REQUIRED, 1),
-            Bet("most_kp", "someone having the highest kill participation", TARGET_REQUIRED, 1),
-            Bet("highest_kda", "someone having the highest KDA", TARGET_REQUIRED, 1),
+            Bet("intfar_kda", "someone being Int-Far by low KDA", Bet.TARGET_OPTIONAL, 4),
+            Bet("intfar_deaths", "someone being Int-Far by many deaths", Bet.TARGET_OPTIONAL, 4),
+            Bet("intfar_kp", "someone being Int-Far by low KP", Bet.TARGET_OPTIONAL, 10),
+            Bet("intfar_vision", "someone being Int-Far by low vision score", Bet.TARGET_OPTIONAL, 5),
+            Bet("doinks_kda", "someone being awarded doinks for high KDA", Bet.TARGET_OPTIONAL, 7.5),
+            Bet("doinks_kills", "someone being awarded doinks for many kills", Bet.TARGET_OPTIONAL, 10),
+            Bet("doinks_damage", "someone being awarded doinks for high damage", Bet.TARGET_OPTIONAL, 150),
+            Bet("doinks_penta", "someone being awarded doinks for getting a pentakill", Bet.TARGET_OPTIONAL, 100),
+            Bet("doinks_vision", "someone being awarded doinks for high vision score", Bet.TARGET_OPTIONAL, 25),
+            Bet("doinks_kp", "someone being awarded doinks for high KP", Bet.TARGET_OPTIONAL, 40),
+            Bet("doinks_monsters", "someone being awarded doinks for securing all epic monsters", Bet.TARGET_OPTIONAL, 50),
+            Bet("doinks_cs", "someone being awarded doinks for having more than 8 cs/min", Bet.TARGET_OPTIONAL, 10),
+            Bet("most_kills", "someone getting the most kills", Bet.TARGET_REQUIRED, 1),
+            Bet("most_damage", "someone doing the most damage", Bet.TARGET_REQUIRED, 1),
+            Bet("most_kp", "someone having the highest kill participation", Bet.TARGET_REQUIRED, 1),
+            Bet("highest_kda", "someone having the highest KDA", Bet.TARGET_REQUIRED, 1),
         ]
 
     def get_bet_resolver(self, bet: Bet, game_stats: GameStats, target_id: int = None) -> BetResolver:

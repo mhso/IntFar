@@ -619,7 +619,7 @@ def initialize_commands():
         website_profile_desc,
         handle_profile_msg,
         access_level="self",
-        game=[GameParam("game")],
+        mandatory_params=[GameParam("game")],
         optional_params=[TargetParam("person")]
     )
 

@@ -1,17 +1,17 @@
-{% macro entry(name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) -%}
+{% macro entry(game, name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) -%}
 {% for bet_id, event, amount in events %}
 <tr class="bets-list-entry list-entry{% if loop.first and loop.last %} bet-single{% elif loop.first %} bet-main{% else %} bet-follow{% endif %}"
     data-bet_id="{{ bet_id }}"{% if result and result != -1 and result != 1 %}data-ticket="{{ result }}"{% endif %}>
     {% if avatar %}
     <td class="bets-list-avatar">{% if loop.first %}
-        <a href="{{ url_for('users.user', disc_id=better_id) }}">
+        <a href="{{ url_for(game + '.users.user', disc_id=better_id) }}">
             <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
         </a>
         {% endif %}
     </td>
     {% endif %}
     {% if name %}
-    <td class="d-none d-sm-table-cell bets-list-name">{% if loop.first %}<a href="{{ url_for('users.user', disc_id=better_id) }}">{{ name }}</a>{% endif%}</td>
+    <td class="d-none d-sm-table-cell bets-list-name">{% if loop.first %}<a href="{{ url_for(game + '.users.user', disc_id=better_id) }}">{{ name }}</a>{% endif%}</td>
     {% endif %}
     {% if date %}
     <td class="bets-list-date">{% if loop.first %}{{ date }}{% endif %}</td>
@@ -38,8 +38,8 @@
             {% if result %}{{ result }}{% endif %}
             {% if better_id == logged_in_user and loop.first %}
             <button class="bets-delete-btn"
-                {% if loop.first and loop.last %}onclick="deleteBet('{{ bet_id }}', '{{ guild_id }}');"
-                {% else %}onclick="deleteMultiBet('{{ result }}', '{{ guild_id }}');"{% endif %}
+                {% if loop.first and loop.last %}onclick="deleteBet('{{ game }}', '{{ bet_id }}', '{{ guild_id }}');"
+                {% else %}onclick="deleteMultiBet('{{ game }}', '{{ result }}', '{{ guild_id }}');"{% endif %}
             >
                 &times;
             </button>

@@ -68,7 +68,7 @@
                 {% if active_game %}
                 <div id="lan-active-game-wrapper">
                     <h2 id="lan-live-game-header">Live Game <div id="live-indicator"></div></h2>
-                    <h3>{{ active_game }}{% if chance_to_win %} - {{ chance_to_win }}% odds{% endif %}</h3>
+                    <!--<h3>{{ active_game }}{% if chance_to_win %} - {{ chance_to_win }}% odds{% endif %}</h3>-->
                     {% for side_splashes, is_our_side in champ_splashes %}
                     {% set blue_side = loop.first %}
 

@@ -6,7 +6,7 @@
 {% import "navbar.html" as navbar %}
 <body>
     <div class="wrapper container-flex">
-        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
+        {{ navbar.navbar(game, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
         <div id="header-wrapper-feed" class="header-wrapper">
             <h1>Feeding Feed</h1>
         </div>
@@ -52,7 +52,7 @@
                         <th>Pct</th>
                     </tr>
                     {% for name, disc_id, games, intfars, intfar_pct, avatar in intfar_all %}
-                        {{ list_entry.entry(disc_id, name, games, intfars, intfar_pct, avatar) }}
+                        {{ list_entry.entry(game, disc_id, name, games, intfars, intfar_pct, avatar) }}
                     {% endfor %}
                 </table>
             </div>
@@ -72,7 +72,7 @@
                         <th>Pct</th>
                     </tr>
                     {% for name, disc_id, games, intfars, intfar_pct, avatar in intfar_month %}
-                        {{ list_entry.entry(disc_id, name, games, intfars, intfar_pct, avatar) }}
+                        {{ list_entry.entry(game, disc_id, name, games, intfars, intfar_pct, avatar) }}
                     {% endfor %}
                 </table>
             </div>

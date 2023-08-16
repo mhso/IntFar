@@ -6,7 +6,7 @@
 {% import "navbar.html" as navbar %}
 <body>
     <div id="betting-wrapper" class="container-flex">
-        {{ navbar.navbar(logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
+        {{ navbar.navbar(game, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
         <h1>Betting</h1>
 
         <div class="row">
@@ -50,10 +50,10 @@
                 <p id="bet-payout">
                     Minimum Payout: <span id="bet-payout-value">0 GBP</span>
                 </p>
-                <button id="bet-add-event" class="cooldown-btn" onclick="buttonClick(this, addEvent);">
+                <button id="bet-add-event" class="cooldown-btn" onclick="buttonClick(this, addEvent, '{{ game }}');">
                     <span>Add Event</span>
                 </button>
-                <button id="bet-submit" class="cooldown-btn" disabled onclick="buttonClick(this, makeBet, this);">
+                <button id="bet-submit" class="cooldown-btn" disabled onclick="buttonClick(this, makeBet, '{{ game }}', this);">
                     <span id="bet-submit-text">Finalize Bet</span>
                     <div class="loading-icon betting-load-icon d-none"></div>
                 </button>
@@ -90,7 +90,7 @@
                         <th>Ticket</th>
                     </tr>
                     {% for better_id, name, date, guild, guild_id, events, result, payout, avatar in active_bets %}
-                        {{ list_entry.entry(name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) }}
+                        {{ list_entry.entry(game, name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
             </div>
@@ -110,12 +110,12 @@
                     {% for disc_id, name, tokens, avatar in all_token_balances %}
                     <tr class="list-entry tokens-list-entry">
                         <td>
-                            <a href="{{ url_for('users.user', disc_id=disc_id) }}">
+                            <a href="{{ url_for(game + '.users.user', disc_id=disc_id) }}">
                                 <img src="{{ avatar }}" class="discord-avatar">
                             </a>
                         </td>
                         <td class="d-none d-sm-table-cell">
-                            <a href="{{ url_for('users.user', disc_id=disc_id) }}">
+                            <a href="{{ url_for(game + '.users.user', disc_id=disc_id) }}">
                                 {{ name }}
                             </a>
                         </td>
@@ -139,7 +139,7 @@
                         <th>Result</th>
                     </tr>
                     {% for better_id, name, date, guild, guild_id, events, result, payout, avatar in resolved_bets %}
-                        {{ list_entry.entry(name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) }}
+                        {{ list_entry.entry(game, name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) }}
                     {% endfor %}
                 </table>
             </div>

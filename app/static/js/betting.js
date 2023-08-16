@@ -89,12 +89,12 @@ function getCurrentBetDetails() {
     };
 }
 
-function getBaseURL() {
-    return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
+function getBaseURL(game) {
+    return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port + "/intfar/" + game;
 }
 
-async function sendBetRequest(endpoint) {
-    let baseUrl = getBaseURL();
+async function sendBetRequest(game, endpoint) {
+    let baseUrl = getBaseURL(game);
 
     let betDetails = getAllBetDetails();
 
@@ -106,7 +106,7 @@ async function sendBetRequest(endpoint) {
             resolve();
         }
     }).then(() => {
-        return $.ajax(baseUrl + "/intfar/betting/" + endpoint, {
+        return $.ajax(baseUrl + "/betting/" + endpoint, {
             data: JSON.stringify(betDetails),
             method: "POST",
             contentType: "application/json",
@@ -134,8 +134,8 @@ function betEventChanged() {
     }
 }
 
-async function betModified() {
-    await sendBetRequest("payout").then((response) => {
+async function betModified(game) {
+    await sendBetRequest(game, "payout").then((response) => {
         let cost = response.cost;
         let payout = response.payout;
         let costElem = document.getElementById("bet-cost-value");
@@ -147,7 +147,7 @@ async function betModified() {
     (error) => setBetStatus(error.responseJSON.response, true));
 }
 
-function addEvent() {
+function addEvent(game) {
     let betDetails = getCurrentBetDetails();
 
     if (!betDetails.valid) {
@@ -189,10 +189,10 @@ function addEvent() {
         lastClick: 0
     });
     deleteBtn.onclick = function() {
-        buttonClick(deleteBtn, function() {
+        buttonClick(deleteBtn, function(removeGame) {
             eventTable.children[0].removeChild(eventRow);
             if (document.getElementsByClassName("event-row").length > 1) {
-                betModified();
+                betModified(removeGame);
             }
             else {
                 let statusElem = document.getElementById("bet-status");
@@ -203,13 +203,13 @@ function addEvent() {
                 statusElem.textContent = "";
                 document.getElementById("bet-submit").disabled = true;
             }
-        });
+        }, game);
     }
     deleteBtnData.appendChild(deleteBtn);
     eventRow.appendChild(deleteBtnData);
     eventTable.children[0].appendChild(eventRow);
 
-    betModified();
+    betModified(game);
 }
 
 function removeBetRows(betId, betType) {
@@ -241,10 +241,10 @@ function removeBetRows(betId, betType) {
     }
 }
 
-function sendDeleteRequest(betId, guildId, betType) {
+function sendDeleteRequest(game, betId, guildId, betType) {
     if (confirm("Are you sure you want to cancel this bet?")) {
-        let baseUrl = getBaseURL();
-        $.ajax(baseUrl + "/intfar/betting/delete", {
+        let baseUrl = getBaseURL(game);
+        $.ajax(baseUrl + "/betting/delete", {
             data: {betId: betId, guildId: guildId, betType: betType, disc_id: LOGGED_IN_USER},
             method: "POST"
         }).then((response) => {
@@ -256,15 +256,15 @@ function sendDeleteRequest(betId, guildId, betType) {
     }
 }
 
-function deleteMultiBet(ticket, guildId) {
-    sendDeleteRequest(Number.parseInt(ticket), guildId, "multi");
+function deleteMultiBet(game, ticket, guildId) {
+    sendDeleteRequest(game, Number.parseInt(ticket), guildId, "multi");
 }
 
-function deleteBet(betId, guildId) {
-    sendDeleteRequest(Number.parseInt(betId), guildId, "single");
+function deleteBet(game, betId, guildId) {
+    sendDeleteRequest(game, Number.parseInt(betId), guildId, "single");
 }
 
-async function makeBet(submitBtn) {
+async function makeBet(game, submitBtn) {
     let btnText = document.getElementById("bet-submit-text");
     let loadIcon = submitBtn.getElementsByClassName("loading-icon").item(0);
     let hiddenClass = "d-none";
@@ -272,7 +272,7 @@ async function makeBet(submitBtn) {
     btnText.classList.add(visibleClass);
     loadIcon.classList.remove(hiddenClass);
 
-    await sendBetRequest("create").then((data) => {
+    await sendBetRequest(game, "create").then((data) => {
         setBetStatus(
             "Bet succesfully placed!<br>" +
             "See details in <span class='discord-command'>#" +
@@ -353,14 +353,14 @@ async function makeBet(submitBtn) {
                     lastClick: 0
                 });
                 deleteBtn.onclick = function() {
-                    buttonClick(deleteBtn, function() {
+                    buttonClick(deleteBtn, function(deleteGame) {
                         if (data.bet_type == "single") {
-                            deleteBet(data.bet_id, data.guild_id);
+                            deleteBet(deleteGame, data.bet_id, data.guild_id);
                         }
                         else {
-                            deleteMultiBet(data.ticket, data.guild_id);
+                            deleteMultiBet(deleteGame, data.ticket, data.guild_id);
                         }
-                    })
+                    }, game);
                 }
                 ticketTd.appendChild(deleteBtn);
             }

@@ -208,7 +208,7 @@ def get_persistent_data():
         "logged_in_avatar": logged_in_avatar,
         "admin_id": ADMIN_DISC_ID
     }
-    game_info = get_game_info()
+    game_info = get_game_info(flask.current_app.config["CURRENT_GAME"])
     shown_games = filter_hidden_games(game_info, logged_in_user)
 
     data["active_game_data"] = shown_games

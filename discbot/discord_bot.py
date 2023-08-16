@@ -92,7 +92,11 @@ class DiscordClient(discord.Client):
         self.steam_api = SteamAPIClient(self.config)
         self.steam_api.login()
 
-        streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
+        if self.config.env == "production":
+            streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
+        else:
+            streamscape = None
+
         self.audio_handler = AudioHandler(self.config, streamscape)
         self.shop_handler = ShopHandler(self.config, self.database)
 

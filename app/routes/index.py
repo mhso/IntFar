@@ -186,8 +186,8 @@ def get_feed_data(game, database, feed_length=10):
 
     return feed_data
 
-@start_page.route()
-@start_page.route("index")
+@start_page.route("/")
+@start_page.route("/index")
 def index():
     game = flask.current_app.config["CURRENT_GAME"]
     database = flask.current_app.config["DATABASE"]
