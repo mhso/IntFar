@@ -9,6 +9,7 @@ from csgo import sharecode
 from google.protobuf.json_format import MessageToJson
 
 from api.config import Config
+from api.game_api_client import GameAPIClient
 
 _ENDPOINT_NEXT_MATCH = (
     "https://api.steampowered.com/ICSGOPlayers_730/GetNextMatchSharingCode/v1"
@@ -23,7 +24,7 @@ _ENDPOINT_PLAYER_SUMMARY = (
     "&steamids=[steam_id]"
 )
 
-class SteamAPIClient:
+class SteamAPIClient(GameAPIClient):
     _MATCH_TOKEN_DICT = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefhijkmnopqrstuvwxyz23456789"
     _MATCH_TOKEN_DICT_LEN = len(_MATCH_TOKEN_DICT)
 

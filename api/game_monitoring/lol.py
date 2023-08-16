@@ -18,10 +18,8 @@ class LoLGameMonitor(GameMonitor):
     POSTGAME_STATUS_NOT_SR = 6
     POSTGAME_STATUS_REMAKE = 7
 
-    def __init__(self, config: Config, database: Database, game: str, game_over_callback: Coroutine, riot_api: RiotAPIClient):
-        super().__init__(config, database, game, game_over_callback)
-
-        self.riot_api = riot_api
+    def __init__(self, config: Config, database: Database, game: str, game_over_callback: Coroutine, api_client: RiotAPIClient):
+        super().__init__(config, database, game, game_over_callback, api_client)
 
     async def get_active_game_info(self, guild_id):
         # First check if users are in the same game (or all are in no games).
@@ -47,7 +45,7 @@ class LoLGameMonitor(GameMonitor):
 
             # Check if any of the summ_names/summ_ids for a given player is in a game.
             for summ_name, summ_id in zip(summ_names, summ_ids):
-                game_data = self.riot_api.get_active_game(summ_id)
+                game_data = self.api_client.get_active_game(summ_id)
                 if game_data is not None:
                     game_start = int(game_data["gameStartTime"]) / 1000
                     active_game_start = game_start
@@ -72,9 +70,9 @@ class LoLGameMonitor(GameMonitor):
         for disc_id in users_in_current_game:
             champ_id = users_in_current_game[disc_id].champ_id
             # New champ has been released, that we don't know about.
-            if self.riot_api.get_champ_name(champ_id) is None:
+            if self.api_client.get_champ_name(champ_id) is None:
                 logger.warning(f"Champ ID is unknown: {champ_id}")
-                self.riot_api.get_latest_data() # Get latest data about champions.
+                self.api_client.get_latest_data() # Get latest data about champions.
                 break
 
         if active_game is None:
@@ -92,7 +90,7 @@ class LoLGameMonitor(GameMonitor):
                 "team_id": active_game_team,
                 "enemy_champ_ids": enemy_champ_ids,
                 "map_id": active_game["mapId"],
-                "map_name": self.riot_api.get_map_name(active_game["mapId"]),
+                "map_name": self.api_client.get_map_name(active_game["mapId"]),
                 "game_type": active_game["gameType"],
                 "game_mode": active_game["gameMode"],
             },
@@ -112,7 +110,7 @@ class LoLGameMonitor(GameMonitor):
         game_info = None
 
         if not custom_game:
-            game_info = self.riot_api.get_game_details(
+            game_info = self.api_client.get_game_details(
                 game_id, tries=2
             )
 
@@ -125,7 +123,7 @@ class LoLGameMonitor(GameMonitor):
                 )
 
                 await asyncio.sleep(time_to_sleep)
-                game_info = self.riot_api.get_game_details(game_id)
+                game_info = self.api_client.get_game_details(game_id)
                 retry += 1
 
         if custom_game: # Do nothing.
@@ -148,11 +146,11 @@ class LoLGameMonitor(GameMonitor):
         elif len(self.users_in_game[guild_id]) == 1:
             status_code = self.POSTGAME_STATUS_SOLO
 
-        elif self.riot_api.is_urf(game_info["gameMode"]):
+        elif self.api_client.is_urf(game_info["gameMode"]):
             # Gamemode was URF.
             status_code = self.POSTGAME_STATUS_URF
 
-        elif not self.riot_api.map_is_sr(game_info["mapId"]):
+        elif not self.api_client.map_is_sr(game_info["mapId"]):
             # Game is not on summoners rift.
             status_code = self.POSTGAME_STATUS_NOT_SR
 

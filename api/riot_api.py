@@ -7,10 +7,12 @@ import json
 from mhooge_flask.logging import logger
 import requests
 
+from api.game_api_client import GameAPIClient
+
 API_PLATFORM = "https://euw1.api.riotgames.com"
 API_REGION = "https://europe.api.riotgames.com"
 
-class RiotAPIClient:
+class RiotAPIClient(GameAPIClient):
     """
     Class for interacting with Riot Games League of Legends game data API.
     """

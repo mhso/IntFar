@@ -9,6 +9,7 @@ from mhooge_flask.logging import logger
 
 from api.database import Database, User
 from api.config import Config
+from api.game_api_client import GameAPIClient
 
 class GameMonitor(ABC):
     GAME_STATUS_NOCHANGE = 0
@@ -17,7 +18,7 @@ class GameMonitor(ABC):
     POSTGAME_STATUS_ERROR = -1
     POSTGAME_STATUS_OK = 0
 
-    def __init__(self, config: Config, database: Database, game: str, game_over_callback: Coroutine):
+    def __init__(self, config: Config, database: Database, game: str, game_over_callback: Coroutine, api_client: GameAPIClient):
         """
         Initialize the game monitor. This class handles the logic of polling for
         games to see if any users registered to Int-Far are playing a game or is done with one.
@@ -34,6 +35,7 @@ class GameMonitor(ABC):
         self.database = database
         self.game = game
         self.game_over_callback  = game_over_callback
+        self.api_client = api_client
 
         self.polling_active: dict[int, bool] = {}
         self.active_game: dict[int, dict] = {}

@@ -2,7 +2,7 @@ from time import time
 import flask
 import app.util as app_util
 import api.util as api_util
-from api.betting import get_dynamic_bet_desc, BETTING_IDS, MAX_BETTING_THRESHOLD
+from api.betting import MAX_BETTING_THRESHOLD
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
