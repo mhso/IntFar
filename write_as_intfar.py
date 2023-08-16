@@ -5,9 +5,9 @@ import io
 from api.betting import BettingHandler
 from api.config import Config
 from api.database import Database
-from api.riot_api import RiotAPIClient
+from api.bets import get_betting_handler
 from discbot.discord_bot import DiscordClient
-from api.util import GUILD_MAP
+from api.util import GUILD_MAP, SUPPORTED_GAMES
 
 CHANNEL_MAP = {
     "nibs": 730744358751567902,
@@ -48,11 +48,11 @@ if __name__ == "__main__":
         exit(0)
 
     conf = Config()
-    riot_api = RiotAPIClient(conf)
     database_client = Database(conf)
     bet_client = BettingHandler(conf, database_client)
+    betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
 
-    discord_client = DiscordClient(conf, database_client, bet_client, riot_api)
+    discord_client = DiscordClient(conf, database_client, bet_client)
 
     channel_id = CHANNEL_MAP[args.guild]
     message = "".join(lines)

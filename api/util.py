@@ -1,6 +1,8 @@
 from datetime import tzinfo, timedelta, datetime
+from glob import glob
+import importlib
+import os
 from dateutil.relativedelta import relativedelta
-from os.path import exists
 import json
 import secrets
 
@@ -246,10 +248,27 @@ def get_website_link(game=None):
 
     return f"{base_url}/{game}"
 
+def find_subclasses_in_dir(dir, base_class):
+    modules = map(lambda x: x.replace(".py", ""), glob(f"{dir}/*.py"))
+
+    subclasses = {}
+    for module_name in modules:
+        module_key = os.path.basename(module_name)
+        if module_key not in SUPPORTED_GAMES:
+            continue
+
+        module = importlib.import_module(module_name.replace("\\", ".").replace("/", "."))
+        for subclass in base_class.__subclasses__():
+            if hasattr(module, subclass.__name__):
+                subclasses[module_key] = subclass
+                break
+
+    return subclasses
+
 def create_predictions_timeline_image():
     filename = "resources/predictions_temp.json"
 
-    if not exists(filename):
+    if not os.path.exists(filename):
         return None
 
     json_data = json.load(open(filename, "r", encoding="utf-8"))

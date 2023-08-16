@@ -103,7 +103,7 @@ def get_real_active_data(lan_info):
     }
 
 def get_active_game_data(face_images, lan_info):
-    riot_api = flask.current_app.config["RIOT_API"]
+    riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
     if lan_api.TESTING:
         game_data = get_test_active_data()
@@ -134,7 +134,7 @@ def get_active_game_data(face_images, lan_info):
 
 def get_data(lan_info):
     database = flask.current_app.config["DATABASE"]
-    riot_api = flask.current_app.config["RIOT_API"]
+    riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
     games_stats = database.get_games_results(
         _GAME,

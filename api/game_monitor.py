@@ -18,7 +18,7 @@ class GameMonitor(ABC):
     POSTGAME_STATUS_ERROR = -1
     POSTGAME_STATUS_OK = 0
 
-    def __init__(self, config: Config, database: Database, game: str, game_over_callback: Coroutine, api_client: GameAPIClient):
+    def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, api_client: GameAPIClient):
         """
         Initialize the game monitor. This class handles the logic of polling for
         games to see if any users registered to Int-Far are playing a game or is done with one.
@@ -27,13 +27,13 @@ class GameMonitor(ABC):
                                     options for Int-Far
         :param database:            SQLiteDatabase instance that handles the logic
                                     of interacting with the sqlite database
-        :param riot_api:            RiotAPIClient instance that handles the logic of
-                                    communicating with Riot Games' LoL API
         :param game_over_callback:  asyncio Coroutine called when a game is finished
+        :param game_client:         GameAPICLient instance that handles the logic of
+                                    communicating with the game's API
         """
+        self.game = game
         self.config = config
         self.database = database
-        self.game = game
         self.game_over_callback  = game_over_callback
         self.api_client = api_client
 
@@ -168,7 +168,7 @@ class GameMonitor(ABC):
                 self._send_game_update("game_ended", self.game, req_data)
 
                 # Call end-of-game callback
-                await self.game_over_callback(game_info, guild_id, status_code)
+                await self.game_over_callback(self.game, game_info, guild_id, status_code)
 
                 self.active_game[guild_id] = None
                 del self.users_in_game[guild_id] # Reset the list of users who are in a game.
@@ -180,7 +180,7 @@ class GameMonitor(ABC):
                 game_id = self.active_game.get(guild_id, {}).get("id")
                 logger.bind(game_id=game_id).exception("Exception after game was over!!!")
 
-                await self.game_over_callback(None, guild_id, self.POSTGAME_STATUS_ERROR)
+                await self.game_over_callback(self.game, None, guild_id, self.POSTGAME_STATUS_ERROR)
 
                 # Re-raise exception.
                 raise e

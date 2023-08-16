@@ -5,7 +5,7 @@ from mhooge_flask.logging import logger
 
 from api.game_monitor import GameMonitor
 from api.database import  Database, User
-from api.riot_api import RiotAPIClient
+from api.game_api.lol import RiotAPIClient
 from api.config import Config
 from api.game_data.lol import get_player_stats
 
@@ -18,8 +18,8 @@ class LoLGameMonitor(GameMonitor):
     POSTGAME_STATUS_NOT_SR = 6
     POSTGAME_STATUS_REMAKE = 7
 
-    def __init__(self, config: Config, database: Database, game: str, game_over_callback: Coroutine, api_client: RiotAPIClient):
-        super().__init__(config, database, game, game_over_callback, api_client)
+    def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, api_client: RiotAPIClient):
+        super().__init__(game, config, database, game_over_callback, api_client)
 
     async def get_active_game_info(self, guild_id):
         # First check if users are in the same game (or all are in no games).

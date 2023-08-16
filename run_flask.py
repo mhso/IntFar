@@ -11,13 +11,12 @@ from app.routes import errors as route_errors
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from api.database import Database
 from api.betting import BettingHandler
-from api.riot_api import RiotAPIClient
+from api.game_api import get_api_client
 from api.config import Config
 
 def run_app(
     database: Database,
     bet_handlers: dict[str, BettingHandler],
-    riot_api: RiotAPIClient,
     config: Config,
     bot_pipe: Connection
 ):
@@ -56,7 +55,7 @@ def run_app(
         bot_conn=bot_pipe,
         current_game="lol",
         logged_in_users={},
-        riot_api=riot_api,
+        game_api_clients={game: get_api_client(game, config) for game in SUPPORTED_GAMES},
         active_game={guild_id: {} for guild_id in GUILD_IDS},
         game_prediction={},
         user_count=0,

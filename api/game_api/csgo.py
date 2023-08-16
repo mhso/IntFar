@@ -28,8 +28,8 @@ class SteamAPIClient(GameAPIClient):
     _MATCH_TOKEN_DICT = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefhijkmnopqrstuvwxyz23456789"
     _MATCH_TOKEN_DICT_LEN = len(_MATCH_TOKEN_DICT)
 
-    def __init__(self, config: Config):
-        self.config = config
+    def __init__(self, game: str, config: Config):
+        super().__init__(game, config)
         self.logged_on_once = False
 
         self.steam_client = SteamClient()

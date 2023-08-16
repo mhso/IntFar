@@ -3,7 +3,6 @@ from dataclasses import dataclass
 import time
 
 from api.game_stats import GameStats, PlayerStats, GameStatsParser
-from api.riot_api import RiotAPIClient
 from api.util import format_duration
 
 @dataclass

@@ -16,20 +16,18 @@ from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
 from discbot import commands
 from discbot.commands.meta import handle_usage_msg
-from api import betting
 from api.award_qualifiers import AwardQualifiers
 from api.awards import get_awards_handler
+from api.game_api import get_api_client
 from api.game_data import get_stat_parser
 from api.game_stats import GameStats
-from api.game_monitor import GameMonitor
+from api.game_monitoring import get_game_monitor
 from api.game_monitoring.lol import LoLGameMonitor
 from api.game_monitoring.csgo import CSGOGameMonitor
 from api.database import DBException, Database
 from api.betting import BettingHandler
 from api.audio_handler import AudioHandler
 from api.shop import ShopHandler
-from api.riot_api import RiotAPIClient
-from api.steam_api import SteamAPIClient
 from api.config import Config
 import discbot.commands.util as commands_util
 import api.util as api_util
@@ -54,7 +52,6 @@ class DiscordClient(discord.Client):
         config: Config,
         database: Database,
         betting_handlers: dict[str, BettingHandler],
-        riot_api: RiotAPIClient,
         **kwargs
     ):
         """
@@ -88,7 +85,6 @@ class DiscordClient(discord.Client):
         self.config = config
         self.database = database
         self.betting_handlers = betting_handlers
-        self.riot_api = riot_api
         self.steam_api = SteamAPIClient(self.config)
         self.steam_api.login()
 
@@ -104,9 +100,11 @@ class DiscordClient(discord.Client):
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
 
-        self.game_monitors: dict[str, GameMonitor] = {
-            "lol": LoLGameMonitor(self.config, self.database, self.riot_api, self.on_lol_game_over),
-            #"csgo": CSGOGameMonitor(self.config, self.database, self.riot_api, self.on_csgo_game_over),
+        self.api_clients = {game: get_api_client(game, self.config) for game in api_util.SUPPORTED_GAMES}
+
+        self.game_monitors = {
+            game: get_game_monitor(game, self.config, self.database, self.on_game_over, self.api_clients[game])
+            for game in api_util.SUPPORTED_GAMES
         }
 
         self.pagination_data = {}
@@ -130,6 +128,10 @@ class DiscordClient(discord.Client):
             file = discord.File(b_io, filename="predictions.png")
             await channel.send("Odds of winning throughout the game:", file=file)
 
+    async def on_game_oveR(self, game: str, game_info: dict, guild_id: int, status_code: int):
+        if game == "lol":
+            await self.on_lol_game_over(game_info, guild_id, status_code)
+
     async def on_lol_game_over(self, game_info: dict, guild_id: int, status_code: int):
         """
         Callback called by the game monitor when a game is finished.
@@ -139,7 +141,7 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         :param status_code: Integer that describes the status of the finished game
         """
-        game_monitor: LoLGameMonitor = self.game_monitors["lol"]
+        game_monitor: LoLGameMonitor = self.game_monitors[["lol"]]
 
         if status_code == game_monitor.POSTGAME_STATUS_ERROR:
             # Something went terribly wrong when handling the end of game logic

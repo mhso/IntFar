@@ -16,8 +16,8 @@ class RiotAPIClient(GameAPIClient):
     """
     Class for interacting with Riot Games League of Legends game data API.
     """
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, game, config):
+        super().__init__(game, config)
         self.champ_names = {}
         self.champ_ids = {}
         self.champ_portraits_path = "app/static/img/champions/portraits"

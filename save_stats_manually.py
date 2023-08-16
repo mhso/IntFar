@@ -7,7 +7,6 @@ from api.awards import get_awards_handler
 from api.bets import get_betting_handler
 from api.config import Config
 from api.database import Database
-from api.riot_api import RiotAPIClient
 from api.game_data import get_stat_parser
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from ai.model import Model
@@ -147,7 +146,6 @@ if not args.missing:
         logger.warning("Either specificy --missing or all of --game, --guild, --task, and --sound")
 
 conf = Config()
-riot_api = RiotAPIClient(conf)
 
 logger.info("Initializing database...")
 
@@ -159,6 +157,6 @@ betting_handlers = {game: get_betting_handler(game, conf, database_client) for g
 ai_model = Model(conf)
 ai_model.load()
 
-client = TestMock(args, conf, database_client, betting_handlers, riot_api, ai_model=ai_model)
+client = TestMock(args, conf, database_client, betting_handlers, ai_model=ai_model)
 
 client.run(conf.discord_token)

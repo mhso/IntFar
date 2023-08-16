@@ -41,7 +41,7 @@ def order_list_items(items): # Sort items alphabetically.
 @lists_page.route("/<list_id>")
 def list_view(list_id, error_msg=None, status=200):
     database = flask.current_app.config["DATABASE"]
-    riot_api = flask.current_app.config["RIOT_API"]
+    riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
     list_id = int(list_id)
 
@@ -120,7 +120,7 @@ def delete_list(list_id):
 @lists_page.route("/<list_id>/add", methods=["POST"])
 def add_item(list_id):
     database = flask.current_app.config["DATABASE"]
-    riot_api = flask.current_app.config["RIOT_API"]
+    riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
     data = flask.request.form
 
     list_id = int(list_id)

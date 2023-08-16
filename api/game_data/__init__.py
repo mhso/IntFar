@@ -1,46 +1,10 @@
-from glob import glob
-import importlib
-import os
-from api.util import SUPPORTED_GAMES
+from api.util import find_subclasses_in_dir
 from api.game_stats import GameStatsParser, GameStats, PlayerStats
 
-_GAME_DATA_MODULES = map(lambda x: x.replace(".py", ""), glob("api/game_data/*.py"))
-
-_GAME_STAT_PARSERS: dict[str, GameStatsParser] = {}
-for module_name in _GAME_DATA_MODULES:
-    module_key = os.path.basename(module_name)
-    if module_key not in SUPPORTED_GAMES:
-        continue
-
-    module = importlib.import_module(module_name.replace("\\", ".").replace("/", "."))
-    for subclass in GameStatsParser.__subclasses__():
-        if hasattr(module, subclass.__name__):
-            _GAME_STAT_PARSERS[module_key] = subclass
-            break
-
-_GAME_STATS_HOLDERS: dict[str, GameStats] = {}
-for module_name in _GAME_DATA_MODULES:
-    module_key = os.path.basename(module_name)
-    if module_key not in SUPPORTED_GAMES:
-        continue
-
-    module = importlib.import_module(module_name.replace("\\", ".").replace("/", "."))
-    for subclass in GameStats.__subclasses__():
-        if hasattr(module, subclass.__name__):
-            _GAME_STATS_HOLDERS[module_key] = subclass
-            break
-
-_PLAYER_STATS_HOLDERS: dict[str, PlayerStats] = {}
-for module_name in _GAME_DATA_MODULES:
-    module_key = os.path.basename(module_name)
-    if module_key not in SUPPORTED_GAMES:
-        continue
-
-    module = importlib.import_module(module_name.replace("\\", ".").replace("/", "."))
-    for subclass in PlayerStats.__subclasses__():
-        if hasattr(module, subclass.__name__):
-            _PLAYER_STATS_HOLDERS[module_key] = subclass
-            break
+_PATH = "api/game_data"
+_GAME_STAT_PARSERS: dict[str, GameStatsParser] = find_subclasses_in_dir(_PATH, GameStatsParser)
+_GAME_STATS_HOLDERS: dict[str, GameStats] = find_subclasses_in_dir(_PATH, GameStats)
+_PLAYER_STATS_HOLDERS: dict[str, PlayerStats] = find_subclasses_in_dir(_PATH, PlayerStats)
 
 def get_stat_parser(game, raw_data, all_users) -> GameStatsParser:
     return _GAME_STAT_PARSERS[game](game, raw_data, all_users)

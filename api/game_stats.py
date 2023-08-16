@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from api.user import User
-from api.riot_api import RiotAPIClient
 
 @dataclass
 class PlayerStats(ABC):

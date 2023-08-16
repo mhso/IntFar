@@ -9,7 +9,6 @@ from mhooge_flask.restartable import restartable
 import run_flask
 from api.config import Config
 from api.database import Database
-from api.riot_api import RiotAPIClient
 from api.util import SUPPORTED_GAMES
 from api.bets import get_betting_handler
 #from ai import model
@@ -74,18 +73,17 @@ def main():
 
     database_client = Database(conf)
     betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
-    riot_api = RiotAPIClient(conf)
 
     # Start process with machine learning model
     # that trains in the background after each game.
     #ai_process, our_end_ai = start_ai_process(conf)
 
     logger.info("Starting Flask web app...")
-    flask_args = [database_client, betting_handlers, riot_api, conf]
+    flask_args = [database_client, betting_handlers, conf]
     flask_process, bot_end_flask = start_flask_process(*flask_args)
 
     logger.info("Starting Discord Client...")
-    discord_args = [conf, database_client, betting_handlers, riot_api, None, bot_end_flask]
+    discord_args = [conf, database_client, betting_handlers, None, bot_end_flask]
     bot_process, _ = start_discord_process(*discord_args)
 
     while True:
