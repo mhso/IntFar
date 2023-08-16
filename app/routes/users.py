@@ -1,7 +1,8 @@
 import flask
 import api.util as api_util
+from api.awards import get_intfar_reasons, get_doinks_reasons
+from api.game_data import get_stat_quantity_descriptions
 from app.util import discord_request, make_template_context, format_bet_timestamp
-from api.betting import get_dynamic_bet_desc, BETTING_DESC
 
 user_page = flask.Blueprint("users", __name__, template_folder="templates")
 
@@ -10,9 +11,9 @@ user_page = flask.Blueprint("users", __name__, template_folder="templates")
 def user_unknown():
     return flask.render_template("no_user.html")
 
-def get_intfar_relations_data(disc_id, database):
+def get_intfar_relations_data(game, disc_id, database):
     relations_data = []
-    games_relations, intfars_relations = database.get_intfar_relations(disc_id)
+    games_relations, intfars_relations = database.get_intfar_relations(game, disc_id)
     for discord_id, total_games in games_relations.items():
         intfars = intfars_relations.get(discord_id, 0)
         relations_data.append(
@@ -38,25 +39,26 @@ def get_intfar_relations_data(disc_id, database):
 
     return {"intfar_relations": full_data}
 
-def get_intfar_data(disc_id, database):
+def get_intfar_data(game, disc_id, database):
     curr_month = api_util.current_month()
-    games_played, intfar_reason_ids = database.get_intfar_stats(disc_id, False)
+    intfar_reasons = get_intfar_reasons(game).values()
+    games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id, False)
     games_all, intfars_all, intfar_counts, pct_all = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
 
     criteria_stats = []
-    for reason_id, reason in enumerate(api_util.INTFAR_REASONS):
+    for reason_id, reason in enumerate(intfar_reasons):
         criteria_stats.append((reason, intfar_counts[reason_id]))
 
-    longest_streak = database.get_longest_intfar_streak(disc_id)[0]
-    longest_non_streak = database.get_longest_no_intfar_streak(disc_id)[0]
+    longest_streak = database.get_longest_intfar_streak(game, disc_id)[0]
+    longest_non_streak = database.get_longest_no_intfar_streak(game, disc_id)[0]
 
-    games_played, intfar_reason_ids = database.get_intfar_stats(disc_id, True)
+    games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id, True)
     games_month, intfars_month, _, pct_month = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
 
-    intfars_of_the_month = database.get_intfars_of_the_month()
+    intfars_of_the_month = database.get_intfars_of_the_month(game)
     user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
 
-    max_intfar_id = database.get_max_intfar_details()[1]
+    max_intfar_id = database.get_max_intfar_details(game)[1]
 
     return {
         "curr_month": curr_month,
@@ -65,14 +67,16 @@ def get_intfar_data(disc_id, database):
             ["Intfars:", intfars_all, intfars_month],
             ["Percent:", f"{pct_all:.2f}%", f"{pct_month:.2f}%"]
         ],
-        "intfar_criteria_data": criteria_stats, "streak": longest_streak,
-        "non_streak": longest_non_streak, "is_ifotm": user_is_ifotm,
+        "intfar_criteria_data": criteria_stats,
+        "streak": longest_streak,
+        "non_streak": longest_non_streak,
+        "is_ifotm": user_is_ifotm,
         "most_intfars": max_intfar_id == disc_id
     }
 
-def get_doinks_relations_data(disc_id, database):
+def get_doinks_relations_data(game, disc_id, database):
     relations_data = []
-    games_relations, doinks_relations = database.get_doinks_relations(disc_id)
+    games_relations, doinks_relations = database.get_doinks_relations(game, disc_id)
     for discord_id, total_games in games_relations.items():
         doinks = doinks_relations.get(discord_id, 0)
         relations_data.append(
@@ -98,34 +102,38 @@ def get_doinks_relations_data(disc_id, database):
 
     return {"doinks_relations": full_data}
 
-def get_doinks_data(disc_id, database):
-    doinks_reason_ids = database.get_doinks_stats(disc_id)
-    total_doinks = database.get_doinks_count(disc_id)[1]
+def get_doinks_data(game, disc_id, database):
+    doinks_reasons = get_doinks_reasons(game).values()
+    doinks_reason_ids = database.get_doinks_stats(game, disc_id)
+    total_doinks = database.get_doinks_count(game, disc_id)[1]
     doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
     criteria_stats = []
-    for reason_id, reason in enumerate(api_util.DOINKS_REASONS):
+    for reason_id, reason in enumerate(doinks_reasons):
         criteria_stats.append((reason, doinks_counts[reason_id]))
 
-    max_doinks_id = database.get_max_doinks_details()[1]
+    max_doinks_id = database.get_max_doinks_details(game)[1]
 
     return {
-        "doinks": total_doinks, "doinks_criteria_data": criteria_stats,
+        "doinks": total_doinks,
+        "doinks_criteria_data": criteria_stats,
         "most_doinks": max_doinks_id == disc_id
     }
 
-def get_bets(disc_id, database, only_active):
+def get_bets(game, disc_id, database, only_active):
     bets = database.get_bets(only_active, disc_id)
     if bets is None:
         return []
+    
+    betting_handler = flask.current_app.config["BET_HANDLERS"][game]
 
     names = discord_request("func", "get_discord_nick", None)
-    names_dict = dict(zip((x[0] for x in database.summoners), names))
+    names_dict = dict(zip(database.users, names))
     presentable_data = []
 
     for bet_ids, _, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
         event_descs = [
             (
-                i, get_dynamic_bet_desc(e, names_dict.get(t)),
+                i, betting_handler.get_dynamic_bet_desc(e, names_dict.get(t)),
                 api_util.format_tokens_amount(a)
             )
             for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
@@ -134,15 +142,19 @@ def get_bets(disc_id, database, only_active):
         presentable_data.append(
             (bet_date, event_descs, result_or_ticket, api_util.format_tokens_amount(payout))
         )
+
     presentable_data.sort(key=lambda x: x[1][0], reverse=True)
     return presentable_data
 
-def get_betting_data(disc_id, database):
+def get_betting_data(game, disc_id, database):
     database = flask.current_app.config["DATABASE"]
+    betting_handler = flask.current_app.config["BET_HANDLERS"][game]
 
-    resolved_bets = get_bets(disc_id, database, False)
-    active_bets = get_bets(disc_id, database, True)
-    bets = database.get_bets(False, disc_id)
+    betting_events = [bet.event_id for bet in betting_handler.all_bets]
+
+    resolved_bets = get_bets(game, disc_id, database, False)
+    active_bets = get_bets(game, disc_id, database, True)
+    bets = database.get_bets(game, False, disc_id)
 
     betting_stats = []
     bet_event_hi_freq = None
@@ -155,9 +167,9 @@ def get_betting_data(disc_id, database):
         total_payout = 0
         highest_amount = 0
         highest_payout = 0
-        events_counts = {x: 0 for x in BETTING_DESC}
-        events_won_counts = {x: 0 for x in BETTING_DESC}
-        target_counts = {d_id: 0 for d_id, _, _ in database.summoners}
+        events_counts = {x: 0 for x in betting_events}
+        events_won_counts = {x: 0 for x in betting_events}
+        target_counts = {d_id: 0 for d_id in database.users}
         total_bets = 0
 
         for _, _, _, amounts, events, targets, _, result, payout in bets:
@@ -186,11 +198,11 @@ def get_betting_data(disc_id, database):
                 bets_won += 1
 
         most_often_event, most_often_event_count = max(events_counts.items(), key=lambda x: x[1])
-        most_often_event_name = BETTING_DESC[most_often_event]
+        most_often_event_name = betting_handler.get_bet(most_often_event).description
 
         most_won_event, most_won_event_count = max(events_won_counts.items(), key=lambda x: x[1])
         if most_won_event_count > 0:
-            most_won_event_name = BETTING_DESC[most_won_event]
+            most_won_event_name = betting_handler.get_bet(most_won_event).description
             most_won_even_desc = f"{most_won_event_name} ({most_won_event_count} times)"
         else:
             most_won_even_desc = "No bets won yet"
@@ -207,7 +219,8 @@ def get_betting_data(disc_id, database):
         pct_won = int((bets_won / len(bets)) * 100)
 
         betting_stats = [
-            ("Bets made", len(bets)), ("Bets won", f"{bets_won} ({pct_won}%)"),
+            ("Bets made", len(bets)),
+            ("Bets won", f"{bets_won} ({pct_won}%)"),
             ("Total points spent", api_util.format_tokens_amount(total_amount)),
             ("Biggest bet amount", api_util.format_tokens_amount(highest_amount)),
             ("Biggest payout", api_util.format_tokens_amount(highest_payout))
@@ -217,9 +230,12 @@ def get_betting_data(disc_id, database):
         bet_person_hi_freq = most_often_target_desc
 
     return {
-        "resolved_bets": resolved_bets, "active_bets": active_bets,
-        "betting_stats": betting_stats, "bet_event_hi_freq": bet_event_hi_freq,
-        "bet_won_hi_freq": bet_won_hi_freq, "bet_person_hi_freq": bet_person_hi_freq
+        "resolved_bets": resolved_bets,
+        "active_bets": active_bets,
+        "betting_stats": betting_stats,
+        "bet_event_hi_freq": bet_event_hi_freq,
+        "bet_won_hi_freq": bet_won_hi_freq,
+        "bet_person_hi_freq": bet_person_hi_freq
 
     }
 
@@ -231,17 +247,19 @@ def get_betting_tokens_data(disc_id, database):
         "is_goodest_boi": max_tokens_holder == disc_id
     }
 
-def get_game_stats(disc_id, database):
+def get_game_stats(game, disc_id, database):
     best_stats = []
     any_gold_best = False
     worst_stats = []
     any_gold_worst = False
 
+    stat_descs = get_stat_quantity_descriptions(game)
+
     # Get who has the best stat ever in every category.
     best_stats_dict = {}
-    for stat in api_util.STAT_COMMANDS:
+    for stat in stat_descs:
         maximize = stat != "deaths"
-        best_or_worst_ever_id = database.get_most_extreme_stat(stat, maximize)[0]
+        best_or_worst_ever_id = database.get_most_extreme_stat(game, stat, maximize)[0]
         best_stats_dict[best_or_worst_ever_id] = best_stats_dict.get(best_or_worst_ever_id, 0) + 1
 
     most_best_stats = max(best_stats_dict.values())
@@ -253,13 +271,15 @@ def get_game_stats(disc_id, database):
     has_most_best = len(most_best_stats_candidates) == 1 and most_best_stats_candidates[0] == disc_id
 
     for best in (True, False):
-        for stat in api_util.STAT_COMMANDS:
+        for stat in stat_descs:
             maximize = not ((stat != "deaths") ^ best)
-            (stat_count,
-             min_or_max_value,
-             _) = database.get_best_or_worst_stat(stat, disc_id, maximize)
+            (
+                stat_count,
+                min_or_max_value,
+                _
+            ) = database.get_best_or_worst_stat(game, stat, disc_id, maximize)
 
-            best_or_worst_ever_id = database.get_most_extreme_stat(stat, maximize)[0]
+            best_or_worst_ever_id = database.get_most_extreme_stat(game, stat, maximize)[0]
             stat_is_gold = best_or_worst_ever_id == disc_id
             if stat_is_gold:
                 if best:
@@ -268,9 +288,8 @@ def get_game_stats(disc_id, database):
                     any_gold_worst = True
 
             pretty_stat = stat.replace("_", " ").capitalize() if len(stat) > 3 else stat.upper()
-            stat_index = api_util.STAT_COMMANDS.index(stat)
             quantity_type = 0 if best else 1
-            pretty_quantity = api_util.STAT_QUANTITY_DESC[stat_index][quantity_type]
+            pretty_quantity = stat_descs[stat][quantity_type]
             if pretty_quantity is not None:
                 pretty_desc = f"{pretty_quantity.capitalize()} {pretty_stat}"
             else:
@@ -308,9 +327,10 @@ def user(disc_id):
         return flask.render_template("no_user.html")
 
     disc_id = int(disc_id)
+    game = flask.current_app.config["CURRENT_GAME"]
     database = flask.current_app.config["DATABASE"]
 
-    if not database.user_exists(disc_id):
+    if not database.user_exists(disc_id, game):
         flask.abort(404)
 
     discord_data = discord_request(
@@ -322,17 +342,20 @@ def user(disc_id):
         avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
     with database:
-        intfar_data = get_intfar_data(disc_id, database)
-        intfar_relation_data = get_intfar_relations_data(disc_id, database)
-        doinks_data = get_doinks_data(disc_id, database)
-        doinks_relation_data = get_doinks_relations_data(disc_id, database)
-        betting_data = get_betting_data(disc_id, database)
+        intfar_data = get_intfar_data(game, disc_id, database)
+        intfar_relation_data = get_intfar_relations_data(game, disc_id, database)
+        doinks_data = get_doinks_data(game, disc_id, database)
+        doinks_relation_data = get_doinks_relations_data(game, disc_id, database)
+        betting_data = get_betting_data(game, disc_id, database)
         tokens_data = get_betting_tokens_data(disc_id, database)
-        game_stat_data = get_game_stats(disc_id, database)
+        game_stat_data = get_game_stats(game, disc_id, database)
         most_reports_id = database.get_max_reports_details()[1]
 
     context = {
-        "disc_id": disc_id, "nickname": nickname, "avatar": avatar,
+        "game": game,
+        "disc_id": disc_id,
+        "nickname": nickname,
+        "avatar": avatar,
         "most_reports": most_reports_id == disc_id
     }
     context.update(intfar_data)

@@ -22,10 +22,10 @@
             <p>You provided an invalid game</p>
             <img src="{{ url_for('static', filename='img/david.png') }}">
             <br>
-            <a href="{{ url_for('index.index', game='lol') }}">
+            <a href="{{ url_for('lol.index.index') }}">
                 <button class="standard-btn">Go To League of Legends</button>
             </a>
-            <a href="{{ url_for('index.index', game='csgo') }}">
+            <a href="{{ url_for('csgo.index.index') }}">
                 <button class="standard-btn">Go To Counter Strike: Global Offensive</button>
             </a>
             {% endif %}

@@ -175,7 +175,7 @@ class Database(SQLiteDatabase):
     def discord_id_from_ingame_name(self, game, name, exact_match=True):
         matches = []
         for disc_id in self.users[game]:
-            for ingame_name in self.users[disc_id]["ingame_name"]:
+            for ingame_name in self.users[disc_id].ingame_name:
                 if exact_match and ingame_name.lower() == name:
                     return disc_id
                 elif not exact_match and name in ingame_name.lower():
@@ -202,8 +202,8 @@ class Database(SQLiteDatabase):
             self.execute_query(query_1, game_id, game, commit=False)
             self.execute_query(query_2, game_id)
 
-    def get_latest_league_game(self, time_after=None, time_before=None, guild_id=None):
-        game = "lol"
+    def get_latest_game(self, game, time_after=None, time_before=None, guild_id=None):
+        stats_table = self._get_participants_table(game)
         games_table = self._get_games_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
 
@@ -216,7 +216,7 @@ class Database(SQLiteDatabase):
             FROM (
                SELECT MAX(timestamp) AS t
                FROM {games_table}{delim_str}
-            ) sub_1, participants AS p
+            ) sub_1, {stats_table} AS p
             JOIN {games_table} AS g
             ON p.game_id = g.game_id
             WHERE doinks IS NOT NULL AND timestamp = sub_1.t
@@ -2223,8 +2223,14 @@ class Database(SQLiteDatabase):
 
     def get_lists(self, disc_id=None):
         query = """
-            SELECT champ_lists.id, champ_lists.owner_id, name, COUNT(list_items.id)
-            FROM champ_lists LEFT JOIN list_items ON champ_lists.id=list_id
+            SELECT
+                champ_lists.id,
+                champ_lists.owner_id,
+                name,
+                COUNT(list_items.id)
+            FROM champ_lists
+            LEFT JOIN list_items
+            ON champ_lists.id = list_id
         """
 
         params = []

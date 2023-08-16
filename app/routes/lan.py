@@ -6,8 +6,11 @@ import flask
 import app.util as app_util
 import api.util as api_util
 import api.lan as lan_api
+from api.awards import get_doinks_reasons
 
 lan_page = flask.Blueprint("lan", __name__, template_folder="templates")
+
+_GAME = "lol"
 
 def get_champ_faces(users_in_game, face_images):
     portrait_width = 308
@@ -64,8 +67,10 @@ def get_test_active_data():
     blue_side = True
 
     return {
-        "users_in_game": users_in_game, "enemy_champs": enemy_champs,
-        "chance_to_win": game_prediction, "blue_side": blue_side,
+        "users_in_game": users_in_game,
+        "enemy_champs": enemy_champs,
+        "chance_to_win": game_prediction,
+        "blue_side": blue_side,
         "active_game": active_game
     }
 
@@ -75,7 +80,9 @@ def get_real_active_data(lan_info):
         return {"active_game": None}
 
     game_data = app_util.discord_request(
-        "func", ["get_users_in_game", "get_active_game", "get_ai_prediction"], lan_info.guild_id
+        "func",
+        ["get_users_in_game", "get_active_game"],
+        [(_GAME, lan_info.guild_id), (_GAME, lan_info.guil_id)]
     )
 
     if game_data[0] is None:
@@ -83,15 +90,15 @@ def get_real_active_data(lan_info):
 
     users_in_game = game_data[0]
     active_game_data = game_data[1]
-    game_prediction = game_data[2]
     enemy_champs = active_game_data["enemy_champ_ids"]
 
     active_game = active_game_data["game_mode"]
     blue_side = active_game_data["team_id"] == 100
 
     return {
-        "users_in_game": users_in_game, "enemy_champs": enemy_champs,
-        "chance_to_win": game_prediction, "blue_side": blue_side,
+        "users_in_game": users_in_game,
+        "enemy_champs": enemy_champs,
+        "blue_side": blue_side,
         "active_game": active_game
     }
 
@@ -130,6 +137,7 @@ def get_data(lan_info):
     riot_api = flask.current_app.config["RIOT_API"]
 
     games_stats = database.get_games_results(
+        _GAME,
         time_after=lan_info.start_time,
         time_before=lan_info.end_time,
         guild_id=lan_info.guild_id
@@ -158,7 +166,7 @@ def get_data(lan_info):
         games_lost = games_played - games_won
         pct_won = (games_won / games_played) * 100
 
-        champs_played = database.get_champs_played(
+        champs_played = database.get_league_champs_played(
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
@@ -174,6 +182,7 @@ def get_data(lan_info):
         duration_since_start = api_util.format_duration(dt_start, dt_now)
 
         longest_game_duration, longest_game_time = database.get_longest_game(
+            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
@@ -183,7 +192,8 @@ def get_data(lan_info):
         longest_game = api_util.format_duration(longest_game_start, longest_game_end)
 
         # Latest game.
-        latest_game_data, latest_doinks_data = database.get_latest_league_game(
+        latest_game_data, latest_doinks_data = database.get_latest_game(
+            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
@@ -201,13 +211,14 @@ def get_data(lan_info):
             latest_intfar_reason = api_util.INTFAR_REASONS[latest_intfar_reason.index("1")]
 
         # Doinks from latest game.
+        doinks_reasons = get_doinks_reasons(_GAME)
         latest_doinks = []
         if latest_doinks_data is not None:
             doinks_names = app_util.discord_request("func", "get_discord_nick", [x[1] for x in latest_doinks_data])
             for doinks_name, doinks_data in zip(doinks_names, latest_doinks_data):
                 doinks_reason = ""
                 any_doinks = False
-                for index, reason in enumerate(api_util.DOINKS_REASONS):
+                for index, reason in enumerate(doinks_reasons.values()):
                     if doinks_data[2][index] == "1":
                         if any_doinks:
                             doinks_reason += " and "
@@ -217,11 +228,13 @@ def get_data(lan_info):
 
         # Int-Far and Doinks in total.
         intfars = database.get_intfar_count(
+            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
         )
         doinks = database.get_doinks_count(
+            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
@@ -265,6 +278,7 @@ def get_data(lan_info):
 
         # TILT VALUE!!
         recent_games = database.get_recent_game_results(
+            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
@@ -291,14 +305,27 @@ def get_data(lan_info):
                 team_comps.append((name, portraits))
 
         game_data = {
-            "games_played": games_played, "games_won": games_won, "games_lost": games_lost,
-            "game_results": game_results, "pct_won": f"{pct_won:.2f}", "intfars": intfars,
-            "champs_played": champs_played, "doinks": doinks, "duration_since_start": duration_since_start,
-            "lan_over": lan_over, "all_player_stats": all_player_stats, "stat_names": stat_names,
-            "duration_since_game": duration_since_game, "latest_win": latest_win,
-            "latest_intfar_name": latest_intfar_name, "longest_game": longest_game,
-            "latest_intfar_reason": latest_intfar_reason, "latest_doinks": latest_doinks,
-            "tilt_value": tilt_value, "tilt_color": tilt_color, "team_comps": team_comps
+            "games_played": games_played,
+            "games_won": games_won,
+            "games_lost": games_lost,
+            "game_results": game_results,
+            "pct_won": f"{pct_won:.2f}",
+            "intfars": intfars,
+            "champs_played": champs_played,
+            "doinks": doinks,
+            "duration_since_start": duration_since_start,
+            "lan_over": lan_over,
+            "all_player_stats": all_player_stats,
+            "stat_names": stat_names,
+            "duration_since_game": duration_since_game,
+            "latest_win": latest_win,
+            "latest_intfar_name": latest_intfar_name,
+            "longest_game": longest_game,
+            "latest_intfar_reason": latest_intfar_reason,
+            "latest_doinks": latest_doinks,
+            "tilt_value": tilt_value,
+            "tilt_color": tilt_color,
+            "team_comps": team_comps
         }
         data.update(game_data)
     else:
