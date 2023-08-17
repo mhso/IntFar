@@ -27,10 +27,7 @@ async def handle_game_msg(client, message, game, target_id):
     game_data = None
     active_id = None
     for ingame_id in ingame_ids:
-        if game == "lol":
-            api_client = client.riot_api
-        else:
-            api_client = client.steam_api
+        api_client = client.api_clients[game]
 
         game_data = api_client.get_active_game(ingame_id)
 
@@ -114,7 +111,7 @@ async def handle_lol_summary_msg(client, message, target_id):
     champs_played = client.database.get_champs_played(target_id)
 
     total_winrate = client.database.get_total_winrate(target_id)
-    total_champs = len(client.riot_api.champ_ids)
+    total_champs = len(client.api_clients["lol"].champ_ids)
 
     longest_win_streak = client.database.get_longest_win_or_loss_streak(target_id, True)
     longest_loss_streak = client.database.get_longest_win_or_loss_streak(target_id, False)
@@ -139,8 +136,8 @@ async def handle_lol_summary_msg(client, message, target_id):
 
     # If person has not played a minimum of 5 games with any champions, skip champ winrate stats.
     if best_champ_wr is not None and worst_champ_wr is not None and best_champ_id != worst_champ_id:
-        best_champ_name = client.riot_api.get_champ_name(best_champ_id)
-        worst_champ_name = client.riot_api.get_champ_name(worst_champ_id)
+        best_champ_name = client.api_clients["lol"].get_champ_name(best_champ_id)
+        worst_champ_name = client.api_clients["lol"].get_champ_name(worst_champ_id)
         response += (
             f"He performs best on **{best_champ_name}** (won " +
             f"**{best_champ_wr:.1f}%** of **{best_champ_games}** games).\n" +
@@ -216,12 +213,12 @@ async def handle_winrate_msg(client, message, game, champ_or_map, target_id):
     qualified_name = None
 
     if game == "lol":
-        champ_id = client.riot_api.try_find_champ(champ_or_map)
+        champ_id = client.api_clients[game].try_find_champ(champ_or_map)
         if champ_id is None:
             response = f"Not a valid champion: `{champ_or_map}`."
         else:
             winrate, games = client.database.get_league_champ_winrate(target_id, champ_id)
-            qualified_name = client.riot_api.get_champ_name(champ_id)
+            qualified_name = client.api_clients[game].get_champ_name(champ_id)
     elif game == "csgo":
         map_id = client.steam_api.try_find_map(champ_or_map)
         if map_id is None:

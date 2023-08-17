@@ -14,7 +14,7 @@ async def handle_stats_msg(client, message, game):
 
 async def handle_average_msg_lol(client, message, stat, champ_id=None, disc_id=None):
     if champ_id is not None:
-        champ_name = client.riot_api.get_champ_name(champ_id)
+        champ_name = client.api_clients["lol"].get_champ_name(champ_id)
 
     minimum_games = 10 if champ_id is None else 5
     values = client.database.get_average_stat_league(stat, disc_id, champ_id, minimum_games)
@@ -81,10 +81,7 @@ async def handle_average_msg(client, message, game, stat, champ_or_map=None, dis
         await handle_average_msg_csgo(client, message, stat, champ_or_map, disc_id)
 
 def get_game_summary(client, game, game_id, target_id):
-    if game == "lol":
-        game_info = client.riot_api.get_game_details(game_id)
-    else:
-        game_info = client.steam_api.get_game_details(game_id)
+    game_info = client.api_clients[game].get_game_details(game_id)
 
     if game_info is not None:
         game_stats_parser = get_stat_parser(game, game_info, client.database.users[game])
@@ -163,7 +160,7 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
                 champ_id, champ_count = client.database.get_league_champ_count_for_stat(
                     stat, best, target_id
                 )
-                champ_name = client.riot_api.get_champ_name(champ_id)
+                champ_name = client.api_clients[game].get_champ_name(champ_id)
                 game_specific_desc = f"The champion he most often gets {readable_stat} with is **{champ_name}** (**{champ_count}** games).\n"
             elif game == "csgo":
                 map_id, map_count = client.database.get_csgo_map_count_for_stat(

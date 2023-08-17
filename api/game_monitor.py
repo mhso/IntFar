@@ -43,11 +43,11 @@ class GameMonitor(ABC):
         self.users_in_voice: dict[int, dict[int, User]] = {}
 
     @abstractmethod
-    async def get_active_game_info(self, guild_id):
+    async def get_active_game_info(self, guild_id: int):
         ...
 
     @abstractmethod
-    async def get_finished_game_info(self, guild_id):
+    async def get_finished_game_info(self, guild_id: int):
         ...
 
     async def check_game_status(self, guild_id: int, guild_name: str) -> int:

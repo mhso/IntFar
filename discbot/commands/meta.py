@@ -10,11 +10,11 @@ async def handle_lol_register_msg(client, message, target_name):
         status = "You must supply a summoner name {emote_angry_gual}"
         return False, status
 
-    if client.database.user_exists(target_name, game):
+    if client.database.user_exists(game, target_name):
         status = "User with that summoner name is already registered."
         return False, status
 
-    elif (summ_id := client.riot_api.get_summoner_id(target_name.replace(" ", "%20"))) is None:
+    elif (summ_id := client.api_clients["lol"].get_summoner_id(target_name.replace(" ", "%20"))) is None:
         status = f"Error: Invalid summoner name {client.get_emoji_by_name('PepeHands')}"
         return False, status
 
@@ -38,7 +38,7 @@ async def handle_csgo_register_msg(client, message, target_name, steam_id=None, 
         status = "You must supply a match authentication code {emote_angry_gual}"
         return False, status
 
-    if client.database.user_exists(target_name, game):
+    if client.database.user_exists(game, target_name):
         status = "User with that Steam account name is already registered."
         return False, status
 

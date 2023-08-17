@@ -330,7 +330,7 @@ def user(disc_id):
     game = flask.current_app.config["CURRENT_GAME"]
     database = flask.current_app.config["DATABASE"]
 
-    if not database.user_exists(disc_id, game):
+    if not database.user_exists(game, disc_id):
         flask.abort(404)
 
     discord_data = discord_request(

@@ -3,6 +3,30 @@ from api.database import Database
 from api.config import Config
 from api.bets import get_betting_handler
 
+BETTING_IDS = {
+    "game_win": 0,
+    "game_loss": 1,
+    "no_intfar": 2,
+    "intfar": 3,
+    "intfar_kda": 4,
+    "intfar_deaths": 5,
+    "intfar_kp": 6,
+    "intfar_vision": 7,
+    "doinks": 8,
+    "doinks_kda": 9,
+    "doinks_kills": 10,
+    "doinks_damage": 11,
+    "doinks_penta": 12,
+    "doinks_vision": 13,
+    "doinks_kp": 14,
+    "doinks_monsters": 15,
+    "doinks_cs": 16,
+    "most_kills": 17,
+    "most_damage": 18,
+    "most_kp": 19,
+    "highest_kda": 20
+}
+
 conf_1 = Config()
 
 database_client_1 = Database(conf_1)
@@ -60,12 +84,13 @@ with database_client_1.get_connection() as db_1:
             "amount, game_duration, target, ticket, result, payout) "
             "VALUES (?, ?, ?, ?, 'lol', ?, ?, ?, ?, ?, ?, ?, ?)"
         )
-        betting_handler = get_betting_handler("lol", conf_1, database_client_1)
-        betting_ids = {bet.event_id: bet for bet in betting_handler.all_bets}
 
         for data in bets:
             data = list(data)
-            data[6] = betting_ids[data[6]]
+            for new_event, old_event in BETTING_IDS.items():
+                if int(data[6]) == old_event:
+                    data[6] = new_event
+                    break
             db_2.cursor().execute(query, tuple(data))
 
         query = "INSERT INTO shop_items VALUES (?, ?, ?, ?)"

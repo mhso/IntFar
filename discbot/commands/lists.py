@@ -5,11 +5,11 @@ from api.util import get_website_link
 
 async def handle_random_champ_msg(client, message, list_name=None):
     if list_name is None:
-        champ_list = list(client.riot_api.champ_names.values())
+        champ_list = list(client.api_clients["lol"].champ_names.values())
     else:
         champ_list = client.database.get_list_by_name(list_name)[1]
         if champ_list is not None:
-            champ_list = [client.riot_api.champ_names[tup[1]] for tup in champ_list]
+            champ_list = [client.api_clients["lol"].champ_names[tup[1]] for tup in champ_list]
 
     if champ_list is None:
         response = f"No champion list found with the name `{list_name}` " + "{emote_sadge}"
@@ -23,10 +23,10 @@ async def handle_random_champ_msg(client, message, list_name=None):
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_random_unplayed_msg(client, message):
-    all_champs = set(client.riot_api.champ_names.keys())
+    all_champs = set(client.api_clients["lol"].champ_names.keys())
     played_champs = set(x[0] for x in client.database.get_played_league_champs(message.author.id))
 
-    unplayed_champs = [client.riot_api.get_champ_name(champ) for champ in (all_champs - played_champs)]
+    unplayed_champs = [client.api_clients["lol"].get_champ_name(champ) for champ in (all_champs - played_champs)]
     if len(unplayed_champs) == 0: # All champs have been played.
         response = "You have already played every champ {emote_woahpikachu}"
     else:
@@ -80,7 +80,7 @@ async def handle_champs_msg(client, message, list_name):
         else:
             max_champs = 12
             response = f"{list_desc} contains the following champions:"
-            champions = [client.riot_api.champ_names[tup[1]] for tup in champ_list]
+            champions = [client.api_clients["lol"].champ_names[tup[1]] for tup in champ_list]
             champions.sort()
             for champ_name in champions[:max_champs]:
                 response += f"\n- `{champ_name}`"
@@ -118,7 +118,7 @@ def parse_champs_params(client, args):
 
     champ_ids = []
     for champ_name in champ_args:
-        champ_id = client.riot_api.try_find_champ(champ_name)
+        champ_id = client.api_clients["lol"].try_find_champ(champ_name)
         if champ_id is None:
             raise ValueError(f"Invalid champion name: `{champ_name}`")
 
@@ -128,7 +128,7 @@ def parse_champs_params(client, args):
 
 async def handle_add_champs(client, message, list_id, champ_ids):
     success, response = lists.add_champ_to_list(
-        message.author.id, list_id, champ_ids, client.riot_api, client.database
+        message.author.id, list_id, champ_ids, client.api_clients["lol"], client.database
     )
     if success:
         list_name = client.database.get_list_data(list_id)[0]
@@ -165,14 +165,14 @@ async def handle_remove_champ(client, message, list_id, champ_ids):
 
 async def handle_random_nochest(client, message, target_id=None):
     summ_data = client.database.game_user_data_from_discord_id(target_id, "lol")
-    champion_mastery_data = client.riot_api.get_champion_mastery(summ_data.ingame_id)
+    champion_mastery_data = client.api_clients["lol"].get_champion_mastery(summ_data.ingame_id)
 
     # Filter champs with no chest granted.
     no_chest_champs = []
     for mastery_data in champion_mastery_data:
         if not mastery_data["chestGranted"]:
             champion_id = mastery_data["championId"]
-            no_chest_champs.append(client.riot_api.get_champ_name(champion_id))
+            no_chest_champs.append(client.api_clients["lol"].get_champ_name(champion_id))
 
     if len(no_chest_champs) == 0: # Chests have been earned on every champ.
         response = "You have already earned a chest on every champ {emote_woahpikachu}"
@@ -190,7 +190,7 @@ async def handle_best_nochest(client, message, target_id=None):
     for the given player where no chest has yet been obtained.
     """
     summ_data = client.database.game_user_data_from_discord_id(target_id, "lol")
-    champion_mastery_data = client.riot_api.get_champion_mastery(summ_data.ingame_id)
+    champion_mastery_data = client.api_clients["lol"].get_champion_mastery(summ_data.ingame_id)
 
     # Filter champs with no chest granted.
     no_chest_champs = []
@@ -217,7 +217,7 @@ async def handle_best_nochest(client, message, target_id=None):
             )
 
             for winrate, games, champ_id in result:
-                champ_name = client.riot_api.get_champ_name(champ_id)
+                champ_name = client.api_clients["lol"].get_champ_name(champ_id)
 
                 response += f"\n - **{champ_name}** "
                 response += f"(**{winrate:.1f}%** wins in **{games}** games)"

@@ -125,12 +125,11 @@ class SteamAPIClient(GameAPIClient):
         return SteamAuthenticator(self.config.steam_secrets).get_code()
 
     def login(self):
-        if self.config.steam_2fa_code is not None:
-            self.steam_client.login(
-                self.config.steam_username,
-                self.config.steam_password,
-                two_factor_code=self.config.steam_2fa_code
-            )
+        self.steam_client.login(
+            self.config.steam_username,
+            self.config.steam_password,
+            two_factor_code=self.config.steam_2fa_code
+        )
 
     def close(self):
         if self.steam_client.logged_on:

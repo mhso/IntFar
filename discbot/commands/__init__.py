@@ -69,7 +69,7 @@ class ChampionParam:
         while index < len(cmd_input):
             name = name + cmd_input[index]
 
-            champ_id = client.riot_api.try_find_champ(name)
+            champ_id = client.api_clients["lol"].try_find_champ(name)
             if champ_id is None and prev_champ_id is not None:
                 return prev_champ_id, index - start_index
 
@@ -115,7 +115,7 @@ class Command:
 
     async def parse_args(self, client, message, args):
         author_id = message.author.id
-        user_is_registered = client.database.user_exists(author_id)
+        user_is_registered = client.database.user_exists(None, author_id)
 
         # If command requires user to be registered, and he is not, send error msg.
         if not user_is_registered and self.access_level == "all":
@@ -161,6 +161,10 @@ class Command:
                         f"Invalid game '{args[index]}'. This command targets a specific "
                         f"game which should be one of: {valid_games}."
                     )
+                    return None
+
+                parsed_args.append(args[index])
+                index += 1
 
             elif index < len(args): # Regular parameter.
                 parsed_args.append(args[index])
@@ -272,8 +276,8 @@ def initialize_commands():
     register_desc = (
         "Sign up for the Int-Far™ Tracker™ for the given game " +
         "by providing your ingame info. For LoL, this is just your summoner name. "
-        "For CSGO, this is your Steam account name, Steam ID, and match authentication "
-        "code (see https://help.steampowered.com/en/wizard/HelpWithGameIssue/?appid=730&issueid=128 for help)."
+        "For CSGO, this is your Steam account name, Steam ID, and match authentication code. "
+        "(For CSGO, signing up on the website is a lot easier)."
     )
     register_command(
         register_name,

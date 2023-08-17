@@ -1,4 +1,3 @@
-import random
 import asyncio
 from io import BytesIO
 from threading import Thread
@@ -63,8 +62,6 @@ class DiscordClient(discord.Client):
                                     of interacting with the sqlite database
         :param betting_handlers:    BettingHandler instance that handles the logic
                                     of creating, resolving, and listing bets
-        :param riot_api:            RiotAPIClient instance that handles the logic of
-                                    communicating with Riot Games' LoL API
         :param audio_handler:       AudioHandler instance that handles the logic of
                                     listing and playing sounds through Discord
         :param shop_handler:        ShopHandler instance that handles the logic of
@@ -85,8 +82,6 @@ class DiscordClient(discord.Client):
         self.config = config
         self.database = database
         self.betting_handlers = betting_handlers
-        self.steam_api = SteamAPIClient(self.config)
-        self.steam_api.login()
 
         if self.config.env == "production":
             streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
@@ -128,7 +123,7 @@ class DiscordClient(discord.Client):
             file = discord.File(b_io, filename="predictions.png")
             await channel.send("Odds of winning throughout the game:", file=file)
 
-    async def on_game_oveR(self, game: str, game_info: dict, guild_id: int, status_code: int):
+    async def on_game_over(self, game: str, game_info: dict, guild_id: int, status_code: int):
         if game == "lol":
             await self.on_lol_game_over(game_info, guild_id, status_code)
 
@@ -218,7 +213,7 @@ class DiscordClient(discord.Client):
         self.game_monitors[game].users_in_game[guild_id] = parsed_game_stats.players_in_game
         logger.debug(f"Users in game after: {parsed_game_stats.players_in_game}")
 
-        if game == "lol" and self.riot_api.is_clash(self.game_monitors[game].active_game[guild_id]["queue_id"]):
+        if game == "lol" and self.api_clients[game].is_clash(self.game_monitors[game].active_game[guild_id]["queue_id"]):
             # Game was played as part of a clash tournament, so it awards more betting tokens.
             multiplier = self.config.clash_multiplier
             await self.channels_to_write[guild_id].send(
@@ -255,7 +250,7 @@ class DiscordClient(discord.Client):
         if game == "lol":
             try:
                 # Get timeline data events for the game.
-                timeline_data = self.riot_api.get_game_timeline(game_info["gameId"])
+                timeline_data = self.api_clients[game].get_game_timeline(game_info["gameId"])
                 if timeline_data is not None:
                     timeline_response = self.get_cool_timeline_data(
                         awards_handler, timeline_data
@@ -622,7 +617,7 @@ class DiscordClient(discord.Client):
         bet_multiplier = 1
 
         # Check if we are playing clash. If so, points are worth more.
-        if game_stats.game == "lol" and self.riot_api.is_clash(self.game_monitors["lol"].active_game[guild_id]["queue_id"]):
+        if game_stats.game == "lol" and self.api_clients[game_stats.game].is_clash(self.game_monitors["lol"].active_game[guild_id]["queue_id"]):
             bet_multiplier = self.config.clash_multiplier
             tokens_gained *= bet_multiplier
 
@@ -842,7 +837,7 @@ class DiscordClient(discord.Client):
             mentions_str += user_str
 
             multiplier = 1
-            if awards_handler.game == "lol" and self.riot_api.is_clash(
+            if awards_handler.game == "lol" and self.api_clients[awards_handler.game].is_clash(
                 self.game_monitors[awards_handler.game].active_game[awards_handler.guild_id]["queue_id"]
             ):
                 # Doinks are worth 5x more during clash
@@ -1348,14 +1343,14 @@ class DiscordClient(discord.Client):
         """
         guild_name = self.get_guild_name(guild_id)
         logger.debug(f"User joined voice in {guild_name}: {disc_id}")
-        summoner_info = self.database.summoner_from_discord_id(disc_id)
 
-        if summoner_info is not None:
-            users_in_voice = self.get_users_in_voice()[guild_id]
-            for game in users_in_voice:
+        users_in_voice = self.get_users_in_voice()[guild_id]
+        for game in users_in_voice:
+            user_game_info = self.database.game_user_data_from_discord_id(game, disc_id)
+            if user_game_info is not None:
                 game_monitor = self.game_monitors[game]
                 game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
-                logger.debug("Summoner joined voice: " + summoner_info[1][0])
+                logger.debug(f"Game user joined voice: {user_game_info.ingame_name}")
 
                 if game_monitor.should_poll(guild_id):
                     logger.info(f"Polling is now active for {api_util.SUPPORTED_GAMES[game]}!")
@@ -1518,7 +1513,7 @@ class DiscordClient(discord.Client):
             new_day = datetime.now(ifotm_monitor.cph_timezone).day
             if new_day != curr_day:
                 # Download latest information from Riot API.
-                self.riot_api.get_latest_data()
+                self.api_clients["lol"].get_latest_data()
                 curr_day = new_day
 
             await asyncio.sleep(time_to_sleep)
@@ -1821,14 +1816,13 @@ class DiscordClient(discord.Client):
     async def close(self):
         super().close()
 
-        self.steam_api.close()
+        self.api_clients["csgo"].close()
 
-def run_client(config, database, betting_handlers, riot_api, ai_pipe, flask_pipe, main_pipe):
+def run_client(config, database, betting_handlers, ai_pipe, flask_pipe, main_pipe):
     client = DiscordClient(
         config,
         database,
         betting_handlers,
-        riot_api,
         ai_pipe=ai_pipe,
         flask_pipe=flask_pipe,
         main_pipe=main_pipe,

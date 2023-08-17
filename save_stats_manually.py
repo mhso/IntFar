@@ -23,8 +23,8 @@ class MockChannel:
         await asyncio.sleep(0.1)
 
 class TestMock(DiscordClient):
-    def __init__(self, args, config, database, betting_handlers, riot_api, **kwargs):
-        super().__init__(config, database, betting_handlers, riot_api, **kwargs)
+    def __init__(self, args, config, database, betting_handlers, **kwargs):
+        super().__init__(config, database, betting_handlers, **kwargs)
         self.missing = args.missing
         self.game = args.game
         self.game_id = args.game_id
@@ -45,12 +45,9 @@ class TestMock(DiscordClient):
         for game_id, guild_id in ids_to_save:
             self.game_monitors[self.game].active_game[guild_id] = {"id": game_id}
 
+            game_info = self.api_clients[self.game].get_game_details(game_id)
             if self.game == "lol":
-                game_info = self.riot_api.get_game_details(game_id)
                 self.game_monitors[self.game].active_game[guild_id]["queue_id"] = game_info["queueId"]
-            elif self.game == "csgo":
-                game_info = self.steam_api.get_game_details(game_id)
-
 
             game_stats_parser = get_stat_parser(self.game, game_info, self.database.users[self.game])
             parsed_game_stats = game_stats_parser.parse_data()

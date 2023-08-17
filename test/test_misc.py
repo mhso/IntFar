@@ -9,7 +9,7 @@ from api.config import Config
 from api.database import Database
 from discbot.discord_bot import DiscordClient
 from api.database import Database
-from api.riot_api import RiotAPIClient
+from api.game_api.lol import RiotAPIClient
 from api.betting import BettingHandler
 
 class TestWrapper(TestRunner):

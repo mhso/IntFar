@@ -99,11 +99,7 @@ class LoLGameStats(GameStats):
         """
         Get a brief text that summaries a player's performance in a finished game.
 
-        :param data:        Dictionary containing un-filtered data about a finished
-                            game fetched from Riot League API
-        :param summ_ids:    List of summoner ids belonging to a player,
-                            for which to get the summary for
-        :parma riot_api:    Riot API client instance
+        :param disc_id: Discord ID of the player for whom to get the summary for
         """
         player_stats: LoLPlayerStats = self.find_player_stats(disc_id, self.filtered_player_stats)
 

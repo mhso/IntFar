@@ -20,17 +20,12 @@ class Database(SQLiteDatabase):
         self.config = config
         super().__init__(self.config.database, "resources/schema.sql", False)
 
-        self.users = {
-            game: {} for game in SUPPORTED_GAMES
-        }
-
         # Populate summoner names and ids lists with currently registered summoners.
-        users = self.get_all_registered_users()
         params = {
-            "lol": ["ingame_name", "ingame_id"],
-            "csgo": ["ingame_name", "ingame_id", "match_auth_code"]
+            "lol": [],
+            "csgo": ["match_auth_code"]
         }
-        self.users: dict[int, User] = dict(map(lambda game: (game, self._group_users(users[game], *params[game])), users))
+        self.users: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
 
     def _group_users(self, user_data, *params):
         user_entries = {}
@@ -44,7 +39,7 @@ class Database(SQLiteDatabase):
                 if param_name not in user_entries[disc_id]:
                     user_entries[disc_id][param_name] = []
 
-                user_entries[disc_id][param_name].append(user[index])
+                user_entries[disc_id][param_name].append(user[index + 1])
 
         return {disc_id: User(**user_entries[disc_id]) for disc_id in user_entries}
 
@@ -57,33 +52,36 @@ class Database(SQLiteDatabase):
     def _get_users_table(self, game):
         return f"users_{game}"
 
-    def user_exists(self, discord_id, game):
+    def user_exists(self, game, discord_id):
+        if game is None:
+            return any(discord_id in self.users[game] for game in self.users)
+
         return discord_id in self.users[game]
 
-    def get_all_registered_users(self):
+    def get_all_registered_users(self, game, *extra_params):
         with self:
             query = "SELECT disc_id, secret FROM users"
-            basic_user_info = self.execute_query(query).fetchall()
-            basic_info_dict = {x[0]: x for x in basic_user_info}
+            values = self.execute_query(query).fetchall()
+            games_user_info = {x[0]: {"disc_id": x[0], "secret": x[1]} for x in values}
 
-            games_user_info = {}
-            for game in SUPPORTED_GAMES:
-                if game not in games_user_info:
-                    games_user_info[game] = []
+            all_params = ["disc_id", "ingame_name", "ingame_id"] + list(extra_params)
+            params_str = ", ".join(all_params)
+            query = f"SELECT {params_str} FROM users_{game}"
+            values = self.execute_query(query).fetchall()
 
-                query = f"SELECT * FROM users_{game}"
-                values = self.execute_query(query).fetchall()
-                for row in values:
-                    disc_id = row[0]
-                    active = row[-1]
-                    if not active:
-                        continue
+            for row in values:
+                disc_id = row[0]
+                active = row[-1]
+                if not active:
+                    continue
 
-                    user_info = basic_info_dict[disc_id]
-                    user_game_info = user_info + row[1:-1]
-                    games_user_info[game].append(user_game_info)
+                for index, param_name in enumerate(all_params[1:], start=1):
+                    if param_name not in games_user_info[disc_id]:
+                        games_user_info[disc_id][param_name] = []
 
-        return games_user_info
+                    games_user_info[disc_id][param_name].append(row[index])
+
+        return {disc_id: User(**games_user_info[disc_id]) for disc_id in games_user_info if "ingame_name" in games_user_info[disc_id]}
 
     def get_client_secret(self, disc_id):
         query = "SELECT secret FROM users WHERE disc_id=?"
@@ -102,7 +100,7 @@ class Database(SQLiteDatabase):
         game_table = self._get_users_table(game)
         try:
             with self:
-                new_user = not any(self.user_exists(discord_id, game_name) for game_name in self.users)
+                new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users)
                 if new_user:
                     # User has never signed up for any game before
                     query = "INSERT INTO users(disc_id, secret, reports) VALUES (?, ?, ?)"
@@ -170,7 +168,7 @@ class Database(SQLiteDatabase):
             query = f"UPDATE users_{game} SET active=0 WHERE disc_id=?"
             self.execute_query(query, disc_id)
 
-        del self.users[disc_id]
+        del self.users[game][disc_id]
 
     def discord_id_from_ingame_name(self, game, name, exact_match=True):
         matches = []
@@ -183,8 +181,8 @@ class Database(SQLiteDatabase):
 
         return matches[0] if len(matches) == 1 else None
 
-    def game_user_data_from_discord_id(self, discord_id, game):
-        return self.users[game].get(discord_id, None)
+    def game_user_data_from_discord_id(self, game, disc_id):
+        return self.users[game].get(disc_id, None)
 
     def game_exists(self, game, game_id):
         games_table = self._get_games_table(game)
@@ -1000,12 +998,12 @@ class Database(SQLiteDatabase):
             games_with_person = {}
             wins_with_person = {}
             for part_id, wins in self.execute_query(query_wins, game, disc_id):
-                if disc_id == part_id or not self.user_exists(part_id):
+                if disc_id == part_id or not self.user_exists(game, part_id):
                     continue
                 wins_with_person[part_id] = wins
 
             for part_id, games in self.execute_query(query_games, disc_id):
-                if self.user_exists(part_id):
+                if self.user_exists(game, part_id):
                     games_with_person[part_id] = games
 
             winrate_with_person = [
@@ -1177,7 +1175,7 @@ class Database(SQLiteDatabase):
             return max_count, timestamp_ended
 
     def get_longest_no_intfar_streak(self, game, disc_id):
-        if not self.user_exists(disc_id):
+        if not self.user_exists(game, disc_id):
             return 0
 
         games_table = self._get_games_table(game)
@@ -1428,12 +1426,12 @@ class Database(SQLiteDatabase):
             intfars_with_person = {}
 
             for part_id, intfars in self.execute_query(query_intfars, game, disc_id):
-                if disc_id == part_id or not self.user_exists(part_id):
+                if disc_id == part_id or not self.user_exists(game, part_id):
                     continue
                 intfars_with_person[part_id] = intfars
 
             for part_id, games in self.execute_query(query_games, disc_id):
-                if self.user_exists(part_id):
+                if self.user_exists(game, part_id):
                     games_with_person[part_id] = games
 
             return games_with_person, intfars_with_person
@@ -1502,12 +1500,12 @@ class Database(SQLiteDatabase):
             doinks_with_person = {}
 
             for part_id, doinks in self.execute_query(query_doinks, disc_id):
-                if disc_id == part_id or not self.user_exists(part_id):
+                if disc_id == part_id or not self.user_exists(game, part_id):
                     continue
                 doinks_with_person[part_id] = doinks
 
             for part_id, games in self.execute_query(query_games, disc_id):
-                if self.user_exists(part_id):
+                if self.user_exists(game, part_id):
                     games_with_person[part_id] = games
 
             return games_with_person, doinks_with_person
