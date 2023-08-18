@@ -19,7 +19,8 @@ async def handle_lol_register_msg(client, message, target_name):
         return False, status
 
     return client.database.add_user(
-        game, message.author.id,
+        game,
+        message.author.id,
         ingame_name=target_name,
         ingame_id=summ_id
     )

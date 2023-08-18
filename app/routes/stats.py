@@ -51,4 +51,4 @@ def home():
     game = flask.current_app.config["CURRENT_GAME"]
     database = flask.current_app.config["DATABASE"]
     stats_data = get_stats(game, database)
-    return make_template_context("stats.html", game=game, stats_data=stats_data)
+    return make_template_context("stats.html", stats_data=stats_data)

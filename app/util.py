@@ -161,9 +161,9 @@ def get_logged_in_user(database, user_id):
         return None
 
     users = database.get_all_registered_users()
-    for tup in users:
-        if get_hashed_secret(tup[1]) == user_id:
-            return tup[0]
+    for disc_id in users:
+        if get_hashed_secret(users[users].secret) == user_id:
+            return disc_id
 
     return None
 
@@ -208,9 +208,12 @@ def get_persistent_data():
         "logged_in_avatar": logged_in_avatar,
         "admin_id": ADMIN_DISC_ID
     }
-    game_info = get_game_info(flask.current_app.config["CURRENT_GAME"])
+    game = flask.current_app.config["CURRENT_GAME"]
+    game_info = get_game_info(game)
     shown_games = filter_hidden_games(game_info, logged_in_user)
 
+    data["game"] = game
+    data["game_name"] = SUPPORTED_GAMES[game]
     data["active_game_data"] = shown_games
 
     return data

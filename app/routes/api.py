@@ -8,6 +8,7 @@ api_page = flask.Blueprint("api", __name__, template_folder="templates")
 @api_page.route("/statistics", methods=["GET"])
 def get_statistics():
     database = flask.current_app.config["DATABASE"]
+    game = flask.current_app.config["CURRENT_GAME"]
 
     # Get authorization values from URL parameters and user_id header.
     disc_id = int(flask.request.args.get("disc_id"))
@@ -22,22 +23,22 @@ def get_statistics():
     try:
         with database:
             # Get active games, if any are ongoing.
-            active_games = app_util.get_game_info()
+            active_games = app_util.get_game_info(game)
 
             # Get total games played and won.
-            games_played, _, games_won, _ = database.get_games_count()
+            games_played, _, games_won, _ = database.get_games_count(game)
             won_pct = float(f"{(games_won / games_played) * 100:.1f}")
 
             # Get total count of Int-Fars awarded.
-            intfars_total = database.get_intfar_count()
+            intfars_total = database.get_intfar_count(game)
             intfars_pct = float(f"{(intfars_total / games_played) * 100:.1f}")
 
             # Games where doinks were earned and total doinks earned.
-            doinks_games, doinks_total = database.get_doinks_count()
+            doinks_games, doinks_total = database.get_doinks_count(game)
             doinks_pct = float(f"{(doinks_games / games_played) * 100:.1f}")
 
             # Get Int-Far of the month leads.
-            monthly_intfars = database.get_intfars_of_the_month()
+            monthly_intfars = database.get_intfars_of_the_month(game)
 
         if monthly_intfars != []:
             tied_intfars = [monthly_intfars[0]]

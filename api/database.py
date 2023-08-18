@@ -25,7 +25,7 @@ class Database(SQLiteDatabase):
             "lol": [],
             "csgo": ["match_auth_code"]
         }
-        self.users: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
+        #self.users: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
 
     def _group_users(self, user_data, *params):
         user_entries = {}
@@ -59,6 +59,7 @@ class Database(SQLiteDatabase):
         return discord_id in self.users[game]
 
     def get_all_registered_users(self, game, *extra_params):
+        users_table = self._get_users_table(game)
         with self:
             query = "SELECT disc_id, secret FROM users"
             values = self.execute_query(query).fetchall()
@@ -66,7 +67,7 @@ class Database(SQLiteDatabase):
 
             all_params = ["disc_id", "ingame_name", "ingame_id"] + list(extra_params)
             params_str = ", ".join(all_params)
-            query = f"SELECT {params_str} FROM users_{game}"
+            query = f"SELECT {params_str} FROM {users_table}"
             values = self.execute_query(query).fetchall()
 
             for row in values:
@@ -97,31 +98,33 @@ class Database(SQLiteDatabase):
 
     def add_user(self, game, discord_id, **game_params):
         status = ""
-        game_table = self._get_users_table(game)
+        users_table = self._get_users_table(game)
         try:
             with self:
-                new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users)
-                if new_user:
-                    # User has never signed up for any game before
-                    query = "INSERT INTO users(disc_id, secret, reports) VALUES (?, ?, ?)"
-                    secret = generate_user_secret()
-                    self.execute_query(query, discord_id, secret, 0)
+                query = f"SELECT * FROM {users_table} WHERE disc_id=? AND active=0"
+                inactive_accounts = self.execute_query(query, discord_id).fetchall()
 
-                user_info = self.users[game].get(discord_id)
-
-                query = f"SELECT * FROM {game_table} WHERE disc_id=? AND active=0"
-                is_inactive = self.execute_query(query, discord_id).fetchone() is not None
-
-                if is_inactive:
-                    query = f"UPDATE {game_table} SET active=1 WHERE disc_id=?"
+                if inactive_accounts != []:
+                    query = f"UPDATE {users_table} SET active=1 WHERE disc_id=?"
+                    self.execute_query(query, discord_id)
                     status = "Welcome back to the Int-Far:tm: Tracker:tm:, my lost son :hearts:"
 
-                    for param_name in game_params:
-                        self.users[game][discord_id][param_name].append(game_params[param_name])
+                    reduced_params = dict(game_params)
+                    del reduced_params["ingame_name"]
+                    del reduced_params["ingame_id"]
 
-                    self.execute_query(query, discord_id)
+                    self.users[game][discord_id] = self.get_all_registered_users(game, **reduced_params)
 
                 else:
+                    new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users)
+                    if new_user:
+                        # User has never signed up for any game before
+                        query = "INSERT INTO users(disc_id, secret, reports) VALUES (?, ?, ?)"
+                        secret = generate_user_secret()
+                        self.execute_query(query, discord_id, secret, 0)
+
+                    user_info = self.users[game].get(discord_id)
+
                     game_user_name = game_params["ingame_name"]
                     game_user_id = game_params["ingame_id"]
 
@@ -129,13 +132,13 @@ class Database(SQLiteDatabase):
                     questionmarks = ", ".join("?" for _ in range(len(parameter_list) - 1))
                     parameter_names = ",\n".join(parameter_list)
                     query = f"""
-                        INSERT INTO {game_table} (
+                        INSERT INTO {users_table} (
                             {parameter_names}
                         ) VALUES ({questionmarks}, 1)
                     """
 
                     if user_info is not None:
-                        if sum(len(user_info.get(param_name, []) for param_name in game_params)) >= 3:
+                        if sum(len(user_info.get(param_name, [])) for param_name in game_params) >= 3:
                             return (
                                 False,
                                 "Error: A maximum of three accounts can be registered for one person."
@@ -164,8 +167,9 @@ class Database(SQLiteDatabase):
         return (True, status)
 
     def remove_user(self, game, disc_id):
+        game_table = self._get_users_table(game)
         with self:
-            query = f"UPDATE users_{game} SET active=0 WHERE disc_id=?"
+            query = f"UPDATE {game_table} SET active=0 WHERE disc_id=?"
             self.execute_query(query, disc_id)
 
         del self.users[game][disc_id]
@@ -189,15 +193,15 @@ class Database(SQLiteDatabase):
 
         with self:
             query = f"SELECT game_id FROM {games_table} WHERE game_id=?"
-            return self.execute_query(query, game_id, game).fetchone() is not None
+            return self.execute_query(query, game_id).fetchone() is not None
 
-    def delete_game(self, game_id, game):
+    def delete_game(self, game, game_id):
         games_table = self._get_games_table(game)
 
         with self:
             query_1 = f"DELETE FROM {games_table} WHERE game_id=?"
             query_2 = f"DELETE FROM participants_{game} WHERE game_id=?"
-            self.execute_query(query_1, game_id, game, commit=False)
+            self.execute_query(query_1, game_id, commit=False)
             self.execute_query(query_2, game_id)
 
     def get_latest_game(self, game, time_after=None, time_before=None, guild_id=None):
@@ -251,7 +255,7 @@ class Database(SQLiteDatabase):
                     ) sub
                 """
 
-                result = self.execute_query(query, game).fetchone()
+                result = self.execute_query(query).fetchone()
                 return result + (None,)
 
             query = f"""
@@ -279,7 +283,7 @@ class Database(SQLiteDatabase):
                 query = f"""
                     SELECT Count(DISTINCT g.game_id)
                     FROM {games_table} AS g
-                    JOIN participants AS p
+                    JOIN {stats_table} AS p
                     ON p.game_id = g.game_id
                     INNER JOIN {users_table} AS u
                     ON u.disc_id = p.disc_id
@@ -288,7 +292,7 @@ class Database(SQLiteDatabase):
                         AND u.active = 1
                 """
 
-                result = self.execute_query(query, disc_id, game).fetchone()
+                result = self.execute_query(query, disc_id).fetchone()
                 return result[0], None, None
 
             query = f"""
@@ -343,7 +347,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            return self.execute_query(query, game, disc_id).fetchone()
+            return self.execute_query(query, disc_id).fetchone()
 
     def get_average_stat_league(self, stat, disc_id=None, champ_id=None, min_games=10):
         game = "lol"
@@ -558,7 +562,7 @@ class Database(SQLiteDatabase):
         games_table = self._get_games_table(game)
         query = f"SELECT game_id FROM {games_table}"
         with self:
-            return self.execute_query(query, game).fetchall()
+            return self.execute_query(query).fetchall()
 
     def get_recent_intfars_and_doinks(self, game):
         games_table = self._get_games_table(game)
@@ -583,7 +587,7 @@ class Database(SQLiteDatabase):
                 GROUP BY p.game_id, p.disc_id
                 ORDER BY timestamp ASC
             """
-            return self.execute_query(query, game).fetchall()
+            return self.execute_query(query).fetchall()
 
     def get_delimeter(self, time_after, time_before, guild_id, other_key=None, other_param=None, prefix=None):
         prefix = prefix if prefix is not None else "WHERE"
@@ -743,7 +747,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            return self.execute_query(query, game, disc_id).fetchone()
+            return self.execute_query(query, disc_id).fetchone()
 
     def get_intfar_count(self, game, disc_id=None, time_after=None, time_before=None, guild_id=None):
         games_table = self._get_games_table(game)
@@ -789,7 +793,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            intfar_multis_data = self.execute_query(query_intfar_multis, game).fetchall()
+            intfar_multis_data = self.execute_query(query_intfar_multis).fetchall()
             if intfar_multis_data == []:
                 return None, None
 
@@ -836,7 +840,7 @@ class Database(SQLiteDatabase):
         """
     
         with self:
-            return self.execute_query(query, game, disc_id, game, disc_id).fetchone()[0]
+            return self.execute_query(query, disc_id, disc_id).fetchone()[0]
 
     def get_league_champ_winrate(self, disc_id, champ_id):
         game = "lol"
@@ -874,7 +878,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            params = [game, disc_id, champ_id] * 2
+            params = [disc_id, champ_id] * 2
             return self.execute_query(query, *params).fetchone()
 
     def get_min_or_max_league_winrate_champ(self, disc_id, best, included_champs=None, return_top_n=1, min_games=10):
@@ -911,7 +915,7 @@ class Database(SQLiteDatabase):
                         ON g.game_id = p.game_id
                     WHERE
                         disc_id = ?
-                        AND win=1
+                        AND win = 1
                     GROUP BY champ_id
                     ORDER BY champ_id
                ) wins,
@@ -938,7 +942,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            params = [game, disc_id] * 2
+            params = [disc_id] * 2
             result = self.execute_query(query, *params).fetchall()
 
             if return_top_n == 1:
@@ -997,7 +1001,7 @@ class Database(SQLiteDatabase):
         with self:
             games_with_person = {}
             wins_with_person = {}
-            for part_id, wins in self.execute_query(query_wins, game, disc_id):
+            for part_id, wins in self.execute_query(query_wins, disc_id):
                 if disc_id == part_id or not self.user_exists(game, part_id):
                     continue
                 wins_with_person[part_id] = wins
@@ -1155,7 +1159,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            int_fars = self.execute_query(query, game).fetchall()
+            int_fars = self.execute_query(query).fetchall()
             max_count = 0
             timestamp_ended = None
             count = 0
@@ -1193,7 +1197,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            int_fars = self.execute_query(query, game, disc_id).fetchall()
+            int_fars = self.execute_query(query, disc_id).fetchall()
             max_count = 0
             timestamp_ended = None
             count = 0
@@ -1231,7 +1235,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            int_fars = self.execute_query(query, game).fetchall()
+            int_fars = self.execute_query(query).fetchall()
             prev_intfar = int_fars[0][0]
             for count, int_far in enumerate(int_fars[1:], start=1):
                 if int_far[0] is None or prev_intfar != int_far[0]:
@@ -1259,7 +1263,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            games = self.execute_query(query, game, disc_id).fetchall()
+            games = self.execute_query(query, disc_id).fetchall()
 
             max_count = 0
             count = 0
@@ -1294,7 +1298,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            games = self.execute_query(query, game, disc_id).fetchall()
+            games = self.execute_query(query, disc_id).fetchall()
 
             count_offset = 1 if offset == 0 else 0
 
@@ -1343,7 +1347,7 @@ class Database(SQLiteDatabase):
         """
 
         with self:
-            return self.execute_query(query, game).fetchone()
+            return self.execute_query(query).fetchone()
 
     def get_intfar_stats(self, game, disc_id, monthly=False, time_after=None, time_before=None, guild_id=None):
         games_table = self._get_games_table(game)
@@ -1370,14 +1374,14 @@ class Database(SQLiteDatabase):
             FROM {games_table} AS g
             JOIN {stats_table} AS p
                 ON g.game_id = p.game_id
-            WHERE {delim_str_1}
+            {delim_str_1}
         """
         query_intfar = f"""
             SELECT intfar_reason
             FROM {games_table} AS g
             JOIN {stats_table} AS p 
                 ON g.game_id = p.game_id
-            WHERE {delim_str_2}
+            {delim_str_2}
             GROUP BY g.game_id
         """
 
@@ -1425,7 +1429,7 @@ class Database(SQLiteDatabase):
             games_with_person = {}
             intfars_with_person = {}
 
-            for part_id, intfars in self.execute_query(query_intfars, game, disc_id):
+            for part_id, intfars in self.execute_query(query_intfars, disc_id):
                 if disc_id == part_id or not self.user_exists(game, part_id):
                     continue
                 intfars_with_person[part_id] = intfars
@@ -2022,7 +2026,7 @@ class Database(SQLiteDatabase):
             params = []
 
             if disc_id is not None:
-                query_select += "AND disc_id = ? "
+                query_select += "WHERE disc_id = ? "
                 params = [disc_id]
             else:
                 query_select += "GROUP BY disc_id "

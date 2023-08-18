@@ -84,7 +84,6 @@ def home():
 
     return app_util.make_template_context(
         "betting.html",
-        game=game,
         resolved_bets=resolved_bets,
         active_bets=active_bets,
         bet_events=all_events,

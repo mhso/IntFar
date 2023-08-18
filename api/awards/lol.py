@@ -7,7 +7,7 @@ from api.database import Database
 
 class LoLAwardQualifiers(AwardQualifiers):
     @classmethod
-    def INTFAR_REASONS():
+    def INTFAR_REASONS(cls):
         return {
             "kda": "Low KDA",
             "deaths": "Many deaths",

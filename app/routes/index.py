@@ -238,7 +238,6 @@ def index():
 
     return app_util.make_template_context(
         "index.html",
-        game=game,
         curr_month=curr_month,
         feed_descs=feed_descs,
         intfar_all=intfar_all_data,

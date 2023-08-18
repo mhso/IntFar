@@ -352,7 +352,6 @@ def user(disc_id):
         most_reports_id = database.get_max_reports_details()[1]
 
     context = {
-        "game": game,
         "disc_id": disc_id,
         "nickname": nickname,
         "avatar": avatar,

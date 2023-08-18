@@ -41,7 +41,7 @@ database_client_2 = Database(conf_2)
 
 with database_client_1.get_connection() as db_1:
     data_games = db_1.cursor().execute("SELECT * FROM games").fetchall()
-    participants = db_1.cursor().execute("SELECT game_id, disc_id, doinks, kills, deaths, assists, kda, kp, champ_id, damage, cs, cs_per_min, gold, vision_wards, vision_score, steals FROM participants").fetchall()
+    participants = db_1.cursor().execute("SELECT * FROM participants").fetchall()
     summoners = db_1.cursor().execute("SELECT * FROM registered_summoners").fetchall()
     balances = db_1.cursor().execute("SELECT * FROM betting_balance").fetchall()
     bets = db_1.cursor().execute("SELECT * FROM bets").fetchall()
@@ -62,13 +62,13 @@ with database_client_1.get_connection() as db_1:
             disc_id = int(summ[0])
             db_2.cursor().execute("INSERT OR IGNORE INTO users_lol VALUES (?, ?, ?, ?)", (disc_id, summ[1], summ[2], summ[5]))
 
-        query = "INSERT INTO games_lol VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        query = "INSERT INTO games_lol(game_id, timestamp, duration, intfar_id, intfar_reason, first_blood, win, guild_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         for data in data_games:
             db_2.cursor().execute(query, data)
 
         query = (
             """
-            INSERT INTO participants_lol
+            INSERT INTO participants_lol(game_id, disc_id, champ_id, doinks, kills, deaths, assists, kda, damage, cs, cs_per_min, gold, kp, vision_wards, vision_score, steals)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         )

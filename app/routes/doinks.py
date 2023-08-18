@@ -57,7 +57,6 @@ def home():
     doinks_data, doinks_counts, doinks_for_person = get_doinks_awards(game, database)
     return make_template_context(
         "doinks.html",
-        game=game,
         doinks_data=doinks_data,
         doinks_counts=doinks_counts,
         doinks_persons=doinks_for_person
