@@ -156,6 +156,7 @@ class Command:
 
             elif isinstance(param, GameParam):
                 if index >= len(args):
+                    parsed_args.append(None)
                     continue
 
                 if args[index] not in SUPPORTED_GAMES:
@@ -579,7 +580,8 @@ def initialize_commands():
         bets_desc,
         handle_all_bets_msg,
         access_level="self",
-        optional_params=[GameParam("game"), TargetParam("person")]
+        mandatory_params=[GameParam("game")],
+        optional_params=[TargetParam("person")]
     )
 
     # betting tokens command

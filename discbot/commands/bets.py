@@ -140,7 +140,7 @@ async def handle_give_tokens_msg(client, message, amount, target_id):
 
     await message.channel.send(response)
 
-async def handle_active_bets_msg(client, message, game=None, target_id=None):
+async def handle_active_bets_msg(client, message, game, target_id):
     def get_bet_description(game, disc_id, single_person=True):
         active_bets = client.database.get_bets(game, True, disc_id)
         recepient = client.get_discord_nick(disc_id, message.guild.id)
@@ -191,7 +191,7 @@ async def handle_active_bets_msg(client, message, game=None, target_id=None):
 
     games_to_check = [game] if game is not None else api_util.SUPPORTED_GAMES
     for game in games_to_check:
-        game_response = f"Bets for {api_util.SUPPORTED_GAMES[game]}"
+        game_response = f"Bets for **{api_util.SUPPORTED_GAMES[game]}**:\n"
         if target_id is None:
             # Check active bets for everyone
             any_bet = False
@@ -210,8 +210,12 @@ async def handle_active_bets_msg(client, message, game=None, target_id=None):
                 response += game_response
 
         else:
-            # Check active bets for a single person 
-            response += game_response + get_bet_description(game, target_id)
+            # Check active bets for a single person
+            game_response += get_bet_description(game, target_id)
+            if response != "":
+                game_response = "\n" + game_response
+
+            response += game_response
 
     if target_id is None and response == "":
         response = "No one has any active bets."
@@ -219,6 +223,7 @@ async def handle_active_bets_msg(client, message, game=None, target_id=None):
     await message.channel.send(response)
 
 async def handle_all_bets_msg(client, message, game, target_id):
+    game_name = api_util.SUPPORTED_GAMES[game]
     all_bets = client.database.get_bets(game, False, target_id)
     tokens_name = client.config.betting_tokens
     bets_won = 0
@@ -258,7 +263,7 @@ async def handle_all_bets_msg(client, message, game, target_id):
         pct_during = int((during_game / len(all_bets)) * 100)
         event_desc = betting_descs[most_often_event]
 
-        response = f"{target_name} has made a total of **{len(all_bets)}** bets.\n"
+        response = f"{target_name} has made a total of **{len(all_bets)}** bets for **{game_name}**.\n"
         response += f"- Bets won: **{bets_won} ({pct_won}%)**\n"
         response += f"- Average amount of {tokens_name} wagered: **{api_util.format_tokens_amount(average_amount)}**\n"
         response += f"- Total {tokens_name} wagered: **{api_util.format_tokens_amount(spent)}**\n"

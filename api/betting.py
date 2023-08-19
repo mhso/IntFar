@@ -223,7 +223,7 @@ class BettingHandler(ABC):
 
         response = f"Betting on `{event_desc}` would return {readable_return} times your investment.\n"
         response += "If you bet after the game has started, the return will be lower.\n"
-        if bet_str > 2:
+        if bet.target_required != bet.TARGET_INVALID:
             start = "If" if target_id is None else "Since"
             response += f"{start} you bet on this event happening to a *specific* person "
             response += "(not just *anyone*), then the return will be further multiplied "
