@@ -87,9 +87,9 @@ class TestRunner:
         self.failed += 1
         self.print_failed(name, "Failed!")
 
-    def assert_exception(self, expr, exc_class, name):
+    def assert_exception(self, expr, exc_class, name, *params):
         try:
-            expr()
+            expr(*params)
             self.failed += 1
             self.print_failed(name, "Failed! No exception was raised.")
         except Exception as exc:
@@ -100,9 +100,9 @@ class TestRunner:
                 self.failed += 1
                 self.print_failed(name, f"Failed! Expected exception: {exc_class}, actual: {exc}.")
 
-    def assert_no_exception(self, expr, name):
+    def assert_no_exception(self, expr, name, *params, **kwargs):
         try:
-            expr()
+            expr(*params, **kwargs)
             self.passed += 1
             self.print_passed(name, "Passed. No exception was raised.")
         except Exception as exc:

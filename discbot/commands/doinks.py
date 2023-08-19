@@ -22,7 +22,7 @@ async def handle_doinks_msg(client, message, game, target_id):
 
             reason_desc = "\n" + "Big doinks awarded so far:"
             for reason_id, reason in enumerate(doinks_reasons):
-                reason_desc += f"\n - {doinks_reasons[reason]}: **{doinks_counts[reason_id]}**"
+                reason_desc += f"\n- {doinks_reasons[reason]}: **{doinks_counts[reason_id]}**"
 
             msg += reason_desc
 

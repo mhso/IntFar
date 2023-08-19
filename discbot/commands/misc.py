@@ -37,7 +37,7 @@ async def handle_game_msg(client, message, game, target_id):
         await asyncio.sleep(1)
 
     if game_data is not None:
-        stat_parser = get_stat_parser(game, game_data, client.database.users[game])
+        stat_parser = get_stat_parser(game, game_data, client.database.users[game], message.guild.id)
         response = f"{target_name} is "
         summary = stat_parser.get_active_game_summary(active_id, api_client)
         response += summary
@@ -113,8 +113,8 @@ async def handle_lol_summary_msg(client, message, target_id):
     total_winrate = client.database.get_total_winrate(target_id)
     total_champs = len(client.api_clients["lol"].champ_ids)
 
-    longest_win_streak = client.database.get_longest_win_or_loss_streak(target_id, True)
-    longest_loss_streak = client.database.get_longest_win_or_loss_streak(target_id, False)
+    longest_win_streak = client.database.get_longest_win_or_loss_streak(target_id, 1)
+    longest_loss_streak = client.database.get_longest_win_or_loss_streak(target_id, 0)
 
     best_champ_wr, best_champ_games, best_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, True)
     worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, False)

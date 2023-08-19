@@ -80,11 +80,11 @@ async def handle_average_msg(client, message, game, stat, champ_or_map=None, dis
     elif game == "csgo":
         await handle_average_msg_csgo(client, message, stat, champ_or_map, disc_id)
 
-def get_game_summary(client, game, game_id, target_id):
+def get_game_summary(client, game, game_id, target_id, guild_id):
     game_info = client.api_clients[game].get_game_details(game_id)
 
     if game_info is not None:
-        game_stats_parser = get_stat_parser(game, game_info, client.database.users[game])
+        game_stats_parser = get_stat_parser(game, game_info, client.database.users[game], guild_id)
         game_stats = game_stats_parser.parse_data()
         return game_stats.get_finished_game_summary(target_id)
     
@@ -139,7 +139,7 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
         game_summary = None
         if min_or_max_value is not None and game_id is not None:
             min_or_max_value = api_util.round_digits(min_or_max_value)
-            game_summary = get_game_summary(client, game, game_id, target_id)
+            game_summary = get_game_summary(client, game, game_id, target_id, message.guild.id)
 
         emote_to_use = "{emote_pog}" if best else "{emote_peberno}"
 

@@ -47,7 +47,7 @@ class PlayerStats(ABC):
     def STAT_QUANTITY_DESC(cls) -> dict[str, tuple[str, str]]:
         return {
             "kills": ("most", "fewest"),
-            "deaths": ("fewest", "most"),
+            "deaths": ("most", "fewest"),
             "deaths": ("most", "fewest"),
             "kda": ("highest", "lowest"),
             "kp": ("highest", "lowest")
@@ -91,7 +91,7 @@ class GameStats(ABC):
         for stat in self.all_player_stats:
             stat.kills_by_team = self.kills_by_our_team
 
-        self.filtered_player_stats = list(filter(lambda x: x[0] is not None, self.all_player_stats))
+        self.filtered_player_stats = list(filter(lambda x: x.disc_id is not None, self.all_player_stats))
 
     def find_player_stats(self, disc_id: int, player_list: list[PlayerStats]):
         for player_stats in player_list:

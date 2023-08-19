@@ -42,7 +42,7 @@ async def handle_intfar_msg(client, message, game, target_id):
 
             reason_desc = "Int-Fars awarded so far:\n"
             for reason_id, reason in enumerate(intfar_reasons):
-                reason_desc += f" - {reason}: **{intfar_counts[reason_id]}**\n"
+                reason_desc += f"- {reason}: **{intfar_counts[reason_id]}**\n"
 
             longest_streak, date_ended = client.database.get_longest_intfar_streak(game, disc_id)
             streak_desc = f"His longest Int-Far streak was **{longest_streak}** games in a row "
@@ -139,13 +139,13 @@ async def handle_intfar_criteria_msg(client, message, game, criteria=None):
     valid_criteria = criteria in intfar_criterias
 
     if valid_criteria:
-        desc = f"Criteria for being Int-Far by {intfar_reasons[criteria]}:"
+        response = f"Criteria for being Int-Far by {intfar_reasons[criteria]}:"
         for line in intfar_criterias[criteria]:
-            desc += f"\n - {line}"
+            response += f"\n- {line}"
     else:
         response = "Possible criterias for getting Int-Far:"
         for reason in intfar_reasons:
-            response += f"\n - {reason}: {intfar_reasons[reason]}"
+            response += f"\n- {reason}: {intfar_reasons[reason]}"
 
     if valid_criteria:
         response += "\nThese criteria must **all** be met to be Int-Far."

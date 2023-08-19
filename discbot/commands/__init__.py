@@ -155,6 +155,9 @@ class Command:
                 parsed_args.append(champ_id)
 
             elif isinstance(param, GameParam):
+                if index >= len(args):
+                    continue
+
                 if args[index] not in SUPPORTED_GAMES:
                     valid_games = ", ".join(f"'{game}'" for game in SUPPORTED_GAMES)
                     await message.channel.send(
@@ -425,7 +428,7 @@ def initialize_commands():
         "Fx. `!average lol kda` to see your average KDA over all games. "
         "This command accepts different parameters for different games. "
         "For LoL, you can see KDA on champs (fx. `!average kda jhin`), "
-        "for CSGO, you can see KDA on maps (fx. `!average kda inferno`)."
+        "for CSGO, you can see KDA on maps (fx. `!average kda inferno`). "
         "(Minimum 10 total games is required to get average KDA)"
     )
     register_command(
@@ -491,7 +494,7 @@ def initialize_commands():
 
     # status command
     status_name = "status"
-    status_desc = "Show overall stats about Int-Far."
+    status_desc = "Show overall stats about Int-Far for a game."
     register_command(
         status_name,
         status_desc,

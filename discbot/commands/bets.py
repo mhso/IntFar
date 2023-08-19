@@ -1,5 +1,6 @@
-from api import betting
+from asyncio import sleep
 import api.util as api_util
+from api import betting
 from discbot.commands import util as commands_util
 from discbot.commands.meta import handle_usage_msg
 
@@ -13,12 +14,14 @@ async def handle_betting_msg(client, message):
     response += "minutes. Betting during a game returns a lower reward, based on "
     response += "how much time has passed in the game.\n"
     response += "**--- List of available events to bet on ---**"
+    await message.channel.send(response)
 
     for game in api_util.SUPPORTED_GAMES:
-        game_response = response + f"\n\nFor **{api_util.SUPPORTED_GAMES[game]}**:"
+        game_response = f"\n\nFor **{api_util.SUPPORTED_GAMES[game]}**:"
         for bet in client.betting_handlers[game].all_bets:
             game_response += f"\n`{bet.event_id}` - Bet on {bet.description}"
 
+        await sleep(0.5)
         await message.channel.send(game_response)
 
 def get_bet_params(client, args):
@@ -93,7 +96,7 @@ async def handle_make_bet_msg(client, message, game, amounts, events, targets):
             message.author.id,
             message.guild.id,
             amounts,
-            client.get_game_start[game, message.guild.id],
+            client.get_game_start(game, message.guild.id),
             events,
             target_ids,
             target_names
@@ -107,11 +110,11 @@ async def handle_cancel_bet_msg(client, message, game, betting_event, target_id=
         else client.get_discord_nick(target_id, message.guild.id)
     )
 
-    response = client.betting_handler.cancel_bet(
+    response = client.betting_handlers[game].cancel_bet(
         message.author.id,
         message.guild.id,
         betting_event,
-        client.get_game_start[game, message.guild.id],
+        client.get_game_start(game, message.guild.id),
         target_id,
         target_name
     )[1]
@@ -123,7 +126,7 @@ async def handle_give_tokens_msg(client, message, amount, target_id):
 
     max_tokens_before, max_tokens_holder = client.database.get_max_tokens_details()
 
-    response = client.betting_handler.give_tokens(
+    response = client.betting_handlers["lol"].give_tokens(
         message.author.id, amount, target_id, target_name
     )[1]
 

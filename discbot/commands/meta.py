@@ -100,18 +100,23 @@ async def handle_users_msg(client, message, game=None):
     response = ""
     games = api_util.SUPPORTED_GAMES if game is None else [game]
     for game in games:
+        game_response = ""
         game_name = api_util.SUPPORTED_GAMES[game]
         for disc_id in client.database.users[game]:
             formatted_names = ", ".join(client.database.users[game][disc_id].ingame_name)
             nickname = client.get_discord_nick(disc_id, message.guild.id)
-            response += f"\n- {nickname} ({formatted_names})"
-        if response == "":
-            response = (
-                f"No lads are currently signed up for {game_name} "
-                "{emote_nat_really_fine} but you can change this!!"
+            game_response += f"\n- {nickname} ({formatted_names})"
+
+        if game_response == "":
+            if response != "":
+                response += "\n\n"
+
+            response += (
+                f"**No lads are currently signed up for {game_name} "
+                "{emote_nat_really_fine} but you can change this!!**"
             )
         else:
-            response = f"**--- Registered bois for {game_name} ---**" + response
+            response += f"\n\n**--- Registered bois for {game_name} ---**" + game_response
 
     await message.channel.send(client.insert_emotes(response))
 
@@ -217,8 +222,8 @@ async def handle_status_msg(client, message, game):
     for disc_id in all_bets:
         bet_data = all_bets[disc_id]
         total_bets += len(bet_data)
-        for _, guild_id, _, amounts, events, targets, _, result, payout in bet_data:
-            for amount, _, _ in zip(amounts, events, targets):
+        for _, guild_id, _, amounts, _, _, _, result, payout in bet_data:
+            for amount in amounts:
                 total_amount += amount
 
             unique_guilds.add(guild_id)
@@ -238,23 +243,23 @@ async def handle_status_msg(client, message, game):
 
     intfar_reasons = get_intfar_reasons(game).values()
 
-    reason_ratio_msg = "\n".join(f"- **{count:.1f}% were for {reason}" for count, reason in zip(intfar_ratios, intfar_reasons))
+    reason_ratio_msg = "\n".join(f"- **{count:.1f}%** were for {reason}" for count, reason in zip(intfar_ratios, intfar_reasons))
     count_literals = ["one", "two", "three", "four", "five", "six", "seven", "eight"]
     def multi_criterias_msg(index, max_count):
         if index == 1:
-            quantifier = f"met just {count_literals[index]} criteria"
+            quantifier = f"met just {count_literals[index-1]} criteria"
         elif index == max_count:
-            quantifier = f"swept and met all {count_literals[index]} criterias"
+            quantifier = f"swept and met all {count_literals[index-1]} criterias"
         else:
-            quantifier = f"met {count_literals[index]} criterias"
+            quantifier = f"met {count_literals[index-1]} criterias"
 
-        return f"- **{intfar_multi_ratios[index-1]:.1f}% of Int-Fars {quantifier}"
+        return f"- **{intfar_multi_ratios[index-1]:.1f}%** of Int-Fars {quantifier}"
 
-    reason_multi_ratio_msg = "\n".join(multi_criterias_msg(index, len(intfar_multi_ratios)) for index in len(range(1, intfar_multi_ratios+1)))
+    reason_multi_ratio_msg = "\n".join(multi_criterias_msg(index, len(intfar_multi_ratios)) for index in range(1, len(intfar_multi_ratios)+1))
 
     response += (
         f"--- Since **{earliest_time}** ---\n"
-        f"- **{games}** games of {api_util.SUPPORTED_GAMES[game]} have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
+        f"- **{games}** games of **{api_util.SUPPORTED_GAMES[game]}** have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
         f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
         f"- **{users}** users have signed up for this game\n"
         f"- **{intfars}** Int-Far awards have been given\n"

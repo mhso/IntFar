@@ -88,8 +88,8 @@ with database_client_1.get_connection() as db_1:
         for data in bets:
             data = list(data)
             for new_event, old_event in BETTING_IDS.items():
-                if int(data[6]) == old_event:
-                    data[6] = new_event
+                if int(data[5]) == old_event:
+                    data[5] = new_event
                     break
             db_2.cursor().execute(query, tuple(data))
 

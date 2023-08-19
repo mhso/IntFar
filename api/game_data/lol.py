@@ -1,6 +1,6 @@
 from datetime import datetime
 from dataclasses import dataclass
-import time
+from time import time
 
 from api.game_stats import GameStats, PlayerStats, GameStatsParser
 from api.util import format_duration
@@ -25,7 +25,7 @@ class LoLPlayerStats(PlayerStats):
     puuid: str
 
     @classmethod
-    def STATS_TO_SAVE():
+    def STATS_TO_SAVE(cls):
         return super().STATS_TO_SAVE() + [
             "champ_id",
             "damage",
@@ -38,7 +38,7 @@ class LoLPlayerStats(PlayerStats):
         ]
 
     @classmethod
-    def STAT_QUANTITY_DESC():
+    def STAT_QUANTITY_DESC(cls):
         stat_quantities = dict(super().STAT_QUANTITY_DESC())
         stat_quantities.update(
             damage=("most", "least"),
@@ -66,7 +66,7 @@ class LoLGameStats(GameStats):
     enemy_herald_kills: int
 
     @classmethod
-    def STATS_TO_SAVE():
+    def STATS_TO_SAVE(cls):
         return super().STATS_TO_SAVE() + ["first_blood"]
 
     def get_filtered_timeline_stats(self, timeline_data: dict):
@@ -137,6 +137,7 @@ class LoLGameStatsParser(GameStatsParser):
         our_team = 100
         player_stats = []
         active_users = []
+        first_blood_id = None
 
         for part_info in self.raw_data["participantIdentities"]:
             for participant in self.raw_data["participants"]:
@@ -149,6 +150,8 @@ class LoLGameStatsParser(GameStatsParser):
                         if part_info["player"]["summonerId"] in summ_ids:
                             our_team = participant["teamId"]
                             stats_for_player = LoLPlayerStats(
+                                game_id=self.raw_data["gameId"],
+                                disc_id=disc_id,
                                 kills=participant["stats"]["kills"],
                                 deaths=participant["stats"]["deaths"],
                                 assists=participant["stats"]["assists"],
@@ -169,7 +172,10 @@ class LoLGameStatsParser(GameStatsParser):
                                 inhibitor_kills=participant["stats"]["inhibitorKills"],
                                 puuid=participant["stats"]["puuid"]
                             )
-                            player_stats.append((disc_id, stats_for_player))
+                            player_stats.append(stats_for_player)
+
+                            if participant["stats"]["firstBloodKill"]:
+                                first_blood_id = disc_id
 
                             summ_data = (
                                 disc_id, part_info["player"]["summonerName"],
@@ -187,21 +193,17 @@ class LoLGameStatsParser(GameStatsParser):
         enemy_dragon_kills = 0
         enemy_herald_kills = 0
 
-        for disc_id, stats in player_stats:
-            for team in self.raw_data["teams"]:
-                if team["teamId"] == our_team:
-                    our_baron_kills = team["baronKills"]
-                    our_dragon_kills = team["dragonKills"]
-                    our_herald_kills = team["riftHeraldKills"]
-                    game_win = team["win"] == "Win"
-                    team_id = team["teamId"]
-                else:
-                    enemy_baron_kills = team["baronKills"]
-                    enemy_dragon_kills = team["dragonKills"]
-                    enemy_herald_kills = team["riftHeraldKills"]
-
-            if stats["firstBloodKill"]:
-                first_blood_id = disc_id
+        for team in self.raw_data["teams"]:
+            if team["teamId"] == our_team:
+                our_baron_kills = team["baronKills"]
+                our_dragon_kills = team["dragonKills"]
+                our_herald_kills = team["riftHeraldKills"]
+                game_win = team["win"] == "Win"
+                team_id = team["teamId"]
+            else:
+                enemy_baron_kills = team["baronKills"]
+                enemy_dragon_kills = team["dragonKills"]
+                enemy_herald_kills = team["riftHeraldKills"]
 
         return LoLGameStats(
             game=self.game,
@@ -238,6 +240,7 @@ class LoLGameStatsParser(GameStatsParser):
         our_team = 100
         player_stats = []
         active_users = []
+        first_blood_id = None
 
         for participant in self.raw_data["participants"]:
             kills_per_team[participant["teamId"]] += participant["kills"]
@@ -253,15 +256,19 @@ class LoLGameStatsParser(GameStatsParser):
             if player_disc_id is not None:
                 our_team = participant["teamId"]
 
+            total_cs = participant["neutralMinionsKilled"] + participant["totalMinionsKilled"]
+
             stats_for_player = LoLPlayerStats(
+                game_id=self.raw_data["gameId"],
+                disc_id=player_disc_id,
                 kills=participant["kills"],
                 deaths=participant["deaths"],
                 assists=participant["assists"],
                 champ_id=participant["championId"],
                 champ_name=participant["championName"],
                 damage=participant["totalDamageDealtToChampions"],
-                cs=participant["neutralMinionsKilled"] + participant["totalMinionsKilled"],
-                cs_per_min=(participant["totalCs"] / self.raw_data["gameDuration"]) * 60,
+                cs=total_cs,
+                cs_per_min=(total_cs / self.raw_data["gameDuration"]) * 60,
                 gold=participant["goldEarned"],
                 vision_wards=participant["visionWardsBoughtInGame"],
                 vision_score=participant["visionScore"],
@@ -275,7 +282,10 @@ class LoLGameStatsParser(GameStatsParser):
                 puuid=participant["puuid"]
             )
 
-            player_stats.append((player_disc_id, stats_for_player))
+            if participant["firstBloodKill"]:
+                first_blood_id = player_disc_id
+
+            player_stats.append(stats_for_player)
 
             if player_disc_id is not None:
                 summ_data = (
@@ -284,7 +294,6 @@ class LoLGameStatsParser(GameStatsParser):
                 )
                 active_users.append(summ_data)
 
-        first_blood_id = None
         game_win = True
         team_id = None
         our_baron_kills = 0
@@ -294,22 +303,18 @@ class LoLGameStatsParser(GameStatsParser):
         enemy_dragon_kills = 0
         enemy_herald_kills = 0
 
-        for disc_id, stats in player_stats:
-            for team in self.raw_data["teams"]:
-                objectives = team["objectives"]
-                if team["teamId"] == our_team:
-                    our_baron_kills = objectives["baron"]["kills"]
-                    our_dragon_kills = objectives["dragon"]["kills"]
-                    our_herald_kills = objectives["riftHerald"]["kills"]
-                    game_win = team["win"]
-                    team_id = team["teamId"]
-                else:
-                    enemy_baron_kills = objectives["baron"]["kills"]
-                    enemy_dragon_kills = objectives["dragon"]["kills"]
-                    enemy_herald_kills = objectives["riftHerald"]["kills"]
-
-            if stats["firstBloodKill"]:
-                first_blood_id = disc_id
+        for team in self.raw_data["teams"]:
+            objectives = team["objectives"]
+            if team["teamId"] == our_team:
+                our_baron_kills = objectives["baron"]["kills"]
+                our_dragon_kills = objectives["dragon"]["kills"]
+                our_herald_kills = objectives["riftHerald"]["kills"]
+                game_win = team["win"]
+                team_id = team["teamId"]
+            else:
+                enemy_baron_kills = objectives["baron"]["kills"]
+                enemy_dragon_kills = objectives["dragon"]["kills"]
+                enemy_herald_kills = objectives["riftHerald"]["kills"]
 
         return LoLGameStats(
             game=self.game,
