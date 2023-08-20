@@ -27,8 +27,11 @@ def run_app(
         Route("soundboard", "soundboard_page", "soundboard"),
         Route("lan", "lan_page", "lan"),
         Route("lists", "lists_page", "lol/lists"),
+        Route("register_csgo", "register_csgo_page", "csgo/register"),
         Route("quiz", "quiz_page", "quiz"),
     ]
+
+    # Dynamic routes that depend on which game is chosen
     game_routes = []
     for game in SUPPORTED_GAMES:
         game_route = Route("games", f"{game}_blueprint", f"/{game}")

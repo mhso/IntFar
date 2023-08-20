@@ -2,7 +2,7 @@ import flask
 
 from app.util import make_template_context, get_user_details, discord_request, make_text_response
 
-register_csgo_page = flask.Blueprint("register_csgo", __name__, template_folder="templates")
+register_csgo_page = flask.Blueprint("register_csgo_page", __name__, template_folder="templates")
 
 @register_csgo_page.route('/', methods=["GET", "POST"])
 def home():

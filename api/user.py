@@ -1,9 +1,9 @@
 class User(dict):
-    def __init__(self, disc_id, ingame_name: list[str], ingame_id: list[str], secret: str, **extra_params):
-        self.__setitem__("ingame_name", disc_id)
+    def __init__(self, disc_id, secret: str, ingame_name: list[str]=None, ingame_id: list[str]=None, **extra_params):
+        self.__setitem__("disc_id", disc_id)
+        self.__setitem__("secret", secret)
         self.__setitem__("ingame_name", ingame_name)
         self.__setitem__("ingame_id", ingame_id)
-        self.__setitem__("secret", secret)
 
         for param in extra_params:
             setattr(self, param, extra_params[param])

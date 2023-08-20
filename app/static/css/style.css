@@ -19,7 +19,6 @@
 
 body {
     background-color: rgb(17, 17, 17);
-    background-image: url(../img/background.jpg);
     background-attachment: fixed;
     background-size: cover;
     color: rgb(228, 228, 228);
@@ -203,7 +202,7 @@ table {
     color: rgb(228, 228, 228);
     text-decoration: none;
     display: inline-block;
-    margin-bottom: 6.5px;
+    margin-bottom: 7.5px;
     vertical-align: middle;
 }
 
@@ -1320,4 +1319,67 @@ table {
 
 .highlighted-entry {
     border: 2px solid #e8da0b;
+}
+
+/****************##############****************\
+|                 Register CSGO                 |
+\****************##############****************/
+#csgo-register-wrapper h1 {
+    margin-top: 100px;
+    margin-bottom: 50px;
+}
+
+#csgo-register-wrapper h2 {
+    font-size: 1.5rem;
+}
+
+#csgo-register-not-logged-in {
+    text-align: center;
+    font-size: 18px;
+    margin-top: 100px;
+}
+
+#csgo-register-form {
+    text-align: center;
+    font-size: 18px;
+    width: 700px;
+    margin: 0 auto;
+    background-color: #0009;
+    border-radius: 50px;
+    border: 1px solid white;
+    padding: 30px;
+}
+
+#csgo-register-form > input {
+    border-radius: 10px;
+    margin-left: 5px;
+    margin-right: 5px;
+    padding: 10px;
+    background-color: #131313;
+    color: white;
+    width: 300px;
+}
+
+#csgo-register-name, #csgo-register-id {
+    width: 200px
+}
+
+.csgo-register-helper {
+    margin-bottom: 50px;
+}
+
+.csgo-register-helper > ol {
+    width: 400px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+#csgo-register-submit {
+    font-size: 22px;
+    background-color: #1712ae;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 10px;
+    border: 2px solid white;
+    cursor: pointer;
 }

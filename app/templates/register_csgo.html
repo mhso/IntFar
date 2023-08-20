@@ -4,38 +4,48 @@
 {% include 'head.html' %}
 {% import "navbar.html" as navbar %}
 <body>
-    <div id="register_csgo-wrapper" class="container-flex">
+    <div id="csgo-register-wrapper" class="container-flex">
         {{ navbar.navbar(game, game_name, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
         <h1>Register for CSGO</h1>
 
         <div class="row">
             <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
             <div class="col-12 col-md-10 col-lg-8 col-xxl-6">
-                <form id="register_csgo-form">
-                    <input name="steam_name" type="text" placeholder="Steam Account Name">
-                    <input name="steam_id" type="text" placeholder="Steam ID">
+                {% if not logged_in_user %}
+                <div id="csgo-register-not-logged-in">
+                    <p>You must be logged in to the website to register for CSGO.</p>
+                    <p>Write <span class="discord-command">!website_verify</span> in Discord to login.</p>
+                </div>
+                {% else %}
+                <form id="csgo-register-form">
+                    <input id="csgo-register-name" name="steam_name" type="text" placeholder="Steam Account Name">
+                    <input id="csgo-register-id" name="steam_id" type="text" placeholder="Steam ID">
                     
-                    <div class="csgo_register-helper">
-                        <h2>How do I find account name and ID?</h2>
+                    <div class="csgo-register-helper">
+                        <h2>How do I find my Steam account name and ID?</h2>
                         <ol>
                             <li>Open Steam</li>
                             <li>Go to 'Settings'</li>
                             <li>Go to 'Account Details'</li>
-                            <li>Account name and Steam ID is shown here</li>
+                            <li><strong>Account name</strong> and <strong>ID</strong> is shown here</li>
+                            <li>Paste these in the fields above
                         </ol>
                     </div>
 
-                    <input name="match_auth_code" type="text" placeholder="Match History Code">
+                    <input id="csgo-register-code" name="match_auth_code" type="text" placeholder="Match History Code">
 
-                    <div class="csgo_register-helper">
-                        <h2>How do I find match history code?</h2>
+                    <div class="csgo-register-helper">
+                        <h2>How do I find my CSGO match history code?</h2>
                         <ol>
-                            <li>Go to this link: <a href="https://help.steampowered.com/en/wizard/HelpWithGameIssue/?appid=730&issueid=128"></a></li>
-                            <li>Under 'Access to Your Match History' click 'Generate Code'</li>
-                            <li>Paste the generated code above</li>
+                            <li>Go to <a style="color: cyan" href="https://help.steampowered.com/en/wizard/HelpWithGameIssue/?appid=730&issueid=128">this link</a></li>
+                            <li>Under 'Access to Your Match History' click <strong>'Generate Code'</strong></li>
+                            <li>Paste the 'Authentication Code' in the field above</li>
                         </ol>
                     </div>
+
+                    <button id="csgo-register-submit" type="submit">Register</button>
                 </form>
+                {% endif %}
             </div>
             <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
         </div>

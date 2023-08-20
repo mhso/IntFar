@@ -9,7 +9,8 @@ import flask
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from discbot.commands.util import ADMIN_DISC_ID
 
-_GAME_SPECIFIC_ROUTES = ["index", "users", "betting", "doinks", "stats", "api"]
+_GAME_SPECIFIC_ROUTES = ["index", "users", "betting", "doinks", "stats", "api", "register"]
+_DEFAULT_GAME = "lol"
 
 def register_discord_connection():
     bot_conn = flask.current_app.config["BOT_CONN"]
@@ -44,19 +45,19 @@ def check_and_set_game():
         if url_split[2] in _GAME_SPECIFIC_ROUTES:
             return flask.redirect(f"{'/'.join(url_split[:2])}/lol/{url_split[2]}")
 
-        game = "lol"
+        game = _DEFAULT_GAME
 
     elif len(url_split) == 4:
         if url_split[3] in _GAME_SPECIFIC_ROUTES:
             if url_split[2] not in SUPPORTED_GAMES:
                 return 400, "Invalid game"
-
+            
             game = url_split[2]
         else:
-            game = "lol"
-    
+            game = _DEFAULT_GAME
+
     else:
-        game = "lol"
+        game = _DEFAULT_GAME
 
     flask.current_app.config["CURRENT_GAME"] = game
 
@@ -181,9 +182,8 @@ def get_logged_in_user(database, user_id):
     if user_id is None:
         return None
 
-    users = database.get_all_registered_users()
-    for disc_id in users:
-        if get_hashed_secret(users[users].secret) == user_id:
+    for disc_id in database.all_users:
+        if get_hashed_secret(database.all_users[disc_id].secret) == user_id:
             return disc_id
 
     return None

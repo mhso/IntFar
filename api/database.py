@@ -26,7 +26,7 @@ class Database(SQLiteDatabase):
             "csgo": ["match_auth_code"]
         }
         with self:
-            self.all_users = self.get_base_users()
+            self.all_users: dict[int, User] = self.get_base_users()
             self.users_by_game: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
 
     def _group_users(self, user_data, *params):
@@ -61,9 +61,9 @@ class Database(SQLiteDatabase):
         return discord_id in self.users_by_game[game]
 
     def get_base_users(self):
-        query = "SELECT disc_id FROM users"
+        query = "SELECT disc_id, secret FROM users"
         with self:
-            return [x[0] for x in self.execute_query(query).fetchall()]
+            return {x[0]: User(x[0], x[1]) for x in self.execute_query(query).fetchall()}
 
     def get_all_registered_users(self, game, *extra_params):
         users_table = self._get_users_table(game)

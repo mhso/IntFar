@@ -9,7 +9,7 @@ user_page = flask.Blueprint("users", __name__, template_folder="templates")
 @user_page.route("/")
 @user_page.route("/unknown")
 def user_unknown():
-    return flask.render_template("no_user.html")
+    return make_template_context("no_user.html")
 
 def get_intfar_relations_data(game, disc_id, database):
     relations_data = []
