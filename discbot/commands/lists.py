@@ -22,9 +22,9 @@ async def handle_random_champ_msg(client, message, list_name=None):
 
     await message.channel.send(client.insert_emotes(response))
 
-async def handle_random_unplayed_msg(client, message):
+async def handle_random_unplayed_msg(client, message, target_id):
     all_champs = set(client.api_clients["lol"].champ_names.keys())
-    played_champs = set(x[0] for x in client.database.get_played_league_champs(message.author.id))
+    played_champs = set(x[0] for x in client.database.get_played_league_champs(target_id))
 
     unplayed_champs = [client.api_clients["lol"].get_champ_name(champ) for champ in (all_champs - played_champs)]
     if len(unplayed_champs) == 0: # All champs have been played.
@@ -164,8 +164,8 @@ async def handle_remove_champ(client, message, list_id, champ_ids):
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_random_nochest(client, message, target_id=None):
-    summ_data = client.database.game_user_data_from_discord_id(target_id, "lol")
-    champion_mastery_data = client.api_clients["lol"].get_champion_mastery(summ_data.ingame_id)
+    summ_data = client.database.game_user_data_from_discord_id("lol", target_id)
+    champion_mastery_data = client.api_clients["lol"].get_champion_mastery(summ_data.ingame_id[0])
 
     # Filter champs with no chest granted.
     no_chest_champs = []
@@ -189,8 +189,8 @@ async def handle_best_nochest(client, message, target_id=None):
     Handler for 'best_nochest' command. Finds the champion with the highest winrate
     for the given player where no chest has yet been obtained.
     """
-    summ_data = client.database.game_user_data_from_discord_id(target_id, "lol")
-    champion_mastery_data = client.api_clients["lol"].get_champion_mastery(summ_data.ingame_id)
+    summ_data = client.database.game_user_data_from_discord_id("lol", target_id)
+    champion_mastery_data = client.api_clients["lol"].get_champion_mastery(summ_data.ingame_id[0])
 
     # Filter champs with no chest granted.
     no_chest_champs = []
@@ -219,7 +219,7 @@ async def handle_best_nochest(client, message, target_id=None):
             for winrate, games, champ_id in result:
                 champ_name = client.api_clients["lol"].get_champ_name(champ_id)
 
-                response += f"\n - **{champ_name}** "
+                response += f"\n- **{champ_name}** "
                 response += f"(**{winrate:.1f}%** wins in **{games}** games)"
 
     await message.channel.send(client.insert_emotes(response))

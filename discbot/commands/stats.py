@@ -84,7 +84,7 @@ def get_game_summary(client, game, game_id, target_id, guild_id):
     game_info = client.api_clients[game].get_game_details(game_id)
 
     if game_info is not None:
-        game_stats_parser = get_stat_parser(game, game_info, client.database.users[game], guild_id)
+        game_stats_parser = get_stat_parser(game, game_info, client.database.users_by_game[game], guild_id)
         game_stats = game_stats_parser.parse_data()
         return game_stats.get_finished_game_summary(target_id)
     

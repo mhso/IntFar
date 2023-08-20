@@ -9,6 +9,8 @@ import flask
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from discbot.commands.util import ADMIN_DISC_ID
 
+_GAME_SPECIFIC_ROUTES = ["index", "users", "betting", "doinks", "stats", "api"]
+
 def register_discord_connection():
     bot_conn = flask.current_app.config["BOT_CONN"]
     conn_map = flask.current_app.config["CONN_MAP"]
@@ -29,13 +31,32 @@ def check_and_set_game():
     if base_url[-1] == "/":
         base_url = base_url[:-1]
 
-    url_split = base_url.split("/")
-    if len(url_split) == 1:
-        return flask.redirect(f"{url_split}/lol")
+    prefix = "https" if base_url.startswith("https") else "http"
+    reduced_url = base_url.replace(f"{prefix}://", "")
+    if reduced_url.startswith("www."):
+        reduced_url = reduced_url.replace("www.", "")
 
-    game = url_split[1]
-    if game not in SUPPORTED_GAMES:
-        return 500, "Invalid"
+    url_split = reduced_url.split("/")
+    if len(url_split) == 2:
+        return flask.redirect(f"{base_url}/lol")
+
+    if len(url_split) == 3:
+        if url_split[2] in _GAME_SPECIFIC_ROUTES:
+            return flask.redirect(f"{'/'.join(url_split[:2])}/lol/{url_split[2]}")
+
+        game = "lol"
+
+    elif len(url_split) == 4:
+        if url_split[3] in _GAME_SPECIFIC_ROUTES:
+            if url_split[2] not in SUPPORTED_GAMES:
+                return 400, "Invalid game"
+
+            game = url_split[2]
+        else:
+            game = "lol"
+    
+    else:
+        game = "lol"
 
     flask.current_app.config["CURRENT_GAME"] = game
 
@@ -53,7 +74,7 @@ def ensure_https():
         return flask.redirect(url, code=code)
 
 def before_request():
-    if (resp := check_and_set_game() is not None):
+    if (resp := check_and_set_game()) is not None:
         return resp
 
     create_session_id()
@@ -135,7 +156,7 @@ def get_game_info(game):
     for guild_id in GUILD_IDS:
         active_game = flask.current_app.config["ACTIVE_GAME"].get(guild_id, {}).get(game)
         if active_game is None:
-            active_game = discord_request("func", "get_active_game", [game, guild_id])
+            active_game = discord_request("func", "get_active_game", (game, guild_id))
             if active_game is None:
                 continue
 

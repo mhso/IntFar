@@ -4,8 +4,8 @@
 {% import "navbar.html" as navbar %}
 <body>
     <div id="lists-wrapper" class="container-flex">
-        {{ navbar.navbar('lol', 'League of Legends', logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
-        <a class="undecorated-link" href="{{ url_for('lol.lists.home') }}">
+        {{ navbar.navbar(game, game_name, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
+        <a class="undecorated-link" href="{{ url_for('lists.home') }}">
             <h1>Champion Lists</h1>
         </a>
 

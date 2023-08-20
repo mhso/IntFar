@@ -48,6 +48,9 @@ if not TESTING:
             803987403932172359 # Core Nibs
         )
     }
+
+    LATEST_LAN_PARTY = "september_23"
+
 else: # Use old data for testing.
     LAN_PARTIES = {
         "april_22": LANInfo(

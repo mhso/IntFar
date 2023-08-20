@@ -58,9 +58,14 @@ with database_client_1.get_connection() as db_1:
             secret = summ[3]
             db_2.cursor().execute("INSERT OR IGNORE INTO users VALUES (?, ?, ?)", (disc_id, secret, summ[4]))
 
+        seen_users = set()
         for summ in summoners:
             disc_id = int(summ[0])
-            db_2.cursor().execute("INSERT OR IGNORE INTO users_lol VALUES (?, ?, ?, ?)", (disc_id, summ[1], summ[2], summ[5]))
+
+            main = 1 if disc_id not in seen_users else 0
+
+            seen_users.add(disc_id)
+            db_2.cursor().execute("INSERT OR IGNORE INTO users_lol VALUES (?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], main, summ[5]))
 
         query = "INSERT INTO games_lol(game_id, timestamp, duration, intfar_id, intfar_reason, first_blood, win, guild_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         for data in data_games:

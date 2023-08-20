@@ -18,9 +18,9 @@ async def handle_game_msg(client, message, game, target_id):
     ingame_ids = None
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    for disc_id in client.database.users[game]:
+    for disc_id in client.database.users_by_game[game]:
         if disc_id == target_id:
-            ingame_ids = client.database.users[game][disc_id].ingame_id
+            ingame_ids = client.database.users_by_game[game][disc_id].ingame_id
             break
 
     response = ""
@@ -37,7 +37,7 @@ async def handle_game_msg(client, message, game, target_id):
         await asyncio.sleep(1)
 
     if game_data is not None:
-        stat_parser = get_stat_parser(game, game_data, client.database.users[game], message.guild.id)
+        stat_parser = get_stat_parser(game, game_data, client.database.users_by_game[game], message.guild.id)
         response = f"{target_name} is "
         summary = stat_parser.get_active_game_summary(active_id, api_client)
         response += summary
@@ -105,16 +105,17 @@ async def handle_flirtation_msg(client, message, language):
     await message.channel.send(f"{mention} {flirt_msg}")
 
 async def handle_lol_summary_msg(client, message, target_id):
+    game = "lol"
     # Shows information about various stats a person has accrued.
     nickname = client.get_discord_nick(target_id, message.guild.id)
-    games_played = client.database.get_intfar_stats(target_id)[0]
-    champs_played = client.database.get_champs_played(target_id)
+    games_played = client.database.get_intfar_stats(game, target_id)[0]
+    champs_played = client.database.get_league_champs_played(target_id)
 
-    total_winrate = client.database.get_total_winrate(target_id)
-    total_champs = len(client.api_clients["lol"].champ_ids)
+    total_winrate = client.database.get_total_winrate(game, target_id)
+    total_champs = len(client.api_clients[game].champ_ids)
 
-    longest_win_streak = client.database.get_longest_win_or_loss_streak(target_id, 1)
-    longest_loss_streak = client.database.get_longest_win_or_loss_streak(target_id, 0)
+    longest_win_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 1)
+    longest_loss_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 0)
 
     best_champ_wr, best_champ_games, best_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, True)
     worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, False)
@@ -136,8 +137,8 @@ async def handle_lol_summary_msg(client, message, target_id):
 
     # If person has not played a minimum of 5 games with any champions, skip champ winrate stats.
     if best_champ_wr is not None and worst_champ_wr is not None and best_champ_id != worst_champ_id:
-        best_champ_name = client.api_clients["lol"].get_champ_name(best_champ_id)
-        worst_champ_name = client.api_clients["lol"].get_champ_name(worst_champ_id)
+        best_champ_name = client.api_clients[game].get_champ_name(best_champ_id)
+        worst_champ_name = client.api_clients[game].get_champ_name(worst_champ_id)
         response += (
             f"He performs best on **{best_champ_name}** (won " +
             f"**{best_champ_wr:.1f}%** of **{best_champ_games}** games).\n" +
@@ -145,11 +146,11 @@ async def handle_lol_summary_msg(client, message, target_id):
             f"**{worst_champ_wr:.1f}%** of **{worst_champ_games}** games).\n"
         )
 
-    best_person_id, best_person_games, best_person_wr = client.database.get_winrate_relation(target_id, True)
-    worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(target_id, False)
+    best_person_id, best_person_games, best_person_wr = client.database.get_winrate_relation(game, target_id, True)
+    worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(game, target_id, False)
 
     if best_person_id == worst_person_id:
-        worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(target_id, False, min_games=5)
+        worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(game, target_id, False, min_games=5)
 
     # If person has not played a minimum of 5 games with any person, skip person winrate stats.
     if best_person_wr is not None and worst_person_wr is not None and best_person_id != worst_person_id:
@@ -163,7 +164,7 @@ async def handle_lol_summary_msg(client, message, target_id):
         )
 
     # Get performance score for person.
-    score, rank, num_scores = client.database.get_performance_score(target_id)
+    score, rank, num_scores = client.database.get_performance_score(game, target_id)
 
     response += (
         f"The *Personally Evaluated Normalized Int-Far Score* for {nickname} is " +

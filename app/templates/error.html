@@ -15,8 +15,13 @@
             <p>That page does not exist</p>
             <img src="{{ url_for('static', filename='img/mads.png') }}">
             <br>
-            <a href="{{ url_for('index.index') }}">
-                <button class="standard-btn">Go Home</button>
+            <a href="{{ url_for('lol.index.index') }}">
+                <button class="standard-btn">Go To League of Legends</button>
+            </a>
+            <br>
+            <br>
+            <a href="{{ url_for('csgo.index.index') }}">
+                <button class="standard-btn">Go To Counter Strike: Global Offensive</button>
             </a>
             {% elif error_code == 400 %}
             <p>You provided an invalid game</p>
@@ -25,6 +30,8 @@
             <a href="{{ url_for('lol.index.index') }}">
                 <button class="standard-btn">Go To League of Legends</button>
             </a>
+            <br>
+            <br>
             <a href="{{ url_for('csgo.index.index') }}">
                 <button class="standard-btn">Go To Counter Strike: Global Offensive</button>
             </a>

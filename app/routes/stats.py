@@ -27,7 +27,7 @@ def get_stats(game, database):
 
             pretty_stat = stat.replace("_", " ").capitalize() if len(stat) > 3 else stat.upper()
             quantity_type = 0 if best else 1
-            pretty_quantity = api_util.STAT_QUANTITY_DESC[stat][quantity_type]
+            pretty_quantity = stat_descs[stat][quantity_type]
             if stat == "first_blood":
                 pretty_quantity = "most" if best else "least"
                 pretty_stat += "s"

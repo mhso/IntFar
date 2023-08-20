@@ -158,7 +158,6 @@ class RiotAPIClient(GameAPIClient):
 
                 sleep(0.5)
 
-
     def make_request(self, endpoint, api_route, *params, ignore_errors=[]):
         req_string = endpoint
         for index, param in enumerate(params):

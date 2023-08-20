@@ -15,8 +15,8 @@ def get_bets(game, database, only_active):
         flask.url_for("static", filename=avatar.replace("app/static/", ""))
         for avatar in avatars
     ]
-    names_dict = dict(zip((x[0] for x in database.summoners), names))
-    avatar_dict = dict(zip((x[0] for x in database.summoners), avatars))
+    names_dict = dict(zip(database.all_users, names))
+    avatar_dict = dict(zip(database.all_users, avatars))
 
     presentable_data = []
     for disc_id in all_bets:
@@ -53,7 +53,7 @@ def home():
     logged_in_user = app_util.get_user_details()[0]
 
     all_events = [(bet.event_id, bet.event_id.replace("_", " ").capitalize()) for bet in betting_handler.all_bets]
-    all_ids = list(database.users)
+    all_ids = list(database.all_users)
     all_names = app_util.discord_request("func", "get_discord_nick", None)
     all_avatars = app_util.discord_request("func", "get_discord_avatar", None)
     guild_names = app_util.discord_request("func", "get_guild_name", None)

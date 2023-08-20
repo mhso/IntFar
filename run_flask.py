@@ -31,7 +31,7 @@ def run_app(
     ]
     game_routes = []
     for game in SUPPORTED_GAMES:
-        game_route = Route("games", f"{game}_blueprint", game)
+        game_route = Route("games", f"{game}_blueprint", f"/{game}")
         game_routes += [
             Route("index", "start_page", parent_route=game_route),
             Route("users", "user_page", "user", parent_route=game_route),

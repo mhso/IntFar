@@ -22,7 +22,7 @@ def home():
             error=err_msg
         )
 
-    existing_accounts_dict = database.users["csgo"].get(disc_id, {})
+    existing_accounts_dict = database.users_by_game["csgo"].get(disc_id, {})
     existing_accounts_list = list(
         zip(
             existing_accounts_dict.get("steam_ids", []),

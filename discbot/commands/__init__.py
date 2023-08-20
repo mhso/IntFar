@@ -821,16 +821,19 @@ def initialize_commands():
     # random unplayed commmand
     random_unplayed_name = "random_unplayed"
     random_unplayed_desc = (
-        "Pick a random champion that you have not played before (from all champs, not a list)."
+        "Pick a random champion that you (or someone else) have not played before (from all champs, not a list)."
     )
     register_command(
-        random_unplayed_name, random_unplayed_desc, handle_random_unplayed_msg
+        random_unplayed_name,
+        random_unplayed_desc,
+        handle_random_unplayed_msg,
+        optional_params=[TargetParam("person")]
     )
 
     # random nochest command
     random_nochest_name = "random_nochest"
     random_nochest_desc = (
-        "Pick a random champion that you have not yet earned a chest on (from all champs)."
+        "Pick a random champion that you (or someone else) have not yet earned a chest on (from all champs)."
     )
     register_command(
         random_nochest_name,
@@ -941,6 +944,7 @@ def initialize_commands():
         summary_desc,
         handle_summary_msg,
         access_level="self",
+        mandatory_params=[GameParam("game")],
         optional_params=[TargetParam("person")]
     )
 
@@ -955,6 +959,7 @@ def initialize_commands():
         handle_performance_msg,
         True,
         "self",
+        mandatory_params=[GameParam("game")],
         optional_params=[TargetParam("person")]
     )
 
@@ -966,7 +971,8 @@ def initialize_commands():
         "In CSGO you can see winrates on maps (f.x. `!wr cache`)."
     )
     register_command(
-        wr_name, wr_desc,
+        wr_name,
+        wr_desc,
         handle_winrate_msg,
         access_level="self",
         mandatory_params=[GameParam("game"), RegularParam("champion_or_map")],
@@ -987,7 +993,8 @@ def initialize_commands():
         lan_performance_desc,
         handle_lan_performance_msg,
         access_level="all",
-        optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+        optional_params=[TargetParam("person")],
+        guilds=[GUILD_MAP["core"]]
     )
 
     lan_intfar_name = "lan_intfar"
@@ -1000,7 +1007,8 @@ def initialize_commands():
         handle_lan_intfar_msg,
         True,
         "all",
-        optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+        optional_params=[TargetParam("person")],
+        guilds=[GUILD_MAP["core"]]
     )
 
     lan_doinks_name = "lan_doinks"
@@ -1013,7 +1021,8 @@ def initialize_commands():
         handle_lan_doinks_msg,
         True,
         "all",
-        optional_params=[TargetParam("person")], guilds=[GUILD_MAP["core"]]
+        optional_params=[TargetParam("person")],
+        guilds=[GUILD_MAP["core"]]
     )
 
     # ===== CUTE COMMANDS =====

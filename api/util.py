@@ -13,8 +13,8 @@ MAIN_GUILD_ID = 619073595561213953
 MY_GUILD_ID  = 512363920044982272
 
 SUPPORTED_GAMES = {
-    "lol": "League of Legends", "csgo":
-    "Counter Strike: Global Offensive"
+    "lol": "League of Legends",
+    "csgo": "Counter Strike: Global Offensive"
 }
 
 GUILD_IDS = [ # List of ids of guilds that Int-Far is active in.
@@ -30,8 +30,6 @@ GUILD_ABBREVIATIONS = {
 GUILD_MAP = {
     "nibs": MAIN_GUILD_ID, "circus": 347488541397483543, "core": 803987403932172359
 }
-
-INTFAR_REASONS = ["Low KDA", "Many deaths", "Low KP", "Low Vision Score"]
 
 DOINKS_REASONS = [
     "KDA larger than or equal to 10", "20 kills or more", "Half of the teams damage",
@@ -201,33 +199,6 @@ def parse_amount_str(amount_str, balance=None):
 
 def generate_user_secret():
     return secrets.token_hex(nbytes=32)
-
-def organize_intfar_stats(games_played, intfar_reason_ids):
-    intfar_counts = {x: 0 for x in range(len(INTFAR_REASONS))}
-
-    for reason_id in intfar_reason_ids:
-        intfar_ids = [int(x) for x in reason_id[0]]
-        for index, intfar_id in enumerate(intfar_ids):
-            if intfar_id == 1:
-                intfar_counts[index] += 1
-
-    pct_intfar = (
-        0 if games_played == 0
-        else (len(intfar_reason_ids) / games_played) * 100
-    )
-
-    return games_played, len(intfar_reason_ids), intfar_counts, pct_intfar
-
-def organize_doinks_stats(doinks_reason_ids):
-    doinks_counts = {x: 0 for x in range(len(DOINKS_REASONS))}
-
-    for reason_id in doinks_reason_ids:
-        intfar_ids = [int(x) for x in reason_id[0]]
-        for index, intfar_id in enumerate(intfar_ids):
-            if intfar_id == 1:
-                doinks_counts[index] += 1
-
-    return doinks_counts
 
 def get_guild_abbreviation(guild_id):
     return GUILD_ABBREVIATIONS.get(guild_id, "")

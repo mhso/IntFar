@@ -1,6 +1,6 @@
 import flask
 import api.util as api_util
-from api.awards import get_intfar_reasons, get_doinks_reasons
+from api.awards import get_intfar_reasons, get_doinks_reasons, organize_intfar_stats, organize_doinks_stats
 from api.game_data import get_stat_quantity_descriptions
 from app.util import discord_request, make_template_context, format_bet_timestamp
 
@@ -43,7 +43,7 @@ def get_intfar_data(game, disc_id, database):
     curr_month = api_util.current_month()
     intfar_reasons = get_intfar_reasons(game).values()
     games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id, False)
-    games_all, intfars_all, intfar_counts, pct_all = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
+    games_all, intfars_all, intfar_counts, pct_all = organize_intfar_stats(game, games_played, intfar_reason_ids)
 
     criteria_stats = []
     for reason_id, reason in enumerate(intfar_reasons):
@@ -53,7 +53,7 @@ def get_intfar_data(game, disc_id, database):
     longest_non_streak = database.get_longest_no_intfar_streak(game, disc_id)[0]
 
     games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id, True)
-    games_month, intfars_month, _, pct_month = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
+    games_month, intfars_month, _, pct_month = organize_intfar_stats(game, games_played, intfar_reason_ids)
 
     intfars_of_the_month = database.get_intfars_of_the_month(game)
     user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
@@ -106,7 +106,7 @@ def get_doinks_data(game, disc_id, database):
     doinks_reasons = get_doinks_reasons(game).values()
     doinks_reason_ids = database.get_doinks_stats(game, disc_id)
     total_doinks = database.get_doinks_count(game, disc_id)[1]
-    doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
+    doinks_counts = organize_doinks_stats(game, doinks_reason_ids)
     criteria_stats = []
     for reason_id, reason in enumerate(doinks_reasons):
         criteria_stats.append((reason, doinks_counts[reason_id]))
@@ -120,14 +120,14 @@ def get_doinks_data(game, disc_id, database):
     }
 
 def get_bets(game, disc_id, database, only_active):
-    bets = database.get_bets(only_active, disc_id)
+    bets = database.get_bets(game, only_active, disc_id)
     if bets is None:
         return []
     
     betting_handler = flask.current_app.config["BET_HANDLERS"][game]
 
     names = discord_request("func", "get_discord_nick", None)
-    names_dict = dict(zip(database.users, names))
+    names_dict = dict(zip(database.all_users, names))
     presentable_data = []
 
     for bet_ids, _, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
@@ -169,7 +169,7 @@ def get_betting_data(game, disc_id, database):
         highest_payout = 0
         events_counts = {x: 0 for x in betting_events}
         events_won_counts = {x: 0 for x in betting_events}
-        target_counts = {d_id: 0 for d_id in database.users}
+        target_counts = {d_id: 0 for d_id in database.users_by_game[game]}
         total_bets = 0
 
         for _, _, _, amounts, events, targets, _, result, payout in bets:

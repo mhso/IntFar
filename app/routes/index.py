@@ -168,7 +168,7 @@ def get_feed_data(game, database, feed_length=10):
         bet_timestamp = bet_data[3]
         if game_timestamp > bet_timestamp:
             intfar_desc, doinks_desc, stat_descs, duration = get_game_desc(
-                game_data, best_stats_ever, worst_stats_ever
+                game, game_data, best_stats_ever, worst_stats_ever
             )
             if intfar_desc is not None:
                 feed_data.append((intfar_desc, duration))
@@ -197,7 +197,7 @@ def index():
 
     intfar_all_data = []
     intfar_month_data = []
-    for disc_id in database.users[game]:
+    for disc_id in database.users_by_game[game]:
         games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id)
         games_played_monthly, intfar_reason_ids_monthly = database.get_intfar_stats(game, disc_id, True)
         pct_intfar = (

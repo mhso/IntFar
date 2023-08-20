@@ -10,12 +10,12 @@ class User(dict):
             self.__setitem__(param, extra_params[param])
 
     @property
-    def disc_id(self) -> int:
-        return self.__getitem__("disc_id")
-
-    @property
     def secret(self) -> str:
         return self.__getitem__("secret")
+
+    @property
+    def main(self) -> bool:
+        return self.__getitem__("disc_id")
 
     @property
     def ingame_name(self) -> list[str]:

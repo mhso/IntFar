@@ -1,5 +1,5 @@
 import api.util as api_util
-from api.awards import get_intfar_reasons, get_intfar_criterias_desc
+from api.awards import get_intfar_reasons, get_intfar_criterias_desc, organize_intfar_stats
 
 async def handle_intfar_msg(client, message, game, target_id):
     current_month = api_util.current_month()
@@ -8,7 +8,7 @@ async def handle_intfar_msg(client, message, game, target_id):
     def format_for_all(disc_id, monthly=False):
         person_to_check = client.get_discord_nick(disc_id, message.guild.id)
         games_played, intfar_reason_ids = client.database.get_intfar_stats(game, disc_id, monthly)
-        games_played, intfars, _, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
+        games_played, intfars, _, pct_intfar = organize_intfar_stats(game, games_played, intfar_reason_ids)
         msg = f"{person_to_check}: Int-Far **{intfars}** times "
         msg += f"**({pct_intfar:.2f}%** of {games_played} games) "
         msg = client.insert_emotes(msg)
@@ -17,7 +17,7 @@ async def handle_intfar_msg(client, message, game, target_id):
     def format_for_single(disc_id):
         person_to_check = client.get_discord_nick(disc_id, message.guild.id)
         games_played, intfar_reason_ids = client.database.get_intfar_stats(game, disc_id, False)
-        games_played, intfars, intfar_counts, pct_intfar = api_util.organize_intfar_stats(games_played, intfar_reason_ids)
+        games_played, intfars, intfar_counts, pct_intfar = organize_intfar_stats(game, games_played, intfar_reason_ids)
         intfars_of_the_month = client.database.get_intfars_of_the_month(game)
         user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
 
@@ -29,7 +29,7 @@ async def handle_intfar_msg(client, message, game, target_id):
         msg += "{emote_unlimited_chins}"
         if intfars > 0:
             monthly_games, monthly_infar_ids = client.database.get_intfar_stats(game, disc_id, True)
-            monthly_games, monthly_intfars, _, pct_monthly = api_util.organize_intfar_stats(monthly_games, monthly_infar_ids)
+            monthly_games, monthly_intfars, _, pct_monthly = organize_intfar_stats(game, monthly_games, monthly_infar_ids)
 
             if game == "lol":
                 ratio_desc = f"\nHe has inted the most when playing **{champ_name}** (**{champ_count}** times)"
@@ -74,7 +74,7 @@ async def handle_intfar_msg(client, message, game, target_id):
     if target_id is None: # Check intfar stats for everyone.
         messages_all_time = []
         messages_monthly = []
-        for disc_id in client.database.users[game]:
+        for disc_id in client.database.users_by_game[game]:
             resp_str_all_time, intfars, pct_all_time, _ = format_for_all(disc_id)
             resp_str_month, intfars_month, pct_month, games_played = format_for_all(disc_id, monthly=True)
 

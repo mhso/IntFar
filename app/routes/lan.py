@@ -6,7 +6,7 @@ import flask
 import app.util as app_util
 import api.util as api_util
 import api.lan as lan_api
-from api.awards import get_doinks_reasons
+from api.awards import get_doinks_reasons, get_intfar_reasons
 
 lan_page = flask.Blueprint("lan", __name__, template_folder="templates")
 
@@ -82,7 +82,7 @@ def get_real_active_data(lan_info):
     game_data = app_util.discord_request(
         "func",
         ["get_users_in_game", "get_active_game"],
-        [(_GAME, lan_info.guild_id), (_GAME, lan_info.guil_id)]
+        [(_GAME, lan_info.guild_id), (_GAME, lan_info.guild_id)]
     )
 
     if game_data[0] is None:
@@ -205,10 +205,11 @@ def get_data(lan_info):
         duration_since_game = api_util.format_duration(dt_start, dt_now)
 
         # Int-Far from latest game.
+        intfar_reasons = get_intfar_reasons(_GAME)
         latest_intfar_name = None
         if latest_intfar_id is not None:
             latest_intfar_name = app_util.discord_request("func", "get_discord_nick", latest_intfar_id)
-            latest_intfar_reason = api_util.INTFAR_REASONS[latest_intfar_reason.index("1")]
+            latest_intfar_reason = list(intfar_reasons.values())[latest_intfar_reason.index("1")]
 
         # Doinks from latest game.
         doinks_reasons = get_doinks_reasons(_GAME)

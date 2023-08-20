@@ -9,7 +9,7 @@ from mhooge_flask.database import SQLiteDatabase
 
 from api.game_stats import GameStats, get_outlier_stat
 from api.user import User
-from api.util import TimeZone, generate_user_secret, DOINKS_REASONS, SUPPORTED_GAMES
+from api.util import TimeZone, generate_user_secret, SUPPORTED_GAMES
 
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
@@ -25,7 +25,9 @@ class Database(SQLiteDatabase):
             "lol": [],
             "csgo": ["match_auth_code"]
         }
-        self.users: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
+        with self:
+            self.all_users = self.get_base_users()
+            self.users_by_game: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
 
     def _group_users(self, user_data, *params):
         user_entries = {}
@@ -54,9 +56,14 @@ class Database(SQLiteDatabase):
 
     def user_exists(self, game, discord_id):
         if game is None:
-            return any(discord_id in self.users[game] for game in self.users)
+            return any(discord_id in self.users_by_game[game] for game in self.users_by_game)
 
-        return discord_id in self.users[game]
+        return discord_id in self.users_by_game[game]
+
+    def get_base_users(self):
+        query = "SELECT disc_id FROM users"
+        with self:
+            return [x[0] for x in self.execute_query(query).fetchall()]
 
     def get_all_registered_users(self, game, *extra_params):
         users_table = self._get_users_table(game)
@@ -65,9 +72,9 @@ class Database(SQLiteDatabase):
             values = self.execute_query(query).fetchall()
             games_user_info = {x[0]: {"disc_id": x[0], "secret": x[1]} for x in values}
 
-            all_params = ["disc_id", "ingame_name", "ingame_id"] + list(extra_params)
+            all_params = ["disc_id", "ingame_name", "ingame_id"] + list(extra_params) + ["active"]
             params_str = ", ".join(all_params)
-            query = f"SELECT {params_str} FROM {users_table}"
+            query = f"SELECT {params_str} FROM {users_table} ORDER BY main DESC"
             values = self.execute_query(query).fetchall()
 
             for row in values:
@@ -105,6 +112,7 @@ class Database(SQLiteDatabase):
                 inactive_accounts = self.execute_query(query, discord_id).fetchall()
 
                 if inactive_accounts != []:
+                    # Check if user has been registered before, and is now re-registering.
                     query = f"UPDATE {users_table} SET active=1 WHERE disc_id=?"
                     self.execute_query(query, discord_id)
                     status = "Welcome back to the Int-Far:tm: Tracker:tm:, my lost son :hearts:"
@@ -113,22 +121,24 @@ class Database(SQLiteDatabase):
                     del reduced_params["ingame_name"]
                     del reduced_params["ingame_id"]
 
-                    self.users[game][discord_id] = self.get_all_registered_users(game, **reduced_params)
+                    self.users_by_game[game][discord_id] = self.get_all_registered_users(game, **reduced_params)
 
                 else:
-                    new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users)
+                    new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users_by_game)
+                    main = 1
                     if new_user:
                         # User has never signed up for any game before
                         query = "INSERT INTO users(disc_id, secret, reports) VALUES (?, ?, ?)"
+                        main = 1
                         secret = generate_user_secret()
                         self.execute_query(query, discord_id, secret, 0)
 
-                    user_info = self.users[game].get(discord_id)
+                    user_info = self.users_by_game[game].get(discord_id)
 
                     game_user_name = game_params["ingame_name"]
                     game_user_id = game_params["ingame_id"]
 
-                    parameter_list = ["disc_id"] + list(game_params.keys()) + ["active"]
+                    parameter_list = ["disc_id"] + list(game_params.keys()) + ["main", "active"]
                     questionmarks = ", ".join("?" for _ in range(len(parameter_list) - 1))
                     parameter_names = ",\n".join(parameter_list)
                     query = f"""
@@ -147,16 +157,17 @@ class Database(SQLiteDatabase):
                         for param_name in game_params:
                             user_info[param_name].append(game_params[param_name])
 
+                        main = 0
+
                         status = f"Added smurf '{game_user_name}' with ID '{game_user_id}' for {SUPPORTED_GAMES[game]}."
                     else:
                         user_params = {param_name: [game_params[param_name]] for param_name in game_params}
                         user_params["disc_id"] = discord_id
                         user_params["secret"] = secret
-                        self.users[game][discord_id] = User(**user_params)
+                        self.users_by_game[game][discord_id] = User(**user_params)
                         status = f"User '{game_user_name}' with ID '{game_user_id}' succesfully added for {SUPPORTED_GAMES[game]}!"
-                        # Check if user has been registered before, and is now re-registering.
 
-                    values_list = [discord_id] + list(game_params.values())
+                    values_list = [discord_id] + list(game_params.values()) + [main]
                     self.execute_query(query, *values_list)
 
                     if new_user:
@@ -175,12 +186,12 @@ class Database(SQLiteDatabase):
             query = f"UPDATE {game_table} SET active=0 WHERE disc_id=?"
             self.execute_query(query, disc_id)
 
-        del self.users[game][disc_id]
+        del self.users_by_game[game][disc_id]
 
     def discord_id_from_ingame_name(self, game, name, exact_match=True):
         matches = []
-        for disc_id in self.users[game]:
-            for ingame_name in self.users[game][disc_id].ingame_name:
+        for disc_id in self.users_by_game[game]:
+            for ingame_name in self.users_by_game[game][disc_id].ingame_name:
                 if exact_match and ingame_name.lower() == name:
                     return disc_id
                 elif not exact_match and name in ingame_name.lower():
@@ -189,7 +200,7 @@ class Database(SQLiteDatabase):
         return matches[0] if len(matches) == 1 else None
 
     def game_user_data_from_discord_id(self, game, disc_id):
-        return self.users[game].get(disc_id, None)
+        return self.users_by_game[game].get(disc_id, None)
 
     def game_exists(self, game, game_id):
         games_table = self._get_games_table(game)
@@ -552,7 +563,7 @@ class Database(SQLiteDatabase):
             """
             doinks_reasons_data = self.execute_query(query_doinks_multis).fetchall()
 
-            doinks_counts = [0 for _ in DOINKS_REASONS]
+            doinks_counts = [0 for _ in len(doinks_reasons_data[0])]
             for reason in doinks_reasons_data:
                 for index, c in enumerate(reason[0]):
                     if c == "1":
@@ -1042,7 +1053,7 @@ class Database(SQLiteDatabase):
         stats_table = self._get_participants_table(game)
         query_persons = f"SELECT Count(*) FROM {stats_table} as p GROUP BY game_id"
 
-        users = (len(self.users[game]),)
+        users = (len(self.users_by_game[game]),)
         with self:
             game_data = self.get_games_count(game)
             longest_game = self.get_longest_game(game)

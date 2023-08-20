@@ -1,7 +1,7 @@
 {% macro navbar(game, game_name, discord_id, name, avatar, active_game_data, admin_id) -%}
 <div class="intfar-navbar row">
     <div class="navbar-menu order-1 order-lg-1 col-10 col-sm-9 col-lg-4 col-xl-4">
-        <span>{{ game_name }}</span>
+        {% if game_name %}<div id="navbar-game-name">{{ game_name }}</div>{% endif %}
         <a href="{{ url_for(game + '.index.index') }}">
             Home
         </a><span class="menu-separator">|</span><a href="{{ url_for('about.home') }}">
@@ -10,11 +10,11 @@
             Betting
         </a><span class="menu-separator">|</span><a href="{{ url_for(game + '.doinks.home') }}">
             Doinks
-        </a><span class="menu-separator d-none d-sm-inline">|</span><br class="d-inline d-sm-none"><a href="{{ url_for(game + '.stats.home') }}">
+        </a><span class="menu-separator d-none d-sm-inline-block">|</span><br class="d-inline d-sm-none"><a href="{{ url_for(game + '.stats.home') }}">
             Stats
         </a><span class="menu-separator">|</span><a href="{{ url_for('soundboard.home') }}">
             Soundboard
-        </a><span class="menu-separator">|</span><a href="{{ url_for('lol.lists.home') }}">
+        </a><span class="menu-separator">|</span><a href="{{ url_for('lists.home') }}">
             Lists
         </a>
     </div>
@@ -35,11 +35,11 @@
         </button>
         {% endif %}
 
-        <a class="navbar-username d-none d-sm-inline" href="{% if discord_id %} {{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
+        <a class="navbar-username d-none d-sm-inline" href="{% if discord_id %} {{ url_for(game + '.users.user', disc_id=discord_id) }}{% else %}{{ url_for(game + '.users.user_unknown') }}{% endif %}">
             <span>{{ name }}</span>
         </a>
 
-        <a href="{% if discord_id %}{{ url_for('users.user', disc_id=discord_id) }}{% else %}{{ url_for('users.user_unknown') }}{% endif %}">
+        <a href="{% if discord_id %}{{ url_for(game + '.users.user', disc_id=discord_id) }}{% else %}{{ url_for(game + '.users.user_unknown') }}{% endif %}">
             <img 
                 class="discord-avatar{% if not discord_id %} discord-avatar-unknown{% endif %}" 
                 src="{% if avatar %}{{ avatar }}{% else %}{{ url_for('static', filename='img/questionmark.png') }}{% endif %}"

@@ -1,5 +1,5 @@
 import api.util as api_util
-from api.awards import get_doinks_reasons
+from api.awards import get_doinks_reasons, organize_doinks_stats
 
 async def handle_doinks_msg(client, message, game, target_id):
     doinks_reasons = get_doinks_reasons(game)
@@ -8,7 +8,7 @@ async def handle_doinks_msg(client, message, game, target_id):
         person_to_check = client.get_discord_nick(disc_id, message.guild.id)
         doinks_reason_ids = client.database.get_doinks_stats(game, disc_id)
         total_doinks = client.database.get_doinks_count(game, disc_id)[1]
-        doinks_counts = api_util.organize_doinks_stats(doinks_reason_ids)
+        doinks_counts = organize_doinks_stats(game, doinks_reason_ids)
 
         if game == "lol":
             champ_id, champ_count = client.database.get_league_champ_with_most_doinks(disc_id)
@@ -31,7 +31,7 @@ async def handle_doinks_msg(client, message, game, target_id):
     response = ""
     if target_id is None: # Check doinks for everyone.
         messages = []
-        for disc_id in client.database.users[game]:
+        for disc_id in client.database.users_by_game[game]:
             resp_str, doinks = get_doinks_stats(disc_id, expanded=False)
             messages.append((resp_str, doinks))
 

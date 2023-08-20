@@ -198,7 +198,7 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         """
         try: # Get formatted stats that are relevant for the players in the game.
-            stat_parser = get_stat_parser(game, game_info, self.database.users, guild_id)
+            stat_parser = get_stat_parser(game, game_info, self.database.users_by_game, guild_id)
             parsed_game_stats = stat_parser.parse_data()
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito pls).
@@ -364,7 +364,7 @@ class DiscordClient(discord.Client):
             return None if member is None else member.display_name
 
         nicknames = []
-        for disc_id, _, _ in self.database.summoners:
+        for disc_id in self.database.all_users:
             member = self.get_member_safe(disc_id, guild_id)
             name = "Unnamed" if member is None else member.display_name
             nicknames.append(name)
@@ -373,9 +373,11 @@ class DiscordClient(discord.Client):
 
     async def get_discord_avatar(self, discord_id=None, size=64):
         default_avatar = "app/static/img/questionmark.png"
-        users_to_search = ([x[0] for x in self.database.summoners]
-                           if discord_id is None
-                           else [discord_id])
+        users_to_search = (
+            [disc_id for disc_id in self.database.all_users]
+            if discord_id is None
+            else [discord_id]
+        )
 
         avatar_paths = []
         for disc_id in users_to_search:
@@ -631,7 +633,7 @@ class DiscordClient(discord.Client):
         betting_handler = self.betting_handlers[game_stats.game]
 
         any_bets = False # Bool to indicate whether any bets were made.
-        for disc_id in self.database.users[game_stats.game]:
+        for disc_id in self.database.users_by_game[game_stats.game]:
             # See if the user corresponding to 'disc_id' was in-game.
             player_stats = game_stats.find_player_stats(disc_id, game_stats.filtered_player_stats)
 
