@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from api.user import User
+from api.game_api_client import GameAPIClient
 
 @dataclass
 class PlayerStats(ABC):
@@ -62,9 +63,9 @@ class GameStats(ABC):
     intfar_id: int = field(init=False)
     intfar_reason: str = field(init=False)
     win: int
-    kills_by_our_team: int
     guild_id: int
-    players_in_game: list[tuple]
+    kills_by_our_team: int
+    players_in_game: list[dict]
     all_player_stats: list[PlayerStats]
     filtered_player_stats: list[PlayerStats] = field(init=False)
 
@@ -82,6 +83,14 @@ class GameStats(ABC):
             "win",
             "guild_id"
         ]
+
+    @classmethod
+    def get_stats_from_db(cls, game: str, game_id: int, database, player_stats_cls: PlayerStats):
+        game_stats_to_save = cls.STATS_TO_SAVE()
+        player_stats_to_save = player_stats_cls.STATS_TO_SAVE()
+        game_stats = database.get_game_stats(game, game_stats_to_save, game_id)
+        player_stats = database.get_player_stats(game, player_stats_to_save, game_id)
+        return dict(zip(game_stats_to_save, game_stats)), dict(zip(player_stats_to_save, player_stats))
 
     @abstractmethod
     def get_finished_game_summary(self, disc_id: int) -> str:
@@ -101,9 +110,10 @@ class GameStats(ABC):
         return None
 
 class GameStatsParser(ABC):
-    def __init__(self, game: str, raw_data: dict, all_users: dict[int, User], guild_id: int):
+    def __init__(self, game: str, raw_data: dict, api_client: GameAPIClient, all_users: dict[int, User], guild_id: int):
         self.game = game
         self.raw_data = raw_data
+        self.api_client = api_client
         self.all_users = all_users
         self.guild_id = guild_id
 
@@ -113,6 +123,10 @@ class GameStatsParser(ABC):
 
     @abstractmethod
     def get_active_game_summary(self, active_id, api_client) -> str:
+        ...
+
+    @abstractmethod
+    def parse_from_database(self, database, game_id: int) -> GameStats:
         ...
 
 def get_outlier(

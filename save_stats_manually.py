@@ -45,12 +45,14 @@ class TestMock(DiscordClient):
         for game_id, guild_id in ids_to_save:
             self.game_monitors[self.game].active_game[guild_id] = {"id": game_id}
 
-            game_info = self.api_clients[self.game].get_game_details(game_id)
-            if self.game == "lol":
-                self.game_monitors[self.game].active_game[guild_id]["queue_id"] = game_info["queueId"]
+            api_client = self.api_clients[self.game]
 
-            game_stats_parser = get_stat_parser(self.game, game_info, self.database.users_by_game[self.game], self.guild_to_use)
+            game_info = self.api_clients[self.game].get_game_details(game_id)
+
+            game_stats_parser = get_stat_parser(self.game, game_info, api_client, self.database.users_by_game[self.game], self.guild_to_use)
             parsed_game_stats = game_stats_parser.parse_data()
+            if self.game == "lol":
+                self.game_monitors[self.game].active_game[guild_id]["queue_id"] = parsed_game_stats.queue_id
             awards_handler = get_awards_handler(self.game, self.config, parsed_game_stats)
 
             intfar, response = self.get_intfar_data(awards_handler)

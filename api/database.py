@@ -105,6 +105,7 @@ class Database(SQLiteDatabase):
 
     def add_user(self, game, discord_id, **game_params):
         status = ""
+        status_code = 0
         users_table = self._get_users_table(game)
         try:
             with self:
@@ -122,6 +123,7 @@ class Database(SQLiteDatabase):
                     del reduced_params["ingame_id"]
 
                     self.users_by_game[game][discord_id] = self.get_all_registered_users(game, **reduced_params)
+                    status_code = 2 # User reactivated
 
                 else:
                     new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users_by_game)
@@ -132,6 +134,8 @@ class Database(SQLiteDatabase):
                         main = 1
                         secret = generate_user_secret()
                         self.execute_query(query, discord_id, secret, 0)
+                    else:
+                        secret = self.all_users[discord_id].secret
 
                     user_info = self.users_by_game[game].get(discord_id)
 
@@ -175,10 +179,13 @@ class Database(SQLiteDatabase):
                         query = "INSERT INTO betting_balance VALUES (?, ?)"
 
                         self.execute_query(query, discord_id, 100)
+
+                    status_code = 1 # User added
     
         except DBException:
-            return (False, "A user with that summoner name is already registered!")
-        return (True, status)
+            return (0, "A user with that summoner name is already registered!")
+
+        return (status_code, status)
 
     def remove_user(self, game, disc_id):
         game_table = self._get_users_table(game)
@@ -188,14 +195,17 @@ class Database(SQLiteDatabase):
 
         del self.users_by_game[game][disc_id]
 
-    def discord_id_from_ingame_name(self, game, name, exact_match=True):
+    def discord_id_from_ingame_info(self, game, exact_match=True, **search_params):
         matches = []
         for disc_id in self.users_by_game[game]:
-            for ingame_name in self.users_by_game[game][disc_id].ingame_name:
-                if exact_match and ingame_name.lower() == name:
-                    return disc_id
-                elif not exact_match and name in ingame_name.lower():
-                    matches.append(disc_id)
+            for search_param in search_params:
+                for ingame_info in self.users_by_game[game][disc_id].get(search_param, []):
+                    info_str = str(ingame_info)
+                    value = str(search_params[search_param])
+                    if exact_match and info_str.lower() == value.lower():
+                        return disc_id
+                    elif not exact_match and value in info_str.lower():
+                        matches.append(disc_id)
 
         return matches[0] if len(matches) == 1 else None
 
@@ -1723,44 +1733,52 @@ class Database(SQLiteDatabase):
         with self:
             self.execute_query(query, game_id, game)
 
-    def get_league_lan_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
-        game = "lol"
+    def get_game_stats(self, game, stats, game_id=None, time_after=None, time_before=None, guild_id=None):
         games_table = self._get_games_table(game)
-        stats_table = self._get_games_table(game)
-        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
+
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "g.game_id", game_id)
+
+        stats_to_select = ", ".join(stats)
 
         query = f"""
             SELECT
-                disc_id,
-                kills,
-                deaths,
-                assists,
-                cs,
-                cs_per_min,
-                damage,
-                gold,
-                kp,
-                vision_wards,
-                vision_score,
-                steals
-            FROM {stats_table} AS p
-            INNER JOIN {games_table} AS g
-            ON g.game_id = p.game_id
+                {stats_to_select}
+            FROM {games_table} AS g
             {delim_str}
         """
 
         with self:
-            results = self.execute_query(query, *params).fetchall()
-            if disc_id is None:
-                result_dict = {}
-                for result_tuple in results:
-                    user_id = result_tuple[0]
-                    if user_id not in result_dict:
-                        result_dict[user_id] = []
+            return self.execute_query(query, *params).fetchall()
 
-                    result_dict[user_id].append(result_tuple[1:])
-                return result_dict
-            return results
+    def get_player_stats(self, game, stats, game_id=None, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        games_table = self._get_games_table(game)
+        stats_table = self._get_games_table(game)
+
+        prefix = "WHERE"
+        game_id_delimeter = ""
+        params = []
+        if game_id is not None:
+            game_id_delimeter = "WHERE game_id=?"
+            params = [game_id]
+            prefix = "AND"
+ 
+        delim_str, delim_params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id, prefix)
+        params = params + delim_params
+
+        stats_to_select = ", ".join(stats)
+
+        query = f"""
+            SELECT
+                {stats_to_select}
+            FROM {stats_table} AS p
+            INNER JOIN {games_table} AS g
+            ON g.game_id = p.game_id
+            {game_id_delimeter}
+            {delim_str}
+        """
+
+        with self:
+            return self.execute_query(query, *params).fetchall()
 
     def create_backup(self):
         backup_name = "resources/database_backup.db"

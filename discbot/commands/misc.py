@@ -37,7 +37,7 @@ async def handle_game_msg(client, message, game, target_id):
         await asyncio.sleep(1)
 
     if game_data is not None:
-        stat_parser = get_stat_parser(game, game_data, client.database.users_by_game[game], message.guild.id)
+        stat_parser = get_stat_parser(game, game_data, client.api_clients[game], client.database.users_by_game[game], message.guild.id)
         response = f"{target_name} is "
         summary = stat_parser.get_active_game_summary(active_id, api_client)
         response += summary

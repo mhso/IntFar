@@ -12,7 +12,7 @@ CREATE TABLE [users_lol] (
 );
 CREATE TABLE [users_csgo] (
     [disc_id] INTEGER NOT NULL,
-    [ingame_name] INTEGER NOT NULL,
+    [ingame_name] NVARCHAR(64) NOT NULL,
     [ingame_id] INTEGER NOT NULL,
     [match_auth_code] INTEGER,
     [main] INTEGER(1),

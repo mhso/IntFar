@@ -1,6 +1,6 @@
 import api.util as api_util
 from api import game_stats
-from api.game_data import get_stat_quantity_descriptions, get_stat_parser
+from api.game_data import get_stat_quantity_descriptions, stats_from_database
 
 async def handle_stats_msg(client, message, game):
     valid_stats = ", ".join(f"'{cmd}'" for cmd in get_stat_quantity_descriptions(game))
@@ -81,14 +81,15 @@ async def handle_average_msg(client, message, game, stat, champ_or_map=None, dis
         await handle_average_msg_csgo(client, message, stat, champ_or_map, disc_id)
 
 def get_game_summary(client, game, game_id, target_id, guild_id):
-    game_info = client.api_clients[game].get_game_details(game_id)
-
-    if game_info is not None:
-        game_stats_parser = get_stat_parser(game, game_info, client.database.users_by_game[game], guild_id)
-        game_stats = game_stats_parser.parse_data()
-        return game_stats.get_finished_game_summary(target_id)
-    
-    return None
+    game_stats = stats_from_database(
+        game,
+        game_id,
+        client.database,
+        client.api_clients[game],
+        client.database.users_by_game[game],
+        guild_id
+    )
+    return game_stats.get_finished_game_summary(target_id)
 
 async def handle_stat_msg(client, message, game, best, stat, target_id):
     """

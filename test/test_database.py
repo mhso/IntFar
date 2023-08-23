@@ -29,7 +29,7 @@ class TestWrapper(TestRunner):
 
         self.assert_equals(users_after, users_before + 1, "User was added.")
 
-        self.assert_no_exception(database.discord_id_from_ingame_name, "User from ingame name", GAME, "name")
+        self.assert_no_exception(database.discord_id_from_ingame_info, "User from ingame info", GAME, ingame_name="name")
 
         users_before = len(database.users_by_game[GAME])
         self.assert_no_exception(database.add_user, "Add Smurf.", GAME, 123, ingame_name="name", ingame_id="id2")

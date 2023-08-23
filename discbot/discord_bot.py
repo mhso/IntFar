@@ -198,7 +198,7 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         """
         try: # Get formatted stats that are relevant for the players in the game.
-            stat_parser = get_stat_parser(game, game_info, self.database.users_by_game, guild_id)
+            stat_parser = get_stat_parser(game, game_info, self.api_clients[game], self.database.users_by_game, guild_id)
             parsed_game_stats = stat_parser.parse_data()
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito pls).
@@ -523,7 +523,7 @@ class DiscordClient(discord.Client):
 
         disc_id_candidates = set()
         for game in api_util.SUPPORTED_GAMES:
-            discord_id = self.database.discord_id_from_ingame_name(game, name, exact_match=False)
+            discord_id = self.database.discord_id_from_ingame_info(game, exact_match=False, ingame_name=name)
             if discord_id is not None:
                 disc_id_candidates.add(discord_id)
 

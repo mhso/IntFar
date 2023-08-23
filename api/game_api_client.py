@@ -5,3 +5,11 @@ class GameAPIClient(ABC):
     def __init__(self, game: str, config: Config):
         self.game = game
         self.config = config
+
+    @abstractmethod
+    def get_active_game(self, user_id) -> dict:
+        ...
+
+    @abstractmethod
+    def get_game_details(self, match_id) -> dict:
+        ...

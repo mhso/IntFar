@@ -1,4 +1,5 @@
 from datetime import datetime
+from game_data import get_stat_quantity_descriptions
 
 TESTING = False
 
@@ -122,7 +123,12 @@ def get_tilt_value(recent_games):
     return int((tilt_value / max_value) * 100), color
 
 def get_average_stats(database, lan_info):
-    all_stats = database.get_league_lan_stats(
+    game = "lol"
+    keys = ["disc_id"] + list(get_stat_quantity_descriptions(game))
+
+    all_stats = database.get_player_stats(
+        game,
+        keys,
         time_after=lan_info.start_time,
         time_before=lan_info.end_time,
         guild_id=lan_info.guild_id
@@ -131,13 +137,8 @@ def get_average_stats(database, lan_info):
     if all_stats == []:
         return None, None
 
-    keys = [
-        "Kills", "Deaths", "KDA", "CS", "CS/min", "Damage",
-        "Gold", "KP", "Vision Wards", "Vision Score"
-    ]
-
     all_avg_stats = {key: [] for key in keys}
-    for disc_id in all_stats:
+    for stat_tuple in all_stats:
         avg_stats = [0 for _ in keys]
         total_kda = 0
 
@@ -151,7 +152,7 @@ def get_average_stats(database, lan_info):
             all_avg_stats[keys[index]].append((disc_id, sum_value / len(all_stats[disc_id])))
 
     for key in all_avg_stats:
-        reverse = False if key == "Deaths" else True
+        reverse = False if key == "deaths" else True
         all_avg_stats[key].sort(key=lambda x: x[1], reverse=reverse)
 
     all_ranks = {}

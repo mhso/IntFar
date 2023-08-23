@@ -1,12 +1,19 @@
 import json
+import bz2
+from uuid import uuid4
+
 from mhooge_flask.logging import logger
 
 import requests
 from steam.client import SteamClient
 from steam.guard import SteamAuthenticator
 from csgo.client import CSGOClient
+from steam.steamid import SteamID
+from steam.core.msg import MsgProto
+from steam.protobufs.steammessages_clientserver_friends_pb2 import CMsgClientAddFriend, CMsgClientAddFriendResponse
 from csgo import sharecode
 from google.protobuf.json_format import MessageToJson
+from awpy import DemoParser
 
 from api.config import Config
 from api.game_api_client import GameAPIClient
@@ -49,6 +56,20 @@ class SteamAPIClient(GameAPIClient):
         else:
             logger.warning("No Steam 2FA code provided. Steam/CSGO functionality wont work!")
 
+    def _download_demo_file(self, url):
+        filename = uuid4().hex
+        try:
+            data = requests.get(url, stream=True)
+            with open(f"{filename}.dem.bz2", "wb") as fp:
+                for chunk in data.iter_content(chunk_size=128):
+                    fp.write(chunk)
+
+        except requests.RequestException:
+            logger.exception("Exception when downloading CSGO demo file from ", url)
+            return None
+
+        return filename
+
     def get_game_details(self, match_token):
         code_dict = sharecode.decode(match_token)
         self.cs_client.request_full_match_info(
@@ -57,12 +78,27 @@ class SteamAPIClient(GameAPIClient):
             code_dict["token"],
         )
         resp, = self.cs_client.wait_event('full_match_info')
-        as_json = json.loads(MessageToJson(resp))
+        game_info = json.loads(MessageToJson(resp))
+        demo_url = game_info["matches"][0]["roundstatsall"][-1]["map"]
 
-        return as_json
+        demo_file = self._download_demo_file(demo_url)
+        with open(f"{demo_file}.dem.bz", "rb") as fp:
+            all_bytes = fp.read()
 
-    def get_active_game(self, steam_id):
-        pass
+        decompressed = bz2.decompress(all_bytes)
+        with open(f"{demo_file}.dem", "wb") as fp:
+            fp.write(decompressed)
+
+        parser = DemoParser(f"{demo_file}.dem")
+        demo_game_data = parser.parse()
+
+        return demo_game_data
+
+    def get_active_game(self, steam_ids):
+        account_ids = [SteamID(steam_id) for steam_id in steam_ids]
+        self.cs_client.request_watch_info_friends(account_ids)
+        resp = self.cs_client.wait_event("watch_info")
+        return json.loads(MessageToJson(resp[0]))
 
     def get_next_sharecode(self, steam_id, game_code, match_token):
         url = _ENDPOINT_NEXT_MATCH.replace(
@@ -77,7 +113,7 @@ class SteamAPIClient(GameAPIClient):
 
         return requests.get(url)
 
-    def validate_steam_id(self, steam_id):
+    def get_steam_display_name(self, steam_id):
         url = _ENDPOINT_PLAYER_SUMMARY.replace(
             "[key]", self.config.steam_key
         ).replace(
@@ -86,9 +122,16 @@ class SteamAPIClient(GameAPIClient):
 
         response = requests.get(url)
         if response.status_code != 200:
-            return False
+            return None
 
-        return response.json().get("response", {}).get("players", []) != []
+        for player in response.json().get("response", {}).get("players", []):
+            if player["steamid"] == str(steam_id):
+                return player["personaname"]
+
+        return None
+
+    def send_friend_request(self, steam_id):
+        self.steam_client.send(MsgProto(CMsgClientAddFriend), {"steam_id": steam_id})
 
     def handle_steam_start(self):
         self.cs_client.launch()
@@ -100,7 +143,7 @@ class SteamAPIClient(GameAPIClient):
 
     def handle_cs_started(self):
         logger.info("CS Started")
-    
+
     def handle_steam_error(self, error):
         logger.bind(steam_error=error).error("Steam Client error")
 

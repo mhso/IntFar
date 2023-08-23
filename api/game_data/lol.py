@@ -16,13 +16,13 @@ class LoLPlayerStats(PlayerStats):
     vision_wards: int
     vision_score: int
     steals: int
-    lane: str
-    role: str
-    pentakills: int
-    total_time_dead: int
-    turret_kills: int
-    inhibitor_kills: int
-    puuid: str
+    lane: str=None
+    role: str=None
+    pentakills: int=None
+    total_time_dead: int=None
+    turret_kills: int=None
+    inhibitor_kills: int=None
+    puuid: str=None
 
     @classmethod
     def STATS_TO_SAVE(cls):
@@ -55,15 +55,16 @@ class LoLPlayerStats(PlayerStats):
 @dataclass
 class LoLGameStats(GameStats):
     first_blood: int
-    map_id: int
-    team_id: int
-    damage_by_our_team: int
-    our_baron_kills: int
-    our_dragon_kills: int
-    our_herald_kills: int
-    enemy_baron_kills: int
-    enemy_dragon_kills: int
-    enemy_herald_kills: int
+    map_id: int = None
+    queue_id: int = None
+    team_id: int = None
+    damage_by_our_team: int = None
+    our_baron_kills: int = None
+    our_dragon_kills: int = None
+    our_herald_kills: int = None
+    enemy_baron_kills: int = None
+    enemy_dragon_kills: int = None
+    enemy_herald_kills: int = None
 
     @classmethod
     def STATS_TO_SAVE(cls):
@@ -92,10 +93,7 @@ class LoLGameStats(GameStats):
 
         return timeline_data
 
-    def get_finished_game_summary(
-        self,
-        disc_id: int
-    ):
+    def get_finished_game_summary(self, disc_id: int):
         """
         Get a brief text that summaries a player's performance in a finished game.
 
@@ -114,14 +112,36 @@ class LoLGameStats(GameStats):
         )
 
 class LoLGameStatsParser(GameStatsParser):
-    def __init__(self, game, data_dict, all_users, guild_id):
-        super().__init__(game, data_dict, all_users, guild_id)
+    def __init__(self, game, raw_data, api_client, all_users, guild_id):
+        super().__init__(game, raw_data, api_client, all_users, guild_id)
 
     def parse_data(self) -> GameStats:
         if "participantIdentities" in self.raw_data: # Old match v4 data.
             return self.get_relevant_stats_v4()
 
         return self.get_relevant_stats()
+
+    def parse_from_database(self, game_id: int, database) -> GameStats:
+        game_stats, player_stats = LoLGameStats.get_stats_from_db(self.game, game_id, database, LoLPlayerStats)
+        parsed_game_stats["kills_by_our_team"] = 0
+
+        parsed_game_stats = GameStats(**game_stats)
+
+        all_player_stats = []
+        players_in_game = []
+        for stat_dict in player_stats:
+            user_game_info = self.all_users[stat_dict["disc_id"]]
+            stat_dict["champ_name"] = self.api_client.get_champ_name(stat_dict["champ_id"])
+            all_player_stats.append(LoLPlayerStats(**all_player_stats))
+            summ_info = {
+                "disc_id": user_game_info.disc_id,
+                "summ_name": user_game_info.summ_name[0],
+                "summ_id": user_game_info.summ_id[0],
+                "champion_id": stat_dict["champ_id"],
+            }
+            players_in_game.append(summ_info)
+
+        return GameStats(**game_stats, players_in_game=players_in_game, all_player_stats=player_stats)
 
     def get_relevant_stats_v4(self) -> GameStats:
         """
@@ -177,10 +197,12 @@ class LoLGameStatsParser(GameStatsParser):
                             if participant["stats"]["firstBloodKill"]:
                                 first_blood_id = disc_id
 
-                            summ_data = (
-                                disc_id, part_info["player"]["summonerName"],
-                                part_info["player"]["summonerId"], participant["championId"]
-                            )
+                            summ_data = {
+                                "disc_id": disc_id,
+                                "summ_name": part_info["player"]["summonerName"],
+                                "summ_id": part_info["player"]["summonerId"],
+                                "champion_id": participant["championId"]
+                            }
                             active_users.append(summ_data)
 
         first_blood_id = None
@@ -217,6 +239,7 @@ class LoLGameStatsParser(GameStatsParser):
             all_player_stats=player_stats,
             first_blood=first_blood_id,
             map_id=self.raw_data["mapId"],
+            queue_id=self.raw_data["queueId"],
             team_id=team_id,
             damage_by_our_team=damage_per_team[our_team],
             our_baron_kills=our_baron_kills,
@@ -288,10 +311,12 @@ class LoLGameStatsParser(GameStatsParser):
             player_stats.append(stats_for_player)
 
             if player_disc_id is not None:
-                summ_data = (
-                    player_disc_id, participant["summonerName"],
-                    participant["summonerId"], participant["championId"]
-                )
+                summ_data = {
+                    "disc_id": player_disc_id,
+                    "summ_name": participant["summonerName"],
+                    "summ_id": participant["summonerId"],
+                    "champion_id": participant["championId"]
+                }
                 active_users.append(summ_data)
 
         game_win = True
@@ -328,6 +353,7 @@ class LoLGameStatsParser(GameStatsParser):
             all_player_stats=player_stats,
             first_blood=first_blood_id,
             map_id=self.raw_data["mapId"],
+            queue_id=self.raw_data["queueId"],
             team_id=team_id,
             damage_by_our_team=damage_per_team[our_team],
             our_baron_kills=our_baron_kills,

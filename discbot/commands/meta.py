@@ -2,65 +2,15 @@ from datetime import datetime
 
 import api.util as api_util
 from api.awards import get_intfar_reasons
+from api.register import register_for_game
 import discbot.commands.util as commands_util
 
-async def handle_lol_register_msg(client, message, target_name):
-    game = "lol"
-    if target_name is None:
-        status = "You must supply a summoner name {emote_angry_gual}"
-        return False, status
+async def handle_register_msg(client, message, game, target, *extra_args):
+    disc_id = message.author.id
+    api_client = client.api_clients[game]
+    status_code, status_msg = register_for_game(client.database, api_client, disc_id, target, *extra_args)
 
-    if client.database.user_exists(game, target_name):
-        status = "User with that summoner name is already registered."
-        return False, status
-
-    elif (summ_id := client.api_clients["lol"].get_summoner_id(target_name.replace(" ", "%20"))) is None:
-        status = f"Error: Invalid summoner name {client.get_emoji_by_name('PepeHands')}"
-        return False, status
-
-    return client.database.add_user(
-        game,
-        message.author.id,
-        ingame_name=target_name,
-        ingame_id=summ_id
-    )
-
-async def handle_csgo_register_msg(client, message, target_name, steam_id=None, match_auth_code=None):
-    game = "csgo"
-    if target_name is None:
-        status = "You must supply a Steam account name {emote_angry_gual}"
-        return False, status
-    
-    if steam_id is None:
-        status = "You must supply a Steam ID {emote_angry_gual}"
-        return False, status
-    
-    if match_auth_code is None:
-        status = "You must supply a match authentication code {emote_angry_gual}"
-        return False, status
-
-    if client.database.user_exists(game, target_name):
-        status = "User with that Steam account name is already registered."
-        return False, status
-
-    elif client.steam_api.validate_steam_id(steam_id) is None:
-        status = f"Error: Invalid Steam ID {client.get_emoji_by_name('PepeHands')}"
-        return False, status
-
-    return client.database.add_user(
-        game, message.author.id,
-        ingame_name=target_name,
-        ingame_id=steam_id,
-        match_auth_code=match_auth_code
-    )
-
-async def handle_register_msg(client, message, game, target_name, *extra_args):
-    if game == "lol":
-        success, status = await handle_lol_register_msg(client, message, target_name)
-    elif game == "csgo":
-        success, status = await handle_csgo_register_msg(client, message, target_name, *extra_args)
-
-    if success:
+    if status_code > 0:
         users_in_voice = client.get_users_in_voice()
         for guild_id in users_in_voice:
             for disc_id in users_in_voice[guild_id][game]:
@@ -68,7 +18,7 @@ async def handle_register_msg(client, message, game, target_name, *extra_args):
                     await client.user_joined_voice(disc_id, guild_id)
                     break
 
-    await message.channel.send(client.insert_emotes(status))
+    await message.channel.send(client.insert_emotes(status_msg))
 
 async def handle_unregister_msg(client, message, game):
     user_in_game = False

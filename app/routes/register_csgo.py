@@ -1,6 +1,7 @@
 import flask
 
-from app.util import make_template_context, get_user_details, discord_request, make_text_response
+from api.register import register_for_game
+from app.util import make_template_context, get_user_details, make_text_response
 
 register_csgo_page = flask.Blueprint("register_csgo_page", __name__, template_folder="templates")
 
@@ -32,15 +33,31 @@ def home():
 
     if flask.request.method == "POST":
         data = flask.request.form
-        required_fields = ["steam_name", "steam_id", "match_auth_code"]
+        required_fields = ["steam_id", "match_auth_code"]
         for field in required_fields:
             if data.get(field, "") == "":
                 return make_text_response(
                     f"Registration failed: Missing value for field '{field}'.",
                     400
                 )
-            
-        
+
+        api_client = flask.current_app.config["GAME_API_CLIENTS"]["csgo"]
+        steam_id = data["steam_id"]
+        match_auth_code = data["match_auth_code"]
+
+        status_code, status_msg = register_for_game(database, api_client, disc_id, steam_id, match_auth_code)
+
+        status_code = 200 if status_code else 400
+
+        friend_request_sent = status_code == 1
+
+        return make_template_context(
+            "register_csgo.html",
+            status_code,
+            error=status_code == 0,
+            register_msg=status_msg,
+            friend_request_sent=friend_request_sent
+        )
 
     return make_template_context("register_csgo.html", registered_accounts=existing_accounts_list)
 

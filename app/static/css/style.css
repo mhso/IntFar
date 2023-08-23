@@ -1342,11 +1342,11 @@ table {
 #csgo-register-form {
     text-align: center;
     font-size: 18px;
-    width: 700px;
+    width: 675px;
     margin: 0 auto;
     background-color: #0009;
     border-radius: 50px;
-    border: 1px solid white;
+    border: 2px solid white;
     padding: 30px;
 }
 
@@ -1360,10 +1360,6 @@ table {
     width: 300px;
 }
 
-#csgo-register-name, #csgo-register-id {
-    width: 200px
-}
-
 .csgo-register-helper {
     margin-bottom: 50px;
 }
@@ -1374,6 +1370,21 @@ table {
     text-align: left;
 }
 
+.csgo-register-error-label {
+    display: block;
+    margin-top: 5px;
+    color: red;
+    font-size: 15px;
+}
+
+.csgo-input-error {
+    border: 1px solid red;
+}
+
+.csgo-input-success {
+    border: 1px solid green;
+}
+
 #csgo-register-submit {
     font-size: 22px;
     background-color: #1712ae;
@@ -1382,4 +1393,17 @@ table {
     border-radius: 10px;
     border: 2px solid white;
     cursor: pointer;
+}
+
+#csgo-register-success-wrapper {
+    text-align: center;
+}
+
+.csgo-submit-success {
+    color: #00ef0f;
+    font-size: 20px;
+}
+
+.csgo-submit-error {
+    color: red;
 }
