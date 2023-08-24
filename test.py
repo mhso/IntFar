@@ -231,8 +231,7 @@ class TestFuncs:
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
         api_client = SteamAPIClient("csgo", self.config)
         steam_id = 76561197970416015
-        idk = api_client.get_friends_stuff(steam_id)
-        print(idk)
+        api_client.send_friend_request(steam_id)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

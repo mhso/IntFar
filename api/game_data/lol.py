@@ -364,7 +364,7 @@ class LoLGameStatsParser(GameStatsParser):
             enemy_herald_kills=enemy_herald_kills,
         )
 
-    def get_active_game_summary(self, active_id, api_client):
+    def get_active_game_summary(self, active_id):
         """
         Extract data about a currently active game.
 
@@ -379,7 +379,7 @@ class LoLGameStatsParser(GameStatsParser):
             for disc_id in self.all_users:
                 if participant["summonerId"] in self.all_users[disc_id].ingame_id:
                     champ_id = participant["championId"]
-                    champ_played = api_client.get_champ_name(champ_id)
+                    champ_played = self.api_client.get_champ_name(champ_id)
                     if champ_played is None:
                         champ_played = "Unknown Champ (Rito pls)"
                     champions[participant["summonerId"]] = (participant["summonerName"], champ_played)

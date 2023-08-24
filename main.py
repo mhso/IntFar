@@ -10,6 +10,9 @@ import run_flask
 from api.config import Config
 from api.database import Database
 from api.util import SUPPORTED_GAMES
+from api.proxy import Manager
+from api.game_api.lol import RiotAPIClient
+from api.game_api.csgo import SteamAPIClient
 from api.bets import get_betting_handler
 #from ai import model
 from discbot import discord_bot
@@ -71,7 +74,14 @@ def main():
 
     logger.info("Initializing database...")
 
+    manager = Manager(SteamAPIClient, "csgo", conf)
+
     database_client = Database(conf)
+    api_clients = {
+        "lol": RiotAPIClient("lol", conf),
+        "csgo": manager.create_proxy()
+    }
+
     betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
 
     # Start process with machine learning model
@@ -79,11 +89,11 @@ def main():
     #ai_process, our_end_ai = start_ai_process(conf)
 
     logger.info("Starting Flask web app...")
-    flask_args = [database_client, betting_handlers, conf]
+    flask_args = [database_client, betting_handlers, api_clients, conf]
     flask_process, bot_end_flask = start_flask_process(*flask_args)
 
     logger.info("Starting Discord Client...")
-    discord_args = [conf, database_client, betting_handlers, None, bot_end_flask]
+    discord_args = [conf, database_client, betting_handlers, api_clients, None, bot_end_flask]
     bot_process, _ = start_discord_process(*discord_args)
 
     while True:
@@ -104,6 +114,7 @@ def main():
                 #ai_process.kill()
                 flask_process.kill()
                 bot_process.kill()
+                manager.close()
 
                 # Wait for all subprocesses to exit.
                 processes = [flask_process, bot_process]

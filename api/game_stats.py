@@ -11,8 +11,8 @@ class PlayerStats(ABC):
     kills: int
     deaths: int
     assists: int
-    doinks: str = field(init=False)
-    kills_by_team: int = field(init=False)
+    doinks: str = field(default=None, init=False)
+    kills_by_team: int = field(default=None, init=False)
 
     @property
     def kda(self) -> float:
@@ -60,14 +60,14 @@ class GameStats(ABC):
     game_id: int
     timestamp: int
     duration: int
-    intfar_id: int = field(init=False)
-    intfar_reason: str = field(init=False)
+    intfar_id: int = field(default=None, init=False)
+    intfar_reason: str = field(default=None, init=False)
     win: int
     guild_id: int
     kills_by_our_team: int
     players_in_game: list[dict]
     all_player_stats: list[PlayerStats]
-    filtered_player_stats: list[PlayerStats] = field(init=False)
+    filtered_player_stats: list[PlayerStats] = field(default=None, init=False)
 
     @classmethod
     def STATS_TO_SAVE(cls) -> list[str]:

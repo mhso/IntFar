@@ -5,18 +5,19 @@ from mhooge_flask.logging import logger
 
 from mhooge_flask import init
 from mhooge_flask.init import Route
+from api.game_api_client import GameAPIClient
 
 from app.util import before_request
 from app.routes import errors as route_errors
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from api.database import Database
 from api.betting import BettingHandler
-from api.game_api import get_api_client
 from api.config import Config
 
 def run_app(
     database: Database,
     bet_handlers: dict[str, BettingHandler],
+    api_clients: dict[str, GameAPIClient],
     config: Config,
     bot_pipe: Connection
 ):
@@ -58,7 +59,7 @@ def run_app(
         bot_conn=bot_pipe,
         current_game="lol",
         logged_in_users={},
-        game_api_clients={game: get_api_client(game, config) for game in SUPPORTED_GAMES},
+        game_api_clients=api_clients,
         active_game={guild_id: {} for guild_id in GUILD_IDS},
         game_prediction={},
         user_count=0,

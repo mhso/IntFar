@@ -1,5 +1,5 @@
 from datetime import datetime
-from game_data import get_stat_quantity_descriptions
+from api.game_data import get_stat_quantity_descriptions
 
 TESTING = False
 

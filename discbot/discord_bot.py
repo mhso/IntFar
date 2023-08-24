@@ -10,6 +10,7 @@ from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
 
 from mhooge_flask.logging import logger
 from streamscape import Streamscape
+from api.game_api_client import GameAPIClient
 
 from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
@@ -17,7 +18,6 @@ from discbot import commands
 from discbot.commands.meta import handle_usage_msg
 from api.award_qualifiers import AwardQualifiers
 from api.awards import get_awards_handler
-from api.game_api import get_api_client
 from api.game_data import get_stat_parser
 from api.game_stats import GameStats
 from api.game_monitoring import get_game_monitor
@@ -51,6 +51,7 @@ class DiscordClient(discord.Client):
         config: Config,
         database: Database,
         betting_handlers: dict[str, BettingHandler],
+        api_clients: dict[str, GameAPIClient],
         **kwargs
     ):
         """
@@ -82,6 +83,7 @@ class DiscordClient(discord.Client):
         self.config = config
         self.database = database
         self.betting_handlers = betting_handlers
+        self.api_clients = api_clients
 
         if self.config.env == "production":
             streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
@@ -94,8 +96,6 @@ class DiscordClient(discord.Client):
         self.ai_conn = kwargs.get("ai_pipe")
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
-
-        self.api_clients = {game: get_api_client(game, self.config) for game in api_util.SUPPORTED_GAMES}
 
         self.game_monitors = {
             game: get_game_monitor(game, self.config, self.database, self.on_game_over, self.api_clients[game])
@@ -1820,11 +1820,12 @@ class DiscordClient(discord.Client):
 
         self.api_clients["csgo"].close()
 
-def run_client(config, database, betting_handlers, ai_pipe, flask_pipe, main_pipe):
+def run_client(config, database, betting_handlers, api_clients, ai_pipe, flask_pipe, main_pipe):
     client = DiscordClient(
         config,
         database,
         betting_handlers,
+        api_clients,
         ai_pipe=ai_pipe,
         flask_pipe=flask_pipe,
         main_pipe=main_pipe,
