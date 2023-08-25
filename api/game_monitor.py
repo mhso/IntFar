@@ -111,7 +111,7 @@ class GameMonitor(ABC):
                 self.polling_active[guild_id] = False
                 return
 
-        game_status = self.check_game_status(guild_id, guild_name)
+        game_status = await self.check_game_status(guild_id, guild_name)
 
         if game_status == self.GAME_STATUS_ACTIVE: # Game has started.
             # Send update to Int-Far website that a game has started.
@@ -151,7 +151,7 @@ class GameMonitor(ABC):
         except KeyboardInterrupt:
             return
 
-        game_status = self.check_game_status(guild_id, guild_name)
+        game_status = await self.check_game_status(guild_id, guild_name)
         if game_status == self.GAME_STATUS_ENDED: # Game is over.
             try:
                 game_info, status_code = await self.get_finished_game_info(guild_id)

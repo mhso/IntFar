@@ -8,7 +8,12 @@
         {{ navbar.navbar(game, game_name, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
         <h1>Register for CSGO</h1>
 
-        {% if register_msg and not error %}
+        {% if not logged_in_user %}
+        <div id="csgo-register-not-logged-in">
+            <p>You must be logged in to the website to register for CSGO.</p>
+            <p>Write <span class="discord-command">!website_verify</span> in Discord to login.</p>
+        </div>
+        {% elif register_msg and not error %}
         <div id="csgo-register-success-wrapper">
             <p class="csgo-submit-success">Easy peasy, lemon squeezy!</p>
             {% if friend_request_sent %}
@@ -23,17 +28,12 @@
         <div class="row">
             <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
             <div class="col-12 col-md-10 col-lg-8 col-xxl-6">
-                {% if not logged_in_user %}
-                <div id="csgo-register-not-logged-in">
-                    <p>You must be logged in to the website to register for CSGO.</p>
-                    <p>Write <span class="discord-command">!website_verify</span> in Discord to login.</p>
-                </div>
-                {% else %}
-                <form id="csgo-register-form" method="POST">
-                    {% if error %}
-                    <p id="csgo-register-submit-error">Error: {{ register_msg }}</p>
-                    {% endif %}
+            <form id="csgo-register-form" method="POST">
+                {% if error %}
+                <p id="csgo-register-submit-error">Error: {{ register_msg }}</p>
+                {% endif %}
 
+                <div>
                     <input id="csgo-register-id" name="steam_id" type="text" placeholder="Steam ID">
                     <label id="csgo-register-id-error" class="csgo-register-error-label" for="steam_id"></label>
 
@@ -41,34 +41,44 @@
                         <h2>How do I find my Steam ID?</h2>
                         <ol>
                             <li>Open Steam</li>
-                            <li>Go to 'Settings'</li>
-                            <li>Go to 'Account Details'</li>
-                            <li><strong>Steam ID</strong> is shown at the top left</li>
+                            <li>Go to 'Settings' > 'Account Details'</li>
+                            <li>
+                                <span class="csgo-register-emph">Steam ID</span> is shown at the top left
+                                <img src="{{ url_for('static', filename='img/csgo_help_steamid.png') }}" class="csgo-register-help-img">
+                            </li>
                             <li>Paste this in the field above
                         </ol>
                     </div>
+                </div>
 
-                    <input id="csgo-register-code" name="match_auth_code" type="text" placeholder="Match History Code">
+                <div>
+                    <input id="csgo-register-token" name="match_token" type="text" placeholder="Recent Match Token">
+                    <label id="csgo-register-token-error" class="csgo-register-error-label" for="match_token"></label>
+
+                    <input id="csgo-register-code" name="match_auth_code" type="text" placeholder="Match Authentication Code">
                     <label id="csgo-register-code-error" class="csgo-register-error-label" for="match_auth_code"></label>
 
                     <div class="csgo-register-helper">
-                        <h2>How do I find my CSGO Match History Authentication Code?</h2>
+                        <h2>How do I find my CSGO Match History Authentication Code and Token?</h2>
                         <ol>
                             <li>Go to <a style="color: cyan" href="https://help.steampowered.com/en/wizard/HelpWithGameIssue/?appid=730&issueid=128" target="_blank">this link</a></li>
-                            <li>Log in if you aren't already</li>
-                            <li>Under 'Access to Your Match History' click <strong>'Generate Code'</strong></li>
-                            <li>Paste the 'Authentication Code' in the field above</li>
+                            <li>Log in if you aren't logged in already</li>
+                            <li>Under 'Access to Your Match History' click <span class="csgo-register-emph">Create Authentication Code</span></li>
+                            <li>
+                                Paste the two codes shown here into the respective fields above
+                                <img src="{{ url_for('static', filename='img/csgo_help_match_code.png') }}" class="csgo-register-help-img">
+                            </li>
                         </ol>
                     </div>
+                </div>
 
-                    <button id="csgo-register-submit" type="submit">Register</button>
-                </form>
-                {% endif %}
+                <button id="csgo-register-submit" type="submit">Register</button>
+            </form>
             </div>
             <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
         </div>
+        <script src="{{ url_for('static', filename='js/csgo_register.js') }}"></script>
         {% endif %}
     </div>
-    <script src="{{ url_for('static', filename='js/csgo_register.js') }}"></script>
 </body>
 </html>

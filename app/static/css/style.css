@@ -1325,8 +1325,8 @@ table {
 |                 Register CSGO                 |
 \****************##############****************/
 #csgo-register-wrapper h1 {
-    margin-top: 100px;
-    margin-bottom: 50px;
+    margin-top: 30px;
+    margin-bottom: 30px;
     font-weight: 1000;
 }
 
@@ -1348,27 +1348,47 @@ table {
     background-color: #0009;
     border-radius: 50px;
     border: 2px solid white;
+}
+
+#csgo-register-form > div {
+    border-bottom: 1px solid white;
     padding: 30px;
 }
 
-#csgo-register-form > input {
+#csgo-register-form input {
     border-radius: 10px;
     margin-left: 5px;
     margin-right: 5px;
     padding: 10px;
     background-color: #131313;
     color: white;
-    width: 300px;
+    width: 420px;
 }
 
-.csgo-register-helper {
-    margin-bottom: 50px;
+#csgo-register-id {
+    width: 350px !important;
+}
+
+#csgo-register-code {
+    margin-top: 15px
 }
 
 .csgo-register-helper > ol {
     width: 400px;
     margin: 0 auto;
     text-align: left;
+}
+
+.csgo-register-emph {
+    font-style: italic;
+    font-weight: 1000;
+}
+
+.csgo-register-help-img {
+    width: 100%;
+    height: auto;
+    border: 1px ridge white;
+    margin: 10px 0;
 }
 
 .csgo-register-error-label {
@@ -1394,6 +1414,7 @@ table {
     border-radius: 10px;
     border: 2px solid white;
     cursor: pointer;
+    margin: 15px 0;
 }
 
 #csgo-register-success-wrapper {

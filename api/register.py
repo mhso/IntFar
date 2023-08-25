@@ -20,31 +20,36 @@ def register_for_lol(database: Database, api_client: RiotAPIClient, disc_id: int
         ingame_id=summ_id
     )
 
-def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: int, steam_id: str, match_auth_code: str=None):
+def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: int, steam_id: str, match_auth_code: str=None, match_token: str=None):
     if steam_id is None:
         return 0, "You must supply a Steam ID."
 
     if match_auth_code is None:
         return 0, "You must supply a match authentication code."
+    
+    if match_token is None:
+        return 0, "You must supply the most recent match token."
 
     if database.discord_id_from_ingame_info(api_client.game, ingame_id=steam_id):
         return 0, "User with that Steam ID is already registered."
 
     steam_name = api_client.get_steam_display_name(steam_id)
     if steam_name is None:
-        return False, "Error: Invalid Steam ID."
+        return 0, "Error: Invalid Steam ID."
 
     status_code, status_msg = database.add_user(
         api_client.game,
         disc_id,
         ingame_name=steam_name,
         ingame_id=steam_id,
-        match_auth_code=match_auth_code
+        match_auth_code=match_auth_code,
+        latest_match_token=match_token
     )
 
     if status_code == 1: # New user
         # Send friend request on Steam from Int-Far to the newly registered player
-        api_client.send_friend_request(steam_id)
+        if not api_client.send_friend_request(steam_id):
+            return 0, "Error: Could not send friend request from Int-Far. Contact Say wat and have him fix it."
 
     return status_code, status_msg
 

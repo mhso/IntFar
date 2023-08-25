@@ -1,3 +1,4 @@
+import inspect
 from multiprocessing import Pipe
 from multiprocessing.connection import wait
 from threading import Thread, Event
@@ -51,22 +52,19 @@ class Manager(object):
     def __init__(self, target, *args):
         self.proxies = []
 
-        # for target_cls in [target, super(target)]:
-        #     for attr in dir(target_cls):
-        #         if not attr.startswith("__"):
-        #             print(type(getattr(target_cls, attr)))
-        #             if inspect.isfunction(getattr(target_cls, attr)):
-        #                 print("Method")
-        #                 print(attr)
-        #                 setattr(
-        #                     Proxy,
-        #                     attr,
-        #                     lambda s: object.__getattribute__(s, '_call_proxy')(attr)
-        #                 )
-        #             else:
-        #                 print("No")
-        #                 print(attr)
-        #                 setattr(Proxy, attr, object.__getattribute__(target_cls, attr))
+        for target_cls in [target, super(target)]:
+            for attr in dir(target_cls):
+                if not attr.startswith("__"):
+                    if inspect.isfunction(getattr(target_cls, attr)):
+                        setattr(
+                            Proxy,
+                            attr,
+                            lambda s: object.__getattribute__(s, '_call_proxy')(attr)
+                        )
+                    else:
+                        print("No")
+                        print(attr)
+                        setattr(Proxy, attr, object.__getattribute__(target_cls, attr))
 
         self.target = target(*args)
         self._stop_event = Event()

@@ -2,7 +2,9 @@ import json
 import argparse
 from glob import glob
 from datetime import datetime
+
 from dateutil.relativedelta import relativedelta
+from csgo import sharecode
 
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, util
@@ -230,8 +232,13 @@ class TestFuncs:
     def test_steam_stuff(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
         api_client = SteamAPIClient("csgo", self.config)
-        steam_id = 76561197970416015
-        api_client.send_friend_request(steam_id)
+        steam_ids = [76561197970416015]#, 76561198014212213, 76561198051680910]
+        print(api_client.get_active_game(steam_ids))
+
+    def test_steam_id(self):
+        match_code = "CSGO-c6K3K-2zNwe-4T7qH-muOUF-U9JjC"
+        code_dict = sharecode.decode(match_code)
+        print(code_dict)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

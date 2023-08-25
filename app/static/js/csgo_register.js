@@ -1,8 +1,8 @@
 function formSubmit(event) {
     event.preventDefault();
     
-    let inputIds = ["csgo-register-id", "csgo-register-code"]
-    let inputLengths = [17, 15];
+    let inputIds = ["csgo-register-id", "csgo-register-token", "csgo-register-code"]
+    let inputLengths = [17, 34, 15];
     const inputErrorClass = "csgo-input-error";
     
     let anyErrors = false;
@@ -40,17 +40,43 @@ function formSubmit(event) {
         }
     }
 
+    let matchTokenInput = document.getElementById("csgo-register-token");
+    if (!matchTokenInput.classList.contains(inputErrorClass)) {
+        let dashSplit = matchTokenInput.value.split("-");
+        let splitLengths = [4, 5, 5, 5, 5, 5];
+        let tokenPrefix = "CSGO";
+        let errors = false;
+        if (!matchTokenInput.value.startsWith(tokenPrefix)) {
+            errors = true;
+        }
+        else {
+            for (let i = 0; i < splitLengths.length; i++) {
+                if (i >= dashSplit.length || splitLengths[i] != dashSplit[i].length) {
+                    errors = true;
+                    break
+                }
+            }
+        }
+        if (errors) {
+            anyErrors = true;
+            let errorLabel = document.getElementById("csgo-register-token-error");
+            errorLabel.textContent = "Invalid Recent Match Token. It should be of the form 'CSGO-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX'.";
+            authCodeInput.classList.add(inputErrorClass);
+        }
+    }
+
     let authCodeInput = document.getElementById("csgo-register-code");
     if (!authCodeInput.classList.contains(inputErrorClass)) {
-        console.log("???");
         let dashSplit = authCodeInput.value.split("-");
-        console.log(dashSplit);
-        if (dashSplit.length != 3 || dashSplit[0].length != 4 || dashSplit[1].length != 5 || dashSplit[2].length != 4) {
-            console.log("WAT");
-            let errorLabel = document.getElementById("csgo-register-code-error");
-            errorLabel.textContent = "Invalid Match History Code. It should be of the form 'XXXX-XXXXX-XXXX'.";
-            anyErrors = true;
-            authCodeInput.classList.add(inputErrorClass);
+        let splitLengths = [4, 5, 4];
+        for (let i = 0; i < splitLengths.length; i++) {
+            if (i >= dashSplit.length || splitLengths[i] != dashSplit[i].length) {
+                let errorLabel = document.getElementById("csgo-register-code-error");
+                errorLabel.textContent = "Invalid Match History Code. It should be of the form 'XXXX-XXXXX-XXXX'.";
+                anyErrors = true;
+                authCodeInput.classList.add(inputErrorClass);
+                break
+            }
         }
     }
 

@@ -15,19 +15,14 @@ _GUILD_ID = 619073595561213953
 
 def parse_demo(steam_api: SteamAPIClient, database: Database, demo_url):
     data = steam_api.parse_demo(demo_url)
-    stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.all_users["csgo"], _GUILD_ID)
+    stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.users_by_game["csgo"], _GUILD_ID)
 
     return stats_parser.parse_data()
 
 def get_data_from_file(folder, database: Database, steam_api: SteamAPIClient):
     url_demos = [line.strip() for line in open(f"{folder}/gotv_demos.txt", "r", encoding="utf-8")]
 
-    # Parse the N most recent matches as demos
     all_data = []
-    for demo in url_demos:
-        parsed_data = parse_demo(steam_api, demo)
-        all_data.append(parsed_data)
-
     with open(f"{folder}/csgo_matches.txt", "r", encoding="utf-8") as fp:
         first_line = True
 
@@ -44,24 +39,47 @@ def get_data_from_file(folder, database: Database, steam_api: SteamAPIClient):
 
                     kills_by_our_team = sum(stats.kills for stats in player_stats)
 
-                    all_data.append(
-                        CSGOGameStats(
-                            "csgo",
-                            match_id,
-                            timestamp,
-                            duration,
-                            win_score,
-                            _GUILD_ID,
-                            kills_by_our_team,
-                            players_in_game,
-                            player_stats,
-                            map_name,
-                            our_team_t,
-                            rounds_us,
-                            rounds_them,
-                            True
+                    # Parse the N most recent matches as demos
+                    if len(all_data) < len(url_demos):
+                        demo_url = url_demos[len(all_data)]
+                        parsed_data = parse_demo(steam_api, database, demo_url)
+                        new_player_stats = []
+                        for other_player_stats in player_stats:
+                            in_filtered = False
+                            for demo_player_stats in parsed_data.filtered_player_stats:
+                                if other_player_stats.disc_id == demo_player_stats.disc_id:
+                                    demo_player_stats.mvps = other_player_stats.mvps
+                                    demo_player_stats.score = other_player_stats.score
+                                    new_player_stats.append(demo_player_stats)
+                                    in_filtered = True
+                                    break
+
+                            if not in_filtered:
+                                new_player_stats.append(other_player_stats)
+
+                        parsed_data.all_player_stats = new_player_stats
+                        parsed_data["timestamp"] = timestamp
+                        parsed_data["duration"] = duration
+                        all_data.append(parsed_data)
+                    else:
+                        all_data.append(
+                            CSGOGameStats(
+                                "csgo",
+                                match_id,
+                                timestamp,
+                                duration,
+                                win_score,
+                                _GUILD_ID,
+                                kills_by_our_team,
+                                players_in_game,
+                                player_stats,
+                                map_name,
+                                our_team_t,
+                                rounds_us,
+                                rounds_them,
+                                True
+                            )
                         )
-                    )
 
                 first_line = False
                 player_stats = []

@@ -72,15 +72,16 @@ def main():
     if conf.env == "production":
         load_opus("/usr/local/lib/libopus.so")
 
-    logger.info("Initializing database...")
-
+    logger.info("Initializing game API clients...")
     manager = Manager(SteamAPIClient, "csgo", conf)
 
-    database_client = Database(conf)
     api_clients = {
         "lol": RiotAPIClient("lol", conf),
         "csgo": manager.create_proxy()
     }
+
+    logger.info("Initializing database...")
+    database_client = Database(conf)
 
     betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
 

@@ -42,10 +42,11 @@ def home():
                 )
 
         api_client = flask.current_app.config["GAME_API_CLIENTS"]["csgo"]
-        steam_id = data["steam_id"]
+        steam_id = int(data["steam_id"])
+        match_token = data["match_token"]
         match_auth_code = data["match_auth_code"]
 
-        status_code, status_msg = register_for_game(database, api_client, disc_id, steam_id, match_auth_code)
+        status_code, status_msg = register_for_game(database, api_client, disc_id, steam_id, match_auth_code, match_token)
 
         status_code = 200 if status_code else 400
 

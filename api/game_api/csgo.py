@@ -75,7 +75,7 @@ class SteamAPIClient(GameAPIClient):
 
         demo_bz2_file = f"{demo_file}.dem.bz2"
         demo_dem_file = f"{demo_file}.dem"
-        demo_json_file = f"{demo_file}.dem"
+        demo_json_file = f"{demo_file}.json"
 
         try:
             # Download and save the demo file to disk
@@ -110,19 +110,22 @@ class SteamAPIClient(GameAPIClient):
         )
         resp, = self.cs_client.wait_event('full_match_info')
         game_info = json.loads(MessageToJson(resp))
-        demo_url = game_info["matches"][0]["roundstatsall"][-1]["map"]
+        round_stats = game_info["matches"][0]["roundstatsall"]
+        demo_url = round_stats[-1]["map"]
 
         parsed_data = self.parse_demo(demo_url)
         parsed_data["matchID"] = match_token
         parsed_data["timestamp"] = game_info["matches"][0]["matchtime"]
-        parsed_data["duration"] = game_info["matches"][0]["roundstatsall"][-1]["matchDuration"]
+        parsed_data["duration"] = round_stats[-1]["matchDuration"]
+        parsed_data["mvps"] = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["mvps"]))
+        parsed_data["scores"] = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["scores"]))
 
-        return self.parse_demo(demo_url)
+        return parsed_data
 
     def get_active_game(self, steam_ids):
-        account_ids = [SteamID(steam_id) for steam_id in steam_ids]
+        account_ids = [self.get_account_id(steam_id) for steam_id in steam_ids]
         self.cs_client.request_watch_info_friends(account_ids)
-        resp = self.cs_client.wait_event("watch_info")
+        resp = self.cs_client.wait_event("watch_info", timeout=10)
         return json.loads(MessageToJson(resp[0]))
 
     def get_next_sharecode(self, steam_id, game_code, match_token):
@@ -137,6 +140,9 @@ class SteamAPIClient(GameAPIClient):
         )
 
         return requests.get(url)
+
+    def get_account_id(self, steam_id):
+        return SteamID(steam_id).account_id
 
     def get_steam_display_name(self, steam_id):
         url = _ENDPOINT_PLAYER_SUMMARY.replace(
@@ -156,13 +162,30 @@ class SteamAPIClient(GameAPIClient):
         return None
 
     def send_friend_request(self, steam_id):
-        self.steam_client.send(MsgProto(EMsg.ClientAddFriend), {"steamid_to_add": steam_id})
-        resp_msg = self.steam_client.wait_msg(EMsg.ClientAddFriendResponse)
-        resp_json = json.loads(MessageToJson(resp_msg.body))
-        if "eresult" in resp_json and resp_json["eresult"] == 1:
-            return True
+        try:
+            self.steam_client.send(MsgProto(EMsg.ClientFriendProfileInfo), {"steamid_friend": steam_id})
+            resp_msg = self.steam_client.wait_msg(EMsg.ClientFriendProfileInfoResponse, timeout=5, raises=False)
+            if resp_msg is None:
+                raise TimeoutError()
 
-        return False
+            resp_json = json.loads(MessageToJson(resp_msg.body))
+            print(resp_json, flush=True)
+            if "eresult" in resp_json and resp_json["eresult"] == 1:
+                return True
+
+            self.steam_client.send(MsgProto(EMsg.ClientAddFriend), {"steamid_to_add": steam_id})
+            resp_msg = self.steam_client.wait_msg(EMsg.ClientAddFriendResponse, timeout=10, raises=False)
+            if resp_msg is None:
+                raise TimeoutError()
+
+            resp_json = json.loads(MessageToJson(resp_msg.body))
+            print(resp_json, flush=True)
+        except Exception:
+            logger.bind(steam_id=steam_id).exception("Exception when sending friend request from Int-Far.")
+            print("DED", flush=True)
+            return False
+
+        return "eresult" in resp_json and resp_json["eresult"] == 1
 
     def _handle_steam_start(self):
         self.cs_client.launch()

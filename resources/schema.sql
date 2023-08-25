@@ -14,7 +14,8 @@ CREATE TABLE [users_csgo] (
     [disc_id] INTEGER NOT NULL,
     [ingame_name] NVARCHAR(64) NOT NULL,
     [ingame_id] INTEGER NOT NULL,
-    [match_auth_code] INTEGER,
+    [match_auth_code] INTEGER NOT NULL,
+    [latest_match_token] NVARCHAR(64) NOT NULL,
     [main] INTEGER(1),
     [active] INTEGER DEFAULT(1)
 );

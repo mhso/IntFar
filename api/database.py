@@ -23,7 +23,7 @@ class Database(SQLiteDatabase):
         # Populate summoner names and ids lists with currently registered summoners.
         params = {
             "lol": [],
-            "csgo": ["match_auth_code"]
+            "csgo": ["match_auth_code", "latest_match_token"]
         }
         with self:
             self.all_users: dict[int, User] = self.get_base_users()
