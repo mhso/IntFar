@@ -48,16 +48,11 @@ def home():
 
         status_code, status_msg = register_for_game(database, api_client, disc_id, steam_id, match_auth_code, match_token)
 
-        status_code = 200 if status_code else 400
-
-        friend_request_sent = status_code == 1
-
         return make_template_context(
             "register_csgo.html",
-            status_code,
-            error=status_code == 0,
+            200 if status_code else 400,
+            register_status=status_code,
             register_msg=status_msg,
-            friend_request_sent=friend_request_sent
         )
 
     return make_template_context("register_csgo.html", registered_accounts=existing_accounts_list)

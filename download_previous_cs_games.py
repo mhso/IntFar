@@ -58,8 +58,8 @@ def get_data_from_file(folder, database: Database, steam_api: SteamAPIClient):
                                 new_player_stats.append(other_player_stats)
 
                         parsed_data.all_player_stats = new_player_stats
-                        parsed_data["timestamp"] = timestamp
-                        parsed_data["duration"] = duration
+                        parsed_data.timestamp = timestamp
+                        parsed_data.duration = duration
                         all_data.append(parsed_data)
                     else:
                         all_data.append(

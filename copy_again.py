@@ -1,7 +1,6 @@
 import os
 from api.database import Database
 from api.config import Config
-from api.bets import get_betting_handler
 
 BETTING_IDS = {
     "game_win": 0,

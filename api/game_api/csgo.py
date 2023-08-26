@@ -12,6 +12,7 @@ from csgo.client import CSGOClient
 from steam.steamid import SteamID
 from steam.core.msg import MsgProto
 from steam.enums.emsg import EMsg
+from steam.enums.common import EResult
 from csgo import sharecode
 from google.protobuf.json_format import MessageToJson
 from awpy import DemoParser
@@ -125,21 +126,37 @@ class SteamAPIClient(GameAPIClient):
     def get_active_game(self, steam_ids):
         account_ids = [self.get_account_id(steam_id) for steam_id in steam_ids]
         self.cs_client.request_watch_info_friends(account_ids)
-        resp = self.cs_client.wait_event("watch_info", timeout=10)
+        resp = self.cs_client.wait_event("watch_info", timeout=10, raises=False)
+
+        if resp is None:
+            return None
+        
         return json.loads(MessageToJson(resp[0]))
 
-    def get_next_sharecode(self, steam_id, game_code, match_token):
+    def get_next_sharecode(self, steam_id, auth_code, match_token):
         url = _ENDPOINT_NEXT_MATCH.replace(
             "[key]", self.config.steam_key
         ).replace(
-            "[steam_id]", steam_id
+            "[steam_id]", str(steam_id)
         ).replace(
-            "[steam_id_key]", game_code
+            "[steam_id_key]", auth_code
         ).replace(
             "[match_token]", match_token
         )
 
-        return requests.get(url)
+        response = requests.get(url)
+        if response.status_code not in (200, 202):
+            logger.bind(steam_id=steam_id, steam_id_key=auth_code, match_token=match_token).exception(
+                "Erroneous response code when getting next sharecode form Steam web API."
+            )
+            return None
+
+        json_response = response.json()
+
+        if response.status_code == 202 and json_response["result"]["nextcode"] == "n/a":
+            return None
+
+        return json_response["result"]["nextcode"]
 
     def get_account_id(self, steam_id):
         return SteamID(steam_id).account_id
@@ -163,29 +180,27 @@ class SteamAPIClient(GameAPIClient):
 
     def send_friend_request(self, steam_id):
         try:
-            self.steam_client.send(MsgProto(EMsg.ClientFriendProfileInfo), {"steamid_friend": steam_id})
-            resp_msg = self.steam_client.wait_msg(EMsg.ClientFriendProfileInfoResponse, timeout=5, raises=False)
-            if resp_msg is None:
-                raise TimeoutError()
-
-            resp_json = json.loads(MessageToJson(resp_msg.body))
-            print(resp_json, flush=True)
-            if "eresult" in resp_json and resp_json["eresult"] == 1:
-                return True
-
             self.steam_client.send(MsgProto(EMsg.ClientAddFriend), {"steamid_to_add": steam_id})
             resp_msg = self.steam_client.wait_msg(EMsg.ClientAddFriendResponse, timeout=10, raises=False)
-            if resp_msg is None:
-                raise TimeoutError()
+            if resp_msg is None: # gevent timeout error
+                return 0
 
             resp_json = json.loads(MessageToJson(resp_msg.body))
-            print(resp_json, flush=True)
-        except Exception:
-            logger.bind(steam_id=steam_id).exception("Exception when sending friend request from Int-Far.")
-            print("DED", flush=True)
-            return False
 
-        return "eresult" in resp_json and resp_json["eresult"] == 1
+            if "eresult" not in resp_json: # Weird protobuf error (shouldn't happen)
+                return 0
+
+            if resp_json["eresult"] == EResult.DuplicateName: # We were already friends
+                return 2
+
+            if resp_json["eresult"] == EResult.OK: # Friend request sent succesfully
+                return 1
+
+            return 0 # Error occured
+        except Exception as exc:
+            print("EXCEPTION", exc, flush=True)
+            logger.bind(steam_id=steam_id).exception("Exception when sending friend request from Int-Far.")
+            return 0
 
     def _handle_steam_start(self):
         self.cs_client.launch()

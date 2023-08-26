@@ -4,7 +4,8 @@ import asyncio
 from mhooge_flask.logging import logger
 
 from api.game_monitor import GameMonitor
-from api.database import  Database, User
+from api.database import  Database
+from api.user import User
 from api.game_api.lol import RiotAPIClient
 from api.config import Config
 from api.game_data.lol import get_player_stats
@@ -41,7 +42,6 @@ class LoLGameMonitor(GameMonitor):
             game_for_summoner = None
             active_name = None
             active_id = None
-            champ_id = None
 
             # Check if any of the summ_names/summ_ids for a given player is in a game.
             for summ_name, summ_id in zip(summ_names, summ_ids):
@@ -59,21 +59,12 @@ class LoLGameMonitor(GameMonitor):
             if game_for_summoner is not None: # We found a game for the current player
                 game_ids.add(game_for_summoner["gameId"])
                 player_stats = get_player_stats(game_for_summoner, summ_ids)
-                champ_id = player_stats["championId"]
                 active_game_team = player_stats["teamId"]
-                users_in_current_game[disc_id] = User([active_name], [active_id], champ_id=champ_id)
+                users_in_current_game[disc_id] = User(disc_id, user_dict[disc_id].secret, [active_name], [active_id])
                 active_game = game_for_summoner
 
         if len(game_ids) > 1: # People are in different games.
             return None, users_in_current_game, self.GAME_STATUS_NOCHANGE
-
-        for disc_id in users_in_current_game:
-            champ_id = users_in_current_game[disc_id].champ_id
-            # New champ has been released, that we don't know about.
-            if self.api_client.get_champ_name(champ_id) is None:
-                logger.warning(f"Champ ID is unknown: {champ_id}")
-                self.api_client.get_latest_data() # Get latest data about champions.
-                break
 
         if active_game is None:
             return None, users_in_current_game, None

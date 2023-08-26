@@ -232,8 +232,8 @@ class TestFuncs:
     def test_steam_stuff(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
         api_client = SteamAPIClient("csgo", self.config)
-        steam_ids = [76561197970416015]#, 76561198014212213, 76561198051680910]
-        print(api_client.get_active_game(steam_ids))
+        steam_id = 76561197970416015#, 76561198014212213, 76561198051680910]
+        print(api_client.get_active_game([steam_id]))
 
     def test_steam_id(self):
         match_code = "CSGO-c6K3K-2zNwe-4T7qH-muOUF-U9JjC"

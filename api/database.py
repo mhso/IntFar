@@ -122,6 +122,7 @@ class Database(SQLiteDatabase):
                     del reduced_params["ingame_name"]
                     del reduced_params["ingame_id"]
 
+                    self.all_users = self.get_base_users()
                     self.users_by_game[game][discord_id] = self.get_all_registered_users(game, **reduced_params)
                     status_code = 2 # User reactivated
 
@@ -168,6 +169,7 @@ class Database(SQLiteDatabase):
                         user_params = {param_name: [game_params[param_name]] for param_name in game_params}
                         user_params["disc_id"] = discord_id
                         user_params["secret"] = secret
+                        self.all_users[discord_id] = User(discord_id, secret)
                         self.users_by_game[game][discord_id] = User(**user_params)
                         status = f"User '{game_user_name}' with ID '{game_user_id}' succesfully added for {SUPPORTED_GAMES[game]}!"
 
@@ -227,6 +229,16 @@ class Database(SQLiteDatabase):
             query_2 = f"DELETE FROM participants_{game} WHERE game_id=?"
             self.execute_query(query_1, game_id, commit=False)
             self.execute_query(query_2, game_id)
+
+    def set_new_csgo_sharecode(self, disc_id, sharecode):
+        game = "csgo"
+        users_table = self._get_users_table(game)
+
+        query = f"UPDATE {users_table} SET latest_match_token=? WHERE disc_id=?"
+
+        with self:
+            self.execute_query(query, sharecode, disc_id)
+            self.users_by_game[game][disc_id].latest_match_token = sharecode
 
     def get_latest_game(self, game, time_after=None, time_before=None, guild_id=None):
         stats_table = self._get_participants_table(game)
@@ -572,8 +584,10 @@ class Database(SQLiteDatabase):
                     AND u.active = 1
             """
             doinks_reasons_data = self.execute_query(query_doinks_multis).fetchall()
+            if doinks_reasons_data == []:
+                return None
 
-            doinks_counts = [0 for _ in len(doinks_reasons_data[0])]
+            doinks_counts = [0 for _ in range(len(doinks_reasons_data[0][0]))]
             for reason in doinks_reasons_data:
                 for index, c in enumerate(reason[0]):
                     if c == "1":
@@ -1662,7 +1676,7 @@ class Database(SQLiteDatabase):
         beaten_records_best = []
         beaten_records_worst = []
 
-        for stat in parsed_game_stats.STATS_TO_SAVE():
+        for stat in parsed_game_stats.filtered_player_stats[0].STATS_TO_SAVE():
             reverse_order = stat == "deaths"
             (
                 min_id, min_value, max_id, max_value,
@@ -1670,14 +1684,14 @@ class Database(SQLiteDatabase):
             ) = self.get_stat_data(parsed_game_stats, stat, reverse_order)
 
             if reverse_order: # Stat is 'deaths'.
-                if min_value < prev_best: # Fewest deaths ever has been reached.
+                if prev_best is not None and min_value < prev_best: # Fewest deaths ever has been reached.
                     beaten_records_best.append((stat, min_value, min_id, prev_best, prev_best_id))
-                elif max_value > prev_worst: # Most deaths ever has been reached.
+                elif prev_worst is not None and max_value > prev_worst: # Most deaths ever has been reached.
                     beaten_records_worst.append((stat, max_value, max_id, prev_worst, prev_worst_id))
             else: # Stat is any other stat.
-                if max_value > prev_best: # A new best has been set for a stat.
+                if prev_best is not None and max_value > prev_best: # A new best has been set for a stat.
                     beaten_records_best.append((stat, max_value, max_id, prev_best, prev_best_id))
-                elif min_value < prev_worst: # A new worst has been set for a stat.
+                elif prev_worst is not None and min_value < prev_worst: # A new worst has been set for a stat.
                     beaten_records_worst.append((stat, min_value, min_id, prev_worst, prev_worst_id))
 
         game_insert_str = ",\n".join(parsed_game_stats.STATS_TO_SAVE())

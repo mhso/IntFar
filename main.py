@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all(thread=False, socket=False)
+
 from time import sleep
 from multiprocessing import Process, Pipe
 from argparse import ArgumentParser

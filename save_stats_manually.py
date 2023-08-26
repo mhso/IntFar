@@ -102,27 +102,6 @@ class TestMock(DiscordClient):
             if self.play_sound:
                 await self.play_event_sounds(self.game, intfar, doinks, guild_id)
 
-            # if self.ai_model is not None and self.task in ("all", "train"):
-            #     logger.info("Training AI Model with new game data.")
-            #     train_data = shape_predict_data(
-            #         self.database, self.riot_api, self.config, users_in_game
-            #     )
-            #     loss = train_online(
-            #         self.ai_model, train_data, filtered[0][1]["gameWon"]
-            #     )
-            #     self.ai_model.save()
-            #     logger.info(f"Loss: {loss}")
-
-            # if self.config.generate_predictions_img:
-            #     predictions_img = None
-            #     for user_data in users_in_game:
-            #         if ADMIN_DISC_ID == user_data[0]:
-            #             predictions_img = create_predictions_timeline_image()
-            #             break
-
-            #     if predictions_img is not None:
-            #         await self.send_predictions_timeline_image(predictions_img, guild_id)
-
             self.database.remove_missed_game(self.game, game_id)
 
     async def user_joined_voice(self, member, guild, poll=False):

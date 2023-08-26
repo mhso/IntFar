@@ -20,7 +20,7 @@ def register_for_lol(database: Database, api_client: RiotAPIClient, disc_id: int
         ingame_id=summ_id
     )
 
-def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: int, steam_id: str, match_auth_code: str=None, match_token: str=None):
+def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: int, steam_id: int, match_auth_code: str=None, match_token: str=None):
     if steam_id is None:
         return 0, "You must supply a Steam ID."
 
@@ -30,7 +30,7 @@ def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: i
     if match_token is None:
         return 0, "You must supply the most recent match token."
 
-    if database.discord_id_from_ingame_info(api_client.game, ingame_id=steam_id):
+    if database.discord_id_from_ingame_info(api_client.game, ingame_id=steam_id) is not None:
         return 0, "User with that Steam ID is already registered."
 
     steam_name = api_client.get_steam_display_name(steam_id)
@@ -48,8 +48,13 @@ def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: i
 
     if status_code == 1: # New user
         # Send friend request on Steam from Int-Far to the newly registered player
-        if not api_client.send_friend_request(steam_id):
-            return 0, "Error: Could not send friend request from Int-Far. Contact Say wat and have him fix it."
+        friend_status = api_client.send_friend_request(steam_id)
+
+        if friend_status == 2: # Int-Far was already friends with the person
+            return 2, "You are already friends with Int-Far on Steam, so you are good to go!"
+
+        if friend_status == 0:
+            status_msg = "Error: Could not send friend request from Int-Far. Contact Say wat and have him fix it."
 
     return status_code, status_msg
 

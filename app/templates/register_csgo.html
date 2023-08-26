@@ -13,12 +13,14 @@
             <p>You must be logged in to the website to register for CSGO.</p>
             <p>Write <span class="discord-command">!website_verify</span> in Discord to login.</p>
         </div>
-        {% elif register_msg and not error %}
+        {% elif register_msg and not register_status == 0 %}
         <div id="csgo-register-success-wrapper">
             <p class="csgo-submit-success">Easy peasy, lemon squeezy!</p>
-            {% if friend_request_sent %}
-            <p class="csgo-submit-success"><strong>One more step!</strong> Accept the Steam friend request from Int-Far</p>
-            <p class="csgo-submit-success">Then he can creep on you point out all your mistakes!</p>
+            {% if register_status == 2 %}
+            <p>{{ register_msg }}</p>
+            {% else %}
+            <p><strong>One more step!</strong> Accept the Steam friend request from Int-Far</p>
+            <p>Then he can creep on you and point out all your mistakes!</p>
             {% endif %}
             <a href="{{ url_for('csgo.index.index') }}">
                 <button class="standard-btn" style="margin-top: 20px;">CSGO Home</button>

@@ -126,6 +126,8 @@ class DiscordClient(discord.Client):
     async def on_game_over(self, game: str, game_info: dict, guild_id: int, status_code: int):
         if game == "lol":
             await self.on_lol_game_over(game_info, guild_id, status_code)
+        elif game == "csgo":
+            await self.on_csgo_game_over(game_info, guild_id, status_code)
 
     async def on_lol_game_over(self, game_info: dict, guild_id: int, status_code: int):
         """
@@ -186,6 +188,9 @@ class DiscordClient(discord.Client):
         
         elif status_code == game_monitor.POSTGAME_STATUS_OK:
             await self.handle_game_over("lol", game_info, guild_id)
+
+    async def on_csgo_game_over(self, game_info: dict, guild_id: int, status_code: int):
+        pass
 
     async def handle_game_over(self, game: str, game_info: dict, guild_id: int):
         """
@@ -281,24 +286,6 @@ class DiscordClient(discord.Client):
         await self.channels_to_write[guild_id].send(response)
 
         await self.play_event_sounds(game, intfar, doinks, guild_id)
-
-        # if self.ai_conn is not None:
-        #     logger.info("Training AI Model with new game data.")
-
-        #     train_data = shape_predict_data(
-        #         self.database, self.riot_api, self.config, users_in_game
-        #     )
-
-        #     # Send train request to AI process and recieve result
-        #     self.ai_conn.send(
-        #         ("train", [train_data, filtered_stats[0][1]["gameWon"]])
-        #     )
-        #     loss, probability = self.ai_conn.recv()
-
-        #     pct_win = int(probability * 100)
-
-        #     logger.debug(f"We had a {pct_win}% chance of winning.")
-        #     logger.debug(f"Training Loss: {loss}.")
 
         if self.config.generate_predictions_img:
             predictions_img = None

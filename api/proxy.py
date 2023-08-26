@@ -4,69 +4,50 @@ from multiprocessing.connection import wait
 from threading import Thread, Event
 
 class Proxy(object):
-    def __init__(self, conn):
+    def __init__(self, conn, target_cls):
         self.conn = conn
+        self.target_cls = target_cls
+
+        self._set_attributes()
 
     @property
     def game(self):
         return self._call_proxy("game")
-
+    
     @property
     def config(self):
         return self._call_proxy("config")
+
+    def _set_attributes(self):
+        for attr in dir(self.target_cls):
+            if not attr.startswith("__"):
+                if inspect.isfunction(getattr(self.target_cls, attr)):
+                    def call(*args, x=attr):
+                        return self.__getattribute__("_call_proxy")(x, *args)
+
+                    setattr(
+                        self,
+                        attr,
+                        call
+                    )
+
+    def __getstate__(self):
+        return {"conn": self.conn, "target_cls": self.target_cls}
+
+    def __setstate__(self, state):
+        self.__dict__ = {"conn": state["conn"], "target_cls": state["target_cls"]}
+        self._set_attributes()
 
     def _call_proxy(self, command, *args):
         self.conn.send((command, *args))
         return self.conn.recv()
 
-    def parse_demo(self, demo_url):
-        return self._call_proxy("parse_demo", demo_url)
-
-    def get_game_details(self, match_token):
-        return self._call_proxy("get_game_details", match_token)
-
-    def get_active_game(self, steam_ids):
-        return self._call_proxy("get_active_game", steam_ids)
-
-    def get_next_sharecode(self, steam_id, game_code, match_token):
-        return self._call_proxy("get_next_sharecode", steam_id, game_code, match_token)
-
-    def get_steam_display_name(self, steam_id):
-        return self._call_proxy("get_steam_display_name", steam_id)
-
-    def send_friend_request(self, steam_id):
-        return self._call_proxy("send_friend_request", steam_id)
-
-    def get_2fa_code_from_secrets(self):
-        return self._call_proxy("get_2fa_code_from_secrets")
-
-    def login(self):
-        return self._call_proxy("login")
-
-    def close(self):
-        res = self._call_proxy("close")
-        self.conn.close()
-        return res
-
 class Manager(object):
-    def __init__(self, target, *args):
+    def __init__(self, target_cls, *args):
         self.proxies = []
-
-        for target_cls in [target, super(target)]:
-            for attr in dir(target_cls):
-                if not attr.startswith("__"):
-                    if inspect.isfunction(getattr(target_cls, attr)):
-                        setattr(
-                            Proxy,
-                            attr,
-                            lambda s: object.__getattribute__(s, '_call_proxy')(attr)
-                        )
-                    else:
-                        print("No")
-                        print(attr)
-                        setattr(Proxy, attr, object.__getattribute__(target_cls, attr))
-
-        self.target = target(*args)
+    
+        self.target = target_cls(*args)
+    
         self._stop_event = Event()
         self.listen_thread = Thread(target=self._listen, args=())
         self.listen_thread.start()
@@ -85,14 +66,17 @@ class Manager(object):
                     if callable(result):
                         result = result(*args)
                 except AttributeError:
-                    return proxy.send(None)
+                    proxy.send(None)
 
                 proxy.send(result)
 
     def create_proxy(self):
         conn_1, conn_2 = Pipe(True)
         self.proxies.append(conn_1)
-        return Proxy(conn_2)
+
+        proxy = Proxy(conn_2, self.target.__class__)
+
+        return proxy
 
     def close(self):
         self._stop_event.set()
