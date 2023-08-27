@@ -297,35 +297,6 @@ class LoLAwardQualifiers(AwardQualifiers):
 
         return cool_stats
 
-    def get_lifetime_stats(self, database: Database):
-        """
-        Returns a list of lifetime awards for each player.
-        These events include:
-            - A player having played a multiple of 1000 games
-            - A player having won a multiple of 1000 games
-            - A player having gotten Int-Far a multiple of 100 times
-            - A player having gotten Doinks a multiple of 100 times
-        """
-        lifetime_mentions = {}
-
-        for stats in self.parsed_game_stats:
-            lifetime_mentions[stats.disc_id] = []
-
-            game_data = database.get_games_count(self.game, stats.disc_id)
-            total_games = game_data[0]
-            total_wins = game_data[2]
-            total_intfars = database.get_intfar_count(self.game, stats.disc_id)
-            total_doinks = database.get_doinks_count(self.game, stats.disc_id)[1]
-
-            values = [total_games, total_wins, total_intfars, total_doinks]
-            moduli = [1000, 1000, 100, 100]
-
-            for index, (val, mod) in enumerate(zip(values, moduli)):
-                if val > 0 and val % mod == 0:
-                    lifetime_mentions[stats.disc_id].append((index, val))
-
-        return lifetime_mentions
-
     def _intfar_by_kda(self):
         """
         Returns the info of the Int-Far, if this person has a truly terrible KDA.

@@ -1,1 +1,5 @@
 not contributing to the team, getting a score of {score}
+managing to do a whole lot of nothing, getting a score of {score}
+being kinda useless with a score of {score}
+being afk, somehow getting a score of {score}
+being unable to do anything, getting a score of {score}

@@ -20,7 +20,6 @@ class Config:
         self.env = auth["env"]
         self.database = "resources/database.db"
         self.generate_predictions_img = False
-        self.min_game_minutes = 5 # Minimum amount of minutes for a game to be valid.
 
         # ===== Active Game Monitoring =====
         self.status_interval_dormant = 60 * 2 # Seconds to wait between checking for game status.

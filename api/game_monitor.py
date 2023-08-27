@@ -17,6 +17,9 @@ class GameMonitor(ABC):
     GAME_STATUS_ENDED = 2
     POSTGAME_STATUS_ERROR = -1
     POSTGAME_STATUS_OK = 0
+    POSTGAME_STATUS_SOLO = 1
+    POSTGAME_STATUS_DUPLICATE = 2
+    POSTGAME_STATUS_MISSING = 3
 
     def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, api_client: GameAPIClient):
         """
@@ -41,6 +44,13 @@ class GameMonitor(ABC):
         self.active_game: dict[int, dict] = {}
         self.users_in_game: dict[int, dict[int, User]] = {}
         self.users_in_voice: dict[int, dict[int, User]] = {}
+
+    @property
+    def min_game_minutes(self):
+        """
+        Minimum amount of minutes for a game to be valid.
+        """
+        return 5
 
     @abstractmethod
     async def get_active_game_info(self, guild_id: int):

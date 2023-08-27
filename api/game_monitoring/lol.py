@@ -11,10 +11,7 @@ from api.config import Config
 from api.game_data.lol import get_player_stats
 
 class LoLGameMonitor(GameMonitor):
-    POSTGAME_STATUS_CUSTOM_GAME = 1
-    POSTGAME_STATUS_MISSING = 2
-    POSTGAME_STATUS_DUPLICATE = 3
-    POSTGAME_STATUS_SOLO = 4
+    POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_URF = 5
     POSTGAME_STATUS_NOT_SR = 6
     POSTGAME_STATUS_REMAKE = 7
@@ -145,7 +142,7 @@ class LoLGameMonitor(GameMonitor):
             # Game is not on summoners rift.
             status_code = self.POSTGAME_STATUS_NOT_SR
 
-        elif game_info["gameDuration"] < self.config.min_game_minutes * 60:
+        elif game_info["gameDuration"] < self.min_game_minutes * 60:
             # Game was too short to count. Probably a remake.
             status_code = self.POSTGAME_STATUS_REMAKE
 

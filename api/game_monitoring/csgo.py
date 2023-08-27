@@ -12,15 +12,17 @@ from api.game_monitor import GameMonitor
 from api.game_api.csgo import SteamAPIClient
 
 class CSGOGameMonitor(GameMonitor):
-    POSTGAME_STATUS_CUSTOM_GAME = 1
-    POSTGAME_STATUS_MISSING = 2
-    POSTGAME_STATUS_DUPLICATE = 3
-    POSTGAME_STATUS_SOLO = 4
-    POSTGAME_STATUS_SHORT_MATCH = 5
-    POSTGAME_STATUS_SURRENDER = 6
+    POSTGAME_STATUS_CUSTOM_GAME = 4
+    POSTGAME_STATUS_DUPLICATE = 5
+    POSTGAME_STATUS_SHORT_MATCH = 6
+    POSTGAME_STATUS_SURRENDER = 7
 
     def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, steam_api: SteamAPIClient):
         super().__init__(game, config, database, game_over_callback, steam_api)
+
+    @property
+    def min_game_minutes(self):
+        return 10
 
     async def get_active_game_info(self, guild_id):
         user_dict = (
@@ -150,8 +152,8 @@ class CSGOGameMonitor(GameMonitor):
                 # Game was a short match
                 status_code = self.POSTGAME_STATUS_SHORT_MATCH
 
-            elif game_info["gameDuration"] < self.config.min_game_minutes * 60:
-                # Game was too short to count. Probably a early surrender.
+            elif game_info["gameDuration"] < self.min_game_minutes * 60:
+                # Game was too short to count. Probably an early surrender.
                 status_code = self.POSTGAME_STATUS_SURRENDER
 
             else:

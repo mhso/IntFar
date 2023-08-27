@@ -124,21 +124,7 @@ class DiscordClient(discord.Client):
             await channel.send("Odds of winning throughout the game:", file=file)
 
     async def on_game_over(self, game: str, game_info: dict, guild_id: int, status_code: int):
-        if game == "lol":
-            await self.on_lol_game_over(game_info, guild_id, status_code)
-        elif game == "csgo":
-            await self.on_csgo_game_over(game_info, guild_id, status_code)
-
-    async def on_lol_game_over(self, game_info: dict, guild_id: int, status_code: int):
-        """
-        Callback called by the game monitor when a game is finished.
-
-        :param data:        Dictionary containing un-filtered data about a finished
-                            game fetched from Riot League API
-        :param guild_id:    ID of the Discord server where the game took place
-        :param status_code: Integer that describes the status of the finished game
-        """
-        game_monitor: LoLGameMonitor = self.game_monitors[["lol"]]
+        game_monitor = self.game_monitors[game]
 
         if status_code == game_monitor.POSTGAME_STATUS_ERROR:
             # Something went terribly wrong when handling the end of game logic
@@ -146,12 +132,13 @@ class DiscordClient(discord.Client):
             await self.send_error_msg(guild_id)
 
         if status_code == game_monitor.POSTGAME_STATUS_MISSING:
-            self.database.save_missed_game(game_info["gameId"], guild_id, int(time()))
+            self.database.save_missed_game(game, game_info["gameId"], guild_id, int(time()))
 
             # Send message pinging me about the error.
             mention_me = self.get_mention_str(commands_util.ADMIN_DISC_ID, guild_id)
+            game_name = api_util.SUPPORTED_GAMES[game]
             message_str = (
-                "Riot API is being a dickfish again, not much I can do :shrug:\n"
+                f"The API for {game_name} is being a dickfish, not much I can do :shrug:\n"
                 f"{mention_me} will add the game manually later."
             )
 
@@ -163,7 +150,20 @@ class DiscordClient(discord.Client):
             response += "and no stats will be saved."
             await self.channels_to_write[guild_id].send(response)
 
-        elif status_code == game_monitor.POSTGAME_STATUS_URF:
+        else:
+            funcs = {"lol": self.on_lol_game_over, "csgo": self.on_csgo_game_over}
+            await funcs[game](game_monitor, game_info, guild_id, status_code)
+
+    async def on_lol_game_over(self, game_monitor: LoLGameMonitor, game_info: dict, guild_id: int, status_code: int):
+        """
+        Callback called by the game monitor when a League of Legends game is finished.
+
+        :param game_info:   Dictionary containing un-filtered data about a finished
+                            game fetched from Riot League API
+        :param guild_id:    ID of the Discord server where the game took place
+        :param status_code: Integer that describes the status of the finished game
+        """
+        if status_code == game_monitor.POSTGAME_STATUS_URF:
             # Gamemode was URF. Don't save stats then.
             response = "That was an URF game {emote_poggers} "
             response += "no Int-Far will be crowned "
@@ -176,21 +176,46 @@ class DiscordClient(discord.Client):
             response += "{emote_woahpikachu} no Int-Far will be crowned "
             response += "and no stats will be saved."
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
-    
+
         elif status_code == game_monitor.POSTGAME_STATUS_REMAKE:
             # Game was too short, most likely a remake.
             response = (
-                "That game lasted less than 5 minutes " +
-                "{emote_zinking} assuming it was a remake. " +
+                f"That game lasted less than {game_monitor.min_game_minutes} minutes "
+                "{emote_zinking} assuming it was a remake. "
                 "No stats are saved."
             )
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
-        
-        elif status_code == game_monitor.POSTGAME_STATUS_OK:
-            await self.handle_game_over("lol", game_info, guild_id)
 
-    async def on_csgo_game_over(self, game_info: dict, guild_id: int, status_code: int):
-        pass
+        elif status_code == game_monitor.POSTGAME_STATUS_OK:
+            await self.handle_game_over(game_monitor.game, game_info, guild_id)
+
+    async def on_csgo_game_over(self, game_monitor: CSGOGameMonitor, game_info: dict, guild_id: int, status_code: int):
+        """
+        Callback called by the game monitor when a CSGO game is finished.
+
+        :param data:        Dictionary containing un-filtered data about a finished
+                            game fetched from CSGO and parsed with awpy
+        :param guild_id:    ID of the Discord server where the game took place
+        :param status_code: Integer that describes the status of the finished game
+        """        
+        if status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
+            # Game was too short, most likely an early surrender
+            response = (
+                "That games was a short match, no stats are saved {emote_suk_a_hotdok}"
+            )
+            await self.channels_to_write[guild_id].send(self.insert_emotes(response))
+
+        elif status_code == game_monitor.POSTGAME_STATUS_SURRENDER:
+            # Game was too short, most likely an early surrender
+            response = (
+                f"That game lasted less than {game_monitor.min_game_minutes} minutes "
+                "{emote_zinking} assuming it was an early surrender. "
+                "No stats are saved."
+            )
+            await self.channels_to_write[guild_id].send(self.insert_emotes(response))
+
+        elif status_code == game_monitor.POSTGAME_STATUS_OK:
+            await self.handle_game_over(game_monitor.game, game_info, guild_id)
 
     async def handle_game_over(self, game: str, game_info: dict, guild_id: int):
         """

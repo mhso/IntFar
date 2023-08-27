@@ -98,6 +98,10 @@ class AwardQualifiers(ABC):
         if "{game}" in flavor_text: # Replace game name if it is present in the text
             flavor_text = flavor_text.replace("{game}", SUPPORTED_GAMES[self.game])
 
+        if "{quantifier}" in flavor_text:
+            quantifier = "s" if params_to_replace["value"] != 1 else ""
+            flavor_text = flavor_text.replace("{quantifier}", quantifier)
+
         return flavor_text
 
     def _load_flavor_texts(self) -> dict[str, str]:
@@ -106,6 +110,35 @@ class AwardQualifiers(ABC):
             flavor_text_dict[filename] = load_flavor_texts(filename, self.game)
 
         return flavor_text_dict
+
+    def get_lifetime_stats(self, database: Database):
+        """
+        Returns a list of lifetime awards for each player.
+        These events include:
+            - A player having played a multiple of 1000 games
+            - A player having won a multiple of 1000 games
+            - A player having gotten Int-Far a multiple of 100 times
+            - A player having gotten Doinks a multiple of 100 times
+        """
+        lifetime_mentions = {}
+
+        for stats in self.parsed_game_stats:
+            lifetime_mentions[stats.disc_id] = []
+
+            game_data = database.get_games_count(self.game, stats.disc_id)
+            total_games = game_data[0]
+            total_wins = game_data[2]
+            total_intfars = database.get_intfar_count(self.game, stats.disc_id)
+            total_doinks = database.get_doinks_count(self.game, stats.disc_id)[1]
+
+            values = [total_games, total_wins, total_intfars, total_doinks]
+            moduli = [1000, 1000, 100, 100]
+
+            for index, (val, mod) in enumerate(zip(values, moduli)):
+                if val > 0 and val % mod == 0:
+                    lifetime_mentions[stats.disc_id].append((index, val))
+
+        return lifetime_mentions
 
     @abstractmethod
     def get_big_doinks(self) -> tuple[dict[int, list[tuple]], dict[int, str]]:
@@ -120,10 +153,6 @@ class AwardQualifiers(ABC):
         """
         Returns a list of miscellaneous interesting stats for each player in the game.
         """
-        ...
-
-    @abstractmethod
-    def get_lifetime_stats(self, database: Database) -> dict[int, list[tuple]]:
         ...
 
     @abstractmethod

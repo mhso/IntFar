@@ -9,7 +9,7 @@ class CSGOAwardQualifiers(AwardQualifiers):
     def INTFAR_REASONS(cls):
         return {
             "kda": "Low KDA",
-            "deaths": "Many deaths",
+            "mvps": "No MVPs",
             "adr": "Low ADR",
             "score": "Low score"
         }
@@ -218,9 +218,6 @@ class CSGOAwardQualifiers(AwardQualifiers):
         return {} # TODO: Implement
 
     def get_cool_stats(self):
-        return {} # TODO: Implement
-
-    def get_lifetime_stats(self):
         return {} # TODO: Implement
 
     def _intfar_by_kda(self):
