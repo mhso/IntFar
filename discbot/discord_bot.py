@@ -1075,10 +1075,6 @@ class DiscordClient(discord.Client):
             logger.warning(f"Int-Far Discord nickname could not be found! Discord ID: {disc_id}")
             mention_str = f"Unknown (w/ discord ID '{disc_id}')"
 
-        if reason is None:
-            logger.warning("Int-Far reason was None!")
-            reason = "being really, really bad" # Generic reason, if None was given
-
         message = ties_msg
         message += awards_handler.get_flavor_text("intfar", "random", nickname=mention_str, reason=reason)
 

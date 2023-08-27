@@ -1,7 +1,7 @@
 from mhooge_flask.logging import logger
 
 from api.award_qualifiers import AwardQualifiers
-from api import util as api_util
+from api.util import round_digits
 from api.game_stats import get_outlier
 from api.database import Database
 
@@ -165,7 +165,7 @@ class LoLAwardQualifiers(AwardQualifiers):
         """
         Returns a string describing people who have been redeemed by playing
         exceptionally well.
-        Criteria for being redeemed:
+        Criteria for getting doinks:
             - Having a KDA of 10 or more
             - Getting 20 kills or more
             - Doing more damage than the rest of the team combined
@@ -182,12 +182,12 @@ class LoLAwardQualifiers(AwardQualifiers):
             mention_list = []
 
             if stats.kda >= 10.0:
-                mention_list.append((0, api_util.round_digits(stats.kda)))
+                mention_list.append((0, round_digits(stats.kda)))
 
             if stats.kills >= 20:
                 mention_list.append((1, stats.kills))
 
-            if stats.damage > stats["damage_by_team"] - stats.damage:
+            if stats.damage > stats.damage_by_team - stats.damage:
                 mention_list.append((2, stats.damage))
 
             if stats.pentakills > 0:
@@ -214,13 +214,13 @@ class LoLAwardQualifiers(AwardQualifiers):
                 mention_list.append((6, own_epics))
 
             if stats.cs_per_min >= 8:
-                mention_list.append((7, api_util.round_digits(stats.cs_per_min)))
+                mention_list.append((7, round_digits(stats.cs_per_min)))
 
             if mention_list != []:
                 mentions[stats.disc_id] = mention_list
                 format_str = ""
 
-                for index in range(len(api_util.DOINKS_REASONS)):
+                for index in range(len(self.DOINKS_REASONS())):
                     has_doinks_for_stats = False
                     for stat_index, _ in mention_list:
                         if stat_index == index:
@@ -254,7 +254,7 @@ class LoLAwardQualifiers(AwardQualifiers):
                 mentions[stats.disc_id].append((1, stats.damage))
 
             if stats.lane != "UTILITY" and stats.lane != "JUNGLE" and stats.cs_per_min < self.config.mentions_max_cs_per_min:
-                mentions[stats.disc_id].append((2, api_util.round_digits(stats.cs_per_min)))
+                mentions[stats.disc_id].append((2, round_digits(stats.cs_per_min)))
 
             epic_monsters_secured = (
                 self.parsed_game_stats.our_baron_kills +

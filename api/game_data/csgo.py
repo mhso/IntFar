@@ -452,7 +452,7 @@ class CSGOPlayerStats(PlayerStats):
     entries: int = None
     triples: int = None
     quads: int = None
-    pentas: int = None
+    aces: int = None
     one_v_ones_tried: int = None
     one_v_ones_won: int = None
     one_v_twos_tried: int = None
@@ -482,7 +482,7 @@ class CSGOPlayerStats(PlayerStats):
             "entries",
             "triples",
             "quads",
-            "pentas",
+            "aces",
             "one_v_ones_tried",
             "one_v_ones_won",
             "one_v_twos_tried",
@@ -513,7 +513,7 @@ class CSGOPlayerStats(PlayerStats):
             entries=("most", "fewest"),
             triples=("most", "fewest"),
             quads=("most", "fewest"),
-            pentas=("most", "fewest"),
+            aces=("most", "fewest"),
             one_v_ones_tried=("most", "fewest"),
             one_v_ones_won=("most", "fewest"),
             one_v_twos_tried=("most", "fewest"),
@@ -630,7 +630,7 @@ class CSGOGameStatsParser(GameStatsParser):
                 entries=player_data["firstKills"],
                 triples=player_data["kills3"],
                 quads=player_data["kills4"],
-                pentas=player_data["kills5"],
+                aces=player_data["kills5"],
                 one_v_ones_tried=player_data["attempts1v1"],
                 one_v_ones_won=player_data["success1v1"],
                 one_v_twos_tried=player_data["attempts1v2"],

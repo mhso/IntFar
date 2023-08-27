@@ -91,7 +91,7 @@ CREATE TABLE [participants_csgo] (
     [entries] INTEGER,
     [triples] INTEGER,
     [quads] INTEGER,
-    [pentas] INTEGER,
+    [aces] INTEGER,
     [one_v_ones_tried] INTEGER,
     [one_v_ones_won] INTEGER,
     [one_v_twos_tried] INTEGER,
