@@ -62,6 +62,7 @@ def get_data_from_file(folder, database: Database, steam_api: SteamAPIClient):
                         parsed_data.duration = duration
                         all_data.append(parsed_data)
                     else:
+                        long_match = rounds_us + rounds_them > 16
                         all_data.append(
                             CSGOGameStats(
                                 "csgo",
@@ -77,7 +78,7 @@ def get_data_from_file(folder, database: Database, steam_api: SteamAPIClient):
                                 our_team_t,
                                 rounds_us,
                                 rounds_them,
-                                True
+                                long_match
                             )
                         )
 
@@ -160,8 +161,9 @@ def get_data_from_file(folder, database: Database, steam_api: SteamAPIClient):
 def run(database: Database, steam_api: SteamAPIClient, args):
     data = get_data_from_file(args.folder, database, steam_api)
     
-    for entry in data:
-        database.record_stats(entry)
+    with database:
+        for entry in data:
+            database.record_stats(entry)
 
 parser = ArgumentParser()
 

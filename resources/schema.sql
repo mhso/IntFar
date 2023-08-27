@@ -36,7 +36,7 @@ CREATE TABLE [games_csgo] (
     [intfar_id] INTEGER,
     [intfar_reason] NVARCHAR(4),
     [win] INTEGER(1),
-    [guild_id] INTEGER
+    [guild_id] INTEGER,
     [map_name] NVARCHAR(32),
     [started_t] INTEGER(1),
     [rounds_us] INTEGER(4),
@@ -103,7 +103,7 @@ CREATE TABLE [participants_csgo] (
     [one_v_fours_won] INTEGER,
     [one_v_fives_tried] INTEGER,
     [one_v_fives_won] INTEGER,
-    [rank] NVARCHAR(32),
+    [rank] INTEGER,
     PRIMARY KEY (game_id, disc_id)
 );
 CREATE TABLE [betting_balance] (

@@ -1676,7 +1676,7 @@ class Database(SQLiteDatabase):
         beaten_records_best = []
         beaten_records_worst = []
 
-        for stat in parsed_game_stats.filtered_player_stats[0].STATS_TO_SAVE():
+        for stat in parsed_game_stats.filtered_player_stats[0].STAT_QUANTITY_DESC():
             reverse_order = stat == "deaths"
             (
                 min_id, min_value, max_id, max_value,
@@ -1684,14 +1684,14 @@ class Database(SQLiteDatabase):
             ) = self.get_stat_data(parsed_game_stats, stat, reverse_order)
 
             if reverse_order: # Stat is 'deaths'.
-                if prev_best is not None and min_value < prev_best: # Fewest deaths ever has been reached.
+                if None not in (prev_best, min_value) and min_value < prev_best: # Fewest deaths ever has been reached.
                     beaten_records_best.append((stat, min_value, min_id, prev_best, prev_best_id))
-                elif prev_worst is not None and max_value > prev_worst: # Most deaths ever has been reached.
+                elif None not in(prev_worst, max_value) and max_value > prev_worst: # Most deaths ever has been reached.
                     beaten_records_worst.append((stat, max_value, max_id, prev_worst, prev_worst_id))
             else: # Stat is any other stat.
-                if prev_best is not None and max_value > prev_best: # A new best has been set for a stat.
+                if None not in (prev_best, max_value) and max_value > prev_best: # A new best has been set for a stat.
                     beaten_records_best.append((stat, max_value, max_id, prev_best, prev_best_id))
-                elif prev_worst is not None and min_value < prev_worst: # A new worst has been set for a stat.
+                elif None not in (prev_worst, min_value) and min_value < prev_worst: # A new worst has been set for a stat.
                     beaten_records_worst.append((stat, min_value, min_id, prev_worst, prev_worst_id))
 
         game_insert_str = ",\n".join(parsed_game_stats.STATS_TO_SAVE())
@@ -1703,7 +1703,7 @@ class Database(SQLiteDatabase):
         game_insert_values = [getattr(parsed_game_stats, stat) for stat in parsed_game_stats.STATS_TO_SAVE()]
 
         games_table = self._get_games_table(parsed_game_stats.game)
-        stats_table = self._get_games_table(parsed_game_stats.game)
+        stats_table = self._get_participants_table(parsed_game_stats.game)
 
         with self:
             query_game = f"""

@@ -1,9 +1,32 @@
 from dataclasses import dataclass
-
-from api.game_stats import GameStats, PlayerStats, GameStatsParser
 from typing import Union, cast, Literal, Optional
+
 import pandas as pd
 from awpy.types import GameRound, PlayerStatistics
+
+from api.game_stats import GameStats, PlayerStats, GameStatsParser
+
+RANKS = [
+    "Unranked",
+    "Silver 1",
+    "Silver 2",
+    "Silver 3",
+    "Silver 4",
+    "Silver Elite",
+    "Silver Elite Master",
+    "Gold Nova 1",
+    "Gold Nova 2",
+    "Gold Nova 3",
+    "Gold Nova Master",
+    "Master Guardian 1",
+    "Master Guardian 2",
+    "Master Guardian Elite",
+    "Distinguished Master Guardian",
+    "Legendary Eagle",
+    "Legendary Eagle Master",
+    "Supreme Master First Class",
+    "The Global Elite"
+]
 
 def other_side(side: Literal["CT", "T"]) -> Literal["T", "CT"]:
     """Takes a csgo side as input and returns the opposite side in the same formatting
@@ -413,57 +436,6 @@ def awpy_player_stats(
     else:
         return player_statistics
 
-class CSGORank:
-    _RANKS = [
-        "Unranked",
-        "Silver 1",
-        "Silver 2",
-        "Silver 3",
-        "Silver 4",
-        "Silver Elite",
-        "Silver Elite Master",
-        "Gold Nova 1",
-        "Gold Nova 2",
-        "Gold Nova 3",
-        "Gold Nova Master",
-        "Master Guardian 1",
-        "Master Guardian 2",
-        "Master Guardian Elite",
-        "Distinguished Master Guardian",
-        "Legendary Eagle",
-        "Legendary Eagle Master",
-        "Supreme Master First Class",
-        "The Global Elite"
-    ]
-
-    def __init__(self, rank: str):
-        self.rank = rank
-        self.number = CSGORank._RANKS.index(rank)
-
-    def __lt__(self, other):
-        return self.number < other.number
-
-    def __le__(self, other):
-        return self.number <= other.number
-
-    def __gt__(self, other):
-        return self.number > other.number
-
-    def __ge__(self, other):
-        return self.number >= other.number
-
-    def __eq__(self, other):
-        return self.number == other.number
-
-    def __ne__(self, other):
-        return self.number != other.number
-    
-    def __str__(self):
-        return self.rank
-    
-    def __repr__(self):
-        return self.rank
-
 @dataclass
 class CSGOPlayerStats(PlayerStats):
     mvps: int = None
@@ -491,7 +463,7 @@ class CSGOPlayerStats(PlayerStats):
     one_v_fours_won: int = None
     one_v_fives_tried: int = None
     one_v_fives_won: int = None
-    rank: CSGORank = None
+    rank: int = None
 
     @classmethod
     def STATS_TO_SAVE(cls):
@@ -671,7 +643,7 @@ class CSGOGameStatsParser(GameStatsParser):
                 one_v_fours_won=player_data["success1v4"],
                 one_v_fives_tried=player_data["attempts1v5"],
                 one_v_fives_won=player_data["success1v5"],
-                rank=CSGORank(player_data["rank"]),
+                rank=RANKS.index(player_data["rank"]) if player_data.get("rank") else None,
             )
             all_player_stats.append(parsed_player_stats)
 
