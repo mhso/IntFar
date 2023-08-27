@@ -4,7 +4,7 @@ import random
 from api.game_stats import GameStats
 from api.config import Config
 from api.database import Database
-from api.util import load_flavor_texts
+from api.util import load_flavor_texts, SUPPORTED_GAMES
 
 class AwardQualifiers(ABC):
     def __init__(self, config: Config, parsed_game_stats: GameStats):
@@ -94,6 +94,9 @@ class AwardQualifiers(ABC):
         for key in params_to_replace:
             if params_to_replace[key] is not None:
                 flavor_text = flavor_text.replace("{" + key + "}", str(params_to_replace[key]))
+
+        if "{game}" in flavor_text: # Replace game name if it is present in the text
+            flavor_text = flavor_text.replace("{game}", SUPPORTED_GAMES[self.game])
 
         return flavor_text
 

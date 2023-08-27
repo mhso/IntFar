@@ -34,14 +34,13 @@ CREATE TABLE [games_csgo] (
     [timestamp] INTEGER,
     [duration] INTEGER,
     [intfar_id] INTEGER,
-    [intfar_reason] NVARCHAR(4),
+    [intfar_reason] NVARCHAR(32),
     [win] INTEGER(1),
     [guild_id] INTEGER,
     [map_name] NVARCHAR(32),
     [started_t] INTEGER(1),
     [rounds_us] INTEGER(4),
-    [rounds_them] INTEGER(4),
-    [long_match] INTEGER(1)
+    [rounds_them] INTEGER(4)
 );
 CREATE TABLE [missed_games] (
     [game_id] NVARCHAR(64) NOT NULL,

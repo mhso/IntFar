@@ -38,19 +38,6 @@ class Config:
         self.max_shop_quantity = 1000
         self.shop_open = False
 
-        # ===== Intfar Criterias =====
-        self.kda_lower_threshold = 1.3
-        self.kda_death_criteria = 2
-        self.death_lower_threshold = 9
-        self.death_kda_criteria = 2.1
-        self.kp_lower_threshold = 20
-        self.kp_takedowns_criteria = 10
-        self.kp_structures_criteria = 2
-        self.kp_deaths_criteria = 2
-        self.vision_score_lower_threshold = 11
-        self.vision_kda_criteria = 3.0
-        self.vision_secs_lower_threshold = 1200
-
         # ===== Honorable Mentions Criterias =====
         self.mentions_vision_wards = 0
         self.mentions_max_damage = 8000

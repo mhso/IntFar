@@ -534,7 +534,6 @@ class CSGOGameStats(GameStats):
     started_t: bool = None
     rounds_us: int = None
     rounds_them: int = None
-    long_match: bool = None
 
     @classmethod
     def STATS_TO_SAVE(cls):
@@ -543,7 +542,6 @@ class CSGOGameStats(GameStats):
             "started_t",
             "rounds_us",
             "rounds_them",
-            "long_match",
         ]
 
     def get_finished_game_summary(self, disc_id: int) -> str:
