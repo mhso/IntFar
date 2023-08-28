@@ -1,0 +1,4 @@
+murdering their teammates {value} time{quantifier} in cold blood
+backstabbing and killing their unsuspecting friends {value} time{quantifier}
+going full 'Et tu Brute?' on their teammates, killing {value} of them
+forgetting what team they were on, killing {value} of their teammates

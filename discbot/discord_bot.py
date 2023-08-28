@@ -124,6 +124,10 @@ class DiscordClient(discord.Client):
             await channel.send("Odds of winning throughout the game:", file=file)
 
     async def on_game_over(self, game: str, game_info: dict, guild_id: int, status_code: int):
+        """
+        Method called by a game monitor when a game is concluded and awards & stats
+        should be saved.
+        """
         game_monitor = self.game_monitors[game]
 
         if status_code == game_monitor.POSTGAME_STATUS_ERROR:

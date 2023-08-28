@@ -20,6 +20,7 @@ def parse_demo(steam_api: SteamAPIClient, database: Database, demo_url):
     return stats_parser.parse_data()
 
 def get_data_from_file(folder, database: Database, steam_api: SteamAPIClient):
+    # TODO: Merge several files by timestamp
     url_demos = [line.strip() for line in open(f"{folder}/gotv_demos.txt", "r", encoding="utf-8")]
 
     all_data = []

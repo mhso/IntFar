@@ -1,0 +1,4 @@
+shooting at literally everything but the enemy team, having an accuracy of {value}%
+wasting a tons of ammo on walls, windows, and chickens, having only an accuracy of {value}%
+being legally blind, having an abyssmal accuracy of {value}%
+shooting a whole bunch of warning shots, only hitting {value}% of his shots

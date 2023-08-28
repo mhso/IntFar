@@ -110,11 +110,22 @@ class CSGOAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def HONORABLE_MENTIONS_FLAVOR_TEXTS(cls):
-        return []
+        return [
+            "mentions_teamkills",
+            "mentions_teamflashes",
+            "mentions_suicides",
+            "mentions_accuracy",
+            "mentions_deaths",
+        ]
 
     @classmethod
     def COOL_STATS_FLAVOR_TEXTS(cls):
-        return []
+        return [
+            "stats_assists",
+            "stats_flashes",
+            "stats_4ks",
+            "stats_clutches"
+        ]
 
     @classmethod
     def DOINKS_FLAVOR_TEXTS(cls):
@@ -215,10 +226,84 @@ class CSGOAwardQualifiers(AwardQualifiers):
         return mentions, formatted_mentions
 
     def get_honorable_mentions(self):
-        return {} # TODO: Implement
+        """
+        Returns players that deserve honorable mentions (questionable stats),
+        for stuff that wasn't quite bad enough to be named Int-Far for.
+        Honorable mentions are given for:
+            - Killing teammates
+            - Flashing teammates
+            - Suiciding
+            - Having very low accuracy
+            - Dying in more than 80% of the rounds
+        """
+        mentions = {} # List of mentioned users for the different criteria.
+        for stats in self.parsed_game_stats.filtered_player_stats:
+            mentions[stats.disc_id] = []
+
+            if stats.team_kills > 1:
+                mentions[stats.disc_id].append((0, stats.team_kills))
+
+            if stats.teammates_flashed > 3:
+                mentions[stats.disc_id].append((1, stats.teammates_flashed))
+
+            if stats.suicides > 0:
+                mentions[stats.disc_id].append((2, stats.suicides))
+
+            if stats.accuracy < 5:
+                mentions[stats.disc_id].append((3, stats.accuracy))
+
+            total_rounds = self.parsed_game_stats.rounds_us + self.parsed_game_stats.rounds_them
+            if stats.deaths / total_rounds > 0.8:
+                mentions[stats.disc_id].append((4, int((stats.deaths / total_rounds) * 100)))
+
+        return mentions
 
     def get_cool_stats(self):
-        return {} # TODO: Implement
+        """
+        Returns a list of miscellaneous interesting stats for each player in the game.
+        These stats include:
+            - Having more than 10 assists
+            - Having more than 20 enemies flashed
+            - Having more than 1 4K
+            - Winning more than 70% of clutches (and being in more than 2)
+        """
+        cool_stats = {}
+
+        for stats in self.parsed_game_stats.filtered_player_stats:
+            cool_stats[stats.disc_id] = []
+
+            if stats.assists > 10:
+                cool_stats[stats.disc_id].append((0, stats.assists))
+
+            if stats.enemies_flashed > 20:
+                cool_stats[stats.disc_id].append((1, stats.enemies_flashed))
+
+            if stats.quads > 1:
+                cool_stats[stats.disc_id].append((2, stats.quads))
+
+            clutches_attempted_keys = [
+                "one_v_ones_tried",
+                "one_v_twos_tried",
+                "one_v_threes_tried",
+                "one_v_fours_tried",
+                "one_v_fives_tried",
+            ]
+            clutches_won_keys = [
+                "one_v_ones_won",
+                "one_v_twos_won",
+                "one_v_threes_won",
+                "one_v_fours_won",
+                "one_v_fives_won",
+            ]
+            num_clutches_attempted = sum(getattr(stats, stat) for stat in clutches_attempted_keys)
+            num_clutches_won = sum(getattr(stats, stat) for stat in clutches_won_keys)
+
+            if num_clutches_attempted > 2 and num_clutches_won / num_clutches_attempted > 0.70:
+                clutch_pct = int((num_clutches_won / num_clutches_attempted) * 100)
+                clutch_desc = f"{clutch_pct}% of {num_clutches_attempted}"
+                cool_stats[stats.disc_id].append((3, clutch_desc))
+
+        return cool_stats
 
     def _intfar_by_kda(self):
         """

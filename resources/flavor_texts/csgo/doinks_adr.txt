@@ -1,3 +1,3 @@
-doing tons and tons of damage with an ADR of {adr}!
-being an absolute menace to society, doing an average of {adr} damage per round!
-ruining the enemy teams day, getting a sick ADR of {adr}!
+doing tons and tons of damage with an ADR of {value}!
+being an absolute menace to society, doing an average of {value} damage per round!
+ruining the enemy teams day, getting a sick ADR of {value}!
