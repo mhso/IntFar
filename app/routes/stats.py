@@ -49,6 +49,9 @@ def get_stats(game, database):
 @stats_page.route('/')
 def home():
     game = flask.current_app.config["CURRENT_GAME"]
+    if game == "csgo":
+        return make_template_context("under_construction.html", 200)
+
     database = flask.current_app.config["DATABASE"]
     stats_data = get_stats(game, database)
     return make_template_context("stats.html", stats_data=stats_data)

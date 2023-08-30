@@ -53,6 +53,9 @@ def get_doinks_awards(game, database):
 @doinks_page.route('/')
 def home():
     game = flask.current_app.config["CURRENT_GAME"]
+    if game == "csgo":
+        return make_template_context("under_construction.html", 200)
+
     database = flask.current_app.config["DATABASE"]
     doinks_data, doinks_counts, doinks_for_person = get_doinks_awards(game, database)
     return make_template_context(

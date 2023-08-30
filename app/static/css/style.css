@@ -588,6 +588,17 @@ table {
     text-align: center;
 }
 
+#under-construction-page-wrapper {
+    margin-top: 5vh;
+    text-align: center;
+}
+
+#under-construction-page-wrapper img {
+    height: 250px;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0px 5px 15px white);
+}
+
 /****************##############****************\
 |                   PROFILE                    |
 \****************##############****************/
@@ -1396,6 +1407,13 @@ table {
     margin-top: 5px;
     color: red;
     font-size: 15px;
+}
+
+#csgo-register-submit-error {
+    font-size: 20px;
+    margin-top: 1rem;
+    margin-bottom: 0;
+    color: red;
 }
 
 .csgo-input-error {

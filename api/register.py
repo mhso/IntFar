@@ -3,6 +3,8 @@ from api.game_api.lol import RiotAPIClient
 from api.game_api.csgo import SteamAPIClient
 from api.game_api_client import GameAPIClient
 
+from mhooge_flask.logging import logger
+
 def register_for_lol(database: Database, api_client: RiotAPIClient, disc_id: int, summ_name: str):
     if summ_name is None:
         return 0, "You must supply a summoner name."
@@ -49,6 +51,7 @@ def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: i
     if status_code == 1: # New user
         # Send friend request on Steam from Int-Far to the newly registered player
         friend_status = api_client.send_friend_request(steam_id)
+        logger.info(f"Sent Steam friend request with status {friend_status}")
 
         if friend_status == 2: # Int-Far was already friends with the person
             return 2, "You are already friends with Int-Far on Steam, so you are good to go!"

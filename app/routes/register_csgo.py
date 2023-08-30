@@ -33,7 +33,7 @@ def home():
 
     if flask.request.method == "POST":
         data = flask.request.form
-        required_fields = ["steam_id", "match_auth_code"]
+        required_fields = ["steam_id", "match_token", "match_auth_code"]
         for field in required_fields:
             if data.get(field, "") == "":
                 return make_text_response(
