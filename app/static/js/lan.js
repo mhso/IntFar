@@ -27,7 +27,25 @@ function getLiveData(lanDate) {
             refreshPage();
         }
     }, (error) => {
-        console.log("ERROR!!! " + error);
+        console.log("DATA ERROR!!! " + error);
+    });
+}
+
+function getSongPlaying(lanDate) {
+    let baseUrl = getBaseURL();
+    $.ajax(baseUrl + "/intfar/lan/now_playing/" + lanDate, {
+        method: "GET"
+    }).then((data) => {
+        let song_str = null;
+        if (data.artist == "nothing") {
+            song_str = data.song;
+        }
+        else {
+            song_str = data.artist + " - " + data.song;
+        }
+        document.getElementById("lan-now-playing").textContent = song_str
+    }, (error) => {
+        console.log("SONG ERROR!!! " + error);
     });
 }
 
@@ -165,15 +183,22 @@ function monitor(gamesPlayed, activeGame, lanOver, lanDate) {
     console.log("Active games on load: " + isActiveGame)
     console.log("LAN active on load: " + isLanActive)
 
-    let delay = 15 * 1000
+    let dataDelay = 15 * 1000
+    let songDelay = 5 * 1000
+    let songInterval = setInterval(function() {
+        getSongPlaying(lanDate)
+    }, songDelay);
+
     let intervalId = setInterval(function() {
         if (!isLanActive) {
             clearInterval(intervalId);
+            clearInterval(songInterval);
         }
         else {
             getLiveData(lanDate);
+            getSongPlaying(lanDate)
         }
-    }, delay);
+    }, dataDelay);
     if (anyGamesPlayed) {
         if (isLanActive) {
             count();

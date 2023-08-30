@@ -68,6 +68,7 @@ def run_app(
         max_content_length=1024 * 512, # 500 KB limit for uploaded sounds
         quiz_categories=set(),
         quiz_team_blue=True,
+        now_playing=None,
         exit_code=0
     )
 

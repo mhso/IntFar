@@ -633,21 +633,21 @@ class Database(SQLiteDatabase):
 
         if time_after is not None:
             params.append(time_after)
-            if params is None:
+            if other_param is None:
                 delimiter += f" {prefix} timestamp > ?"
             else:
                 delimiter += " AND timestamp > ?"
 
         if time_before is not None:
             params.append(time_before)
-            if params is None:
+            if time_after is None:
                 delimiter += f" {prefix} timestamp < ?"
             else:
                 delimiter += " AND timestamp < ?"
 
         if guild_id is not None:
             params.append(guild_id)
-            if params is None:
+            if time_before is None:
                 delimiter += f" {prefix} guild_id = ?"
             else:
                 delimiter += " AND guild_id = ?"
@@ -1766,7 +1766,7 @@ class Database(SQLiteDatabase):
 
     def get_player_stats(self, game, stats, game_id=None, disc_id=None, time_after=None, time_before=None, guild_id=None):
         games_table = self._get_games_table(game)
-        stats_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
 
         prefix = "WHERE"
         game_id_delimeter = ""
@@ -1780,6 +1780,8 @@ class Database(SQLiteDatabase):
         params = params + delim_params
 
         stats_to_select = ", ".join(stats)
+        if disc_id is None:
+            stats_to_select = f"disc_id, {stats_to_select}"
 
         query = f"""
             SELECT

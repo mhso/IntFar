@@ -151,9 +151,8 @@
                         </div>
                     </div>
                     <div class="col-lg-6">
-                        <video autoplay muted loop class="lan-catjam">
-                            <source src="{{ url_for('static', filename='img/catjam.webm') }}", type="video/webm">
-                        </video>
+                        <h2>Now Playing 🎵</h2>
+                        <div id="lan-now-playing">Nothing ATM</div>
                     </div>
                 </div>
                 {% endif %}
@@ -169,6 +168,11 @@
             {% endif %}
         </div>
     </div>
+    {% if games_played and not active_game %}
+    <video autoplay muted loop class="lan-catjam">
+        <source src="{{ url_for('static', filename='img/catjam.webm') }}", type="video/webm">
+    </video>
+    {% endif %}
     <script src="{{ url_for('static', filename='js/lan.js') }}"></script>
     <script>
         monitor("{{ games_played }}", "{{ active_game }}", "{{ lan_over }}", "{{ lan_date }}");

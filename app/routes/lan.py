@@ -23,6 +23,7 @@ def get_champ_faces(users_in_game, face_images):
             stripped = line.strip()
             if stripped == "":
                 continue
+
             split_1 = stripped.split(":")
             champ_id = int(split_1[0].strip())
             coords = [int(c) for c in split_1[1].strip().split(",")]
@@ -57,11 +58,11 @@ def get_test_active_data():
     active_game = "CLASSIC"
     enemy_champs = [15, 421, 45, 10, 432]
     users_in_game = [
-        (172757468814770176, 223),
-        (235831136733888512, 35),
+        (115142485579137029, 223),
+        (172757468814770176, 35),
         (267401734513491969, 517),
-        (115142485579137029, 221),
-        (331082926475182081, 888)
+        (331082926475182081, 221),
+        (347489125877809155, 888)
     ]
     game_prediction = 53
     blue_side = True
@@ -145,7 +146,7 @@ def get_data(lan_info):
     if lan_api.TESTING:
         with open("dummy.txt", "r") as fp:
             if fp.readline().strip() in ("0", "1"):
-                games_stats = None
+                games_stats = []
 
     names = ["david", "martin", "mikkel", "mads", "anton"]
 
@@ -270,7 +271,9 @@ def get_data(lan_info):
         # Organize and sort stats by total rank.
         all_player_stats = [
             (
-                all_player_ranks[disc_id], face_images[disc_id], all_player_stats[disc_id]
+                all_player_ranks[disc_id],
+                face_images[disc_id],
+                all_player_stats[disc_id]
             ) for disc_id in all_player_stats
         ]
         all_player_stats.sort(key=lambda x: x[0])
@@ -377,3 +380,41 @@ def live_data(date):
     data = get_data(lan_info)
 
     return app_util.make_json_response(data, 200)
+
+@lan_page.route("/now_playing/<date>", methods=["GET", "POST"])
+def now_playing(date):
+    if flask.request.method == "POST":
+        # Update the currently playing song
+        data = flask.request.form
+        conf = flask.current_app.config["APP_CONFIG"]
+
+        secret = data.get("secret")
+        lan_info = lan_api.LAN_PARTIES.get(date)
+
+        if lan_info is None:
+            return flask.abort(404) # LAN info not found
+
+        if secret != conf.discord_token:
+            return flask.abort(401) # User is not authorized
+
+        song = data["song"]
+
+        if song == "nothing":
+            flask.current_app.config["NOW_PLAYING"] = None
+
+        else:
+            artist = data["artist"]
+            flask.current_app.config["NOW_PLAYING"] = (song, artist)
+
+        return flask.make_response(("Success! Song playing updated.", 200))
+    
+    # Return the currently playing song and artist (if any)
+    data = flask.current_app.config["NOW_PLAYING"]
+    if data is None:
+        response_data = {"song": "Nothing ATM", "artist": "nothing"}
+        return app_util.make_json_response(response_data, 200)
+
+    song, artist = data
+    response_data = {"song": song, "artist": artist}
+
+    return app_util.make_json_response(response_data, 200)

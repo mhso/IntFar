@@ -5,6 +5,7 @@ from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
 from csgo import sharecode
+from api.lan import get_average_stats, LAN_PARTIES
 
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, util
@@ -86,10 +87,12 @@ class TestFuncs:
         intfar_data = award_qualifiers.get_intfar(relevant, CONFIG)
         print(intfar_data)
 
-    def test_ifotm_stuff(self):
-        intfar_data = self.database.get_intfars_of_the_month()
+    def test_lan_rework(self):
+        lan_info = LAN_PARTIES["april_22"]
+        all_avg_stats, all_ranks_list = get_average_stats(self.database, lan_info)
 
-        print(intfar_data)
+        print(all_avg_stats)
+        print(all_ranks_list)
 
     def test_duration(self):
         dt_2 = datetime.now()

@@ -1,6 +1,4 @@
 import asyncio
-import sys
-import traceback
 from concurrent.futures import TimeoutError as FutureTimeout, CancelledError
 from time import time, sleep
 from multiprocessing import Pipe

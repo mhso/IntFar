@@ -1,7 +1,7 @@
 from datetime import datetime
 from api.game_data import get_stat_quantity_descriptions
 
-TESTING = False
+TESTING = True
 
 class LANInfo:
     def __init__(self, start_time, end_time, participants, guild_id):
@@ -55,8 +55,8 @@ if not TESTING:
 else: # Use old data for testing.
     LAN_PARTIES = {
         "april_22": LANInfo(
-            1631470327,
-            1631655446,
+            datetime(2022, 4, 15, 14, 0, 0).timestamp(),
+            datetime(2022, 4, 16, 12, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",
@@ -64,20 +64,20 @@ else: # Use old data for testing.
                 331082926475182081: "Muds",
                 347489125877809155: "Nønø"
             },
-            619073595561213953 # League Nibs
+            803987403932172359 # League Nibs
         )
     }
 
 def is_lan_ongoing(timestamp, guild_id=None):
-    lan_date = list(filter(
+    lan_data = list(filter(
         lambda x: timestamp > LAN_PARTIES[x].start_time and timestamp < LAN_PARTIES[x].end_time,
         LAN_PARTIES
     ))
 
-    if lan_date == []:
+    if lan_data == []:
         return False
 
-    latest_lan_info = LAN_PARTIES[lan_date[0]]
+    latest_lan_info = LAN_PARTIES[lan_data[0]]
 
     # Check if guild_id matches, if given.
     return guild_id is None or guild_id == latest_lan_info.guild_id
@@ -124,11 +124,13 @@ def get_tilt_value(recent_games):
 
 def get_average_stats(database, lan_info):
     game = "lol"
-    keys = ["disc_id"] + list(get_stat_quantity_descriptions(game))
+    stat_quantity_desc = get_stat_quantity_descriptions(game)
+    stats_to_get = list(stat_quantity_desc)
+    stats_to_get.remove("first_blood")
 
     all_stats = database.get_player_stats(
         game,
-        keys,
+        stats_to_get,
         time_after=lan_info.start_time,
         time_before=lan_info.end_time,
         guild_id=lan_info.guild_id
@@ -137,19 +139,27 @@ def get_average_stats(database, lan_info):
     if all_stats == []:
         return None, None
 
-    all_avg_stats = {key: [] for key in keys}
-    for stat_tuple in all_stats:
-        avg_stats = [0 for _ in keys]
+    grouped_by_player = {}
+    for stats in all_stats:
+        disc_id = stats[0]
+        if disc_id not in grouped_by_player:
+            grouped_by_player[disc_id] = []
+
+        grouped_by_player[disc_id].append(stats[1:])
+
+    all_avg_stats = {key: [] for key in stats_to_get}
+    for disc_id in grouped_by_player:
+        avg_stats = [0 for _ in stats_to_get]
         total_kda = 0
 
-        for stat_tuple in all_stats[disc_id]:
+        for stat_tuple in grouped_by_player[disc_id]:
             total_kda += (stat_tuple[0] + stat_tuple[2]) / stat_tuple[1]
             for index, stat_value in enumerate(stat_tuple):
                 avg_stats[index] += stat_value
             avg_stats[2] = total_kda
 
         for index, sum_value in enumerate(avg_stats):
-            all_avg_stats[keys[index]].append((disc_id, sum_value / len(all_stats[disc_id])))
+            all_avg_stats[stats_to_get[index]].append((disc_id, sum_value / len(all_stats)))
 
     for key in all_avg_stats:
         reverse = False if key == "deaths" else True

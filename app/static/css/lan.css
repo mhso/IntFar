@@ -20,6 +20,7 @@
 
 body {
     overflow-y: hidden;
+    position: relative;
 }
 
 #bg-image {
@@ -230,6 +231,10 @@ h2 {
     text-align: center;
 }
 
+#lan-teamcomp-wrapper > div:first-child {
+    border-right: 2px solid white;
+}
+
 #lan-teamcomp-scroll {
     max-height: 290px;
     overflow-y: auto;
@@ -247,6 +252,10 @@ h2 {
     width: 60px;
     height: auto;
     margin-right: 5px;
+}
+
+#lan-now-playing {
+    font-size: 30px;
 }
 
 #lan-no-games-wrapper > video {
@@ -285,6 +294,8 @@ h2 {
 }
 
 .lan-catjam {
-    width: 140%;
-    border-left: 2px solid white;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    clip-path: polygon(30% 0%, 30% 100%, 100% 100%, 100% 0);
 }

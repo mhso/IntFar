@@ -1,5 +1,5 @@
 import json
-from time import time
+from time import sleep, time
 from os import remove
 from os.path import exists
 
@@ -217,6 +217,10 @@ def index():
         )
 
     avatars = app_util.discord_request("func", "get_discord_avatar", None)
+    if not avatars:
+        sleep(1)
+        avatars = app_util.discord_request("func", "get_discord_avatar", None)
+
     if avatars:
         avatars = [
             flask.url_for("static", filename=avatar.replace("app/static/", ""))
