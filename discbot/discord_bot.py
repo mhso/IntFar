@@ -1756,11 +1756,11 @@ class DiscordClient(discord.Client):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
 
-        if ((self.config.env == "dev" and message.guild.id != api_util.MY_GUILD_ID)
-                or (self.config.env == "production" and message.guild.id not in api_util.GUILD_IDS)):
-            # If Int-Far is running in dev mode, only handle messages that are sent from
-            # my personal sandbox Discord server.
-            return
+        # if ((self.config.env == "dev" and message.guild.id != api_util.MY_GUILD_ID)
+        #         or (self.config.env == "production" and message.guild.id not in api_util.GUILD_IDS)):
+        #     # If Int-Far is running in dev mode, only handle messages that are sent from
+        #     # my personal sandbox Discord server.
+        #     return
 
         msg = message.content.strip()
         if msg.startswith("!"): # Message is a command.

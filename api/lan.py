@@ -159,7 +159,7 @@ def get_average_stats(database, lan_info):
             avg_stats[2] = total_kda
 
         for index, sum_value in enumerate(avg_stats):
-            all_avg_stats[stats_to_get[index]].append((disc_id, sum_value / len(all_stats)))
+            all_avg_stats[stats_to_get[index]].append((disc_id, sum_value / len(grouped_by_player[disc_id])))
 
     for key in all_avg_stats:
         reverse = False if key == "deaths" else True

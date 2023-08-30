@@ -43,7 +43,10 @@ function getSongPlaying(lanDate) {
         else {
             song_str = data.artist + " - " + data.song;
         }
-        document.getElementById("lan-now-playing").textContent = song_str
+        let elem = document.getElementById("lan-now-playing");
+        if (elem != null) {
+            document.getElementById("lan-now-playing").textContent = song_str
+        }
     }, (error) => {
         console.log("SONG ERROR!!! " + error);
     });

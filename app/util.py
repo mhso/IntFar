@@ -28,6 +28,11 @@ def register_discord_connection():
     conn_map[sess_id] = new_conn
 
 def check_and_set_game():
+    """
+    Gets the game that the current page responds to, if any, based on the URL.
+    Sets this on the flask config for later use. Also redirects to LoL, if no
+    game is given in the URL, but the current page requires one.
+    """
     base_url = flask.request.base_url
     if base_url[-1] == "/":
         base_url = base_url[:-1]
@@ -38,14 +43,18 @@ def check_and_set_game():
         reduced_url = reduced_url.replace("www.", "")
 
     url_split = reduced_url.split("/")
+
     if len(url_split) == 2:
         return flask.redirect(f"{base_url}/lol")
 
     if len(url_split) == 3:
         if url_split[2] in _GAME_SPECIFIC_ROUTES:
-            return flask.redirect(f"{'/'.join(url_split[:2])}/lol/{url_split[2]}")
+            return flask.redirect(f"{'/'.join(url_split[:2])}/{_DEFAULT_GAME}/{url_split[2]}")
 
-        game = _DEFAULT_GAME
+        if url_split[2] in SUPPORTED_GAMES:
+            game = url_split[2]
+        else:
+            game = _DEFAULT_GAME
 
     elif len(url_split) == 4:
         if url_split[3] in _GAME_SPECIFIC_ROUTES:

@@ -80,3 +80,5 @@ class Manager(object):
 
     def close(self):
         self._stop_event.set()
+        if self.proxies:
+            self.proxies[0].close()

@@ -344,7 +344,9 @@ class Database(SQLiteDatabase):
                     FROM {stats_table} AS p
                     JOIN {users_table} AS u
                     ON u.disc_id = p.disc_id
-                    WHERE u.active = 1
+                    WHERE
+                        u.active = 1
+                        AND {stat} IS NOT NULL
                     GROUP BY game_id
                 ) sub
                 WHERE disc_id = ?
@@ -869,7 +871,7 @@ class Database(SQLiteDatabase):
                     ON g.game_id = p.game_id
                 WHERE
                     disc_id = ?
-                    AND win=1
+                    AND win = 1
             ) wins,
             (
                 SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
@@ -1592,7 +1594,7 @@ class Database(SQLiteDatabase):
                     FROM {games_table} AS g
                     JOIN {stats_table} AS p
                         ON g.game_id = p.game_id
-                    WHERE win=1
+                    WHERE win = 1
                     GROUP BY disc_id
                 ) wins,
                 (

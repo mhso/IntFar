@@ -50,7 +50,7 @@ class CSGOGameMonitor(GameMonitor):
         if active_games is None or "watchableMatchInfos" not in active_games or "accountIds" not in active_games:
             return None, users_in_current_game, None # No active game
 
-        print("Len of lists:", len(active_games["accountIds"]), len(active_games["watchableMatchInfos"]))
+        logger.info("Len of lists:", len(active_games["accountIds"]), len(active_games["watchableMatchInfos"]))
 
         game_ids = set()
         active_game = None
@@ -113,6 +113,8 @@ class CSGOGameMonitor(GameMonitor):
                     user_data.match_auth_code,
                     user_data.latest_match_token
                 )
+
+                logger.info(f"New match sharing code for '{disc_id}': '{next_code}'")
 
                 if next_code is not None and next_code != current_sharecodes[disc_id]: # Error or new code hasn't been updated yet
                     self.database.set_new_csgo_sharecode(disc_id, next_code)
