@@ -289,7 +289,7 @@ def initialize_commands():
     register_desc = (
         "Sign up for the Int-Far™ Tracker™ for the given game " +
         "by providing your ingame info. For LoL, this is just your summoner name. "
-        "For CSGO, this is your Steam account name, Steam ID, and match authentication code. "
+        "For CSGO, this is your Steam account name, Steam ID, latest match token, and match authentication code. "
         "(For CSGO, signing up on the website is a lot easier)."
     )
     register_command(
@@ -297,7 +297,7 @@ def initialize_commands():
         register_desc,
         handle_register_msg,
         mandatory_params=[GameParam("game"), RegularParam("user_name")],
-        optional_params=[RegularParam("user_id"), RegularParam("extra_info")]
+        optional_params=[RegularParam("user_id"), RegularParam("extra_info_1"), RegularParam("extra_info_2")]
     )
 
     # unregister command
@@ -969,7 +969,8 @@ def initialize_commands():
         True,
         "self",
         mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")]
+        optional_params=[TargetParam("person")],
+        aliases=["penis"]
     )
 
     # wr command

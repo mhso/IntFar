@@ -870,6 +870,23 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, *params).fetchone()[0]
 
+    def get_csgo_maps_played(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        game = "csgo"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
+
+        query = f"""
+            SELECT COUNT(DISTINCT map_id)
+            FROM {stats_table} AS p
+            JOIN {games_table} g
+                ON p.game_id = g.game_id
+                {delim_str}
+        """
+
+        with self:
+            return self.execute_query(query, *params).fetchone()[0]
+
     def get_champ_with_most_intfars(self, disc_id):
         game = "lol"
         games_table = self._get_games_table(game)
@@ -939,7 +956,7 @@ class Database(SQLiteDatabase):
         with self:
             intfar_multis_data = self.execute_query(query_intfar_multis).fetchall()
             if intfar_multis_data == []:
-                return None, None
+                return [], []
 
             amount_intfars = len(intfar_multis_data[0][0])
 
@@ -1099,7 +1116,116 @@ class Database(SQLiteDatabase):
             return result
 
     def get_csgo_map_winrate(self, disc_id, map_id):
-        pass # TODO: Implement
+        game = "csgo"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+
+        query = f"""
+            SELECT
+                (wins.c / played.c) * 100 AS wr,
+                played.c AS gs
+            FROM (
+                SELECT
+                    CAST(COALESCE(COUNT(DISTINCT g.game_id), 0) as real) AS c,
+                    map_id
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
+                WHERE
+                    disc_id = ?
+                    AND map_id = ?
+                    AND win = 1
+            ) wins,
+            (
+                SELECT
+                    CAST(COUNT(DISTINCT g.game_id) as real) AS c,
+                    map_id
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
+                WHERE
+                    disc_id = ?
+                    AND map_id = ?
+            ) played
+            WHERE wins.map_id = played.map_id OR wins.map_id IS NULL
+        """
+
+        with self:
+            params = [disc_id, map_id] * 2
+            return self.execute_query(query, *params).fetchone()
+
+    def get_min_or_max_csgo_winrate_map(self, disc_id, best, included_maps=None, return_top_n=1, min_games=10):
+        game = "csgo"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+
+        sort_order = "DESC" if best else "ASC"
+        if included_maps is not None:
+            maps_condition = (
+                "AND played.map_id IN (" +
+                ",\n".join(f"'{map_id}'" for map_id in included_maps) +
+                ")"
+            )
+        else:
+            maps_condition = ""
+
+        query = f"""
+            SELECT
+                sub.wr,
+                CAST(sub.gs as integer),
+                sub.map
+            FROM (
+                SELECT
+                    (wins.c / played.c) * 100 AS wr,
+                    played.c AS gs,
+                    played.map_id as map
+                FROM (
+                    SELECT
+                        CAST(COUNT(DISTINCT g.game_id) as real) AS c,
+                        map_id
+                    FROM {games_table} AS g
+                    LEFT JOIN {stats_table} AS p 
+                        ON g.game_id = p.game_id
+                    WHERE
+                        disc_id = ?
+                        AND win = 1
+                    GROUP BY map_id
+                    ORDER BY map_id
+               ) wins,
+               (
+                SELECT
+                    CAST(COUNT(DISTINCT g.game_id) as real) AS c,
+                    map_id
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
+                WHERE disc_id = ?
+                GROUP BY map_id
+                ORDER BY map_id
+               ) played
+               WHERE
+                    wins.map_id = played.map_id
+                    AND played.c > {min_games}
+                    {maps_condition}
+            ) sub
+            ORDER BY
+                sub.wr {sort_order},
+                sub.gs DESC
+            LIMIT {return_top_n}
+        """
+
+        with self:
+            params = [disc_id] * 2
+            result = self.execute_query(query, *params).fetchall()
+
+            if return_top_n == 1:
+                result = result[0]
+
+            if result is None and min_games == 10:
+                # If no champs are found with min 10 games, try again with 5.
+                return self.get_min_or_max_csgo_winrate_map(disc_id, best, included_maps, return_top_n, min_games=5)
+
+            return result
 
     def get_winrate_relation(self, game, disc_id, best, min_games=10):
         games_table = self._get_games_table(game)
@@ -1669,16 +1795,18 @@ class Database(SQLiteDatabase):
         total = 4
         performance_range = 10
         equation = (
-            f"(((1 - intfars.c / played.c) * {intfar_weight} + " +
-            f"(doinks.c / played.c) * {doinks_weight} + " +
-            f"(wins.c / played.c) * {winrate_weight}) / {total}) * {performance_range}"
+            f"(((1 - COALESCE(intfars.c / played.c, 0)) * {intfar_weight} + " +
+            f"COALESCE(doinks.c / played.c, 0) * {doinks_weight} + " +
+            f"COALESCE(wins.c / played.c, 0) * {winrate_weight}) / {total}) * {performance_range}"
         )
+        min_games = self.config.performance_mimimum_games
 
-        query_outer = "SELECT sub.user, sub.score FROM\n("
-
-        query_select = f"   SELECT played.disc_id AS user, {equation} AS score FROM "
-
-        query_subs = f"""
+        query = f"""
+            SELECT sub.user, sub.score FROM (
+                SELECT
+                    played.disc_id AS user,
+                    {equation} AS score
+                FROM
                 (
                     SELECT
                         CAST(COUNT(DISTINCT g.game_id) AS real) AS c,
@@ -1687,8 +1815,8 @@ class Database(SQLiteDatabase):
                     JOIN {stats_table} AS p
                         ON g.game_id = p.game_id
                     GROUP BY disc_id
-                ) played,
-                (
+                ) played
+                LEFT JOIN (
                     SELECT
                         CAST(COUNT(DISTINCT g.game_id) AS real) AS c,
                         disc_id
@@ -1697,15 +1825,17 @@ class Database(SQLiteDatabase):
                         ON g.game_id = p.game_id
                     WHERE win = 1
                     GROUP BY disc_id
-                ) wins,
-                (
+                ) wins
+                ON wins.disc_id = played.disc_id
+                LEFT JOIN (
                     SELECT
                         CAST(COUNT(*) AS real) AS c,
                         intfar_id
                     FROM {games_table} AS g
                     GROUP BY intfar_id
-                ) intfars,
-                (
+                ) intfars
+                ON intfars.intfar_id = wins.disc_id
+                LEFT JOIN (
                     SELECT
                         CAST(SUM(LENGTH(REPLACE(doinks_sub.doinks, '0', ''))) AS real) AS c,
                         doinks_sub.disc_id
@@ -1719,13 +1849,8 @@ class Database(SQLiteDatabase):
                     ) doinks_sub
                     GROUP BY doinks_sub.disc_id
                 ) doinks
-                WHERE
-                    played.disc_id = wins.disc_id
-                    AND played.disc_id = intfars.intfar_id
-                    AND played.disc_id = doinks.disc_id
-                    AND wins.disc_id = intfars.intfar_id
-                    AND wins.disc_id = doinks.disc_id
-                    AND intfars.intfar_id = doinks.disc_id
+                ON doinks.disc_id = intfars.intfar_id
+                WHERE played.c > {min_games}
             ) sub
             LEFT JOIN {users_table} AS u
                 ON sub.user = u.disc_id
@@ -1734,13 +1859,11 @@ class Database(SQLiteDatabase):
             ORDER BY sub.score DESC
         """
 
-        query_full = query_outer + query_select + query_subs
-
         with self:
-            performance_scores = self.execute_query(query_full).fetchall()
+            performance_scores = self.execute_query(query).fetchall()
             if disc_id is None:
                 return performance_scores
-            
+
             rank = 0
             score = 0
             for index, (score_id, score_value) in enumerate(performance_scores):

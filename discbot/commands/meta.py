@@ -5,10 +5,9 @@ from api.awards import get_intfar_reasons
 from api.register import register_for_game
 import discbot.commands.util as commands_util
 
-async def handle_register_msg(client, message, game, target, *extra_args):
+async def handle_register_msg(client, message, game, username, *extra_args):
     disc_id = message.author.id
-    api_client = client.api_clients[game]
-    status_code, status_msg = register_for_game(client.database, api_client, disc_id, target, *extra_args)
+    status_code, status_msg = register_for_game(client.database, client.api_clients[game], disc_id, username, *extra_args)
 
     if status_code > 0:
         users_in_voice = client.get_users_in_voice()

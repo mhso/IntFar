@@ -53,7 +53,7 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient):
 
                 try:
                     if line.startswith("Competitive") or line == ">EOF<": # Map name line
-                        if not first_line and len(players_in_game) > 1:
+                        if not first_line and len(players_in_game) > 1 and (score_team_1 > 9 or score_team_2 > 9):
                             # Only save data if more than 1 registered player was in the game
                             rounds_us = score_team_2 if our_team_t else score_team_1
                             rounds_them = score_team_1 if our_team_t else score_team_2

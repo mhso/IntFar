@@ -20,6 +20,7 @@ class Config:
         self.env = auth["env"]
         self.database = "resources/database.db"
         self.generate_predictions_img = False
+        self.performance_mimimum_games = 20
 
         # ===== Active Game Monitoring =====
         self.status_interval_dormant = 60 * 2 # Seconds to wait between checking for game status.

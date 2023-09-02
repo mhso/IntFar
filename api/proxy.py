@@ -13,10 +13,14 @@ class Proxy(object):
     @property
     def game(self):
         return self._call_proxy("game")
-    
+
     @property
     def config(self):
         return self._call_proxy("config")
+
+    @property
+    def map_names(self):
+        return self._call_proxy("map_names")
 
     def _set_attributes(self):
         for attr in dir(self.target_cls):
