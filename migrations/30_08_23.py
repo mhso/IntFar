@@ -39,13 +39,9 @@ if os.path.exists(conf_2.database):
 database_client_2 = Database(conf_2)
 
 with database_client_1.get_connection() as db_1:
-    data_games_lol = db_1.cursor().execute("SELECT * FROM games_lol").fetchall()
-    data_games_csgo = db_1.cursor().execute("SELECT * FROM games_csgo").fetchall()
-    participants_lol = db_1.cursor().execute("SELECT * FROM participants_lol").fetchall()
-    participants_csgo = db_1.cursor().execute("SELECT * FROM participants_csgo").fetchall()
-    users = db_1.cursor().execute("SELECT * FROM users").fetchall()
-    users_lol = db_1.cursor().execute("SELECT * FROM users_lol").fetchall()
-    users_csgo = db_1.cursor().execute("SELECT * FROM users_csgo").fetchall()
+    data_games = db_1.cursor().execute("SELECT * FROM games").fetchall()
+    participants = db_1.cursor().execute("SELECT * FROM participants").fetchall()
+    summoners = db_1.cursor().execute("SELECT * FROM registered_summoners").fetchall()
     balances = db_1.cursor().execute("SELECT * FROM betting_balance").fetchall()
     bets = db_1.cursor().execute("SELECT * FROM bets").fetchall()
     shop_items = db_1.cursor().execute("SELECT * FROM shop_items").fetchall()
@@ -56,37 +52,31 @@ with database_client_1.get_connection() as db_1:
     missed_games = db_1.cursor().execute("SELECT * FROM missed_games").fetchall()
 
     with database_client_2.get_connection() as db_2:
-        for user in users:
-            db_2.cursor().execute("INSERT OR IGNORE INTO users VALUES (?, ?, ?)", user)
+        for summ in summoners:
+            disc_id = int(summ[0])
+            secret = summ[3]
+            db_2.cursor().execute("INSERT OR IGNORE INTO users VALUES (?, ?, ?)", (disc_id, secret, summ[4]))
 
-        for user in users_lol:
-            db_2.cursor().execute("INSERT OR IGNORE INTO users_lol VALUES (?, ?, ?, ?, ?)", user)
+        seen_users = set()
+        for summ in summoners:
+            disc_id = int(summ[0])
 
-        for user in users_csgo:
-            db_2.cursor().execute("INSERT OR IGNORE INTO users_csgo VALUES (?, ?, ?, ?, ?, ?, ?)", user)
+            main = 1 if disc_id not in seen_users else 0
 
-        query = "INSERT INTO games_lol VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        for data in data_games_lol:
-            db_2.cursor().execute(query, data)
+            seen_users.add(disc_id)
+            db_2.cursor().execute("INSERT OR IGNORE INTO users_lol VALUES (?, ?, ?, ?, ?)", (disc_id, summ[1], summ[2], main, summ[5]))
 
-        query = "INSERT INTO games_csgo VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        for data in data_games_csgo:
-            db_2.cursor().execute(query, data)
-
-        query = (
-            """
-            INSERT INTO participants_lol VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
-        )
-        for data in participants_lol:
+        query = "INSERT INTO games_lol(game_id, timestamp, duration, intfar_id, intfar_reason, first_blood, win, guild_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        for data in data_games:
             db_2.cursor().execute(query, data)
 
         query = (
             """
-            INSERT INTO participants_csgo VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO participants_lol(game_id, disc_id, champ_id, doinks, kills, deaths, assists, kda, damage, cs, cs_per_min, gold, kp, vision_wards, vision_score, steals)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         )
-        for data in participants_csgo:
+        for data in participants:
             db_2.cursor().execute(query, data)
 
         query = "INSERT OR IGNORE INTO betting_balance(disc_id, tokens) VALUES (?, ?)"
@@ -94,10 +84,18 @@ with database_client_1.get_connection() as db_1:
             db_2.cursor().execute(query, data)
 
         query = (
-            "INSERT OR IGNORE INTO bets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT OR IGNORE INTO bets(id, better_id, guild_id, game_id, game, timestamp, event_id, "
+            "amount, game_duration, target, ticket, result, payout) "
+            "VALUES (?, ?, ?, ?, 'lol', ?, ?, ?, ?, ?, ?, ?, ?)"
         )
+
         for data in bets:
-            db_2.cursor().execute(query, data)
+            data = list(data)
+            for new_event, old_event in BETTING_IDS.items():
+                if int(data[5]) == old_event:
+                    data[5] = new_event
+                    break
+            db_2.cursor().execute(query, tuple(data))
 
         query = "INSERT INTO shop_items VALUES (?, ?, ?, ?)"
         for data in shop_items:
@@ -107,7 +105,7 @@ with database_client_1.get_connection() as db_1:
         for data in owned_items:
             db_2.cursor().execute(query, data)
 
-        query = "INSERT INTO event_sounds(disc_id, game, sound, event) VALUES (?, ?, ?, ?)"
+        query = "INSERT INTO event_sounds(disc_id, game, sound, event) VALUES (?, 'lol', ?, ?)"
         for data in event_sounds:
             db_2.cursor().execute(query, data)
 
@@ -121,6 +119,8 @@ with database_client_1.get_connection() as db_1:
 
         query = "INSERT INTO missed_games(game_id, game, guild_id, timestamp) VALUES (?, ?, ?, ?)"
         for data in missed_games:
-            db_2.cursor().execute(query, data)
+            game = "lol"
+            data = [data[0], game] + list(data[1:])
+            db_2.cursor().execute(query, tuple(data))
 
         db_2.commit()

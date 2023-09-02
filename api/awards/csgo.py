@@ -317,6 +317,10 @@ class CSGOAwardQualifiers(AwardQualifiers):
         tied_intfars, tied_stats = get_outlier(
             self.parsed_game_stats.all_player_stats, "kda", include_ties=True
         )
+
+        if tied_intfars is None: # No data for stat
+            return None, None
+
         lowest_kda = tied_stats[0].kda
         criterias = self.INTFAR_CRITERIAS()["kda"]
 
@@ -359,6 +363,10 @@ class CSGOAwardQualifiers(AwardQualifiers):
         tied_intfars, tied_stats = get_outlier(
             self.parsed_game_stats.all_player_stats, "mvps", include_ties=True
         )
+
+        if tied_intfars is None: # No data for stat
+            return None, None
+
         least_mvps = tied_stats[0].mvps
 
         mvp_criteria = criterias["lower_threshold"]
@@ -392,6 +400,10 @@ class CSGOAwardQualifiers(AwardQualifiers):
         tied_intfars, tied_stats = get_outlier(
             self.parsed_game_stats.all_player_stats, "adr", include_ties=True
         )
+
+        if tied_intfars is None: # No data for stat
+            return None, None
+
         lowest_adr = tied_stats[0].adr
         criterias = self.INTFAR_CRITERIAS()["adr"]
 
@@ -434,6 +446,10 @@ class CSGOAwardQualifiers(AwardQualifiers):
         tied_intfars, tied_stats = get_outlier(
             self.parsed_game_stats.all_player_stats, "score", include_ties=True
         )
+
+        if tied_intfars is None: # No data for stat
+            return None, None
+
         lowest_score = tied_stats[0].score
 
         score_criteria = criterias["lower_threshold"]

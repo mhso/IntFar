@@ -57,28 +57,30 @@ class TargetParam:
     def __str__(self):
         return self.name
 
-class ChampionParam:
+class PlayedParam:
     def __init__(self, name):
         self.name = name
 
-    def get_champ_id(self, cmd_input, start_index, client):
+    def get_played_id(self, game, cmd_input, start_index, client):
         index = start_index
         name = ""
-        prev_champ_id = None
+        prev_played_id = None
+        games_to_try = [game] if game is not None else SUPPORTED_GAMES
 
         while index < len(cmd_input):
             name = name + cmd_input[index]
 
-            champ_id = client.api_clients["lol"].try_find_champ(name)
-            if champ_id is None and prev_champ_id is not None:
-                return prev_champ_id, index - start_index
+            for game in games_to_try:
+                played_id = client.api_clients[game].try_find_played(name)
+                if played_id is None and prev_played_id is not None:
+                    return prev_played_id, index - start_index
 
-            prev_champ_id = champ_id
+            prev_played_id = played_id
 
             name += " "
             index += 1
 
-        return prev_champ_id, index - start_index
+        return prev_played_id, index - start_index
 
     def __str__(self):
         return self.name
@@ -147,12 +149,19 @@ class Command:
                 parsed_args.append(value)
                 index += 1
 
-            elif isinstance(param, ChampionParam):
-                champ_id, consumed_params = param.get_champ_id(args, index, client)
-                if champ_id is not None:
+            elif isinstance(param, PlayedParam):
+                # Try to find game from previously parsed args
+                game = None
+                for arg in parsed_args:
+                    if arg in SUPPORTED_GAMES:
+                        game = arg
+                        break
+
+                played_id, consumed_params = param.get_played_id(game, args, index, client)
+                if played_id is not None:
                     index += consumed_params
 
-                parsed_args.append(champ_id)
+                parsed_args.append(played_id)
 
             elif isinstance(param, GameParam):
                 if index >= len(args):
@@ -160,7 +169,7 @@ class Command:
                     continue
 
                 if args[index] not in SUPPORTED_GAMES:
-                    valid_games = ", ".join(f"'{game}'" for game in SUPPORTED_GAMES)
+                    valid_games = ", ".join(f"`{game}`" for game in SUPPORTED_GAMES)
                     await message.channel.send(
                         f"Invalid game '{args[index]}'. This command targets a specific "
                         f"game which should be one of: {valid_games}."
@@ -439,7 +448,7 @@ def initialize_commands():
         True,
         "self",
         mandatory_params=[GameParam("game"), RegularParam("stat")],
-        optional_params=[ChampionParam("champion_or_map"), TargetParam("person")],
+        optional_params=[PlayedParam("champion_or_map"), TargetParam("person")],
         aliases=["avg"]
     )
 

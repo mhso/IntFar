@@ -7,15 +7,15 @@ from api.util import format_duration
 
 @dataclass
 class LoLPlayerStats(PlayerStats):
-    champ_id: int
-    champ_name: str
-    damage: int
-    cs: int
-    cs_per_min: float
-    gold: int
-    vision_wards: int
-    vision_score: int
-    steals: int
+    champ_id: int = None
+    champ_name: str = None
+    damage: int = None
+    cs: int = None
+    cs_per_min: float = None
+    gold: int = None
+    vision_wards: int = None
+    vision_score: int = None
+    steals: int = None
     lane: str=None
     role: str=None
     pentakills: int=None
@@ -54,7 +54,7 @@ class LoLPlayerStats(PlayerStats):
 
 @dataclass
 class LoLGameStats(GameStats):
-    first_blood: int
+    first_blood: int = None
     map_id: int = None
     queue_id: int = None
     team_id: int = None
@@ -101,7 +101,7 @@ class LoLGameStats(GameStats):
         """
         player_stats: LoLPlayerStats = self.find_player_stats(disc_id, self.filtered_player_stats)
 
-        date = datetime.fromtimestamp(self.timestamp / 1000.0).strftime("%Y/%m/%d")
+        date = datetime.fromtimestamp(self.timestamp).strftime("%Y/%m/%d")
         dt_1 = datetime.fromtimestamp(time())
         dt_2 = datetime.fromtimestamp(time() + self.duration)
         fmt_duration = format_duration(dt_1, dt_2)
@@ -121,27 +121,25 @@ class LoLGameStatsParser(GameStatsParser):
 
         return self.get_relevant_stats()
 
-    def parse_from_database(self, game_id: int, database) -> GameStats:
+    def parse_from_database(self, database, game_id: int) -> GameStats:
         game_stats, player_stats = LoLGameStats.get_stats_from_db(self.game, game_id, database, LoLPlayerStats)
-        parsed_game_stats["kills_by_our_team"] = 0
-
-        parsed_game_stats = GameStats(**game_stats)
 
         all_player_stats = []
         players_in_game = []
-        for stat_dict in player_stats:
-            user_game_info = self.all_users[stat_dict["disc_id"]]
-            stat_dict["champ_name"] = self.api_client.get_champ_name(stat_dict["champ_id"])
-            all_player_stats.append(LoLPlayerStats(**all_player_stats))
+        for disc_id in player_stats:
+            player_stats[disc_id]["champ_name"] = self.api_client.get_champ_name(player_stats[disc_id]["champ_id"])
+            all_player_stats.append(LoLPlayerStats(**player_stats[disc_id]))
+
+            user_game_info = self.all_users[disc_id]
             summ_info = {
-                "disc_id": user_game_info.disc_id,
-                "summ_name": user_game_info.summ_name[0],
-                "summ_id": user_game_info.summ_id[0],
-                "champion_id": stat_dict["champ_id"],
+                "disc_id": disc_id,
+                "summ_name": user_game_info.ingame_name[0],
+                "summ_id": user_game_info.ingame_id[0],
+                "champion_id": player_stats[disc_id],
             }
             players_in_game.append(summ_info)
 
-        return GameStats(**game_stats, players_in_game=players_in_game, all_player_stats=player_stats)
+        return LoLGameStats(self.game, **game_stats, players_in_game=players_in_game, all_player_stats=all_player_stats)
 
     def get_relevant_stats_v4(self) -> GameStats:
         """
@@ -168,6 +166,12 @@ class LoLGameStatsParser(GameStatsParser):
                     for disc_id in self.all_users:
                         summ_ids = self.all_users[disc_id].ingame_id
                         if part_info["player"]["summonerId"] in summ_ids:
+                            kda =  (
+                                participant["stats"]["kills"] + participant["stats"]["assists"]
+                                if participant["stats"]["deaths"] == 0
+                                else (participant["stats"]["kills"] + participant["stats"]["assists"]) / participant["stats"]["deaths"]
+                            )
+
                             our_team = participant["teamId"]
                             stats_for_player = LoLPlayerStats(
                                 game_id=self.raw_data["gameId"],
@@ -175,6 +179,7 @@ class LoLGameStatsParser(GameStatsParser):
                                 kills=participant["stats"]["kills"],
                                 deaths=participant["stats"]["deaths"],
                                 assists=participant["stats"]["assists"],
+                                kda=kda,
                                 champ_id=participant["championId"],
                                 champ_name=participant["stats"]["championName"],
                                 damage=participant["stats"]["totalDamageDealtToChampions"],
@@ -205,6 +210,12 @@ class LoLGameStatsParser(GameStatsParser):
                             }
                             active_users.append(summ_data)
 
+        for stats in player_stats:
+            stats.kp = (
+                100 if kills_per_team[our_team] == 0
+                else int((float(stats.kills + stats.assists) / float(kills_per_team[our_team])) * 100.0)
+            )
+
         first_blood_id = None
         game_win = True
         team_id = None
@@ -233,7 +244,6 @@ class LoLGameStatsParser(GameStatsParser):
             timestamp=self.raw_data["gameCreation"],
             duration=int(self.raw_data["gameDuration"]),
             win=int(game_win),
-            kills_by_our_team=kills_per_team[our_team],
             guild_id=self.guild_id,
             players_in_game=active_users,
             all_player_stats=player_stats,
@@ -280,6 +290,11 @@ class LoLGameStatsParser(GameStatsParser):
                 our_team = participant["teamId"]
 
             total_cs = participant["neutralMinionsKilled"] + participant["totalMinionsKilled"]
+            kda =  (
+                participant["kills"] + participant["assists"]
+                if participant["deaths"] == 0
+                else (participant["kills"] + participant["assists"]) / participant["deaths"]
+            )
 
             stats_for_player = LoLPlayerStats(
                 game_id=self.raw_data["gameId"],
@@ -287,6 +302,7 @@ class LoLGameStatsParser(GameStatsParser):
                 kills=participant["kills"],
                 deaths=participant["deaths"],
                 assists=participant["assists"],
+                kda=kda,
                 champ_id=participant["championId"],
                 champ_name=participant["championName"],
                 damage=participant["totalDamageDealtToChampions"],
@@ -319,6 +335,13 @@ class LoLGameStatsParser(GameStatsParser):
                 }
                 active_users.append(summ_data)
 
+        # Set kill participation
+        for stats in player_stats:
+            stats.kp = (
+                100 if kills_per_team[our_team] == 0
+                else int((float(stats.kills + stats.assists) / float(kills_per_team[our_team])) * 100.0)
+            )
+
         game_win = True
         team_id = None
         our_baron_kills = 0
@@ -347,7 +370,6 @@ class LoLGameStatsParser(GameStatsParser):
             timestamp=self.raw_data["gameCreation"],
             duration=int(self.raw_data["gameDuration"]),
             win=int(game_win),
-            kills_by_our_team=kills_per_team[our_team],
             guild_id=self.guild_id,
             players_in_game=active_users,
             all_player_stats=player_stats,

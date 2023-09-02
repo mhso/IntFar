@@ -76,14 +76,12 @@ class CSGOGameMonitor(GameMonitor):
         if active_game is None:
             return None, users_in_current_game, None
 
-        map_name = active_game["gameMap"].split("_")[-1].capitalize()
-
         return (
             {
                 "id": active_game["matchId"],
                 "start": 0,
                 "map_id": active_game["gameMap"],
-                "map_name": map_name,
+                "map_name": self.api_client.get_map_name(active_game["gameMap"]),
                 "game_type": active_game["gameType"]
             },
             users_in_current_game,

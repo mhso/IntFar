@@ -1,7 +1,7 @@
 from datetime import datetime
 from api.game_data import get_stat_quantity_descriptions
 
-TESTING = True
+TESTING = False
 
 class LANInfo:
     def __init__(self, start_time, end_time, participants, guild_id):

@@ -13,3 +13,11 @@ class GameAPIClient(ABC):
     @abstractmethod
     def get_game_details(self, match_id) -> dict:
         ...
+
+    @abstractmethod
+    def get_map_name(self, map_id):
+        ...
+
+    @abstractmethod
+    def try_find_played(self, played_name):
+        ...

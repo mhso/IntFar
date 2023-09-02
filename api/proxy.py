@@ -25,11 +25,7 @@ class Proxy(object):
                     def call(*args, x=attr):
                         return self.__getattribute__("_call_proxy")(x, *args)
 
-                    setattr(
-                        self,
-                        attr,
-                        call
-                    )
+                    setattr(self, attr, call)
 
     def __getstate__(self):
         return {"conn": self.conn, "target_cls": self.target_cls}

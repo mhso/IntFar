@@ -13,7 +13,7 @@ def register_for_lol(database: Database, api_client: RiotAPIClient, disc_id: int
         return 0, "User with that summoner name is already registered."
 
     elif (summ_id := api_client.get_summoner_id(summ_name.replace(" ", "%20"))) is None:
-        return 0, "Error: Invalid summoner name."
+        return 0, "Invalid summoner name."
 
     return database.add_user(
         api_client.game,
@@ -28,7 +28,7 @@ def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: i
 
     if match_auth_code is None:
         return 0, "You must supply a match authentication code."
-    
+
     if match_token is None:
         return 0, "You must supply the most recent match token."
 
@@ -37,7 +37,7 @@ def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: i
 
     steam_name = api_client.get_steam_display_name(steam_id)
     if steam_name is None:
-        return 0, "Error: Invalid Steam ID."
+        return 0, "Invalid Steam ID."
 
     status_code, status_msg = database.add_user(
         api_client.game,
@@ -56,8 +56,9 @@ def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: i
         if friend_status == 2: # Int-Far was already friends with the person
             return 2, "You are already friends with Int-Far on Steam, so you are good to go!"
 
-        if friend_status == 0:
-            status_msg = "Error: Could not send friend request from Int-Far. Contact Say wat and have him fix it."
+        # if friend_status == 0:
+        #     status_msg = "Could not send friend request from Int-Far. Contact Say wat and have him fix it."
+        #     status_code = 0
 
     return status_code, status_msg
 

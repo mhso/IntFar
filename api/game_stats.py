@@ -11,22 +11,9 @@ class PlayerStats(ABC):
     kills: int
     deaths: int
     assists: int
-    doinks: str = field(default=None, init=False)
-    kills_by_team: int = field(default=None, init=False)
-
-    @property
-    def kda(self) -> float:
-        if self.deaths == 0:
-            return self.kills + self.assists
-
-        return (self.kills + self.assists) / self.deaths
-
-    @property
-    def kp(self) -> int:
-        if self.kills_by_team == 0:
-            return 100
-
-        return int((float(self.kills + self.assists) / float(self.kills_by_team)) * 100.0)
+    doinks: str = None
+    kda: str = None
+    kp: str = None
 
     @classmethod
     def STATS_TO_SAVE(cls) -> list[str]:
@@ -60,13 +47,12 @@ class GameStats(ABC):
     game_id: int
     timestamp: int
     duration: int
-    intfar_id: int = field(default=None, init=False)
-    intfar_reason: str = field(default=None, init=False)
     win: int
     guild_id: int
-    kills_by_our_team: int
     players_in_game: list[dict]
     all_player_stats: list[PlayerStats]
+    intfar_id: int = None
+    intfar_reason: str = None
     filtered_player_stats: list[PlayerStats] = field(default=None, init=False)
 
     @classmethod
@@ -88,18 +74,25 @@ class GameStats(ABC):
     def get_stats_from_db(cls, game: str, game_id: int, database, player_stats_cls: PlayerStats):
         game_stats_to_save = cls.STATS_TO_SAVE()
         player_stats_to_save = player_stats_cls.STATS_TO_SAVE()
+
         game_stats = database.get_game_stats(game, game_stats_to_save, game_id)
         player_stats = database.get_player_stats(game, player_stats_to_save, game_id)
-        return dict(zip(game_stats_to_save, game_stats)), dict(zip(player_stats_to_save, player_stats))
+
+        game_stats_dict = dict(zip(game_stats_to_save, game_stats[0]))
+        player_stats_dict = {tup[0]: dict(zip(player_stats_to_save, tup)) for tup in player_stats}
+
+        return game_stats_dict, player_stats_dict
 
     @abstractmethod
     def get_finished_game_summary(self, disc_id: int) -> str:
+        """
+        Get a brief text that summaries a player's performance in a finished game.
+
+        :param disc_id: Discord ID of the player for whom to get the summary for
+        """
         ...
 
     def __post_init__(self):
-        for stat in self.all_player_stats:
-            stat.kills_by_team = self.kills_by_our_team
-
         self.filtered_player_stats = list(filter(lambda x: x.disc_id is not None, self.all_player_stats))
 
     def find_player_stats(self, disc_id: int, player_list: list[PlayerStats]):
@@ -145,10 +138,16 @@ def get_outlier(
     :param include_ties:    Whether to return a list of potentially tied outliers
                             or just return one person as an outlier, ignoring ties
     """
+
     def outlier_func_short(x: PlayerStats):
         return getattr(x, stat)
 
-    sorted_data = sorted(player_stats_list, key=outlier_func_short, reverse=not asc)
+    filtered_data = list(filter(lambda p: outlier_func_short(p) is not None, player_stats_list))
+
+    if filtered_data == []:
+        return None, None
+
+    sorted_data = sorted(filtered_data, key=outlier_func_short, reverse=not asc)
 
     if include_ties: # Determine whether there are tied outliers.
         outlier = outlier_func_short(sorted_data[0])

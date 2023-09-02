@@ -56,4 +56,3 @@ def home():
         )
 
     return make_template_context("register_csgo.html", registered_accounts=existing_accounts_list)
-

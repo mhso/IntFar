@@ -1,10 +1,13 @@
 from dataclasses import dataclass
+from datetime import datetime
+from time import time
 from typing import Union, cast, Literal, Optional
 
 import pandas as pd
 from awpy.types import GameRound, PlayerStatistics
 
 from api.game_stats import GameStats, PlayerStats, GameStatsParser
+from api.util import format_duration
 
 RANKS = [
     "Unranked",
@@ -530,6 +533,7 @@ class CSGOPlayerStats(PlayerStats):
 
 @dataclass
 class CSGOGameStats(GameStats):
+    map_id: str = None
     map_name: str = None
     started_t: bool = None
     rounds_us: int = None
@@ -538,14 +542,29 @@ class CSGOGameStats(GameStats):
     @classmethod
     def STATS_TO_SAVE(cls):
         return super().STATS_TO_SAVE() + [
-            "map_name",
+            "map_id",
             "started_t",
             "rounds_us",
             "rounds_them",
         ]
 
     def get_finished_game_summary(self, disc_id: int) -> str:
-        return super().get_finished_game_summary(disc_id)
+        """
+        Get a brief text that summaries a player's performance in a finished game.
+
+        :param disc_id: Discord ID of the player for whom to get the summary for
+        """
+        player_stats: CSGOPlayerStats = self.find_player_stats(disc_id, self.filtered_player_stats)
+
+        date = datetime.fromtimestamp(self.timestamp).strftime("%Y/%m/%d")
+        dt_1 = datetime.fromtimestamp(time())
+        dt_2 = datetime.fromtimestamp(time() + self.duration)
+        fmt_duration = format_duration(dt_1, dt_2)
+
+        return (
+            f"{self.map_name} with a score of {player_stats.kills}/" +
+            f"{player_stats.deaths}/{player_stats.assists} on {date} in a {fmt_duration} long game"
+        )
 
 class CSGOGameStatsParser(GameStatsParser):
     def parse_data(self) -> GameStats:
@@ -610,12 +629,25 @@ class CSGOGameStatsParser(GameStatsParser):
         all_player_stats = []
         for steam_id in player_stats:
             player_data = player_stats[steam_id]
+
+            kda = (
+                player_data["kills"] + player_data["assists"]
+                if player_data["deaths"] == 0
+                else (player_data["kills"] + player_data["assists"]) / player_data["deaths"]
+            )
+            kp = (
+                100 if kills_by_our_team == 0
+                else int((float(player_data["kills"] + player_data["assists"]) / float(kills_by_our_team)) * 100.0)
+            )
+
             parsed_player_stats = CSGOPlayerStats(
                 game_id=self.raw_data["matchID"],
                 disc_id=player_data.get("disc_id"),
                 kills=player_data["kills"],
                 deaths=player_data["deaths"],
                 assists=player_data["assists"],
+                kda=kda,
+                kp=kp,
                 mvps=player_data.get("mvps"),
                 score=player_data.get("scores"),
                 headshot_pct=player_data["hsPercent"],
@@ -645,6 +677,9 @@ class CSGOGameStatsParser(GameStatsParser):
             )
             all_player_stats.append(parsed_player_stats)
 
+        map_id = self.raw_data["mapName"]
+        map_name = self.api_client.get_map_name(map_id)
+
         return CSGOGameStats(
             game=self.game,
             game_id=self.raw_data["matchID"],
@@ -652,18 +687,33 @@ class CSGOGameStatsParser(GameStatsParser):
             duration=self.raw_data.get("duration"),
             win=win_score,
             guild_id=self.guild_id,
-            kills_by_our_team=kills_by_our_team,
             players_in_game=players_in_game,
             all_player_stats=all_player_stats,
-            map_name=self.raw_data["mapName"].split("_")[-1],
+            map_id=map_id,
+            map_name=map_name,
             started_t=started_t,
             rounds_us=rounds_us,
             rounds_them=rounds_them,
-            long_match=self.raw_data["serverVars"]["maxRounds"] == 30
         )
 
     def get_active_game_summary(self, active_id, api_client) -> str:
         return "Not implemented yet :O"
 
     def parse_from_database(self, database, game_id: int) -> GameStats:
-        return None
+        game_stats, player_stats = CSGOGameStats.get_stats_from_db(self.game, game_id, database, CSGOPlayerStats)
+        game_stats["map_name"] = self.api_client.get_map_name(game_stats["map_id"])
+
+        all_player_stats = []
+        players_in_game = []
+        for disc_id in player_stats:
+            all_player_stats.append(CSGOPlayerStats(**player_stats[disc_id]))
+
+            user_game_info = self.all_users[disc_id]
+            game_info = {
+                "disc_id": disc_id,
+                "steam_name": user_game_info.ingame_name[0],
+                "steam_id": user_game_info.ingame_id[0],
+            }
+            players_in_game.append(game_info)
+
+        return CSGOGameStats(self.game, **game_stats, players_in_game=players_in_game, all_player_stats=all_player_stats)

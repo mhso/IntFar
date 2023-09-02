@@ -213,20 +213,17 @@ async def handle_winrate_msg(client, message, game, champ_or_map, target_id):
     games = None
     qualified_name = None
 
-    if game == "lol":
-        champ_id = client.api_clients[game].try_find_champ(champ_or_map)
-        if champ_id is None:
-            response = f"Not a valid champion: `{champ_or_map}`."
+    played_id = client.api_clients[game].try_find_played(champ_or_map)
+    if played_id is None:
+        played_name = "champion" if game == "lol" else "map"
+        response = f"Not a valid {played_name}: `{champ_or_map}`."
+    else:
+        if game == "lol":
+            winrate, games = client.database.get_league_champ_winrate(target_id, played_id)
+            qualified_name = client.api_clients[game].get_champ_name(played_id)
         else:
-            winrate, games = client.database.get_league_champ_winrate(target_id, champ_id)
-            qualified_name = client.api_clients[game].get_champ_name(champ_id)
-    elif game == "csgo":
-        map_id = client.steam_api.try_find_map(champ_or_map)
-        if map_id is None:
-            response = f"Not a valid map: `{champ_or_map}`"
-        else:
-            winrate, games = client.database.get_csgo_map_winrate(target_id, map_id)
-            qualified_name = client.steam_api.get_map_name(map_id)
+            winrate, games = client.database.get_csgo_map_winrate(target_id, played_id)
+            qualified_name = client.api_clients[game].get_map_name(played_id)
 
     if winrate is not None:
         user_name = client.get_discord_nick(target_id, message.guild.id)

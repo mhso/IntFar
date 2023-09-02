@@ -118,7 +118,7 @@ def parse_champs_params(client, args):
 
     champ_ids = []
     for champ_name in champ_args:
-        champ_id = client.api_clients["lol"].try_find_champ(champ_name)
+        champ_id = client.api_clients["lol"].try_find_played(champ_name)
         if champ_id is None:
             raise ValueError(f"Invalid champion name: `{champ_name}`")
 

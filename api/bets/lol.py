@@ -33,11 +33,14 @@ class LoLBetResolver(BetResolver):
 
     def resolve_stats(self):
         stat = self.bet.event_id.split("_")[1]
-        most_kills_ties = get_outlier(
+        stat_outlier_ties = get_outlier(
             self.game_stats.filtered_player_stats, stat, asc=False, include_ties=True
         )[0]
 
-        return self.target_id in most_kills_ties and len(most_kills_ties) == 1
+        if stat_outlier_ties is None:
+            return None
+
+        return self.target_id in stat_outlier_ties and len(stat_outlier_ties) == 1
 
     @property
     def should_resolve_with_intfar_reason(self):

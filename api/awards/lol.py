@@ -309,6 +309,10 @@ class LoLAwardQualifiers(AwardQualifiers):
         tied_intfars, tied_stats = get_outlier(
             self.parsed_game_stats.all_player_stats, "kda", include_ties=True
         )
+
+        if tied_intfars is None: # No data for stat
+            return None, None
+
         lowest_kda = tied_stats[0].kda
         criterias = self.INTFAR_CRITERIAS()["kda"]
 
@@ -343,6 +347,10 @@ class LoLAwardQualifiers(AwardQualifiers):
         tied_intfars, tied_stats = get_outlier(
             self.parsed_game_stats.all_player_stats, "deaths", asc=False, include_ties=True
         )
+
+        if tied_intfars is None: # No data for stat
+            return None, None
+
         highest_deaths = tied_stats[0].deaths
         criterias = self.INTFAR_CRITERIAS()["deaths"]
 
@@ -379,6 +387,10 @@ class LoLAwardQualifiers(AwardQualifiers):
         tied_intfars, tied_stats = get_outlier(
             self.parsed_game_stats.filtered_player_stats, "kp", include_ties=True
         )
+
+        if tied_intfars is None: # No data for stat
+            return None, None
+
         lowest_kp = tied_stats[0].kp
         criterias = self.INTFAR_CRITERIAS()["kp"]
 
@@ -424,6 +436,10 @@ class LoLAwardQualifiers(AwardQualifiers):
         tied_intfars, tied_stats = get_outlier(
             self.parsed_game_stats.filtered_player_stats, "vision_score", include_ties=True
         )
+
+        if tied_intfars is None: # No data for stat
+            return None, None
+
         lowest_score = tied_stats[0].vision_score
 
         vision_criteria = criterias["lower_threshold"]

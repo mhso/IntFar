@@ -387,6 +387,96 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
+    def get_csgo_map_count_for_stat(self, stat, maximize, disc_id):
+        game = "csgo"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+        aggregator = "MAX" if maximize else "MIN"
+
+        query = f"""
+            SELECT sub2.map_id, {aggregator}(c) FROM (
+                SELECT
+                    sub.map_id,
+                    COUNT(*) AS c
+                FROM (
+                    SELECT
+                        {aggregator}({stat}) AS c,
+                        g.map_id,
+                        p.disc_id
+                    FROM {stats_table} AS p
+                    JOIN {games_table} AS g
+                        ON g.game_id = p.game_id
+                    JOIN {users_table} AS u
+                        ON u.disc_id = p.disc_id
+                    WHERE u.active = 1
+                    GROUP BY p.game_id
+                ) sub
+                WHERE disc_id = ?
+                GROUP BY map_id
+            ) sub2
+        """
+
+        with self:
+            return self.execute_query(query, disc_id).fetchone()
+
+    def get_average_stat_csgo(self, stat, disc_id=None, map_id=None, min_games=10):
+        game = "csgo"
+        games_table = self._get_games_table(game)
+        stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
+        params = []
+        player_condition = ""
+        map_condition = ""
+
+        if map_id is not None:
+            params = [map_id] * 2
+            map_condition = "AND g.map_id=?"
+
+        if disc_id is not None:
+            params.append(disc_id)
+            player_condition = "AND played.disc_id=?"
+
+        query = f"""
+            SELECT played.disc_id, stat_values.s / played.c AS avg_val, CAST(played.c AS int)
+            FROM
+            (
+                SELECT
+                    disc_id,
+                    SUM({stat}) AS s
+                FROM {stats_table} AS p
+                INNER JOIN {games_table} AS g
+                    ON g.game_id = p.game_id
+                WHERE {stat} IS NOT NULL
+                {map_condition}
+                GROUP BY p.disc_id
+            ) stat_values
+            INNER JOIN
+            (
+                SELECT
+                    disc_id,
+                    CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                FROM {games_table} AS g
+                LEFT JOIN {stats_table} AS p
+                    ON g.game_id = p.game_id
+                WHERE {stat} IS NOT NULL
+                {map_condition}
+                GROUP BY p.disc_id
+            ) played
+                ON played.disc_id = stat_values.disc_id
+            INNER JOIN {users_table} AS u
+                ON u.disc_id = played.disc_id
+            WHERE u.active = 1
+                AND played.c > {min_games}
+                {player_condition}
+            GROUP BY played.disc_id
+            ORDER BY avg_val DESC
+        """
+
+        with self:
+            result = self.execute_query(query, *params).fetchall()
+            return result or [(disc_id, None, None)]
+
     def get_average_stat_league(self, stat, disc_id=None, champ_id=None, min_games=10):
         game = "lol"
         games_table = self._get_games_table(game)
@@ -397,7 +487,7 @@ class Database(SQLiteDatabase):
         champ_condition = ""
 
         if champ_id is not None:
-            params = [champ_id, champ_id]
+            params = [champ_id] * 2
             champ_condition = "WHERE p.champ_id=?"
 
         if disc_id is not None:
@@ -406,9 +496,14 @@ class Database(SQLiteDatabase):
 
         if stat == "first_blood":
             query = f"""
-                SELECT played.disc_id, first_bloods.c / played.c AS avg_val, CAST(played.c AS int)
+                SELECT
+                    played.disc_id,
+                    first_bloods.c / played.c AS avg_val,
+                    CAST(played.c AS int)
                 FROM (
-                    SELECT g.first_blood, CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
+                    SELECT
+                        g.first_blood,
+                        CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
                     FROM {games_table} AS g
                     INNER JOIN {stats_table} AS p
                         ON p.game_id = g.game_id
@@ -418,7 +513,9 @@ class Database(SQLiteDatabase):
                 ) first_bloods
                 INNER JOIN
                 (
-                    SELECT p.disc_id, CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
+                    SELECT
+                        p.disc_id,
+                        CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
                     FROM {games_table} AS g
                     LEFT JOIN {stats_table} AS p
                         ON g.game_id = p.game_id
@@ -437,17 +534,24 @@ class Database(SQLiteDatabase):
 
         else:
             query = f"""
-                SELECT played.disc_id, stat_values.s / played.c AS avg_val, CAST(played.c AS int)
+                SELECT
+                    played.disc_id,
+                    stat_values.s / played.c AS avg_val,
+                    CAST(played.c AS int)
                 FROM
                 (
-                    SELECT disc_id, SUM({stat}) AS s
+                    SELECT
+                        disc_id,
+                        SUM({stat}) AS s
                     FROM {stats_table} AS p
-                    {champ_condition.replace('AND', 'WHERE')}
+                    {champ_condition}
                     GROUP BY p.disc_id
                 ) stat_values
                 INNER JOIN
                 (
-                    SELECT disc_id, CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                    SELECT
+                        disc_id,
+                        CAST(COUNT(DISTINCT g.game_id) as real) AS c
                     FROM {games_table} AS g
                     LEFT JOIN {stats_table} AS p
                         ON g.game_id = p.game_id
@@ -467,9 +571,6 @@ class Database(SQLiteDatabase):
         with self:
             result = self.execute_query(query, *params).fetchall()
             return result or [(disc_id, None, None)]
-
-    def get_csgo_map_count_for_stat(self, stat, maximize, disc_id):
-        pass
 
     def get_doinks_count(
         self,
@@ -1774,16 +1875,26 @@ class Database(SQLiteDatabase):
         game_id_delimeter = ""
         params = []
         if game_id is not None:
-            game_id_delimeter = "WHERE game_id=?"
+            game_id_delimeter = "WHERE g.game_id=?"
             params = [game_id]
             prefix = "AND"
  
         delim_str, delim_params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id, prefix)
         params = params + delim_params
 
-        stats_to_select = ", ".join(stats)
         if disc_id is None:
-            stats_to_select = f"disc_id, {stats_to_select}"
+            stats.insert(0, "disc_id")
+
+        stats_copy = list(stats)
+
+        try:
+            # game_id will be ambigious, so we need to specify a table alias
+            index = stats_copy.index("game_id")
+            stats_copy[index] = "g.game_id"
+        except ValueError:
+            pass
+
+        stats_to_select = ", ".join(stats_copy)
 
         query = f"""
             SELECT

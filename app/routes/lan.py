@@ -304,7 +304,7 @@ def get_data(lan_info):
                     if stripped == "_":
                         img_name = "img/any_champ.png"
                     else:
-                        champ_id = riot_api.try_find_champ(stripped)
+                        champ_id = riot_api.try_find_played(stripped)
                         img_name = riot_api.get_champ_portrait_path(champ_id).replace("app/static/", "")
 
                     portraits.append(flask.url_for("static", filename=img_name))

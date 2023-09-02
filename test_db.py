@@ -1,16 +1,18 @@
-from sys import argv
 from time import time
+from argparse import ArgumentParser
 import sqlite3
 
-if len(argv) == 1:
-    exit(0)
+parser = ArgumentParser()
 
-database = argv[1]
+parser.add_argument("--database", default="database", type=str)
+parser.add_argument("--query", default=None, type=str)
 
-conn = sqlite3.connect("resources/" + database + ".db")
+args = parser.parse_args()
 
-if len(argv) > 2:
-    filename = f"misc/queries/{argv[2]}"
+conn = sqlite3.connect("resources/" + args.database + ".db")
+
+if args.query is not None:
+    filename = f"misc/queries/{args.query}"
     with open(filename + ".sql", "r") as fp:
         time_start = time()
         result = conn.cursor().execute(fp.read())

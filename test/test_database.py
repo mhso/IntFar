@@ -120,6 +120,26 @@ class TestWrapper(TestRunner):
         self.assert_no_exception(database.get_current_win_or_loss_streak, "Get current win or loss streak", GAME, MY_DISC_ID, 1)
         self.assert_no_exception(database.get_current_win_or_loss_streak, "Get current win or loss streak", GAME, MY_DISC_ID, 0)
 
+        test_game_id = 5163331322
+        game_stats_to_save = ["timestamp", "duration", "game_id"]
+        self.assert_no_exception(database.get_game_stats, "Get game stats", GAME, game_stats_to_save)
+        self.assert_no_exception(database.get_game_stats, "Get game stats", GAME, game_stats_to_save, test_game_id)
+
+        player_stats_to_save = ["kills", "deaths", "game_id"]
+        self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save)
+        self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, test_game_id)
+        self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, None, MY_DISC_ID)
+        self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, test_game_id, MY_DISC_ID)
+
+        game_stats = database.get_game_stats(GAME, game_stats_to_save, test_game_id)
+        player_stats = database.get_player_stats(GAME, player_stats_to_save, test_game_id)
+
+        game_stats_dict = dict(zip(game_stats_to_save, game_stats[0]))
+        player_stats_dict = {tup[0]: dict(zip(player_stats_to_save, tup)) for tup in player_stats}
+
+        print(game_stats_dict)
+        print(player_stats_dict)
+
     @test
     def test_doinks_queries(self):
         database: Database = self.database

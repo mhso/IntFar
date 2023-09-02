@@ -6,6 +6,7 @@ from uuid import uuid4
 from mhooge_flask.logging import logger
 
 import requests
+from bs4 import BeautifulSoup
 from steam.client import SteamClient
 from steam.guard import SteamAuthenticator
 from csgo.client import CSGOClient
@@ -38,6 +39,9 @@ class SteamAPIClient(GameAPIClient):
         super().__init__(game, config)
         self.logged_on_once = False
 
+        self.map_names = {}
+        self.get_latest_data()
+
         self.steam_client = SteamClient()
         self.cs_client = CSGOClient(self.steam_client)
 
@@ -55,6 +59,31 @@ class SteamAPIClient(GameAPIClient):
         else:
             logger.warning("No Steam 2FA code provided. Steam/CSGO functionality wont work!")
 
+    def get_latest_data(self):
+        url = "https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive/Maps"
+
+        try:
+            response = requests.get(url)
+            html = BeautifulSoup(response.text, "html.parser")
+
+            former_header = html.find(id="Former_Maps")
+
+            maps_table = former_header.find_previous("table")
+            table_rows = maps_table.find_all("tr")
+
+            for row in table_rows[3:]:
+                columns = row.find_all("td")
+                full_name = columns[1].string.strip()
+                split = columns[2].string.split("_")
+                if len(split) == 1:
+                    continue
+
+                short_name = split[1].strip()
+                self.map_names[short_name] = full_name
+
+        except requests.RequestException:
+            logger.exception("Exception when downloading CSGO maps from", url)
+
     def _download_demo_file(self, filename, url):
         try:
             data = requests.get(url, stream=True)
@@ -63,7 +92,7 @@ class SteamAPIClient(GameAPIClient):
                     fp.write(chunk)
 
         except requests.RequestException:
-            logger.exception("Exception when downloading CSGO demo file from ", url)
+            logger.exception("Exception when downloading CSGO demo file from", url)
             return None
 
         return filename
@@ -130,7 +159,7 @@ class SteamAPIClient(GameAPIClient):
 
         if resp is None:
             return None
-        
+
         return json.loads(MessageToJson(resp[0]))
 
     def get_next_sharecode(self, steam_id, auth_code, match_token):
@@ -161,6 +190,9 @@ class SteamAPIClient(GameAPIClient):
     def get_account_id(self, steam_id):
         return SteamID(steam_id).account_id
 
+    def get_map_name(self, map_id):
+        return self.map_names.get(map_id)
+
     def get_steam_display_name(self, steam_id):
         url = _ENDPOINT_PLAYER_SUMMARY.replace(
             "[key]", self.config.steam_key
@@ -178,10 +210,39 @@ class SteamAPIClient(GameAPIClient):
 
         return None
 
+    def try_find_played(self, search_term):
+        """
+        Search for a played map by name.
+
+        Tries to find candidates that have `search_term` as part
+        of their name. If only one candidate is found it is returned,
+        if more are found, None is returned.
+
+        :param search_term: The search term to try and match map against.
+        """
+        search_name = search_term.strip().lower()
+        candidates = []
+
+        # Try to find candidates that have the search_term in ther name.
+        for map_id in self.map_names:
+            if search_name == map_id:
+                return map_id
+
+            lowered = self.map_names[map_id].lower()
+            if search_name in lowered:
+                candidates.append(map_id)
+                break
+
+            # Remove apostrophe and period from name.
+            if search_name in lowered.replace("'", "").replace(".", ""):
+                candidates.append(map_id)
+
+        return candidates[0] if len(candidates) == 1 else None
+
     def send_friend_request(self, steam_id):
         try:
             self.steam_client.send(MsgProto(EMsg.ClientAddFriend), {"steamid_to_add": steam_id})
-            resp_msg = self.steam_client.wait_msg(EMsg.ClientAddFriendResponse, timeout=10, raises=False)
+            resp_msg = self.steam_client.wait_msg(EMsg.ClientAddFriendResponse, timeout=5, raises=False)
             if resp_msg is None: # gevent timeout error
                 return 0
 

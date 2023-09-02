@@ -256,10 +256,10 @@ class RiotAPIClient(GameAPIClient):
     def get_champ_data_path(self, champ_id):
         return f"{self.champ_data_path}/{champ_id}.json"
 
-    def try_find_champ(self, search_term):
+    def try_find_played(self, search_term):
         """
-        Search for a champion by name.
-        
+        Search for a played champion by name.
+
         Tries to find candidates that have `search_term` as part
         of their name. If only one candidate is found it is returned,
         if more are found, None is returned.

@@ -1,6 +1,6 @@
 import api.util as api_util
-from api import game_stats
 from api.game_data import get_stat_quantity_descriptions, stats_from_database
+from api.game_data.csgo import RANKS
 
 async def handle_stats_msg(client, message, game):
     valid_stats = ", ".join(f"'{cmd}'" for cmd in get_stat_quantity_descriptions(game))
@@ -13,6 +13,7 @@ async def handle_stats_msg(client, message, game):
     await message.channel.send(response)
 
 async def handle_average_msg_lol(client, message, stat, champ_id=None, disc_id=None):
+    champ_name = None
     if champ_id is not None:
         champ_name = client.api_clients["lol"].get_champ_name(champ_id)
 
@@ -64,8 +65,58 @@ async def handle_average_msg_lol(client, message, stat, champ_id=None, disc_id=N
 
     await message.channel.send(client.insert_emotes(response))
 
-async def handle_average_msg_csgo(client, message, stat, map=None, disc_id=None):
-    await message.channel.send("Not implemented yet :O")
+async def handle_average_msg_csgo(client, message, stat, map_id=None, disc_id=None):
+    map_name = None
+    if map_id is not None:
+        map_name = client.api_clients["csgo"].get_map_name(map_id)
+
+    minimum_games = 10 if map_id is None else 5
+    values = client.database.get_average_stat_csgo(stat, disc_id, map_id, minimum_games)
+
+    for_all = disc_id is None
+    readable_stat = stat.replace("_", " ")
+
+    response = ""
+
+    for index, (disc_id, avg_value, games) in enumerate(values):
+        if for_all:
+            response += "- "
+
+        target_name = client.get_discord_nick(disc_id, message.guild.id)
+
+        if avg_value is None:
+            # No games or no games on the given map.
+            response += f"{target_name} doesn't have at least {minimum_games} games with that stat "
+
+            if map_name is not None:
+                response += f"on {map_name} "
+
+            response += "{emote_perker_nono}"
+
+        elif stat == "rank":
+            avg_rank = RANKS[int(avg_value)]
+            response += f"{target_name}'s average rank is **{avg_rank}** in **{games}** games "
+
+            if map_name is not None:
+                response += f"when playing **{map_name}** "
+
+            if not for_all:
+                response += "{emote_poggers}"
+
+        else:
+            ratio = f"{avg_value:.2f}"
+            response += f"{target_name} averages **{ratio}** {readable_stat} in **{games}** games "
+
+            if map_name is not None:
+                response += f"of playing **{map_name}** "
+
+            if not for_all:
+                response += "{emote_poggers}"
+
+        if index < len(values) - 1:
+            response += "\n"
+
+    await message.channel.send(client.insert_emotes(response))
 
 async def handle_average_msg(client, message, game, stat, champ_or_map=None, disc_id=None):
     quantity_descs = get_stat_quantity_descriptions(game)
@@ -167,7 +218,7 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
                 map_id, map_count = client.database.get_csgo_map_count_for_stat(
                     stat, best, target_id
                 )
-                map_name = client.steam_api.get_map_name(map_id)
+                map_name = client.api_clients[game].get_map_name(map_id)
                 game_specific_desc = f"The map he most often gets {readable_stat} on is **{map_name}** (**{map_count}** games)\n"
 
             response = (
