@@ -1,22 +1,55 @@
 {% macro navbar(game, game_name, discord_id, name, avatar, active_game_data, admin_id) -%}
 <div class="intfar-navbar row">
     <div class="navbar-menu order-1 order-lg-1 col-10 col-sm-9 col-lg-4 col-xl-4">
+        <div id="navbar-menu-toggle" onclick="toggleDropdownMenu();">
+            <img src="{{ url_for('static', filename='img/menu.png') }}">
+        </div>
+        
         {% if game_name %}<div id="navbar-game-name">{{ game_name }}</div>{% endif %}
-        <a href="{{ url_for(game + '.index.index') }}">
-            Home
-        </a><span class="menu-separator">|</span><a href="{{ url_for('about.home') }}">
-            About
-        </a><span class="menu-separator">|</span><a href="{{ url_for(game + '.betting.home') }}">
-            Betting
-        </a><span class="menu-separator">|</span><a href="{{ url_for(game + '.doinks.home') }}">
-            Doinks
-        </a><span class="menu-separator d-none d-sm-inline-block">|</span><br class="d-inline d-sm-none"><a href="{{ url_for(game + '.stats.home') }}">
-            Stats
-        </a><span class="menu-separator">|</span><a href="{{ url_for('soundboard.home') }}">
-            Soundboard
-        </a><span class="menu-separator">|</span><a href="{{ url_for('lists.home') }}">
-            Lists
-        </a>
+
+        <div id="navbar-menu-dropdown">
+            <div class="navbar-menu-dropdown-item">
+                <a href="{{ url_for(game + '.index.index') }}">
+                    Home
+                </a>
+            </div>
+            <div class="navbar-menu-dropdown-item">
+                <a href="{{ url_for('about.home') }}">
+                    About
+                </a>
+            </div>
+            <div class="navbar-menu-dropdown-item">
+                <a href="{{ url_for(game + '.betting.home') }}">
+                    Betting
+                </a>
+            </div>
+            <div class="navbar-menu-dropdown-item">
+                <a href="{{ url_for(game + '.doinks.home') }}">
+                    Doinks
+                </a>
+            </div>
+            <div class="navbar-menu-dropdown-item">
+                <a href="{{ url_for(game + '.stats.home') }}">
+                    Stats
+                </a>
+            </div>
+            <div class="navbar-menu-dropdown-item">
+                <a href="{{ url_for('soundboard.home') }}">
+                    Soundboard
+                </a>
+            </div>
+            <div class="navbar-menu-dropdown-item">
+                <a href="{{ url_for('lists.home') }}">
+                    Lists
+                </a>
+            </div>
+            {% if game == 'csgo' %}
+            <div class="navbar-menu-dropdown-item">
+                <a href="{{ url_for('register_csgo_page.home') }}"></a>
+            </div>
+            {% endif %}
+        </div>
+
     </div>
     <div class="navbar-active-game-wrapper order-3 order-lg-2 col-12 col-lg-6 col-xl-5">
         {% for game_data in active_game_data %}

@@ -125,7 +125,7 @@ class LoLGameMonitor(GameMonitor):
             )
             status_code = self.POSTGAME_STATUS_MISSING
 
-        elif self.database.game_exists(game_info["gameId"]):
+        elif self.database.game_exists(self.game, game_info["gameId"]):
             status_code = self.POSTGAME_STATUS_DUPLICATE
             logger.warning(
                 "We triggered end of game stuff again... Strange!"

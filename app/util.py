@@ -44,17 +44,23 @@ def check_and_set_game():
 
     url_split = reduced_url.split("/")
 
+    default_game = (
+        flask.current_app.config["CURRENT_GAME"]
+        if flask.current_app.config["CURRENT_GAME"] is not None
+        else _DEFAULT_GAME
+    )
+
     if len(url_split) == 2:
-        return flask.redirect(f"{base_url}/lol")
+        return flask.redirect(f"{base_url}/{default_game}")
 
     if len(url_split) == 3:
         if url_split[2] in _GAME_SPECIFIC_ROUTES:
-            return flask.redirect(f"{'/'.join(url_split[:2])}/{_DEFAULT_GAME}/{url_split[2]}")
+            return flask.redirect(f"{'/'.join(url_split[:2])}/{default_game}/{url_split[2]}")
 
         if url_split[2] in SUPPORTED_GAMES:
             game = url_split[2]
         else:
-            game = _DEFAULT_GAME
+            game = default_game
 
     elif len(url_split) == 4:
         if url_split[3] in _GAME_SPECIFIC_ROUTES:
@@ -63,10 +69,10 @@ def check_and_set_game():
             
             game = url_split[2]
         else:
-            game = _DEFAULT_GAME
+            game = default_game
 
     else:
-        game = _DEFAULT_GAME
+        game = default_game
 
     flask.current_app.config["CURRENT_GAME"] = game
 

@@ -3,7 +3,6 @@ from mhooge_flask.logging import logger
 from api.award_qualifiers import AwardQualifiers
 from api.util import round_digits
 from api.game_stats import get_outlier
-from api.database import Database
 
 class LoLAwardQualifiers(AwardQualifiers):
     @classmethod
@@ -111,8 +110,8 @@ class LoLAwardQualifiers(AwardQualifiers):
     @classmethod
     def INTFAR_FLAVOR_TEXTS(cls):
         return [
-            "most_deaths",
             "lowest_kda",
+            "most_deaths",
             "lowest_kp",
             "lowest_vision",
         ]
@@ -187,7 +186,7 @@ class LoLAwardQualifiers(AwardQualifiers):
             if stats.kills >= 20:
                 mention_list.append((1, stats.kills))
 
-            if stats.damage > stats.damage_by_team - stats.damage:
+            if stats.damage > self.parsed_game_stats.damage_by_our_team - stats.damage:
                 mention_list.append((2, stats.damage))
 
             if stats.pentakills > 0:

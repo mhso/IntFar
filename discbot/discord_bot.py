@@ -160,7 +160,7 @@ class DiscordClient(discord.Client):
 
     async def on_lol_game_over(self, game_monitor: LoLGameMonitor, game_info: dict, guild_id: int, status_code: int):
         """
-        Callback called by the game monitor when a League of Legends game is finished.
+        Method called when a League of Legends game is finished.
 
         :param game_info:   Dictionary containing un-filtered data about a finished
                             game fetched from Riot League API
@@ -191,11 +191,19 @@ class DiscordClient(discord.Client):
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
         elif status_code == game_monitor.POSTGAME_STATUS_OK:
+            if self.api_clients[game_monitor.game].is_clash(game_monitor.active_game[guild_id]["queue_id"]):
+                # Game was played as part of a clash tournament, so it awards more betting tokens.
+                multiplier = self.config.clash_multiplier
+                await self.channels_to_write[guild_id].send(
+                    "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
+                    f"{multiplier} TIMES AS MUCH!!! <<<<<**"
+                )
+
             await self.handle_game_over(game_monitor.game, game_info, guild_id)
 
     async def on_csgo_game_over(self, game_monitor: CSGOGameMonitor, game_info: dict, guild_id: int, status_code: int):
         """
-        Callback called by the game monitor when a CSGO game is finished.
+        Method called when a CSGO game is finished.
 
         :param data:        Dictionary containing un-filtered data about a finished
                             game fetched from CSGO and parsed with awpy
@@ -205,7 +213,7 @@ class DiscordClient(discord.Client):
         if status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
             # Game was too short, most likely an early surrender
             response = (
-                "That games was a short match, no stats are saved {emote_suk_a_hotdok}"
+                "That games was a short match or was surrendered early, no stats are saved {emote_suk_a_hotdok}"
             )
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
@@ -246,14 +254,6 @@ class DiscordClient(discord.Client):
 
         self.game_monitors[game].users_in_game[guild_id] = parsed_game_stats.players_in_game
         logger.debug(f"Users in game after: {parsed_game_stats.players_in_game}")
-
-        if game == "lol" and self.api_clients[game].is_clash(self.game_monitors[game].active_game[guild_id]["queue_id"]):
-            # Game was played as part of a clash tournament, so it awards more betting tokens.
-            multiplier = self.config.clash_multiplier
-            await self.channels_to_write[guild_id].send(
-                "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
-                f"{multiplier} TIMES AS MUCH!!! <<<<<**"
-            )
 
         # Get class for handling award qualifiers for the current game
         awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
@@ -663,7 +663,7 @@ class DiscordClient(discord.Client):
                 betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
             # Get list of active bets for the current user.
-            bets_made = self.database.get_bets(player_stats.game, True, disc_id, guild_id)
+            bets_made = self.database.get_bets(game_stats.game, True, disc_id, guild_id)
             balance_before = self.database.get_token_balance(disc_id)
             tokens_earned = gain_for_user # Variable for tracking tokens gained for the user.
             tokens_lost = -1 # Variable for tracking tokens lost for the user.
@@ -1132,7 +1132,7 @@ class DiscordClient(discord.Client):
                                 any players that are not registered with Int-Far
         :param guild_id:        ID of the Discord server where the game took place
         """
-        reason_ids = ["0"] * len(awards_handler.intfar_reasons)
+        reason_ids = ["0"] * len(awards_handler.INTFAR_REASONS())
 
         final_intfar, final_intfar_data, ties, ties_msg = awards_handler.get_intfar()
 
@@ -1143,7 +1143,7 @@ class DiscordClient(discord.Client):
 
             # Go through the criteria the chosen Int-Far met and list them in a readable format.
             for (count, (reason_index, stat_value)) in enumerate(final_intfar_data):
-                stat = awards_handler.intfar_reasons[reason_index]
+                stat = list(awards_handler.INTFAR_REASONS())[reason_index]
                 reason_text = awards_handler.get_flavor_text("intfar", reason_index, "random", **{stat: stat_value})
                 reason_ids[reason_index] = "1"
 

@@ -57,7 +57,7 @@ def run_app(
         app_config=config,
         bet_handlers=bet_handlers,
         bot_conn=bot_pipe,
-        current_game="lol",
+        current_game=None,
         logged_in_users={},
         game_api_clients=api_clients,
         active_game={guild_id: {} for guild_id in GUILD_IDS},

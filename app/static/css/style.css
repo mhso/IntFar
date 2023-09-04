@@ -151,8 +151,9 @@ table {
     font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
     color: orange;
     display: inline-block;
-    margin-right: 20px;
+    margin-left: 15px;
     font-size: 20px;
+    margin-bottom: 4px;
 }
 
 @media screen and (max-width: 600px) {
@@ -210,9 +211,34 @@ table {
     text-decoration: underline;
 }
 
-.menu-separator {
-    margin-left: 5px;
-    margin-right: 5px;
+#navbar-menu-toggle {
+    display: inline-block;
+    cursor: pointer;
+    vertical-align: text-bottom;
+}
+
+#navbar-menu-toggle > img {
+    width: 24px;
+    height: auto;
+    vertical-align: top;
+}
+
+#navbar-menu-dropdown {
+    display: none;
+    background-color: #00000080;
+    width: 200px;
+    position: absolute;
+    top: 50px;
+    border: 2px solid orange;
+    border-top: none;
+    border-left: none;
+    border-radius: 20px;
+    left: 0;
+    padding: 10px;
+    padding-left: 25px;
+    font-size: 18px;
+    line-height: 1.9;
+    transition: opacity 1s;
 }
 
 .navbar-active-game-wrapper {

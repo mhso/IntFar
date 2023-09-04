@@ -48,7 +48,6 @@ class LoLPlayerStats(PlayerStats):
             vision_wards=("most", "fewest"),
             vision_score=("highest", "lowest"),
             steals=("most", "least"),
-            first_blood=("most", "least")
         )
         return stat_quantities
 
@@ -241,7 +240,7 @@ class LoLGameStatsParser(GameStatsParser):
         return LoLGameStats(
             game=self.game,
             game_id=self.raw_data["gameId"],
-            timestamp=self.raw_data["gameCreation"],
+            timestamp=int(self.raw_data["gameCreation"] / 1000),
             duration=int(self.raw_data["gameDuration"]),
             win=int(game_win),
             guild_id=self.guild_id,
@@ -367,7 +366,7 @@ class LoLGameStatsParser(GameStatsParser):
         return LoLGameStats(
             game=self.game,
             game_id=self.raw_data["gameId"],
-            timestamp=self.raw_data["gameCreation"],
+            timestamp=int(self.raw_data["gameCreation"] / 1000),
             duration=int(self.raw_data["gameDuration"]),
             win=int(game_win),
             guild_id=self.guild_id,

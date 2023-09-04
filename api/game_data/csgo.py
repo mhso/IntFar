@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from time import time
 from typing import Union, cast, Literal, Optional
@@ -538,6 +538,7 @@ class CSGOGameStats(GameStats):
     started_t: bool = None
     rounds_us: int = None
     rounds_them: int = None
+    long_match: bool = field(default=True, init=False)
 
     @classmethod
     def STATS_TO_SAVE(cls):
@@ -565,6 +566,9 @@ class CSGOGameStats(GameStats):
             f"{self.map_name} with a score of {player_stats.kills}/" +
             f"{player_stats.deaths}/{player_stats.assists} on {date} in a {fmt_duration} long game"
         )
+
+    def __post_init__(self):
+        self.long_match = self.rounds_us > 9 or self.rounds_them > 9
 
 class CSGOGameStatsParser(GameStatsParser):
     def parse_data(self) -> GameStats:

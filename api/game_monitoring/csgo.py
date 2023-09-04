@@ -33,7 +33,7 @@ class CSGOGameMonitor(GameMonitor):
 
         steam_id_map = {}
         for disc_id in user_dict:
-            for steam_id in user_dict[user_dict].ingame_id:
+            for steam_id in user_dict[disc_id].ingame_id:
                 steam_id_map[steam_id] = disc_id
 
         # Get a dictionary of information about friends who are in-game
@@ -139,7 +139,7 @@ class CSGOGameMonitor(GameMonitor):
         else:
             game_info = self.api_client.get_game_details(new_sharecode)
 
-            if self.database.game_exists(game_info["matchID"]):
+            if self.database.game_exists(self.game, game_info["matchID"]):
                 status_code = self.POSTGAME_STATUS_DUPLICATE
                 logger.warning(
                     "We triggered end of game stuff again... Strange!"

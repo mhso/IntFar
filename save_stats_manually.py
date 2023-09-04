@@ -5,11 +5,11 @@ from mhooge_flask.logging import logger
 
 from api.awards import get_awards_handler
 from api.bets import get_betting_handler
+from api.game_api import get_api_client
 from api.config import Config
 from api.database import Database
 from api.game_data import get_stat_parser
 from api.util import GUILD_IDS, SUPPORTED_GAMES
-from ai.model import Model
 from discbot.discord_bot import DiscordClient
 
 GUILDS = {
@@ -23,8 +23,8 @@ class MockChannel:
         await asyncio.sleep(0.1)
 
 class TestMock(DiscordClient):
-    def __init__(self, args, config, database, betting_handlers, **kwargs):
-        super().__init__(config, database, betting_handlers, **kwargs)
+    def __init__(self, args, config, database, betting_handlers, api_clients, **kwargs):
+        super().__init__(config, database, betting_handlers, api_clients, **kwargs)
         self.missing = args.missing
         self.game = args.game
         self.game_id = args.game_id
@@ -132,9 +132,8 @@ database_client = Database(conf)
 logger.info("Starting Discord Client...")
 
 betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
-ai_model = Model(conf)
-ai_model.load()
+api_clients = {game: get_api_client(game, conf) for game in SUPPORTED_GAMES}
 
-client = TestMock(args, conf, database_client, betting_handlers, ai_model=ai_model)
+client = TestMock(args, conf, database_client, betting_handlers, api_clients)
 
 client.run(conf.discord_token)

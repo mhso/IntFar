@@ -5,12 +5,11 @@ var monitorInterval = null;
 var scrollIndex = 0;
 
 function getBaseURL(game=null) {
-    let base = window.location.protocol + "//" + window.location.hostname + "/intfar";
-    let port = ":" + window.location.port;
+    let base = window.location.protocol + "//" + window.location.hostname + ":" + window.location.port + "/intfar";
     if (game != null) {
-        return base + "/" + game + port
+        return base + "/" + game
     }
-    return base + port;
+    return base;
 }
 
 function formatDuration(duration) {
@@ -85,6 +84,31 @@ function resizeNav() {
         }
     }
     wrapper.style.setProperty("height", navHeight + "px");
+}
+
+function hideDropdownMenu(menu) {
+    menu.style.opacity = 0;
+    setTimeout(function() {
+        menu.style.display = "none";
+    }, 1000);
+}
+
+function toggleDropdownMenu() {
+    let elem = document.getElementById("navbar-menu-dropdown");
+    if (elem.style.display == "block") {
+        hideDropdownMenu(elem);
+    }
+    else {
+        elem.style.display = "block";
+        elem.style.opacity = 1;
+
+        // window.addEventListener("click", function(event) {
+        //     if (event.target != elem) {
+        //         hideDropdownMenu(elem);
+        //         window.removeEventListener("click", this);
+        //     }
+        // })
+    }
 }
 
 function startMonitor(game) {

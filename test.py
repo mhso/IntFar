@@ -9,6 +9,7 @@ from api.lan import get_average_stats, LAN_PARTIES
 
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, util
+from api.awards import get_awards_handler
 from api.game_api.lol import RiotAPIClient
 from api.game_api.csgo import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
@@ -219,6 +220,10 @@ class TestFuncs:
         client = DiscordClient(CONFIG, DATABASE, None, RIOT_API)
         client.add_event_listener("onready", self.play_sound, url, client)
         client.run(CONFIG.discord_token)
+
+    def test_monthly_intfar(self):
+        stats = self.database.get_intfar_stats("lol", 267401734513491969, True)
+        print(stats)
 
     def test_steam_api(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")

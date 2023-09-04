@@ -82,9 +82,9 @@ class GameMonitor(ABC):
 
             active_game_info["game_guild_name"] = guild_name
 
-            logger.debug(f"Game start for {self.game}: {datetime.fromtimestamp(self.active_game[guild_id]['start'])}")
             self.active_game[guild_id] = active_game_info
             self.users_in_game[guild_id] = users_in_current_game
+            logger.debug(f"Game start for {self.game}: {datetime.fromtimestamp(self.active_game[guild_id]['start'])}")
 
             return self.GAME_STATUS_ACTIVE # Game is now active.
 
@@ -170,6 +170,7 @@ class GameMonitor(ABC):
                 logger.debug(f"Users in game before: {self.users_in_game.get(guild_id)}")
 
                 # Send update to Int-Far website that the game is over.
+                game_id = self.active_game.get(guild_id, {}).get("id")
                 req_data = {
                     "secret": self.config.discord_token,
                     "guild_id": guild_id,

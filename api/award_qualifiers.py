@@ -81,7 +81,7 @@ class AwardQualifiers(ABC):
 
     def get_flavor_text(self, flavor: str, outer_index, inner_index=None, **params_to_replace) -> str:
         if inner_index is not None:
-            flavor = self.GAME_SPECIFIC_FLAVORS()[flavor]
+            flavor = self.GAME_SPECIFIC_FLAVORS()[flavor][outer_index]
             outer_index = inner_index
 
         flavor_choices = self.flavor_texts[flavor]
@@ -104,7 +104,7 @@ class AwardQualifiers(ABC):
 
         return flavor_text
 
-    def _load_flavor_texts(self) -> dict[str, str]:
+    def _load_flavor_texts(self) -> dict[str, list[str]]:
         flavor_text_dict = {}
         for filename in self.ALL_FLAVOR_TEXTS():
             flavor_text_dict[filename] = load_flavor_texts(filename, self.game)
