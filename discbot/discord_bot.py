@@ -86,9 +86,9 @@ class DiscordClient(discord.Client):
         self.api_clients = api_clients
 
         if self.config.env == "production":
-            streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
+           streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
         else:
-            streamscape = None
+           streamscape = None
 
         self.audio_handler = AudioHandler(self.config, streamscape)
         self.shop_handler = ShopHandler(self.config, self.database)
@@ -240,7 +240,7 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         """
         try: # Get formatted stats that are relevant for the players in the game.
-            stat_parser = get_stat_parser(game, game_info, self.api_clients[game], self.database.users_by_game, guild_id)
+            stat_parser = get_stat_parser(game, game_info, self.api_clients[game], self.database.users_by_game[game], guild_id)
             parsed_game_stats = stat_parser.parse_data()
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito pls).
@@ -379,11 +379,11 @@ class DiscordClient(discord.Client):
             member = self.get_member_safe(discord_id, guild_id)
             return None if member is None else member.display_name
 
-        nicknames = []
+        nicknames = {}
         for disc_id in self.database.all_users:
             member = self.get_member_safe(disc_id, guild_id)
             name = "Unnamed" if member is None else member.display_name
-            nicknames.append(name)
+            nicknames[disc_id] = name
 
         return nicknames
 
@@ -395,11 +395,11 @@ class DiscordClient(discord.Client):
             else [discord_id]
         )
 
-        avatar_paths = []
+        avatar_paths = {}
         for disc_id in users_to_search:
             member = self.get_member_safe(disc_id)
             if member is None:
-                avatar_paths.append(default_avatar)
+                avatar_paths[disc_id] = default_avatar
                 continue
 
             key = f"{member.id}_{size}"
@@ -416,9 +416,9 @@ class DiscordClient(discord.Client):
                     logger.bind(disc_id=discord_id).exception("Could not load Discord avatar")
                     path = default_avatar
 
-            avatar_paths.append(path)
+            avatar_paths[disc_id] = path
 
-        return avatar_paths if discord_id is None else avatar_paths[0]
+        return avatar_paths if discord_id is None else avatar_paths[discord_id]
 
     def get_discord_id(self, nickname, guild_id=api_util.MAIN_GUILD_ID, exact_match=True):
         matches = []
@@ -452,18 +452,18 @@ class DiscordClient(discord.Client):
             key=lambda g: api_util.GUILD_IDS.index(g.id) if g.id in api_util.GUILD_IDS else -1
         )
 
-        guild_names = []
+        guild_names = {}
         for guild in guilds:
             if (guild.id in api_util.GUILD_IDS and
                     ((guild_id is None) or (guild.id == guild_id))
                ):
-                guild_names.append(guild.name)
+                guild_names[guild.id] = guild.name
 
-        if guild_names == []:
+        if guild_names == {}:
             logger.warning(f"get_guild_name: Could not find name of guild with ID '{guild_id}'")
             return None
 
-        return guild_names if guild_id is None else guild_names[0]
+        return guild_names if guild_id is None else guild_names[guild_id]
 
     def get_channel_name(self, guild_id=None):
         channel_names = []

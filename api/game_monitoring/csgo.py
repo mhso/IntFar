@@ -42,7 +42,7 @@ class CSGOGameMonitor(GameMonitor):
             for steam_id in user_dict[disc_id].ingame_id:
                 account_id_map[SteamID(steam_id).account_id] = steam_id
 
-        active_games = self.api_client.get_active_game(steam_id_map)
+        active_games = self.api_client.get_active_game(*steam_id_map)
         # {'requestId': 1, 'accountIds': [10150287], 'watchableMatchInfos': [{'serverIp': 1682023191, 'tvPort': 1, 'tvSpectators': 1, 'tvTime': 661, 'tvWatchPassword': 'JuuR4sOG8GCPWjiQtGT8p6XlPJJVpnZoiD8zBNDYf7U=', 'clDecryptdataKeyPub': '7758645395651441676', 'gameType': 1048584, 'gameMapgroup': 'mg_de_cache', 'gameMap': 'de_cache', 'serverId': '90175702499272731', 'matchId': '3635666711287431410'}]}
 
         users_in_current_game = {}
@@ -114,16 +114,17 @@ class CSGOGameMonitor(GameMonitor):
 
                 logger.info(f"New match sharing code for '{disc_id}': '{next_code}'")
 
-                if next_code is not None and next_code != current_sharecodes[disc_id]: # Error or new code hasn't been updated yet
+                if next_code is not None and next_code != current_sharecodes[disc_id]:
                     self.database.set_new_csgo_sharecode(disc_id, next_code)
                     code_retrieved[disc_id] = True
-                    new_sharecode = new_sharecode
+                    new_sharecode = next_code
 
                 await asyncio.sleep(0.5)
 
             if all(code_retrieved[disc_id] for disc_id in code_retrieved):
                 break
 
+            # Error or new code hasn't been updated yet
             logger.warning(
                 f"Next match sharecode not yet received for CSGO! Retrying in {time_to_sleep} secs..."
             )
@@ -132,7 +133,7 @@ class CSGOGameMonitor(GameMonitor):
 
         if not all(code_retrieved[disc_id] for disc_id in code_retrieved):
             logger.bind(game_id=match_id, sharecode=new_sharecode, guild_id=guild_id).error(
-                "Next match sharecode STILL not yet received for everyone after 3 tries! Saving to missing games..."
+                "Next match sharecode STILL not received for everyone after 3 tries! Saving to missing games..."
             )
             status_code = self.POSTGAME_STATUS_MISSING
 

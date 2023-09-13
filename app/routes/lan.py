@@ -30,9 +30,8 @@ def get_champ_faces(users_in_game, face_images):
             coords_map[champ_id] = coords
 
         image_data = []
-        for user_data in users_in_game:
-            disc_id = user_data[0]
-            champ_id = user_data[-1]
+        for disc_id in users_in_game:
+            champ_id = users_in_game[disc_id]["champ_id"]
 
             face_img = face_images[disc_id]
             coords = coords_map[champ_id]
@@ -384,11 +383,25 @@ def live_data(date):
 
     return app_util.make_json_response(data, 200)
 
+@lan_page.route("/live_league_data/<date>", methods=["GET"])
+def live_league_data(date):
+    lock = flask.current_app.config["LEAGUE_EVENTS_LOCK"]
+    lock.acquire()
+    events = flask.current_app.config["LEAGUE_EVENTS"]
+    print("New events:", events, flush=True)
+    flask.current_app.config["LEAGUE_EVENTS"] = []
+    print("Events after:", events, flush=True)
+    print(flask.current_app.config["LEAGUE_EVENTS"], flush=True)
+    data = {"events": events}
+    lock.release()
+
+    return app_util.make_json_response(data, 200)
+
 @lan_page.route("/now_playing/<date>", methods=["GET", "POST"])
 def now_playing(date):
     if flask.request.method == "POST":
         # Update the currently playing song
-        data = flask.request.form
+        data = flask.request.json
         conf = flask.current_app.config["APP_CONFIG"]
 
         secret = data.get("secret")
@@ -408,6 +421,14 @@ def now_playing(date):
         else:
             artist = data["artist"]
             flask.current_app.config["NOW_PLAYING"] = (song, artist)
+
+        # Set live league data
+        if data["lol_events"] != []:
+            lock = flask.current_app.config["LEAGUE_EVENTS_LOCK"]
+            lock.acquire()
+            flask.current_app.config["LEAGUE_EVENTS"].extend(data["lol_events"])
+            lock.release()
+            print("NEW EVENTS RECIEVED:", data["lol_events"], flush=True)
 
         return flask.make_response(("Success! Song playing updated.", 200))
     

@@ -57,7 +57,13 @@ class LoLGameMonitor(GameMonitor):
                 game_ids.add(game_for_summoner["gameId"])
                 player_stats = get_player_stats(game_for_summoner, summ_ids)
                 active_game_team = player_stats["teamId"]
-                users_in_current_game[disc_id] = User(disc_id, user_dict[disc_id].secret, [active_name], [active_id])
+                users_in_current_game[disc_id] = User(
+                    disc_id,
+                    user_dict[disc_id].secret,
+                    [active_name],
+                    [active_id],
+                    champ_id=player_stats["championId"]
+                )
                 active_game = game_for_summoner
 
         if len(game_ids) > 1: # People are in different games.
@@ -93,7 +99,7 @@ class LoLGameMonitor(GameMonitor):
         logger.debug(f"Active game: {game_id}")
 
         # Check if game was a custom game, if so don't save stats.
-        custom_game = self.active_game[guild_id]["game_type"] == "CUSTOM_GAME"
+        custom_game = self.active_game[guild_id].get("game_type", "") == "CUSTOM_GAME"
 
         game_info = None
 
@@ -148,7 +154,6 @@ class LoLGameMonitor(GameMonitor):
 
         else:
             status_code = self.POSTGAME_STATUS_OK
-
-        self.active_game[guild_id]["queue_id"] = game_info["queueId"]
+            self.active_game[guild_id]["queue_id"] = game_info["queueId"]
 
         return game_info, status_code

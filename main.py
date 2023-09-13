@@ -1,21 +1,23 @@
+import run_flask
+from discbot import discord_bot
+
 from time import sleep
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, Manager
 from argparse import ArgumentParser
 
 from discord.opus import load_opus
 from mhooge_flask.logging import logger
 from mhooge_flask.restartable import restartable
 
-import run_flask
 from api.config import Config
 from api.database import Database
 from api.util import SUPPORTED_GAMES
-from api.proxy import Manager
+from api.proxy import ProxyManager
+
 from api.game_api.lol import RiotAPIClient
 from api.game_api.csgo import SteamAPIClient
 from api.bets import get_betting_handler
 #from ai import model
-from discbot import discord_bot
 
 def start_discord_process(*args):
     """
@@ -73,15 +75,16 @@ def main():
         load_opus("/usr/local/lib/libopus.so")
 
     logger.info("Initializing game API clients...")
-    manager = Manager(SteamAPIClient, "csgo", conf)
+    proxy_manager = ProxyManager(SteamAPIClient, "csgo", conf)
 
     api_clients = {
         "lol": RiotAPIClient("lol", conf),
-        "csgo": manager.create_proxy()
+        "csgo": proxy_manager.create_proxy()
     }
 
     logger.info("Initializing database...")
-    database_client = Database(conf)
+    sync_manager = Manager()
+    database_client = Database(conf, sync_manager)
 
     betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
 
@@ -115,7 +118,8 @@ def main():
                 #ai_process.kill()
                 flask_process.kill()
                 bot_process.kill()
-                manager.close()
+                proxy_manager.close()
+                sync_manager.shutdown()
 
                 # Wait for all subprocesses to exit.
                 processes = [flask_process, bot_process]

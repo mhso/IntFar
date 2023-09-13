@@ -122,7 +122,7 @@ class AwardQualifiers(ABC):
         """
         lifetime_mentions = {}
 
-        for stats in self.parsed_game_stats:
+        for stats in self.parsed_game_stats.filtered_player_stats:
             lifetime_mentions[stats.disc_id] = []
 
             game_data = database.get_games_count(self.game, stats.disc_id)

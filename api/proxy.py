@@ -1,4 +1,7 @@
 import inspect
+import subprocess
+import json
+from time import sleep
 from multiprocessing import Pipe
 from multiprocessing.connection import wait
 from threading import Thread, Event
@@ -42,14 +45,23 @@ class Proxy(object):
         self.conn.send((command, *args))
         return self.conn.recv()
 
-class Manager(object):
-    def __init__(self, target_cls, *args):
+class ProxyManager(object):
+    def __init__(self, target_cls, game, config):
         self.proxies = []
-    
-        self.target = target_cls(*args)
-    
+
+        self.target_cls = target_cls
+
+        self.steam_process = subprocess.Popen(
+            f". venv/bin/activate; python run_steam.py {game} {config.steam_2fa_code}",
+            executable="/bin/bash",
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            shell=True,
+            text=True
+        )
+
         self._stop_event = Event()
-        self.listen_thread = Thread(target=self._listen, args=())
+        self.listen_thread = Thread(target=self._listen)
         self.listen_thread.start()
 
     def _listen(self):
@@ -61,20 +73,31 @@ class Manager(object):
                     proxy.send("exiting...")
                     break
 
-                try:
-                    result = getattr(self.target, command)
-                    if callable(result):
-                        result = result(*args)
-                except AttributeError:
-                    proxy.send(None)
+                serialized_cmd = f"{command}: {';'.join(map(str, args))}\n"
 
-                proxy.send(result)
+                print("Sending:", serialized_cmd, flush=True)
+
+                self.steam_process.stdin.write(serialized_cmd)
+                self.steam_process.stdin.flush()
+
+                result = self.steam_process.stdout.readline()
+                if result.endswith("\n"):
+                    result = result.strip()
+
+                print("Received:", result, flush=True)
+
+                dtype, *values = result.split(":")
+                value_str = ":".join(values)
+                if dtype == "json":
+                    value_str = json.loads(value_str)
+
+                proxy.send(value_str)
 
     def create_proxy(self):
         conn_1, conn_2 = Pipe(True)
         self.proxies.append(conn_1)
 
-        proxy = Proxy(conn_2, self.target.__class__)
+        proxy = Proxy(conn_2, self.target_cls)
 
         return proxy
 
@@ -82,3 +105,9 @@ class Manager(object):
         self._stop_event.set()
         if self.proxies:
             self.proxies[0].close()
+
+        self.steam_process.stdin.write("close")
+        self.steam_process.stdin.flush()
+
+        while self.steam_process.returncode is None:
+            sleep(0.1)

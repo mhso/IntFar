@@ -13,15 +13,15 @@ def get_doinks_awards(game, database):
     avatars = discord_request(
         "func", "get_discord_avatar", None
     )
-    avatars = [
-        flask.url_for("static", filename=avatar.replace("app/static/", ""))
-        for avatar in avatars
-    ]
+    avatars = {
+        disc_id: flask.url_for("static", filename=avatars[disc_id].replace("app/static/", ""))
+        for disc_id in avatars
+    }
     nicknames = discord_request(
         "func", "get_discord_nick", None
     )
 
-    for index, disc_id in enumerate(database.all_users):
+    for disc_id in database.users_by_game[game]:
         doinks_reasons = database.get_doinks_stats(game, disc_id)
         total_doinks = database.get_doinks_count(game, disc_id)[1]
         unique_doinks = set()
@@ -38,9 +38,9 @@ def get_doinks_awards(game, database):
                 doinks_reason_counts[index] += 1
             doinks_counts[len(doinks_indices)-1] += 1
 
-        doinks_for_person.append((
-            disc_id, nicknames[index], avatars[index], total_doinks, len(unique_doinks)
-        ))
+        doinks_for_person.append(
+            (disc_id, nicknames[disc_id], avatars[disc_id], total_doinks, len(unique_doinks))
+        )
 
     doinks_for_person.sort(key=lambda x: x[3], reverse=True)
 

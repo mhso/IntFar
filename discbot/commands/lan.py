@@ -47,7 +47,7 @@ async def handle_lan_msg(client, message):
             _GAME, time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
         )
         doinks = client.database.get_doinks_count(
-            _GAME, time_after=lan_party.start_time, time_before=lan_party.end_timeE, guild_id=lan_party.guild_id
+            _GAME, time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
         )[1]
 
         longest_game_duration, longest_game_time = client.database.get_longest_game(
@@ -76,7 +76,7 @@ async def handle_lan_performance_msg(client, message, target_id):
         return
 
     # Info about various stats for a person at the current LAN.
-    all_avg_stats, all_ranks = lan_api.get_average_stats(client.database)
+    all_avg_stats, all_ranks = lan_api.get_average_stats(client.database, lan_party)
 
     if all_avg_stats is None:
         response = "No games have yet been played at this LAN."

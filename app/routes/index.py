@@ -123,8 +123,10 @@ def get_bet_desc(game, bet_data):
         ("regular", "in"), ("bold", guild), ("regular", "by betting on")
     ]
     for i, (event, target) in enumerate(zip(events, targets)):
-        target_name = (None if target is None
-                       else app_util.discord_request("func", "get_discord_nick", target))
+        target_name = (
+            None if target is None
+            else app_util.discord_request("func", "get_discord_nick", target)
+        )
         dynamic_desc = betting_handler.get_dynamic_bet_desc(event, target_name)
         if i != 0:
             response_list.append(("regular", " and "))
@@ -199,8 +201,8 @@ def index():
 
     feed_descs = get_feed_data(game, database, feed_length=25)
 
-    intfar_all_data = []
-    intfar_month_data = []
+    intfar_all_data = {}
+    intfar_month_data = {}
     for disc_id in database.users_by_game[game]:
         games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id)
         games_played_monthly, intfar_reason_ids_monthly = database.get_intfar_stats(game, disc_id, True)
@@ -213,11 +215,11 @@ def index():
             else len(intfar_reason_ids_monthly) / games_played_monthly * 100
         )
 
-        intfar_all_data.append(
-            (disc_id, games_played, len(intfar_reason_ids), f"{pct_intfar:.2f}")
+        intfar_all_data[disc_id] = (
+            games_played, len(intfar_reason_ids), f"{pct_intfar:.2f}"
         )
-        intfar_month_data.append(
-            (disc_id, games_played_monthly, len(intfar_reason_ids_monthly), f"{pct_intfar_monthly:.2f}")
+        intfar_month_data[disc_id] = (
+            games_played_monthly, len(intfar_reason_ids_monthly), f"{pct_intfar_monthly:.2f}"
         )
 
     avatars = app_util.discord_request("func", "get_discord_avatar", None)
@@ -226,19 +228,19 @@ def index():
         avatars = app_util.discord_request("func", "get_discord_avatar", None)
 
     if avatars:
-        avatars = [
-            flask.url_for("static", filename=avatar.replace("app/static/", ""))
-            for avatar in avatars
-        ]
+        avatars = {
+            disc_id: flask.url_for("static", filename=avatars[disc_id].replace("app/static/", ""))
+            for disc_id in avatars
+        }
     nicknames = app_util.discord_request("func", "get_discord_nick", None)
 
     intfar_all_data = [
-        (x,) + y + (z,)
-        for (x, y, z) in zip(nicknames, intfar_all_data, avatars)
+        (nicknames[disc_id], disc_id) + intfar_all_data[disc_id] + (avatars[disc_id],)
+        for disc_id in intfar_all_data
     ]
     intfar_month_data = [
-        (x,) + y + (z,)
-        for (x, y, z) in zip(nicknames, intfar_month_data, avatars)
+        (nicknames[disc_id], disc_id) + intfar_month_data[disc_id] + (avatars[disc_id],)
+        for disc_id in intfar_month_data
     ]
 
     intfar_all_data.sort(key=lambda x: (x[3], x[4]), reverse=True)

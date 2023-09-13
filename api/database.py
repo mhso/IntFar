@@ -16,7 +16,7 @@ class DBException(OperationalError, ProgrammingError):
         super().__init__(args)
 
 class Database(SQLiteDatabase):
-    def __init__(self, config):
+    def __init__(self, config, sync_manager=None):
         self.config = config
         super().__init__(self.config.database, "resources/schema.sql", False)
 
@@ -28,6 +28,9 @@ class Database(SQLiteDatabase):
         with self:
             self.all_users: dict[int, User] = self.get_base_users()
             self.users_by_game: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
+
+            # self.all_users = sync_manager.dict(all_users)
+            # self.users_by_game = sync_manager.dict(users_by_game)
 
     def _group_users(self, user_data, *params):
         user_entries = {}

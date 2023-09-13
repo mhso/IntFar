@@ -38,7 +38,7 @@ if not TESTING:
         ),
         "september_23": LANInfo(
             datetime(2023, 9, 9, 14, 0, 0).timestamp(),
-            datetime(2023, 9, 10, 12, 0, 0).timestamp(),
+            datetime(2023, 9, 10, 18, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",
@@ -126,7 +126,6 @@ def get_average_stats(database, lan_info):
     game = "lol"
     stat_quantity_desc = get_stat_quantity_descriptions(game)
     stats_to_get = list(stat_quantity_desc)
-    stats_to_get.remove("first_blood")
 
     all_stats = database.get_player_stats(
         game,
@@ -135,6 +134,7 @@ def get_average_stats(database, lan_info):
         time_before=lan_info.end_time,
         guild_id=lan_info.guild_id
     )
+    stats_to_get.remove("disc_id")
 
     if all_stats == []:
         return None, None

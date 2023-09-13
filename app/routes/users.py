@@ -127,13 +127,12 @@ def get_bets(game, disc_id, database, only_active):
     betting_handler = flask.current_app.config["BET_HANDLERS"][game]
 
     names = discord_request("func", "get_discord_nick", None)
-    names_dict = dict(zip(database.all_users, names))
     presentable_data = []
 
     for bet_ids, _, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
         event_descs = [
             (
-                i, betting_handler.get_dynamic_bet_desc(e, names_dict.get(t)),
+                i, betting_handler.get_dynamic_bet_desc(e, names.get(t)),
                 api_util.format_tokens_amount(a)
             )
             for (e, t, a, i) in zip(events, targets, amounts, bet_ids)

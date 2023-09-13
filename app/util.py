@@ -144,7 +144,7 @@ def discord_request(command_types, commands, params, pipe=None):
             tuple_params.append(param)
     try:
         pipe.send((sess_id, command_type_list, command_list, tuple_params))
-        conn_received = pipe.poll(5)
+        conn_received = pipe.poll(15)
         if not conn_received:
             logger.warning("Connection to App Listener timed out!")
             raise ConnectionError()

@@ -57,7 +57,7 @@ class GameMonitor(ABC):
         ...
 
     @abstractmethod
-    async def get_finished_game_info(self, guild_id: int):
+    async def get_finished_game_info(self, guild_id: int) -> tuple[dict, int]:
         ...
 
     async def check_game_status(self, guild_id: int, guild_name: str) -> int:

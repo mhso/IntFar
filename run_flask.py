@@ -1,15 +1,15 @@
-from multiprocessing import Lock
 from multiprocessing.connection import Connection
+from multiprocessing import Lock
 
 from mhooge_flask.logging import logger
 
 from mhooge_flask import init
 from mhooge_flask.init import Route
-from api.game_api_client import GameAPIClient
 
 from app.util import before_request
 from app.routes import errors as route_errors
 from api.util import GUILD_IDS, SUPPORTED_GAMES
+from api.game_api_client import GameAPIClient
 from api.database import Database
 from api.betting import BettingHandler
 from api.config import Config
@@ -21,6 +21,7 @@ def run_app(
     config: Config,
     bot_pipe: Connection
 ):
+
     # Define URL routes
     static_routes = [
         Route("about", "about_page", "about"),
@@ -69,6 +70,8 @@ def run_app(
         quiz_categories=set(),
         quiz_team_blue=True,
         now_playing=None,
+        league_events=[],
+        league_events_lock=Lock(),
         exit_code=0
     )
 

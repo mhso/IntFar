@@ -311,7 +311,7 @@ class LoLGameStatsParser(GameStatsParser):
                 vision_wards=participant["visionWardsBoughtInGame"],
                 vision_score=participant["visionScore"],
                 steals=participant["objectivesStolen"],
-                lane=participant["lane"],
+                lane=participant["teamPosition"],
                 role=participant["role"],
                 pentakills=participant["pentaKills"],
                 total_time_dead=participant["totalTimeSpentDead"],
@@ -387,13 +387,9 @@ class LoLGameStatsParser(GameStatsParser):
 
     def get_active_game_summary(self, active_id):
         """
-        Extract data about a currently active game.
+        Get a description about a currently active game for a given player.
 
-        :param data:    Data aquired from Riot's API about an active game
-        :active_id:     The summoner ID that we should extract data for in the game
-        :users:         List of users that are registered with Int-Far.
-                        Any user in the game not part of this list is filtered out
-        :riot_api       Riot API Client instance. Used to get champion name of the player
+        :active_id: The summoner ID that we should extract data for in the game
         """
         champions = {}
         for participant in self.raw_data["participants"]:

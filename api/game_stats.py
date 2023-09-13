@@ -36,7 +36,7 @@ class PlayerStats(ABC):
         return {
             "kills": ("most", "fewest"),
             "deaths": ("most", "fewest"),
-            "deaths": ("most", "fewest"),
+            "assists": ("most", "fewest"),
             "kda": ("highest", "lowest"),
             "kp": ("highest", "lowest")
         }
@@ -115,7 +115,7 @@ class GameStatsParser(ABC):
         ...
 
     @abstractmethod
-    def get_active_game_summary(self, active_id, api_client) -> str:
+    def get_active_game_summary(self, active_id) -> str:
         ...
 
     @abstractmethod

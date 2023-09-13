@@ -11,12 +11,10 @@ def get_bets(game, database, only_active):
     all_bets = database.get_bets(game, only_active)
     names = app_util.discord_request("func", "get_discord_nick", None)
     avatars = app_util.discord_request("func", "get_discord_avatar", None)
-    avatars = [
-        flask.url_for("static", filename=avatar.replace("app/static/", ""))
-        for avatar in avatars
-    ]
-    names_dict = dict(zip(database.all_users, names))
-    avatar_dict = dict(zip(database.all_users, avatars))
+    avatars = {
+        disc_id: flask.url_for("static", filename=avatars[disc_id].replace("app/static/", ""))
+        for disc_id in avatars
+    }
 
     presentable_data = []
     for disc_id in all_bets:
@@ -24,7 +22,7 @@ def get_bets(game, database, only_active):
 
         for bet_ids, guild_id, timestamp, amounts, events, targets, _, result_or_ticket, payout in bets:
             event_descs = [
-                (i, bet_handler.get_dynamic_bet_desc(e, names_dict.get(t)), api_util.format_tokens_amount(a))
+                (i, bet_handler.get_dynamic_bet_desc(e, names.get(t)), api_util.format_tokens_amount(a))
                 for (e, t, a, i) in zip(events, targets, amounts, bet_ids)
             ]
 
@@ -33,8 +31,8 @@ def get_bets(game, database, only_active):
 
             presentable_data.append(
                 (
-                    disc_id, names_dict[disc_id], bet_date, guild_short, str(guild_id), event_descs,
-                    result_or_ticket, api_util.format_tokens_amount(payout), avatar_dict[disc_id]
+                    disc_id, names[disc_id], bet_date, guild_short, str(guild_id), event_descs,
+                    result_or_ticket, api_util.format_tokens_amount(payout), avatars[disc_id]
                 )
             )
 
@@ -56,7 +54,6 @@ def home():
     logged_in_user = app_util.get_user_details()[0]
 
     all_events = [(bet.event_id, bet.event_id.replace("_", " ").capitalize()) for bet in betting_handler.all_bets]
-    all_ids = list(database.all_users)
     all_names = app_util.discord_request("func", "get_discord_nick", None)
     all_avatars = app_util.discord_request("func", "get_discord_avatar", None)
     guild_names = app_util.discord_request("func", "get_guild_name", None)
@@ -65,9 +62,8 @@ def home():
     all_balances = database.get_token_balance()
     all_token_balances = []
     for balance, disc_id in all_balances:
-        index = all_ids.index(disc_id)
-        name = all_names[index]
-        avatar = flask.url_for("static", filename=all_avatars[index].replace("app/static/", ""))
+        name = all_names[disc_id]
+        avatar = flask.url_for("static", filename=all_avatars[disc_id].replace("app/static/", ""))
         formatted_balance = api_util.format_tokens_amount(balance)
         all_token_balances.append((disc_id, name, formatted_balance, avatar))
 
@@ -77,9 +73,9 @@ def home():
     all_guild_data = []
     if logged_in_user is not None:
         guilds_for_user = app_util.discord_request("func", "get_guilds_for_user", logged_in_user)
-        for guild_id, guild_name in zip(api_util.GUILD_IDS, guild_names):
+        for guild_id in guild_names:
             if guild_id in guilds_for_user:
-                all_guild_data.append((guild_id, guild_name))
+                all_guild_data.append((guild_id, guild_names[guild_id]))
 
     main_guild_id = flask.request.cookies.get("main_guild_id")
     if main_guild_id is None:
@@ -90,7 +86,7 @@ def home():
         resolved_bets=resolved_bets,
         active_bets=active_bets,
         bet_events=all_events,
-        targets=list(zip(all_ids, all_names)),
+        targets=list(all_names.items()),
         token_balance=user_token_balance,
         all_token_balances=all_token_balances,
         all_guild_data=all_guild_data,

@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from time import time
 from typing import Union, cast, Literal, Optional
 
@@ -700,9 +701,6 @@ class CSGOGameStatsParser(GameStatsParser):
             rounds_them=rounds_them,
         )
 
-    def get_active_game_summary(self, active_id, api_client) -> str:
-        return "Not implemented yet :O"
-
     def parse_from_database(self, database, game_id: int) -> GameStats:
         game_stats, player_stats = CSGOGameStats.get_stats_from_db(self.game, game_id, database, CSGOPlayerStats)
         game_stats["map_name"] = self.api_client.get_map_name(game_stats["map_id"])
@@ -721,3 +719,39 @@ class CSGOGameStatsParser(GameStatsParser):
             players_in_game.append(game_info)
 
         return CSGOGameStats(self.game, **game_stats, players_in_game=players_in_game, all_player_stats=all_player_stats)
+
+    def get_active_game_summary(self, active_id: int) -> str:
+        """
+        Get a description about a currently active game for a given player.
+
+        :active_id: The Steam ID that we should extract data for in the game
+        """
+        other_players = []
+        for disc_id in self.all_users:
+            for steam_id, ingame_name in zip(self.all_users[disc_id].ingame_id, self.all_users[disc_id].ingame_name):
+                if steam_id != active_id and self.api_client.get_account_id(steam_id) in self.raw_data["accountIds"]:
+                    other_players.append(ingame_name)
+
+        game_start = self.raw_data["gameStartTime"]
+        if "watchableMatchInfos" in self.raw_data:
+            seconds = self.raw_data["watchableMatchInfos"][0]["tvTime"]
+
+            now = datetime.now()
+            game_start = now - relativedelta(seconds=seconds)
+
+            dt_1 = datetime.fromtimestamp(game_start)
+            dt_2 = datetime.fromtimestamp(now)
+            fmt_duration = format_duration(dt_1, dt_2) + " "
+        else:
+            fmt_duration = ""
+
+        map_name = self.api_client.get_map_name(self.raw_data["gameMap"])
+
+        response = f"{fmt_duration}in a game on {map_name}.\n"
+
+        if len(other_players) > 1:
+            response += "He is playing with:"
+            for other_name in other_players:
+                response += f"\n - {other_name}"
+
+        return response

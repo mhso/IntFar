@@ -35,6 +35,9 @@ _ENDPOINT_PLAYER_SUMMARY = (
 )
 
 class SteamAPIClient(GameAPIClient):
+    """
+    Class for interacting with Steam and CSGO web and Game Coordinator APIs.
+    """
     def __init__(self, game: str, config: Config):
         super().__init__(game, config)
         self.logged_on_once = False
@@ -47,12 +50,8 @@ class SteamAPIClient(GameAPIClient):
 
         self.steam_client.on("logged_on", self._handle_steam_start)
         self.steam_client.on("error", self._handle_steam_error)
-        self.steam_client.on("connected", self._handle_steam_connected)
         self.steam_client.on("channel_secured", self._handle_channel_secured)
         self.steam_client.on("disconnected", self._handle_steam_disconnect)
-        self.steam_client.on("reconnect", self._handle_steam_reconnect)
-
-        self.cs_client.on("ready", self._handle_cs_started)
 
         if self.config.steam_2fa_code is not None:
             self.login()
@@ -84,7 +83,7 @@ class SteamAPIClient(GameAPIClient):
         except requests.RequestException:
             logger.exception("Exception when downloading CSGO maps from", url)
 
-    def _download_demo_file(self, filename, url):
+    def _download_demo_file(self, filename: str, url: str):
         try:
             data = requests.get(url, stream=True)
             with open(f"{filename}.dem.bz2", "wb") as fp:
@@ -97,9 +96,9 @@ class SteamAPIClient(GameAPIClient):
 
         return filename
 
-    def parse_demo(self, demo_url):
+    def parse_demo(self, demo_url: str):
         """
-        Download and parse demo file from the given URL
+        Download and parse demo file from the given URL using awpy.
         """
         demo_file = uuid4().hex
 
@@ -131,7 +130,10 @@ class SteamAPIClient(GameAPIClient):
 
         return demo_game_data
 
-    def get_game_details(self, match_token):
+    def get_game_details(self, match_token: str) -> dict:
+        """
+        Get details about a finished game from the given match_token.
+        """
         code_dict = sharecode.decode(match_token)
         self.cs_client.request_full_match_info(
             code_dict["matchid"],
@@ -152,8 +154,8 @@ class SteamAPIClient(GameAPIClient):
 
         return parsed_data
 
-    def get_active_game(self, steam_ids):
-        account_ids = [self.get_account_id(steam_id) for steam_id in steam_ids]
+    def get_active_game(self, *steam_ids) -> dict:
+        account_ids = [self.get_account_id(int(steam_id)) for steam_id in steam_ids]
         self.cs_client.request_watch_info_friends(account_ids)
         resp = self.cs_client.wait_event("watch_info", timeout=10, raises=False)
 
@@ -188,7 +190,7 @@ class SteamAPIClient(GameAPIClient):
         return json_response["result"]["nextcode"]
 
     def get_account_id(self, steam_id):
-        return SteamID(steam_id).account_id
+        return SteamID(int(steam_id)).account_id
 
     def get_map_name(self, map_id):
         return self.map_names.get(map_id)
@@ -241,7 +243,7 @@ class SteamAPIClient(GameAPIClient):
 
     def send_friend_request(self, steam_id):
         try:
-            self.steam_client.send(MsgProto(EMsg.ClientAddFriend), {"steamid_to_add": steam_id})
+            self.steam_client.send(MsgProto(EMsg.ClientAddFriend), {"steamid_to_add": int(steam_id)})
             resp_msg = self.steam_client.wait_msg(EMsg.ClientAddFriendResponse, timeout=5, raises=False)
             if resp_msg is None: # gevent timeout error
                 return 0
@@ -267,32 +269,19 @@ class SteamAPIClient(GameAPIClient):
         self.cs_client.launch()
 
         self.logged_on_once = True
-        logger.info(f"Logged on to Steam as '{self.steam_client.user.name}'")
 
         self.steam_client.run_forever()
 
-    def _handle_cs_started(self):
-        logger.info("CS Started")
-
     def _handle_steam_error(self, error):
         logger.bind(steam_error=error).error("Steam Client error")
-
-    def _handle_steam_connected(self):
-        logger.info(f"Steam connected to {self.steam_client.current_server_addr}")
 
     def _handle_channel_secured(self):
         if self.logged_on_once and self.steam_client.relogin_available:
             self.steam_client.relogin()
 
     def _handle_steam_disconnect(self):
-        logger.info("Steam disconnected")
-
         if self.logged_on_once:
-            logger.info("Reconnecting to Steam...")
             self.steam_client.reconnect(maxdelay=30)
-
-    def _handle_steam_reconnect(self, delay):
-        logger.info(f"Reconnecting to steam in {delay} seconds...")
 
     def get_2fa_code_from_secrets(self):
         return SteamAuthenticator(self.config.steam_secrets).get_code()

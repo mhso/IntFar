@@ -45,6 +45,12 @@ class TestMock(DiscordClient):
         for game_id, guild_id in ids_to_save:
             self.game_monitors[self.game].active_game[guild_id] = {"id": game_id}
 
+            game_info, status = await self.game_monitors[self.game].get_finished_game_info(guild_id)
+
+            if status != self.game_monitors[self.game].POSTGAME_STATUS_OK:
+                print(f"Error: Status from game monitor was {status}. Exiting...")
+                exit(1)
+
             api_client = self.api_clients[self.game]
 
             game_info = self.api_clients[self.game].get_game_details(game_id)
@@ -97,6 +103,10 @@ class TestMock(DiscordClient):
                     continue
 
             if self.loud and self.task == "all":
+                lifetime_stats = self.get_lifetime_stats_data(awards_handler)
+                if lifetime_stats is not None:
+                    response = lifetime_stats + "\n" + response
+
                 await self.send_message_unprompted(response, guild_id)
 
             if self.play_sound:

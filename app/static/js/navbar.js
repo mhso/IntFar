@@ -99,6 +99,7 @@ function toggleDropdownMenu() {
         hideDropdownMenu(elem);
     }
     else {
+        elem.style.opacity = 0;
         elem.style.display = "block";
         elem.style.opacity = 1;
 
