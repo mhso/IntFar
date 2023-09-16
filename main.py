@@ -84,7 +84,16 @@ def main():
 
     logger.info("Initializing database...")
     sync_manager = Manager()
-    database_client = Database(conf, sync_manager)
+    database_client = Database(conf)
+
+    # Convert database user dicts to synchronized proxies so they're synced across processes
+    database_client.all_users = sync_manager.dict(database_client.all_users)
+    database_client.users_by_game = sync_manager.dict(
+        {
+            game: sync_manager.dict(database_client.users_by_game[game])
+            for game in SUPPORTED_GAMES
+        }
+    )
 
     betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
 

@@ -583,7 +583,7 @@ class CSGOGameStatsParser(GameStatsParser):
         started_t = False
         t_side_players = [player["steamID"] for player in self.raw_data["gameRounds"][0]["tSide"]["players"]]
         for steam_id in t_side_players:
-            if any(int(steam_id) in self.all_users[disc_id].ingame_id for disc_id in self.all_users):
+            if any(int(steam_id) in self.all_users[disc_id].ingame_id for disc_id in self.all_users.keys()):
                 started_t = True
                 break
 
@@ -592,7 +592,7 @@ class CSGOGameStatsParser(GameStatsParser):
         # Get players in game
         players_in_game = []
         for steam_id in player_stats:
-            for disc_id in self.all_users:
+            for disc_id in self.all_users.keys():
                 if int(steam_id) in self.all_users[disc_id].ingame_id:
                     user_game_data = {
                         "disc_id": disc_id,
@@ -727,7 +727,7 @@ class CSGOGameStatsParser(GameStatsParser):
         :active_id: The Steam ID that we should extract data for in the game
         """
         other_players = []
-        for disc_id in self.all_users:
+        for disc_id in self.all_users.keys():
             for steam_id, ingame_name in zip(self.all_users[disc_id].ingame_id, self.all_users[disc_id].ingame_name):
                 if steam_id != active_id and self.api_client.get_account_id(steam_id) in self.raw_data["accountIds"]:
                     other_players.append(ingame_name)

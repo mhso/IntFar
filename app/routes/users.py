@@ -168,7 +168,7 @@ def get_betting_data(game, disc_id, database):
         highest_payout = 0
         events_counts = {x: 0 for x in betting_events}
         events_won_counts = {x: 0 for x in betting_events}
-        target_counts = {d_id: 0 for d_id in database.users_by_game[game]}
+        target_counts = {d_id: 0 for d_id in database.users_by_game[game].keys()}
         total_bets = 0
 
         for _, _, _, amounts, events, targets, _, result, payout in bets:

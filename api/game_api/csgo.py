@@ -140,7 +140,7 @@ class SteamAPIClient(GameAPIClient):
             code_dict["outcomeid"],
             code_dict["token"],
         )
-        resp, = self.cs_client.wait_event('full_match_info')
+        resp, = self.cs_client.wait_event("full_match_info")
         game_info = json.loads(MessageToJson(resp))
         round_stats = game_info["matches"][0]["roundstatsall"]
         demo_url = round_stats[-1]["map"]
@@ -154,15 +154,14 @@ class SteamAPIClient(GameAPIClient):
 
         return parsed_data
 
-    def get_active_game(self, *steam_ids) -> dict:
-        account_ids = [self.get_account_id(int(steam_id)) for steam_id in steam_ids]
-        self.cs_client.request_watch_info_friends(account_ids)
+    def get_active_game(self, steam_id) -> dict:
+        self.cs_client.request_watch_info_friends([self.get_account_id(steam_id)])
         resp = self.cs_client.wait_event("watch_info", timeout=10, raises=False)
 
-        if resp is None:
-            return None
+        if resp is not None:
+            json.loads(MessageToJson(resp[0]))
 
-        return json.loads(MessageToJson(resp[0]))
+        return None
 
     def get_next_sharecode(self, steam_id, auth_code, match_token):
         url = _ENDPOINT_NEXT_MATCH.replace(

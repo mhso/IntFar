@@ -380,7 +380,7 @@ class DiscordClient(discord.Client):
             return None if member is None else member.display_name
 
         nicknames = {}
-        for disc_id in self.database.all_users:
+        for disc_id in self.database.all_users.keys():
             member = self.get_member_safe(disc_id, guild_id)
             name = "Unnamed" if member is None else member.display_name
             nicknames[disc_id] = name
@@ -390,7 +390,7 @@ class DiscordClient(discord.Client):
     async def get_discord_avatar(self, discord_id=None, size=64):
         default_avatar = "app/static/img/questionmark.png"
         users_to_search = (
-            [disc_id for disc_id in self.database.all_users]
+            [disc_id for disc_id in self.database.all_users.keys()]
             if discord_id is None
             else [discord_id]
         )
@@ -649,7 +649,7 @@ class DiscordClient(discord.Client):
         betting_handler = self.betting_handlers[game_stats.game]
 
         any_bets = False # Bool to indicate whether any bets were made.
-        for disc_id in self.database.users_by_game[game_stats.game]:
+        for disc_id in self.database.users_by_game[game_stats.game].keys():
             # See if the user corresponding to 'disc_id' was in-game.
             player_stats = game_stats.find_player_stats(disc_id, game_stats.filtered_player_stats)
 

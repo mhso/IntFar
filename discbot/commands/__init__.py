@@ -289,7 +289,7 @@ def initialize_commands():
     register_desc = (
         "Sign up for the Int-Far™ Tracker™ for the given game " +
         "by providing your ingame info. For LoL, this is just your summoner name. "
-        "For CSGO, this is your Steam account name, Steam ID, latest match token, and match authentication code. "
+        "For CSGO, this is your Steam ID, latest match token, and match authentication code. "
         "(For CSGO, signing up on the website is a lot easier)."
     )
     register_command(

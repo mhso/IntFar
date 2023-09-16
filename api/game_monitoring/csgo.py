@@ -42,15 +42,17 @@ class CSGOGameMonitor(GameMonitor):
             for steam_id in user_dict[disc_id].ingame_id:
                 account_id_map[SteamID(steam_id).account_id] = steam_id
 
-        active_games = self.api_client.get_active_game(*steam_id_map)
+        active_games = []
+        for steam_id in steam_id_map:        
+            active_game = self.api_client.get_active_game(steam_id)
+            if active_game is not None:
+                active_games.append((active_game["accountIds"], active_game["watchableMatchInfos"]))
         # {'requestId': 1, 'accountIds': [10150287], 'watchableMatchInfos': [{'serverIp': 1682023191, 'tvPort': 1, 'tvSpectators': 1, 'tvTime': 661, 'tvWatchPassword': 'JuuR4sOG8GCPWjiQtGT8p6XlPJJVpnZoiD8zBNDYf7U=', 'clDecryptdataKeyPub': '7758645395651441676', 'gameType': 1048584, 'gameMapgroup': 'mg_de_cache', 'gameMap': 'de_cache', 'serverId': '90175702499272731', 'matchId': '3635666711287431410'}]}
 
         users_in_current_game = {}
 
-        if active_games is None or "watchableMatchInfos" not in active_games or "accountIds" not in active_games:
+        if active_games == []:
             return None, users_in_current_game, None # No active game
-
-        logger.info("Len of lists:", len(active_games["accountIds"]), len(active_games["watchableMatchInfos"]))
 
         game_ids = set()
         active_game = None

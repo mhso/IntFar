@@ -51,9 +51,12 @@ class ProxyManager(object):
 
         self.target_cls = target_cls
 
+        subfolder = "bin" if config.env == "production" else "Scripts"
+        executable = "/bin/bash" if config.env == "production" else "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+
         self.steam_process = subprocess.Popen(
-            f". venv/bin/activate; python run_steam.py {game} {config.steam_2fa_code}",
-            executable="/bin/bash",
+            f". venv/{subfolder}/activate; python run_steam.py {game} {config.steam_2fa_code}",
+            executable=executable,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             shell=True,
@@ -87,11 +90,14 @@ class ProxyManager(object):
                 print("Received:", result, flush=True)
 
                 dtype, *values = result.split(":")
-                value_str = ":".join(values)
-                if dtype == "json":
-                    value_str = json.loads(value_str)
+                if dtype == "null":
+                    proxy.send(None)
+                else:
+                    value_str = ":".join(values)
+                    if dtype == "json":
+                        value_str = json.loads(value_str)
 
-                proxy.send(value_str)
+                    proxy.send(value_str)
 
     def create_proxy(self):
         conn_1, conn_2 = Pipe(True)

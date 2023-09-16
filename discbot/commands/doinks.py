@@ -1,4 +1,3 @@
-import api.util as api_util
 from api.awards import get_doinks_reasons, organize_doinks_stats
 
 async def handle_doinks_msg(client, message, game, target_id):
@@ -31,7 +30,7 @@ async def handle_doinks_msg(client, message, game, target_id):
     response = ""
     if target_id is None: # Check doinks for everyone.
         messages = []
-        for disc_id in client.database.users_by_game[game]:
+        for disc_id in client.database.users_by_game[game].keys():
             resp_str, doinks = get_doinks_stats(disc_id, expanded=False)
             messages.append((resp_str, doinks))
 

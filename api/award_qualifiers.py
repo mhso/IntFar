@@ -93,7 +93,10 @@ class AwardQualifiers(ABC):
 
         for key in params_to_replace:
             if params_to_replace[key] is not None:
-                flavor_text = flavor_text.replace("{" + key + "}", str(params_to_replace[key]))
+                value = params_to_replace[key]
+                if key == "kda":
+                    value = f"{value:.2f}"
+                flavor_text = flavor_text.replace("{" + key + "}", str(value))
 
         if "{game}" in flavor_text: # Replace game name if it is present in the text
             flavor_text = flavor_text.replace("{game}", SUPPORTED_GAMES[self.game])

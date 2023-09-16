@@ -151,63 +151,78 @@ class LoLGameStatsParser(GameStatsParser):
         """
         kills_per_team = {100: 0, 200: 0}
         damage_per_team = {100: 0, 200: 0}
-        our_team = 100
         player_stats = []
         active_users = []
         first_blood_id = None
 
+        # First figure out what team we were on
+        our_team = 100
         for part_info in self.raw_data["participantIdentities"]:
             for participant in self.raw_data["participants"]:
                 if part_info["participantId"] == participant["participantId"]:
+                    for disc_id in self.all_users.keys():
+                        summ_ids = self.all_users[disc_id].ingame_id
+                        if part_info["player"]["summonerId"] in summ_ids:
+                            our_team = participant["teamId"]
+                            break
+
+        # Collect relevant stats for all players
+        for part_info in self.raw_data["participantIdentities"]:
+            for participant in self.raw_data["participants"]:
+                if participant["teamId"] == our_team and part_info["participantId"] == participant["participantId"]:
                     kills_per_team[participant["teamId"]] += participant["stats"]["kills"]
                     damage_per_team[participant["teamId"]] += participant["stats"]["totalDamageDealtToChampions"]
 
-                    for disc_id in self.all_users:
+                    player_disc_id = None
+                    for disc_id in self.all_users.keys():
                         summ_ids = self.all_users[disc_id].ingame_id
                         if part_info["player"]["summonerId"] in summ_ids:
-                            kda =  (
-                                participant["stats"]["kills"] + participant["stats"]["assists"]
-                                if participant["stats"]["deaths"] == 0
-                                else (participant["stats"]["kills"] + participant["stats"]["assists"]) / participant["stats"]["deaths"]
-                            )
+                            player_disc_id = disc_id
+                            break
 
-                            our_team = participant["teamId"]
-                            stats_for_player = LoLPlayerStats(
-                                game_id=self.raw_data["gameId"],
-                                disc_id=disc_id,
-                                kills=participant["stats"]["kills"],
-                                deaths=participant["stats"]["deaths"],
-                                assists=participant["stats"]["assists"],
-                                kda=kda,
-                                champ_id=participant["championId"],
-                                champ_name=participant["stats"]["championName"],
-                                damage=participant["stats"]["totalDamageDealtToChampions"],
-                                cs=participant["stats"]["neutralMinionsKilled"] + participant["stats"]["totalMinionsKilled"],
-                                cs_per_min=(participant["stats"]["totalCs"] / self.raw_data["gameDuration"]) * 60,
-                                gold=participant["stats"]["goldEarned"],
-                                vision_wards=participant["stats"]["visionWardsBoughtInGame"],
-                                vision_score=participant["stats"]["visionScore"],
-                                steals=participant["stats"]["objectivesStolen"],
-                                lane=participant["stats"]["role"],
-                                role=participant["stats"]["role"],
-                                pentakills=participant["stats"]["pentaKills"],
-                                total_time_dead=participant["stats"]["totalTimeSpentDead"],
-                                turret_kills=participant["stats"]["turretKills"],
-                                inhibitor_kills=participant["stats"]["inhibitorKills"],
-                                puuid=participant["stats"]["puuid"]
-                            )
-                            player_stats.append(stats_for_player)
+                    kda =  (
+                        participant["stats"]["kills"] + participant["stats"]["assists"]
+                        if participant["stats"]["deaths"] == 0
+                        else (participant["stats"]["kills"] + participant["stats"]["assists"]) / participant["stats"]["deaths"]
+                    )
 
-                            if participant["stats"]["firstBloodKill"]:
-                                first_blood_id = disc_id
+                    stats_for_player = LoLPlayerStats(
+                        game_id=self.raw_data["gameId"],
+                        disc_id=player_disc_id,
+                        kills=participant["stats"]["kills"],
+                        deaths=participant["stats"]["deaths"],
+                        assists=participant["stats"]["assists"],
+                        kda=kda,
+                        champ_id=participant["championId"],
+                        champ_name=participant["stats"]["championName"],
+                        damage=participant["stats"]["totalDamageDealtToChampions"],
+                        cs=participant["stats"]["neutralMinionsKilled"] + participant["stats"]["totalMinionsKilled"],
+                        cs_per_min=(participant["stats"]["totalCs"] / self.raw_data["gameDuration"]) * 60,
+                        gold=participant["stats"]["goldEarned"],
+                        vision_wards=participant["stats"]["visionWardsBoughtInGame"],
+                        vision_score=participant["stats"]["visionScore"],
+                        steals=participant["stats"]["objectivesStolen"],
+                        lane=participant["stats"]["role"],
+                        role=participant["stats"]["role"],
+                        pentakills=participant["stats"]["pentaKills"],
+                        total_time_dead=participant["stats"]["totalTimeSpentDead"],
+                        turret_kills=participant["stats"]["turretKills"],
+                        inhibitor_kills=participant["stats"]["inhibitorKills"],
+                        puuid=participant["stats"]["puuid"]
+                    )
+                    player_stats.append(stats_for_player)
 
-                            summ_data = {
-                                "disc_id": disc_id,
-                                "summ_name": part_info["player"]["summonerName"],
-                                "summ_id": part_info["player"]["summonerId"],
-                                "champion_id": participant["championId"]
-                            }
-                            active_users.append(summ_data)
+                    if participant["stats"]["firstBloodKill"]:
+                        first_blood_id = disc_id
+
+                    if player_disc_id is not None:
+                        summ_data = {
+                            "disc_id": disc_id,
+                            "summ_name": part_info["player"]["summonerName"],
+                            "summ_id": part_info["player"]["summonerId"],
+                            "champion_id": participant["championId"]
+                        }
+                        active_users.append(summ_data)
 
         for stats in player_stats:
             stats.kp = (
@@ -269,70 +284,76 @@ class LoLGameStatsParser(GameStatsParser):
         """
         kills_per_team = {100: 0, 200: 0}
         damage_per_team = {100: 0, 200: 0}
-        our_team = 100
         player_stats = []
         active_users = []
         first_blood_id = None
 
+        # First figure out what team we were on
+        our_team = 100
         for participant in self.raw_data["participants"]:
-            kills_per_team[participant["teamId"]] += participant["kills"]
-            damage_per_team[participant["teamId"]] += participant["totalDamageDealtToChampions"]
-
-            player_disc_id = None
-
-            for disc_id in self.all_users:
+            for disc_id in self.all_users.keys():
                 if participant["summonerId"] in self.all_users[disc_id].ingame_id:
-                    player_disc_id = disc_id
+                    our_team = participant["teamId"]
                     break
 
-            if player_disc_id is not None:
-                our_team = participant["teamId"]
+        # Collect relevant stats for all players
+        for participant in self.raw_data["participants"]:
+            if participant["teamId"] == our_team:
+                kills_per_team[participant["teamId"]] += participant["kills"]
+                damage_per_team[participant["teamId"]] += participant["totalDamageDealtToChampions"]
 
-            total_cs = participant["neutralMinionsKilled"] + participant["totalMinionsKilled"]
-            kda =  (
-                participant["kills"] + participant["assists"]
-                if participant["deaths"] == 0
-                else (participant["kills"] + participant["assists"]) / participant["deaths"]
-            )
+                player_disc_id = None
 
-            stats_for_player = LoLPlayerStats(
-                game_id=self.raw_data["gameId"],
-                disc_id=player_disc_id,
-                kills=participant["kills"],
-                deaths=participant["deaths"],
-                assists=participant["assists"],
-                kda=kda,
-                champ_id=participant["championId"],
-                champ_name=participant["championName"],
-                damage=participant["totalDamageDealtToChampions"],
-                cs=total_cs,
-                cs_per_min=(total_cs / self.raw_data["gameDuration"]) * 60,
-                gold=participant["goldEarned"],
-                vision_wards=participant["visionWardsBoughtInGame"],
-                vision_score=participant["visionScore"],
-                steals=participant["objectivesStolen"],
-                lane=participant["teamPosition"],
-                role=participant["role"],
-                pentakills=participant["pentaKills"],
-                total_time_dead=participant["totalTimeSpentDead"],
-                turret_kills=participant["turretKills"],
-                inhibitor_kills=participant["inhibitorKills"],
-                puuid=participant["puuid"]
-            )
+                for disc_id in self.all_users.keys():
+                    if participant["summonerId"] in self.all_users[disc_id].ingame_id:
+                        player_disc_id = disc_id
+                        break
 
-            if participant["firstBloodKill"]:
-                first_blood_id = player_disc_id
+                total_cs = participant["neutralMinionsKilled"] + participant["totalMinionsKilled"]
+                kda =  (
+                    participant["kills"] + participant["assists"]
+                    if participant["deaths"] == 0
+                    else (participant["kills"] + participant["assists"]) / participant["deaths"]
+                )
 
-            player_stats.append(stats_for_player)
+                stats_for_player = LoLPlayerStats(
+                    game_id=self.raw_data["gameId"],
+                    disc_id=player_disc_id,
+                    kills=participant["kills"],
+                    deaths=participant["deaths"],
+                    assists=participant["assists"],
+                    kda=kda,
+                    champ_id=participant["championId"],
+                    champ_name=participant["championName"],
+                    damage=participant["totalDamageDealtToChampions"],
+                    cs=total_cs,
+                    cs_per_min=(total_cs / self.raw_data["gameDuration"]) * 60,
+                    gold=participant["goldEarned"],
+                    vision_wards=participant["visionWardsBoughtInGame"],
+                    vision_score=participant["visionScore"],
+                    steals=participant["objectivesStolen"],
+                    lane=participant["teamPosition"],
+                    role=participant["role"],
+                    pentakills=participant["pentaKills"],
+                    total_time_dead=participant["totalTimeSpentDead"],
+                    turret_kills=participant["turretKills"],
+                    inhibitor_kills=participant["inhibitorKills"],
+                    puuid=participant["puuid"]
+                )
 
-            if player_disc_id is not None:
-                summ_data = {
-                    "disc_id": player_disc_id,
-                    "summ_name": participant["summonerName"],
-                    "summ_id": participant["summonerId"],
-                    "champion_id": participant["championId"]
-                }
-                active_users.append(summ_data)
+                if participant["firstBloodKill"]:
+                    first_blood_id = player_disc_id
+
+                player_stats.append(stats_for_player)
+
+                if player_disc_id is not None:
+                    summ_data = {
+                        "disc_id": player_disc_id,
+                        "summ_name": participant["summonerName"],
+                        "summ_id": participant["summonerId"],
+                        "champion_id": participant["championId"]
+                    }
+                    active_users.append(summ_data)
 
         # Set kill participation
         for stats in player_stats:
@@ -393,7 +414,7 @@ class LoLGameStatsParser(GameStatsParser):
         """
         champions = {}
         for participant in self.raw_data["participants"]:
-            for disc_id in self.all_users:
+            for disc_id in self.all_users.keys():
                 if participant["summonerId"] in self.all_users[disc_id].ingame_id:
                     champ_id = participant["championId"]
                     champ_played = self.api_client.get_champ_name(champ_id)

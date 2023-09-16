@@ -18,7 +18,7 @@ async def handle_game_msg(client, message, game, target_id):
     ingame_ids = None
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    for disc_id in client.database.users_by_game[game]:
+    for disc_id in client.database.users_by_game[game].keys():
         if disc_id == target_id:
             ingame_ids = client.database.users_by_game[game][disc_id].ingame_id
             break

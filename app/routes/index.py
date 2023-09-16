@@ -203,7 +203,7 @@ def index():
 
     intfar_all_data = {}
     intfar_month_data = {}
-    for disc_id in database.users_by_game[game]:
+    for disc_id in database.users_by_game[game].keys():
         games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id)
         games_played_monthly, intfar_reason_ids_monthly = database.get_intfar_stats(game, disc_id, True)
         pct_intfar = (

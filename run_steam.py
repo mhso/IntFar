@@ -53,6 +53,9 @@ try:
         if isinstance(result, dict) or isinstance(result, list):
             dtype = "json"
             encoded_val = json.dumps(result)
+        elif result is None:
+            dtype = "null"
+            encoded_val = str(result)
         else:
             dtype = "str"
             encoded_val = str(result)

@@ -4,12 +4,12 @@ from glob import glob
 from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
-from csgo import sharecode
 from api.lan import get_average_stats, LAN_PARTIES
 
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, util
 from api.awards import get_awards_handler
+from api.game_data import get_stat_parser
 from api.game_api.lol import RiotAPIClient
 from api.game_api.csgo import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
@@ -81,11 +81,14 @@ class TestFuncs:
         for champ in unplayed_champs:
             print(champ)
 
-    def test_tie_stuff(self):
-        game_id = 5560333770
+    def test_intfar_stuff(self):
+        game_id = 6595962524
+        guild_id = 803987403932172359
         game_data = self.riot_api.get_game_details(game_id)
-        relevant = get_relevant_stats(self.database.summoners, [], game_data)[0]
-        intfar_data = award_qualifiers.get_intfar(relevant, CONFIG)
+        parser = get_stat_parser("lol", game_data, self.riot_api, self.database.users_by_game["lol"], guild_id)
+        parsed_stats = parser.parse_data()
+
+        intfar_data = get_awards_handler("lol", self.config, parsed_stats).get_intfar_qualifiers()
         print(intfar_data)
 
     def test_lan_rework(self):
@@ -240,8 +243,8 @@ class TestFuncs:
     def test_steam_stuff(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
         api_client = SteamAPIClient("csgo", self.config)
-        steam_id = 76561197970416015#, 76561198014212213, 76561198051680910]
-        print(api_client.get_active_game([steam_id]))
+        #steam_ids = [76561198014212213, 76561197970416015]
+        print(api_client.get_active_game(76561197970416015))
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlite3 import DatabaseError, OperationalError, ProgrammingError
 
 from mhooge_flask.logging import logger
-
 from mhooge_flask.database import SQLiteDatabase
 
 from api.game_stats import GameStats, get_outlier_stat
@@ -16,7 +15,7 @@ class DBException(OperationalError, ProgrammingError):
         super().__init__(args)
 
 class Database(SQLiteDatabase):
-    def __init__(self, config, sync_manager=None):
+    def __init__(self, config):
         self.config = config
         super().__init__(self.config.database, "resources/schema.sql", False)
 
@@ -28,9 +27,6 @@ class Database(SQLiteDatabase):
         with self:
             self.all_users: dict[int, User] = self.get_base_users()
             self.users_by_game: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
-
-            # self.all_users = sync_manager.dict(all_users)
-            # self.users_by_game = sync_manager.dict(users_by_game)
 
     def _group_users(self, user_data, *params):
         user_entries = {}
@@ -59,7 +55,7 @@ class Database(SQLiteDatabase):
 
     def user_exists(self, game, discord_id):
         if game is None:
-            return any(discord_id in self.users_by_game[game] for game in self.users_by_game)
+            return any(discord_id in self.users_by_game[game] for game in self.users_by_game.keys())
 
         return discord_id in self.users_by_game[game]
 
@@ -130,7 +126,7 @@ class Database(SQLiteDatabase):
                     status_code = 2 # User reactivated
 
                 else:
-                    new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users_by_game)
+                    new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users_by_game.keys())
                     main = 1
                     if new_user:
                         # User has never signed up for any game before
@@ -202,7 +198,7 @@ class Database(SQLiteDatabase):
 
     def discord_id_from_ingame_info(self, game, exact_match=True, **search_params):
         matches = []
-        for disc_id in self.users_by_game[game]:
+        for disc_id in self.users_by_game[game].keys():
             for search_param in search_params:
                 for ingame_info in self.users_by_game[game][disc_id].get(search_param, []):
                     info_str = str(ingame_info)

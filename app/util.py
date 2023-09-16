@@ -197,7 +197,7 @@ def get_logged_in_user(database, user_id):
     if user_id is None:
         return None
 
-    for disc_id in database.all_users:
+    for disc_id in database.all_users.keys():
         if get_hashed_secret(database.all_users[disc_id].secret) == user_id:
             return disc_id
 
