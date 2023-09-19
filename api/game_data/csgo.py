@@ -569,71 +569,165 @@ class CSGOGameStats(GameStats):
         )
 
     def __post_init__(self):
+        super().__post_init__()
         self.long_match = self.rounds_us > 9 or self.rounds_them > 9
 
 class CSGOGameStatsParser(GameStatsParser):
     def parse_data(self) -> GameStats:
-        player_stats = awpy_player_stats(self.raw_data["gameRounds"])
+        demo_was_parsed = "gameRounds" in self.raw_data
+        round_stats = self.raw_data["matches"][0]["roundstatsall"]
 
-        for rank_entry in self.raw_data["matchmakingRanks"]:
-            steam_id = str(rank_entry["steamID"])
-            player_stats[steam_id]["rank"] = rank_entry["rankOld"]
-
-        # Determine if we started on t side
-        started_t = False
-        t_side_players = [player["steamID"] for player in self.raw_data["gameRounds"][0]["tSide"]["players"]]
-        for steam_id in t_side_players:
-            if any(int(steam_id) in self.all_users[disc_id].ingame_id for disc_id in self.all_users.keys()):
-                started_t = True
-                break
-
-        players_on_our_team = {player["steamID"] for player in self.raw_data["gameRounds"][0]["tSide" if started_t else "ctSide"]["players"]}
-
-        # Get players in game
-        players_in_game = []
-        for steam_id in player_stats:
-            for disc_id in self.all_users.keys():
-                if int(steam_id) in self.all_users[disc_id].ingame_id:
-                    user_game_data = {
-                        "disc_id": disc_id,
-                        "steam_name": player_stats[steam_id]["playerName"],
-                        "steam_id": int(steam_id),
-                    }
-                    player_stats[steam_id]["disc_id"] = disc_id
-                    players_in_game.append(user_game_data)
+        if demo_was_parsed: # Parse stats from demo if demo was valid/recent
+            # Determine if we started on t side
+            started_t = False
+            t_side_players = [player["steamID"] for player in self.raw_data["gameRounds"][0]["tSide"]["players"]]
+            for steam_id in t_side_players:
+                if any(int(steam_id) in self.all_users[disc_id].ingame_id for disc_id in self.all_users.keys()):
+                    started_t = True
                     break
 
-        # Get total rounds on t side and on ct side
-        rounds_t = self.raw_data["gameRounds"][-1]["endTScore"]
-        rounds_ct = self.raw_data["gameRounds"][-1]["endCTScore"]
+            both_teams_stats = awpy_player_stats(self.raw_data["gameRounds"], selected_side="T" if started_t else "CT")
 
-        # Get total kills by our teamn
-        kills_by_our_team = sum(
-            player_stats[steam_id]["kills"]
-            for steam_id in player_stats
-            if steam_id in players_on_our_team
-        )
+            # Filter out players not on our team
+            player_stats = {}
+            for steam_id in both_teams_stats:
+                if (int(steam_id) in t_side_players) ^ (not started_t):
+                    player_stats[steam_id] = both_teams_stats[steam_id]
 
-        # Get our round count, enemy round count, and who won
-        rounds_us = rounds_t if started_t else rounds_ct
-        rounds_them = rounds_ct if started_t else rounds_t
-        win_score = 1 if rounds_us > rounds_them else -1
-        if rounds_us == rounds_them:
-            win_score = 0
+            for rank_entry in self.raw_data["matchmakingRanks"]:
+                steam_id = str(rank_entry["steamID"])
+                if steam_id in player_stats:
+                    player_stats[steam_id]["rank"] = rank_entry["rankOld"]
+
+            # Get players in game
+            players_in_game = []
+            for steam_id in player_stats:
+                for disc_id in self.all_users.keys():
+                    if int(steam_id) in self.all_users[disc_id].ingame_id:
+                        user_game_data = {
+                            "disc_id": disc_id,
+                            "steam_name": player_stats[steam_id]["playerName"],
+                            "steam_id": int(steam_id),
+                        }
+                        player_stats[steam_id]["disc_id"] = disc_id
+                        players_in_game.append(user_game_data)
+                        break
+
+            # Get total rounds on t side and on ct side
+            rounds_t = self.raw_data["gameRounds"][-1]["endTScore"]
+            rounds_ct = self.raw_data["gameRounds"][-1]["endCTScore"]
+
+            # Get total kills by our teamn
+            kills_by_our_team = sum(
+                player_stats[steam_id]["kills"]
+                for steam_id in player_stats
+            )
+
+            # Get our round count, enemy round count, and who won
+            rounds_us = rounds_t if started_t else rounds_ct
+            rounds_them = rounds_ct if started_t else rounds_t
+            win_score = 1 if rounds_us > rounds_them else -1
+            if rounds_us == rounds_them:
+                win_score = 0
+
+            account_id_map = {self.api_client.get_account_id(int(steam_id)): steam_id for steam_id in player_stats}
+
+            map_id = self.raw_data["mapName"]
+
+        else: # Parse (a subset of) stats from basic game data
+            # Get players in game from the round were most players are present (in case of disconnects)
+            max_player_round = 0
+            max_players = 0
+            for index, round_data in enumerate(round_stats):
+                players_in_round = len(round_data["reservation"]["accountIds"])
+                if players_in_round > max_players:
+                    max_players = players_in_round
+                    max_player_round = index
+
+            # Get users in game and map account ids to discord ids
+            account_id_map = {}
+            players_in_game = []
+            started_t = False
+            for disc_id in self.all_users:
+                for steam_id, steam_name in zip(self.all_users[disc_id].ingame_id, self.all_users[disc_id].ingame_name):
+                    account_id = self.api_client.get_account_id(int(steam_id))
+                    try:
+                        index = round_stats[max_player_round]["reservation"]["accountIds"].index(account_id)
+                        started_t = index > 4
+                        account_id_map[account_id] = disc_id
+                        user_game_data = {
+                            "disc_id": disc_id,
+                            "steam_name": steam_name,
+                            "steam_id": int(steam_id),
+                        }
+                        players_in_game.append(user_game_data)
+                        break
+
+                    except ValueError:
+                        pass
+
+            game_type = round_data["reservation"]["gameType"]
+
+            start_index = 5 if started_t else 0
+            for account_id in round_stats[max_player_round]["reservation"]["accountIds"][start_index:start_index+5]:
+                if account_id not in account_id_map:
+                    account_id_map[account_id] = None
+
+            round_data = round_stats[-1]
+            account_ids = round_data["reservation"]["accountIds"]
+
+            player_stats = {}
+            for index, account_id in enumerate(round_stats[max_player_round]["reservation"]["accountIds"]):
+                if started_t ^ (index < 5):
+                    player_stats[account_id] = {"disc_id": account_id_map[account_id]}
+
+            # Get kills, assists, deaths, and headshot percentage
+            stats_to_collect = ["kills", "assists", "deaths", "enemyHeadshots"]
+            for stat in stats_to_collect:
+                for index, stat_value in enumerate(round_data[stat]):
+                    if started_t ^ (index < 5):
+                        player_stats[account_ids[index]][stat] = stat_value
+
+            for account_id in player_stats:
+                player_stats[account_id]["hsPercent"] = player_stats[account_id]["enemyHeadshots"] / player_stats[account_id]["kills"]
+
+            # Get total kills by our teamn
+            kills_by_our_team = sum(
+                player_stats[account_id]["kills"]
+                for account_id in player_stats
+            )
+
+            # Get total rounds on t side and on ct side
+            rounds_ct = round_data["teamScores"][0]
+            rounds_t = round_data["teamScores"][1]
+
+            # Get our round count, enemy round count, and who won
+            rounds_us = rounds_t if started_t else rounds_ct
+            rounds_them = rounds_ct if started_t else rounds_t
+            win_score = 1 if rounds_us > rounds_them else -1
+            if rounds_us == rounds_them:
+                win_score = 0
+
+            map_id = self.api_client.get_map_id(game_type)
 
         # Get MVPs for each player
-        account_id_map = {self.api_client.get_account_id(int(steam_id)): steam_id for steam_id in player_stats}
-        for account_id in self.raw_data.get("mvps", []):
-            player_stats[account_id_map[account_id]]["mvps"] = self.raw_data["mvps"][account_id]
+        mvps = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["mvps"]))
+        for account_id in mvps:
+            if account_id in account_id_map:
+                key = account_id_map[account_id] if demo_was_parsed else account_id 
+                player_stats[key]["mvps"] = mvps[account_id]
 
         # Get scores of each player
-        for account_id in self.raw_data.get("scores", []):
-            player_stats[account_id_map[account_id]]["scores"] = self.raw_data["scores"][account_id]
+        scores = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["scores"]))
+        for account_id in scores:
+            if account_id in account_id_map:
+                key = account_id_map[account_id] if demo_was_parsed else account_id 
+                player_stats[key]["scores"] = scores[account_id]
 
         # Add it all to player stats
         all_player_stats = []
-        for steam_id in player_stats:
-            player_data = player_stats[steam_id]
+        for steam_or_account_id in player_stats:
+            player_data = player_stats[steam_or_account_id]
 
             kda = (
                 player_data["kills"] + player_data["assists"]
@@ -644,6 +738,13 @@ class CSGOGameStatsParser(GameStatsParser):
                 100 if kills_by_our_team == 0
                 else int((float(player_data["kills"] + player_data["assists"]) / float(kills_by_our_team)) * 100.0)
             )
+            accuracy = player_data.get("accuracy")
+            if accuracy is not None:
+                accuracy = int(accuracy * 100)
+
+            rank = player_data.get("rank")
+            if rank is not None:
+                rank = RANKS.index(player_data["rank"])
 
             parsed_player_stats = CSGOPlayerStats(
                 game_id=self.raw_data["matchID"],
@@ -653,43 +754,44 @@ class CSGOGameStatsParser(GameStatsParser):
                 assists=player_data["assists"],
                 kda=kda,
                 kp=kp,
-                mvps=player_data.get("mvps"),
-                score=player_data.get("scores"),
-                headshot_pct=player_data["hsPercent"],
-                adr=player_data["adr"],
-                utility_damage=player_data["utilityDamage"],
-                enemies_flashed=player_data["enemiesFlashed"],
-                teammates_flashed=player_data["teammatesFlashed"],
-                flash_assists=player_data["flashAssists"],
-                team_kills=player_data["teamKills"],
-                suicides=player_data["suicides"],
-                accuracy=int(player_data["accuracy"] * 100),
-                entries=player_data["firstKills"],
-                triples=player_data["kills3"],
-                quads=player_data["kills4"],
-                aces=player_data["kills5"],
-                one_v_ones_tried=player_data["attempts1v1"],
-                one_v_ones_won=player_data["success1v1"],
-                one_v_twos_tried=player_data["attempts1v2"],
-                one_v_twos_won=player_data["success1v2"],
-                one_v_threes_tried=player_data["attempts1v3"],
-                one_v_threes_won=player_data["success1v3"],
-                one_v_fours_tried=player_data["attempts1v4"],
-                one_v_fours_won=player_data["success1v4"],
-                one_v_fives_tried=player_data["attempts1v5"],
-                one_v_fives_won=player_data["success1v5"],
-                rank=RANKS.index(player_data["rank"]) if player_data.get("rank") else None,
+                mvps=player_data["mvps"],
+                score=player_data["scores"],
+                headshot_pct=int(player_data["hsPercent"] * 100),
+                adr=player_data.get("adr"),
+                utility_damage=player_data.get("utilityDamage"),
+                enemies_flashed=player_data.get("enemiesFlashed"),
+                teammates_flashed=player_data.get("teammatesFlashed"),
+                flash_assists=player_data.get("flashAssists"),
+                team_kills=player_data.get("teamKills"),
+                suicides=player_data.get("suicides"),
+                accuracy=accuracy,
+                entries=player_data.get("firstKills"),
+                triples=player_data.get("kills3"),
+                quads=player_data.get("kills4"),
+                aces=player_data.get("kills5"),
+                one_v_ones_tried=player_data.get("attempts1v1"),
+                one_v_ones_won=player_data.get("success1v1"),
+                one_v_twos_tried=player_data.get("attempts1v2"),
+                one_v_twos_won=player_data.get("success1v2"),
+                one_v_threes_tried=player_data.get("attempts1v3"),
+                one_v_threes_won=player_data.get("success1v3"),
+                one_v_fours_tried=player_data.get("attempts1v4"),
+                one_v_fours_won=player_data.get("success1v4"),
+                one_v_fives_tried=player_data.get("attempts1v5"),
+                one_v_fives_won=player_data.get("success1v5"),
+                rank=rank,
             )
             all_player_stats.append(parsed_player_stats)
 
-        map_id = self.raw_data["mapName"]
+        timestamp = self.raw_data["matches"][0]["matchtime"]
+        duration = round_stats[-1]["matchDuration"]
         map_name = self.api_client.get_map_name(map_id)
 
         return CSGOGameStats(
             game=self.game,
             game_id=self.raw_data["matchID"],
-            timestamp=self.raw_data.get("timestamp"),
-            duration=self.raw_data.get("duration"),
+            timestamp=timestamp,
+            duration=duration,
             win=win_score,
             guild_id=self.guild_id,
             players_in_game=players_in_game,

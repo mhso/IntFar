@@ -1,14 +1,16 @@
-from datetime import datetime
 import traceback
+from argparse import ArgumentParser
+from datetime import datetime
 from glob import glob
 from uuid import uuid4
 from time import sleep
 import os
+import json
 
 from api.game_api.csgo import SteamAPIClient
 from api.game_data.csgo import CSGOGameStats, CSGOPlayerStats, CSGOGameStatsParser
 from api.config import Config
-from api.database import Database
+from api.database import Database, DBException
 
 """
 Array.from(document.getElementsByClassName("csgo_scoreboard_btn_gotv")).forEach((x) => console.log(x.parentNode.href));
@@ -16,13 +18,51 @@ Array.from(document.getElementsByClassName("csgo_scoreboard_btn_gotv")).forEach(
 
 _GUILD_ID = 619073595561213953
 
+def group_data(data) -> list[CSGOGameStats]:
+    # Group duplicate game data by timestamp
+    grouped_by_date = {}
+    for entry in data:
+        grouped_by_date[entry.timestamp] = entry
+
+    merged = [entry for entry in grouped_by_date.values()]
+    merged.sort(key=lambda x: x.timestamp)
+
+    return merged
+
+def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> list[CSGOGameStats]:
+    all_data = []
+    for disc_id in database.users_by_game["csgo"]:
+        steam_id = database.users_by_game["csgo"][disc_id].ingame_id[0]
+        auth_code = database.users_by_game["csgo"][disc_id].match_auth_code[0]
+        curr_sharecode = database.users_by_game["csgo"][disc_id].latest_match_token[0]
+        print(f"Progress for {disc_id}:")
+        while curr_sharecode is not None:
+            print("Sharecode:", curr_sharecode)
+
+            data = steam_api.get_game_details(curr_sharecode)
+            stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.users_by_game["csgo"], _GUILD_ID)
+            try:
+                parsed_data = stats_parser.parse_data()
+                if len(parsed_data.filtered_player_stats) > 1:
+                    all_data.append(parsed_data)
+            except Exception:
+                with open(f"test_data_{curr_sharecode}.json", "w", encoding="utf-8") as fp:
+                    json.dump(data, fp)
+                    exit(0)
+    
+            curr_sharecode = steam_api.get_next_sharecode(steam_id, auth_code, curr_sharecode)
+
+            sleep(1)
+
+    return group_data(all_data)
+
 def parse_demo(steam_api: SteamAPIClient, database: Database, demo_url):
     data = steam_api.parse_demo(demo_url)
     stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.users_by_game["csgo"], _GUILD_ID)
 
     return stats_parser.parse_data()
 
-def get_data_from_file(database: Database, steam_api: SteamAPIClient):
+def get_data_from_file(database: Database, steam_api: SteamAPIClient) -> list[CSGOGameStats]:
     folder = "misc/old_csgo_games"
     all_match_files = glob(f"{folder}/csgo_matches*")
     all_demo_files = glob(f"{folder}/gotv_demos*")
@@ -40,7 +80,8 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient):
     for name in match_files_by_name:
         match_file = match_files_by_name[name]
         demo_file = demo_files_by_name[name]
-        url_demos = [line.strip() for line in open(demo_file, "r", encoding="utf-8")]
+        matches_for_name = 0
+        url_demos = []#[line.strip() for line in open(demo_file, "r", encoding="utf-8")]
 
         with open(match_file, "r", encoding="utf-8") as fp:
             first_line = True
@@ -52,7 +93,7 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient):
                 count_lines += 1
 
                 try:
-                    if line.startswith("Competitive") or line == ">EOF<": # Map name line
+                    if line.startswith("Competitive") or line == ">EOF<": # Map name line or end of file
                         if not first_line and len(players_in_game) > 1 and (score_team_1 > 9 or score_team_2 > 9):
                             # Only save data if more than 1 registered player was in the game
                             rounds_us = score_team_2 if our_team_t else score_team_1
@@ -64,7 +105,7 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient):
                             kills_by_our_team = sum(stats.kills for stats in player_stats)
 
                             # Parse the N most recent matches as demos
-                            if len(all_data) < len(url_demos):
+                            if matches_for_name < len(url_demos):
                                 demo_url = url_demos[len(all_data)]
                                 parsed_data = parse_demo(steam_api, database, demo_url)
                                 sleep(2)
@@ -113,6 +154,8 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient):
 
                             if len(players_in_game) < 2 and url_demos != []:
                                 url_demos.pop(0)
+
+                            matches_for_name += 1
     
                         if line != ">EOF<":
                             first_line = False
@@ -209,28 +252,46 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient):
                     exit(1)
 
     # Group duplicate game data by timestamp
-    grouped_by_date = {}
-    for data in all_data:
-        grouped_by_date[data.timestamp] = data
+    return group_data(all_data)
 
-    merged = [data for data in grouped_by_date.values()]
-    merged.sort(key=lambda x: x.timestamp)
-
-    return merged
-
-def run(database: Database, steam_api: SteamAPIClient):
-    data = get_data_from_file(database, steam_api)
+def run(source: str, database: Database, steam_api: SteamAPIClient):
+    if source == "file":
+        data = get_data_from_file(database, steam_api)
+    elif source == "sharecode":
+        data = get_data_from_sharecode(database, steam_api)
 
     print("Saving to database...")
 
     with database:
         for entry in data:
-            database.record_stats(entry)
+            try:
+                database.record_stats(entry)
+            except DBException:
+                print(f"Could not save data for {entry.game_id}, probably a duplicate.")
+
+    if source == "sharecode":
+        # Update newest match token for players
+        for disc_id in database.users_by_game["csgo"]:
+            newest_code = None
+            for entry in data:
+                if entry.find_player_stats(disc_id, entry.filtered_player_stats) is not None:
+                    newest_code = entry.game_id
+
+            database.set_new_csgo_sharecode(disc_id, newest_code)
 
     print(f"DONE! Saved data for {len(data)} games")
 
-config = Config()
-database = Database(config)
-steam_api = SteamAPIClient("csgo", config)
+if __name__ == "__main__":
+    parser = ArgumentParser()
 
-run(database, steam_api)
+    parser.add_argument("source", choices=("file", "sharecode"))
+    parser.add_argument("--steam_2fa_code", type=str)
+
+    args = parser.parse_args()
+
+    config = Config()
+    config.steam_2fa_code = args.steam_2fa_code
+    database = Database(config)
+    steam_api = SteamAPIClient("csgo", config)
+
+    run(args.source, database, steam_api)

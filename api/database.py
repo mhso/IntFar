@@ -1106,7 +1106,7 @@ class Database(SQLiteDatabase):
             result = self.execute_query(query, *params).fetchall()
 
             if return_top_n == 1:
-                result = result[0]
+                result = result[0] if result != [] else None
 
             if result is None and min_games == 10:
                 # If no champs are found with min 10 games, try again with 5.

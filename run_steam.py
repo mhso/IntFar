@@ -4,8 +4,6 @@ monkey.patch_all()
 import sys
 import json
 
-from gevent._socketcommon import wait_read
-
 from api.config import Config
 from api.game_api.csgo import SteamAPIClient
 from argparse import ArgumentParser
@@ -26,8 +24,7 @@ try:
     client = SteamAPIClient(args.game, config)
 
     while True:
-        wait_read(sys.stdin.fileno())
-        cmd = sys.stdin.readline()[:-2]
+        cmd = input().strip()
 
         log_stuff.write(f"Command: {cmd}\n")
 
@@ -60,7 +57,7 @@ try:
             dtype = "str"
             encoded_val = str(result)
 
-        sys.stdout.write(f"{dtype}: {encoded_val}\n")
+        sys.stdout.write(f"{dtype}:{encoded_val}\n")
         sys.stdout.flush()
 
 finally:

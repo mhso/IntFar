@@ -1,7 +1,6 @@
 import asyncio
 from typing import Coroutine
-
-from steam.steamid import SteamID
+from time import time
 
 from mhooge_flask.logging import logger
 
@@ -25,6 +24,11 @@ class CSGOGameMonitor(GameMonitor):
         return 10
 
     async def get_active_game_info(self, guild_id):
+        if not self.api_client.logged_on_once is None:
+            # Steam is not logged on, don't try to track games
+            return None, {}, None
+
+        # Create a bunch of maps for different IDs
         user_dict = (
             self.users_in_voice.get(guild_id, {})
             if self.users_in_game.get(guild_id) is None
@@ -36,55 +40,33 @@ class CSGOGameMonitor(GameMonitor):
             for steam_id in user_dict[disc_id].ingame_id:
                 steam_id_map[steam_id] = disc_id
 
-        # Get a dictionary of information about friends who are in-game
-        account_id_map = {}
-        for disc_id in user_dict:
-            for steam_id in user_dict[disc_id].ingame_id:
-                account_id_map[SteamID(steam_id).account_id] = steam_id
-
-        active_games = []
-        for steam_id in steam_id_map:        
-            active_game = self.api_client.get_active_game(steam_id)
-            if active_game is not None:
-                active_games.append((active_game["accountIds"], active_game["watchableMatchInfos"]))
-        # {'requestId': 1, 'accountIds': [10150287], 'watchableMatchInfos': [{'serverIp': 1682023191, 'tvPort': 1, 'tvSpectators': 1, 'tvTime': 661, 'tvWatchPassword': 'JuuR4sOG8GCPWjiQtGT8p6XlPJJVpnZoiD8zBNDYf7U=', 'clDecryptdataKeyPub': '7758645395651441676', 'gameType': 1048584, 'gameMapgroup': 'mg_de_cache', 'gameMap': 'de_cache', 'serverId': '90175702499272731', 'matchId': '3635666711287431410'}]}
+        active_users = []
+        for steam_id in steam_id_map:
+            is_user_active = self.api_client.is_person_ingame(steam_id)     
+            if is_user_active:
+                active_users.append(steam_id)
 
         users_in_current_game = {}
 
-        if active_games == []:
-            return None, users_in_current_game, None # No active game
+        if active_users == []:
+            return None, users_in_current_game, None # No active users
 
-        game_ids = set()
-        active_game = None
-        for account_id, game_info in zip(active_games["accountIds"], active_games["watchableMatchInfos"]):
-            match_id = game_info["matchId"]
-            game_ids.add(match_id)
+        for steam_id in active_users:
+            disc_id = steam_id_map[steam_id]
+            if self.active_game.get(guild_id) is None: # First time we see this active game
+                steam_name = self.api_client.get_steam_display_name(steam_id)
+            else:
+                steam_name = user_dict[disc_id].ingame_name
 
-            if account_id in account_id_map:
-                steam_id = account_id_map[account_id]
-                disc_id = steam_id_map[steam_id]
-                if self.active_game.get(guild_id) is None: # First time we see this active game
-                    steam_name = self.api_client.get_steam_display_name(steam_id)
-                else:
-                    steam_name = user_dict[disc_id].ingame_name
-
-                users_in_current_game[disc_id] = User(disc_id, user_dict[disc_id].secret, [steam_name], [steam_id])
-
-                active_game = game_info
-
-        if len(game_ids) > 1: # People are in different games
-            return None, users_in_current_game, self.GAME_STATUS_NOCHANGE
-
-        if active_game is None:
-            return None, users_in_current_game, None
+            users_in_current_game[disc_id] = User(disc_id, user_dict[disc_id].secret, [steam_name], [steam_id])
 
         return (
             {
-                "id": active_game["matchId"],
+                "id": str(time()),
                 "start": 0,
-                "map_id": active_game["gameMap"],
-                "map_name": self.api_client.get_map_name(active_game["gameMap"]),
-                "game_type": active_game["gameType"]
+                "map_id": "Unknown",
+                "map_name": "Unknown",
+                "game_type": "Unknown"
             },
             users_in_current_game,
             None
@@ -99,7 +81,7 @@ class CSGOGameMonitor(GameMonitor):
         }
 
         retries = 4
-        time_to_sleep = 30
+        time_to_sleep = 15
         code_retrieved = {disc_id: False for disc_id in current_sharecodes}
         new_sharecode = None
         for _ in range(retries):
@@ -148,7 +130,7 @@ class CSGOGameMonitor(GameMonitor):
                     "We triggered end of game stuff again... Strange!"
                 )
 
-            elif len(self.users_in_game[guild_id]) == 1:
+            elif len(self.users_in_game.get(guild_id, [])) == 1:
                 status_code = self.POSTGAME_STATUS_SOLO
 
             elif not game_info.long_match:

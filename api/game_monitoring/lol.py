@@ -104,9 +104,7 @@ class LoLGameMonitor(GameMonitor):
         game_info = None
 
         if not custom_game:
-            game_info = self.api_client.get_game_details(
-                game_id, tries=2
-            )
+            game_info = self.api_client.get_game_details(game_id, tries=2)
 
             retry = 0
             retries = 4
@@ -137,7 +135,7 @@ class LoLGameMonitor(GameMonitor):
                 "We triggered end of game stuff again... Strange!"
             )
 
-        elif len(self.users_in_game[guild_id]) == 1:
+        elif len(self.users_in_game.get(guild_id, [])) == 1:
             status_code = self.POSTGAME_STATUS_SOLO
 
         elif self.api_client.is_urf(game_info["gameMode"]):

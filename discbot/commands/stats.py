@@ -123,7 +123,7 @@ async def handle_average_msg(client, message, game, stat, champ_or_map=None, dis
     if stat not in quantity_descs: # Check if the requested stat is a valid stat.
         emote = "{emote_carole_fucking_baskin}"
         response = f"Not a valid stat: '{stat}' {emote}. See `!stats` for a list of valid stats."
-        await message.channel.send(response)
+        await message.channel.send(client.insert_emotes(response))
         return
 
     if game == "lol":

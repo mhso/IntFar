@@ -43,7 +43,15 @@ class SteamAPIClient(GameAPIClient):
         self.logged_on_once = False
 
         self.map_names = {}
+        self.game_types = {
+            1048584: "cache",
+            8200: "nuke",
+            4104: "inferno",
+            2056: "ancient",
+            520: "dust2",
+        }
         self.get_latest_data()
+        self.csgo_app_id = 730
 
         self.steam_client = SteamClient()
         self.cs_client = CSGOClient(self.steam_client)
@@ -77,7 +85,7 @@ class SteamAPIClient(GameAPIClient):
                 if len(split) == 1:
                     continue
 
-                short_name = split[1].strip()
+                short_name = split[1].strip().split("_")[-1]
                 self.map_names[short_name] = full_name
 
         except requests.RequestException:
@@ -121,7 +129,7 @@ class SteamAPIClient(GameAPIClient):
             parser = DemoParser(demo_dem_file)
             demo_game_data = parser.parse()
         except Exception:
-            demo_game_data = None
+            demo_game_data = {}
         finally:
             # Clean up the files after use
             for filename in (demo_bz2_file, demo_dem_file, demo_json_file):
@@ -146,11 +154,8 @@ class SteamAPIClient(GameAPIClient):
         demo_url = round_stats[-1]["map"]
 
         parsed_data = self.parse_demo(demo_url)
+        parsed_data.update(game_info)
         parsed_data["matchID"] = match_token
-        parsed_data["timestamp"] = game_info["matches"][0]["matchtime"]
-        parsed_data["duration"] = round_stats[-1]["matchDuration"]
-        parsed_data["mvps"] = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["mvps"]))
-        parsed_data["scores"] = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["scores"]))
 
         return parsed_data
 
@@ -194,6 +199,9 @@ class SteamAPIClient(GameAPIClient):
     def get_map_name(self, map_id):
         return self.map_names.get(map_id)
 
+    def get_map_id(self, game_type):
+        return self.game_types.get(game_type)
+
     def get_steam_display_name(self, steam_id):
         url = _ENDPOINT_PLAYER_SUMMARY.replace(
             "[key]", self.config.steam_key
@@ -210,6 +218,26 @@ class SteamAPIClient(GameAPIClient):
                 return player["personaname"]
 
         return None
+
+    def is_person_ingame(self, steam_id):
+        """
+        Returns a boolean indicating whether the user with the given Steam ID is in a game of CS.
+        """
+        url = _ENDPOINT_PLAYER_SUMMARY.replace(
+            "[key]", self.config.steam_key
+        ).replace(
+            "[steam_id]", str(steam_id)
+        )
+
+        response = requests.get(url)
+        if response.status_code != 200:
+            return False
+
+        for player in response.json().get("response", {}).get("players", []):
+            if player["steamid"] == str(steam_id):
+                return int(player.get("gameid", "0")) == self.csgo_app_id
+
+        return False
 
     def try_find_played(self, search_term):
         """

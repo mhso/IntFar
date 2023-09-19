@@ -136,9 +136,15 @@ class AwardQualifiers(ABC):
 
             values = [total_games, total_wins, total_intfars, total_doinks]
             moduli = [1000, 1000, 100, 100]
+            conditions = [
+                None,
+                bool(self.parsed_game_stats.win),
+                self.parsed_game_stats.intfar_id == stats.disc_id,
+                stats.doinks is not None
+            ]
 
-            for index, (val, mod) in enumerate(zip(values, moduli)):
-                if val > 0 and val % mod == 0:
+            for index, (val, mod, cond) in enumerate(zip(values, moduli, conditions)):
+                if val > 0 and val % mod == 0 and cond:
                     lifetime_mentions[stats.disc_id].append((index, val))
 
         return lifetime_mentions

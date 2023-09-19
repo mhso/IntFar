@@ -8,6 +8,7 @@ from api.bets import get_betting_handler
 from api.game_api import get_api_client
 from api.config import Config
 from api.database import Database
+from api.user import User
 from api.game_data import get_stat_parser
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from discbot.discord_bot import DiscordClient
@@ -33,6 +34,7 @@ class TestMock(DiscordClient):
         self.loud = not args.silent if not self.missing else False
         self.play_sound = args.sound.lower() in ("yes", "true", "1") if not self.missing else False
         self.ai_model = kwargs.get("ai_model")
+        self.users_in_game = args.get("users")
 
     async def on_ready(self):
         await super(TestMock, self).on_ready()
@@ -43,22 +45,43 @@ class TestMock(DiscordClient):
             ids_to_save = [(self.game_id, self.guild_to_use)]
 
         for game_id, guild_id in ids_to_save:
-            self.game_monitors[self.game].active_game[guild_id] = {"id": game_id}
+            game_monitor = self.game_monitors[self.game]
+            game_monitor.active_game[guild_id] = {"id": game_id}
 
-            game_info, status = await self.game_monitors[self.game].get_finished_game_info(guild_id)
+            if self.users_in_game is not None:
+                game_monitor.users_in_game[guild_id] = {
+                    disc_id: User(disc_id, None) for disc_id in self.users_in_game
+                }
 
-            if status != self.game_monitors[self.game].POSTGAME_STATUS_OK:
+            game_info, status = await game_monitor.get_finished_game_info(guild_id)
+
+            if status != game_monitor.POSTGAME_STATUS_OK:
                 print(f"Error: Status from game monitor was {status}. Exiting...")
                 exit(1)
 
             api_client = self.api_clients[self.game]
 
-            game_info = self.api_clients[self.game].get_game_details(game_id)
-
             game_stats_parser = get_stat_parser(self.game, game_info, api_client, self.database.users_by_game[self.game], self.guild_to_use)
             parsed_game_stats = game_stats_parser.parse_data()
+
+            game_monitor.users_in_game[guild_id] = {
+                player_stats.disc_id: self.database.users_by_game[self.game][player_stats.disc_id]
+                for player_stats in parsed_game_stats.filtered_player_stats
+            }
+
+            if not self.loud:
+                self.channels_to_write[guild_id] = MockChannel()
+
             if self.game == "lol":
-                self.game_monitors[self.game].active_game[guild_id]["queue_id"] = parsed_game_stats.queue_id
+                game_monitor.active_game[guild_id]["queue_id"] = parsed_game_stats.queue_id
+                if self.api_clients[game_monitor.game].is_clash(game_monitor.active_game[guild_id]["queue_id"]):
+                    # Game was played as part of a clash tournament, so it awards more betting tokens.
+                    multiplier = self.config.clash_multiplier
+                    await self.channels_to_write[guild_id].send(
+                        "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
+                        f"{multiplier} TIMES AS MUCH!!! <<<<<**"
+                    )
+
             awards_handler = get_awards_handler(self.game, self.config, parsed_game_stats)
 
             intfar, response = self.get_intfar_data(awards_handler)
@@ -80,9 +103,6 @@ class TestMock(DiscordClient):
             response = ""
 
             if self.task in ("all", "bets"):
-                if not self.loud:
-                    self.channels_to_write[guild_id] = MockChannel()
-
                 response, max_tokens_id, new_max_tokens_id = self.resolve_bets(parsed_game_stats)
                 if max_tokens_id != new_max_tokens_id:
                     await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
@@ -120,11 +140,12 @@ class TestMock(DiscordClient):
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--missing", action="store_true")
-parser.add_argument("--game_id", type=int)
 parser.add_argument("--game", type=str)
+parser.add_argument("--game_id", type=int)
 parser.add_argument("--guild", type=str, choices=GUILDS)
 parser.add_argument("--task", type=str, choices=("all", "bets", "stats", "train"))
 parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
+parser.add_argument("--users", type=str, nargs="+")
 parser.add_argument("-s", "--silent", action="store_true")
 
 args = parser.parse_args()

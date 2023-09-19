@@ -14,6 +14,10 @@ class Proxy(object):
         self._set_attributes()
 
     @property
+    def logged_on_once(self):
+        return self._call_proxy("logged_on_once")
+
+    @property
     def game(self):
         return self._call_proxy("game")
 
@@ -76,9 +80,7 @@ class ProxyManager(object):
                     proxy.send("exiting...")
                     break
 
-                serialized_cmd = f"{command}: {';'.join(map(str, args))}\n"
-
-                print("Sending:", serialized_cmd, flush=True)
+                serialized_cmd = f"{command}:{';'.join(map(str, args))}\n"
 
                 self.steam_process.stdin.write(serialized_cmd)
                 self.steam_process.stdin.flush()
@@ -86,8 +88,6 @@ class ProxyManager(object):
                 result = self.steam_process.stdout.readline()
                 if result.endswith("\n"):
                     result = result.strip()
-
-                print("Received:", result, flush=True)
 
                 dtype, *values = result.split(":")
                 if dtype == "null":
