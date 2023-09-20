@@ -43,8 +43,6 @@ def get_bets(game, database, only_active):
 @betting_page.route("/")
 def home():
     game = flask.current_app.config["CURRENT_GAME"]
-    if game == "csgo":
-        return app_util.make_template_context("under_construction.html", 200)
 
     database = flask.current_app.config["DATABASE"]
     betting_handler = flask.current_app.config["BET_HANDLERS"][game]

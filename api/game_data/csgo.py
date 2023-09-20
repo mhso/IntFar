@@ -539,7 +539,7 @@ class CSGOGameStats(GameStats):
     started_t: bool = None
     rounds_us: int = None
     rounds_them: int = None
-    long_match: bool = field(default=True, init=False)
+    cs2: bool = False
 
     @classmethod
     def STATS_TO_SAVE(cls):
@@ -568,16 +568,11 @@ class CSGOGameStats(GameStats):
             f"{player_stats.deaths}/{player_stats.assists} on {date} in a {fmt_duration} long game"
         )
 
-    def __post_init__(self):
-        super().__post_init__()
-        self.long_match = self.rounds_us > 9 or self.rounds_them > 9
-
 class CSGOGameStatsParser(GameStatsParser):
     def parse_data(self) -> GameStats:
-        demo_was_parsed = "gameRounds" in self.raw_data
         round_stats = self.raw_data["matches"][0]["roundstatsall"]
 
-        if demo_was_parsed: # Parse stats from demo if demo was valid/recent
+        if self.raw_data["demo_parsed"]: # Parse stats from demo if demo was valid/recent
             # Determine if we started on t side
             started_t = False
             t_side_players = [player["steamID"] for player in self.raw_data["gameRounds"][0]["tSide"]["players"]]
@@ -586,7 +581,7 @@ class CSGOGameStatsParser(GameStatsParser):
                     started_t = True
                     break
 
-            both_teams_stats = awpy_player_stats(self.raw_data["gameRounds"], selected_side="T" if started_t else "CT")
+            both_teams_stats = awpy_player_stats(self.raw_data["gameRounds"])
 
             # Filter out players not on our team
             player_stats = {}
@@ -617,22 +612,20 @@ class CSGOGameStatsParser(GameStatsParser):
             rounds_t = self.raw_data["gameRounds"][-1]["endTScore"]
             rounds_ct = self.raw_data["gameRounds"][-1]["endCTScore"]
 
-            # Get total kills by our teamn
-            kills_by_our_team = sum(
-                player_stats[steam_id]["kills"]
-                for steam_id in player_stats
-            )
-
             # Get our round count, enemy round count, and who won
-            rounds_us = rounds_t if started_t else rounds_ct
-            rounds_them = rounds_ct if started_t else rounds_t
+            rounds_us = rounds_ct if started_t else rounds_t
+            rounds_them = rounds_t if started_t else rounds_ct
+
+            if rounds_us + rounds_them < 16: # Swap scores if game finished before halftime
+                rounds_us, rounds_them = rounds_them, rounds_us
+
             win_score = 1 if rounds_us > rounds_them else -1
             if rounds_us == rounds_them:
                 win_score = 0
 
             account_id_map = {self.api_client.get_account_id(int(steam_id)): steam_id for steam_id in player_stats}
 
-            map_id = self.raw_data["mapName"]
+            map_id = self.raw_data["mapName"].split("_")[-1]
 
         else: # Parse (a subset of) stats from basic game data
             # Get players in game from the round were most players are present (in case of disconnects)
@@ -684,18 +677,13 @@ class CSGOGameStatsParser(GameStatsParser):
             # Get kills, assists, deaths, and headshot percentage
             stats_to_collect = ["kills", "assists", "deaths", "enemyHeadshots"]
             for stat in stats_to_collect:
-                for index, stat_value in enumerate(round_data[stat]):
+                source_stat = "enemyKills" if stat == "kills" else stat
+                for index, stat_value in enumerate(round_data[source_stat]):
                     if started_t ^ (index < 5):
                         player_stats[account_ids[index]][stat] = stat_value
 
             for account_id in player_stats:
                 player_stats[account_id]["hsPercent"] = player_stats[account_id]["enemyHeadshots"] / player_stats[account_id]["kills"]
-
-            # Get total kills by our teamn
-            kills_by_our_team = sum(
-                player_stats[account_id]["kills"]
-                for account_id in player_stats
-            )
 
             # Get total rounds on t side and on ct side
             rounds_ct = round_data["teamScores"][0]
@@ -710,18 +698,24 @@ class CSGOGameStatsParser(GameStatsParser):
 
             map_id = self.api_client.get_map_id(game_type)
 
+        # Get total kills by our teamn
+        kills_by_our_team = sum(
+            player_stats[key]["kills"]
+            for key in player_stats
+        )
+
         # Get MVPs for each player
         mvps = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["mvps"]))
         for account_id in mvps:
             if account_id in account_id_map:
-                key = account_id_map[account_id] if demo_was_parsed else account_id 
+                key = account_id_map[account_id] if self.raw_data["demo_parsed"] else account_id 
                 player_stats[key]["mvps"] = mvps[account_id]
 
         # Get scores of each player
         scores = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["scores"]))
         for account_id in scores:
             if account_id in account_id_map:
-                key = account_id_map[account_id] if demo_was_parsed else account_id 
+                key = account_id_map[account_id] if self.raw_data["demo_parsed"] else account_id 
                 player_stats[key]["scores"] = scores[account_id]
 
         # Add it all to player stats
@@ -798,7 +792,7 @@ class CSGOGameStatsParser(GameStatsParser):
             all_player_stats=all_player_stats,
             map_id=map_id,
             map_name=map_name,
-            started_t=started_t,
+            started_t=int(started_t),
             rounds_us=rounds_us,
             rounds_them=rounds_them,
         )

@@ -327,8 +327,6 @@ def user(disc_id):
 
     disc_id = int(disc_id)
     game = flask.current_app.config["CURRENT_GAME"]
-    if game == "csgo":
-        return make_template_context("under_construction.html", 200)
 
     database = flask.current_app.config["DATABASE"]
 

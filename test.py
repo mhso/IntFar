@@ -1,7 +1,7 @@
 import json
 import argparse
 from glob import glob
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from dateutil.relativedelta import relativedelta
 from api.lan import get_average_stats, LAN_PARTIES
@@ -17,7 +17,7 @@ from discbot.montly_intfar import MonthlyIntfar, MONTH_NAMES
 from discbot.discord_bot import DiscordClient
 
 class TestFuncs:
-    def __init__(self, config, database, riot_api):
+    def __init__(self, config, database: database.Database, riot_api):
         self.config = config
         self.database = database
         self.riot_api = riot_api

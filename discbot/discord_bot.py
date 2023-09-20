@@ -213,7 +213,14 @@ class DiscordClient(discord.Client):
         if status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
             # Game was too short, most likely an early surrender
             response = (
-                "That games was a short match or was surrendered early, no stats are saved {emote_suk_a_hotdok}"
+                "That game was a short match or was surrendered early, no stats are saved {emote_suk_a_hotdok}"
+            )
+            await self.channels_to_write[guild_id].send(self.insert_emotes(response))
+
+        elif status_code == game_monitor.POSTGAME_STATUS_CS2:
+            # Game was most likely played on CS2
+            response = (
+                "That seems to have been a CS2 game, we can't handle that (yet) so no stats are saved {emote_unlimited_chins}"
             )
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 

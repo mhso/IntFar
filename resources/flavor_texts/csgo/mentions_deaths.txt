@@ -1,4 +1,4 @@
-going a little too hard, dying in {value}% of the rounds in that game
+going a little too hard up in this _, dying in {value}% of the rounds in that game
 playing that game in spectator mode by being dead in {value}% of the rounds
 not caring about the KDA at all, dying in {value}% of all rounds
 apparently hating being alive, dying in {value}% of the rounds played

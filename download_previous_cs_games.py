@@ -5,7 +5,6 @@ from glob import glob
 from uuid import uuid4
 from time import sleep
 import os
-import json
 
 from api.game_api.csgo import SteamAPIClient
 from api.game_data.csgo import CSGOGameStats, CSGOPlayerStats, CSGOGameStatsParser
@@ -41,14 +40,13 @@ def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> li
 
             data = steam_api.get_game_details(curr_sharecode)
             stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.users_by_game["csgo"], _GUILD_ID)
-            try:
-                parsed_data = stats_parser.parse_data()
-                if len(parsed_data.filtered_player_stats) > 1:
-                    all_data.append(parsed_data)
-            except Exception:
-                with open(f"test_data_{curr_sharecode}.json", "w", encoding="utf-8") as fp:
-                    json.dump(data, fp)
-                    exit(0)
+            parsed_data: CSGOGameStats = stats_parser.parse_data()
+            max_rounds = max(parsed_data.rounds_us, parsed_data.rounds_them)
+            cs2 = not data["demo_parsed"] and (max_rounds == 13 or parsed_data.map_id is None)
+            if cs2:
+                print(f"Game {curr_sharecode} seems to be a CS2 game...")
+            if len(parsed_data.filtered_player_stats) > 1 and not cs2 and max_rounds > 9:
+                all_data.append(parsed_data)
     
             curr_sharecode = steam_api.get_next_sharecode(steam_id, auth_code, curr_sharecode)
 

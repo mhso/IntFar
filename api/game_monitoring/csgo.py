@@ -14,7 +14,8 @@ class CSGOGameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_DUPLICATE = 5
     POSTGAME_STATUS_SHORT_MATCH = 6
-    POSTGAME_STATUS_SURRENDER = 7
+    POSTGAME_STATUS_CS2 = 7
+    POSTGAME_STATUS_SURRENDER = 8
 
     def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, steam_api: SteamAPIClient):
         super().__init__(game, config, database, game_over_callback, steam_api)
@@ -123,6 +124,11 @@ class CSGOGameMonitor(GameMonitor):
 
         else:
             game_info = self.api_client.get_game_details(new_sharecode)
+            # Define a value that determines whether the played game was (most likely) a CS2 match
+            max_rounds = max(game_info["matches"][0]["roundstatsall"][-1]["teamScores"])
+            map_id = self.api_client.get_map_id(game_info["matches"][0]["roundstatsall"][-1]["reservation"].get("gameType"))
+
+            cs2 = not game_info["demo_parsed"] and (max_rounds == 13 or map_id is None)
 
             if self.database.game_exists(self.game, game_info["matchID"]):
                 status_code = self.POSTGAME_STATUS_DUPLICATE
@@ -133,9 +139,13 @@ class CSGOGameMonitor(GameMonitor):
             elif len(self.users_in_game.get(guild_id, [])) == 1:
                 status_code = self.POSTGAME_STATUS_SOLO
 
-            elif not game_info.long_match:
+            elif max_rounds < 10:
                 # Game was a short match
                 status_code = self.POSTGAME_STATUS_SHORT_MATCH
+
+            elif cs2:
+                # Game was (presumably) a CS2 game
+                status_code = self.POSTGAME_STATUS_CS2
 
             elif game_info["gameDuration"] < self.min_game_minutes * 60:
                 # Game was too short to count. Probably an early surrender.

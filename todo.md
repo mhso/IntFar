@@ -1,2 +1,2 @@
 # Ting der skal fixes
-* Lav CSGO uden active game stuff? Sharecode + request match info + demo parser
+* Lav performance stuff om til også at medtage hvor mange procent af games man er best-of-stat

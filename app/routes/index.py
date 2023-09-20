@@ -165,9 +165,12 @@ def get_feed_data(game, database, feed_length=10):
 
     while len(feed_data) < feed_length:
         game_data = all_game_data[games_index]
-        bet_data = all_bets[bets_index]
+        if 0 <= bets_index < len(all_bets):
+            bet_data = all_bets[bets_index]
+            bet_timestamp = bet_data[3]
+        else:
+            bet_timestamp = 0
         game_timestamp = game_data[1]
-        bet_timestamp = bet_data[3]
         if game_timestamp > bet_timestamp:
             intfar_desc, doinks_desc, stat_descs, duration = get_game_desc(
                 game, game_data, best_stats_ever, worst_stats_ever
@@ -192,9 +195,6 @@ def get_feed_data(game, database, feed_length=10):
 @start_page.route("/index")
 def index():
     game = flask.current_app.config["CURRENT_GAME"]
-
-    if game == "csgo":
-        return app_util.make_template_context("under_construction.html", 200)
 
     database = flask.current_app.config["DATABASE"]
     curr_month = api_util.current_month()

@@ -82,10 +82,10 @@ class SteamAPIClient(GameAPIClient):
                 columns = row.find_all("td")
                 full_name = columns[1].string.strip()
                 split = columns[2].string.split("_")
-                if len(split) == 1:
+                if len(split) == 1 or len(columns) < 8 or columns[7].string == "No":
                     continue
 
-                short_name = split[1].strip().split("_")[-1]
+                short_name = split[1].strip()[-1]
                 self.map_names[short_name] = full_name
 
         except requests.RequestException:
@@ -154,6 +154,8 @@ class SteamAPIClient(GameAPIClient):
         demo_url = round_stats[-1]["map"]
 
         parsed_data = self.parse_demo(demo_url)
+        demo_parsed = parsed_data != {}
+        parsed_data["demo_parsed"] = demo_parsed
         parsed_data.update(game_info)
         parsed_data["matchID"] = match_token
 
