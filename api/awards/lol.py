@@ -82,30 +82,14 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def ALL_FLAVOR_TEXTS(cls):
-        return super().ALL_FLAVOR_TEXTS() + [
-            "most_deaths",
-            "lowest_kda",
-            "lowest_kp",
-            "lowest_vision",
-            "mentions_no_vision_ward",
-            "mentions_low_damage",
-            "mentions_low_cs_min",
-            "mentions_no_epic_monsters",
-            "stats_time_spent_dead",
-            "stats_objectives_stolen",
-            "stats_turrets_killed",
-            "timeline_comeback",
-            "timeline_throw",
-            "timeline_goldkeeper",
-            "doinks_kda",
-            "doinks_kills",
-            "doinks_damage",
-            "doinks_penta",
-            "doinks_vision_score",
-            "doinks_kp",
-            "doinks_jungle",
-            "doinks_cs",
-        ]
+        return (
+            super().ALL_FLAVOR_TEXTS() + 
+            cls.INTFAR_FLAVOR_TEXTS() +
+            cls.HONORABLE_MENTIONS_FLAVOR_TEXTS() +
+            cls.COOL_STATS_FLAVOR_TEXTS() +
+            cls.TIMELINE_FLAVOR_TEXTS() +
+            cls.DOINKS_FLAVOR_TEXTS()
+        )
 
     @classmethod
     def INTFAR_FLAVOR_TEXTS(cls):
@@ -563,7 +547,7 @@ class LoLAwardQualifiers(AwardQualifiers):
         biggest_gold_lead = 0
         biggest_gold_deficit = 0
         too_much_gold = {}
-        game_win = bool(self.parsed_game_stats.win)
+        game_win = self.parsed_game_stats.win == 1
 
         # Calculate stats from timeline frames.
         for frame_data in timeline_data["frames"]:

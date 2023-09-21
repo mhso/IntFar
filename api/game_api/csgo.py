@@ -82,10 +82,10 @@ class SteamAPIClient(GameAPIClient):
                 columns = row.find_all("td")
                 full_name = columns[1].string.strip()
                 split = columns[2].string.split("_")
-                if len(split) == 1 or len(columns) < 8 or columns[7].string == "No":
+                if len(split) == 1 or len(columns) < 8 or columns[7].string.strip() == "No":
                     continue
 
-                short_name = split[1].strip()[-1]
+                short_name = split[-1].strip()
                 self.map_names[short_name] = full_name
 
         except requests.RequestException:

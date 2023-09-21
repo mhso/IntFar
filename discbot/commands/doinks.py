@@ -1,3 +1,4 @@
+from api.util import SUPPORTED_GAMES
 from api.awards import get_doinks_reasons, organize_doinks_stats
 
 async def handle_doinks_msg(client, message, game, target_id):
@@ -72,12 +73,13 @@ async def handle_doinks_relations_msg(client, message, game, target_id):
 
     await message.channel.send(response)
 
-async def handle_doinks_criteria_msg(client, game, message):
+async def handle_doinks_criteria_msg(client, message, game):
     doinks_reasons = get_doinks_reasons(game)
+    game_name = SUPPORTED_GAMES[game]
 
-    response = "Criteria for being awarded {emote_Doinks}:\n"
+    response = "Criteria for being awarded {emote_Doinks}: in " + game_name + "\n"
     for reason in doinks_reasons:
-        response += f"- {reason}: {doinks_reasons[reason]}\n"
+        response += f"- **{reason}**: {doinks_reasons[reason]}\n"
 
     response += "Any of these being met will award 1 {emote_Doinks}"
 

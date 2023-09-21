@@ -137,15 +137,16 @@ async def handle_intfar_criteria_msg(client, message, game, criteria=None):
     intfar_reasons = get_intfar_reasons(game)
     intfar_criterias = get_intfar_criterias_desc(game)
     valid_criteria = criteria in intfar_criterias
+    game_name = api_util.SUPPORTED_GAMES[game]
 
     if valid_criteria:
-        response = f"Criteria for being Int-Far by {intfar_reasons[criteria]}:"
+        response = f"Criteria for being Int-Far in {game_name} by {intfar_reasons[criteria]}:"
         for line in intfar_criterias[criteria]:
             response += f"\n- {line}"
     else:
-        response = "Possible criterias for getting Int-Far:"
+        response = f"Possible criterias for getting Int-Far in {game_name}:"
         for reason in intfar_reasons:
-            response += f"\n- {reason}: {intfar_reasons[reason]}"
+            response += f"\n- **{reason}**: {intfar_reasons[reason]}"
 
     if valid_criteria:
         response += "\nThese criteria must **all** be met to be Int-Far."

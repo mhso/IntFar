@@ -1,5 +1,5 @@
-doing a little oopsie, suiciding {value} time{quantifer} that game
-thinking suicide is badass and killing themselves {value} time{quantifer}
-taking the easy way out with {value} suicide{quantifer}
-jumping on a grenade... That they threw {value} time{quantifer}
+doing a little oopsie, suiciding {value} time{quantifier} that game
+thinking suicide is badass and killing themselves {value} time{quantifier}
+taking the easy way out with {value} suicide{quantifier}
+jumping on a grenade... That they threw {value} time{quantifier}
 doing the big yikers, dying by their own hand {value} time{quantifier}

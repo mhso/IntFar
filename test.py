@@ -243,7 +243,18 @@ class TestFuncs:
     def test_steam_stuff(self):
         api_client = SteamAPIClient("csgo", self.config)
         #steam_ids = [76561198014212213, 76561197970416015]
-        print(api_client.get_active_game(76561197970416015))
+        print(api_client.is_person_ingame(76561197970416015))
+
+    def test_cs_maps(self):
+        api_client = SteamAPIClient("csgo", self.config)
+        print(api_client.map_names)
+
+    def test_cs_sharecode(self):
+        api_client = SteamAPIClient("csgo", self.config)
+        user = self.database.users_by_game["csgo"][267401734513491969]
+        print(user.latest_match_token[0])
+        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], user.latest_match_token[0])
+        print(next_code)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

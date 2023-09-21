@@ -55,13 +55,13 @@ class CSGOAwardQualifiers(AwardQualifiers):
             "adr": [
                 "Having the lowest ADR of the people playing",
                 f"Having an ADR of less than {criterias['adr']['lower_threshold']}",
-                f"Having more than {criterias['kp']['deaths_criteria']} deaths",
+                f"Having more than {criterias['adr']['deaths_criteria']} deaths",
             ],
             "score": [
                 "Having the lowest score of the people playing",
                 f"Having a score of less than {criterias['score']['lower_threshold']}",
                 f"Having less than {criterias['score']['kda_criteria']} KDA",
-                f"The game being longer than {criterias['score']['secs_lower_threshold'] // 60} minutes",
+                f"The game had more than {criterias['score']['rounds_criteria']} rounds",
             ]
         }
 
@@ -82,22 +82,13 @@ class CSGOAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def ALL_FLAVOR_TEXTS(cls):
-        return super().ALL_FLAVOR_TEXTS() + [
-            "lowest_kda",
-            "no_mvps",
-            "lowest_adr",
-            "lowest_score",
-            "doinks_kda",
-            "doinks_kills",
-            "doinks_headshot",
-            "doinks_adr",
-            "doinks_utility",
-            "doinks_mvp",
-            "doinks_entries",
-            "doinks_ace",
-            "doinks_clutch",
-            "doinks_ace_clutch",
-        ]
+        return (
+            super().ALL_FLAVOR_TEXTS() +
+            cls.INTFAR_FLAVOR_TEXTS() +
+            cls.HONORABLE_MENTIONS_FLAVOR_TEXTS() +
+            cls.COOL_STATS_FLAVOR_TEXTS() +
+            cls.DOINKS_FLAVOR_TEXTS()
+        )
 
     @classmethod
     def INTFAR_FLAVOR_TEXTS(cls):

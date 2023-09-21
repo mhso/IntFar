@@ -257,7 +257,7 @@ class LoLGameStatsParser(GameStatsParser):
             game_id=self.raw_data["gameId"],
             timestamp=int(self.raw_data["gameCreation"] / 1000),
             duration=int(self.raw_data["gameDuration"]),
-            win=int(game_win),
+            win=1 if game_win else -1,
             guild_id=self.guild_id,
             players_in_game=active_users,
             all_player_stats=player_stats,

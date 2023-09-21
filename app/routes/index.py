@@ -286,7 +286,7 @@ def active_game_started():
     saved_data = dict(data)
     del saved_data["secret"]
     saved_data["start"] = float(saved_data["start"])
-    saved_data["map_id"] = int(saved_data["map_id"])
+    saved_data["map_id"] = saved_data["map_id"]
     saved_data["guild_id"] = int(saved_data["guild_id"])
 
     flask.current_app.config["ACTIVE_GAME"][saved_data["guild_id"]][game] = saved_data

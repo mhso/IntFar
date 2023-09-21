@@ -43,10 +43,6 @@ class BetResolver(ABC):
     def resolve_stats(self):
         ...
 
-    def resolve_game_outcome(self):
-        bet_on_win = self.bet.event_id == "game_win"
-        return bool(self.game_stats.win) ^ bet_on_win
-
     def resolve_has_intfar(self):
         intfar = self.game_stats.intfar_id
         if self.target_id is None: # Bet was about whether anyone was Int-Far.
@@ -81,7 +77,7 @@ class BetResolver(ABC):
 
     @property
     def should_resolve_with_game_outcome(self) -> list[str]:
-        return ["game_win", "game_loss"]
+        ...
 
     @property
     def should_resolve_with_has_intfar(self) -> list[str]:
@@ -119,8 +115,6 @@ class BettingHandler(ABC):
     @property
     def all_bets(self) -> list[Bet]:
         return [
-            Bet("game_win", "winning the game", Bet.TARGET_INVALID, 2),
-            Bet("game_loss", "losing the game", Bet.TARGET_INVALID, 2),
             Bet("no_intfar", "no one being Int-Far", Bet.TARGET_INVALID, 2),
             Bet("intfar", "someone being Int-Far", Bet.TARGET_OPTIONAL, 2),
             Bet("doinks", "someone being awarded doinks", Bet.TARGET_OPTIONAL, 2),

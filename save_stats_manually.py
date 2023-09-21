@@ -33,8 +33,8 @@ class TestMock(DiscordClient):
         self.task = args.task if not self.missing else "all"
         self.loud = not args.silent if not self.missing else False
         self.play_sound = args.sound.lower() in ("yes", "true", "1") if not self.missing else False
+        self.users_in_game = args.users
         self.ai_model = kwargs.get("ai_model")
-        self.users_in_game = args.get("users")
 
     async def on_ready(self):
         await super(TestMock, self).on_ready()
@@ -50,10 +50,18 @@ class TestMock(DiscordClient):
 
             if self.users_in_game is not None:
                 game_monitor.users_in_game[guild_id] = {
-                    disc_id: User(disc_id, None) for disc_id in self.users_in_game
+                    disc_id: self.database.users_by_game[self.game][disc_id]
+                    for disc_id in self.users_in_game
                 }
 
             game_info, status = await game_monitor.get_finished_game_info(guild_id)
+
+            if self.game == "csgo":
+                if status != game_monitor.POSTGAME_STATUS_ERROR:
+                    print("Saving new sharecode for CSGO:", game_info["matchID"])
+                    for disc_id in game_monitor.users_in_game[guild_id]:
+                        steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
+                        self.database.set_new_csgo_sharecode(disc_id, steam_id, game_info["matchID"])
 
             if status != game_monitor.POSTGAME_STATUS_OK:
                 print(f"Error: Status from game monitor was {status}. Exiting...")
@@ -145,7 +153,8 @@ parser.add_argument("--game_id", type=int)
 parser.add_argument("--guild", type=str, choices=GUILDS)
 parser.add_argument("--task", type=str, choices=("all", "bets", "stats", "train"))
 parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
-parser.add_argument("--users", type=str, nargs="+")
+parser.add_argument("--steam_2fa_code", type=str)
+parser.add_argument("--users", type=int, nargs="+")
 parser.add_argument("-s", "--silent", action="store_true")
 
 args = parser.parse_args()
@@ -155,6 +164,7 @@ if not args.missing:
         logger.warning("Either specificy --missing or all of --game, --guild, --task, and --sound")
 
 conf = Config()
+conf.steam_2fa_code = args.steam_2fa_code
 
 logger.info("Initializing database...")
 

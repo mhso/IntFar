@@ -25,7 +25,7 @@ class CSGOGameMonitor(GameMonitor):
         return 10
 
     async def get_active_game_info(self, guild_id):
-        if not self.api_client.logged_on_once is None:
+        if not self.api_client.logged_on_once:
             # Steam is not logged on, don't try to track games
             return None, {}, None
 
@@ -39,7 +39,7 @@ class CSGOGameMonitor(GameMonitor):
         steam_id_map = {}
         for disc_id in user_dict:
             for steam_id in user_dict[disc_id].ingame_id:
-                steam_id_map[steam_id] = disc_id
+                steam_id_map[int(steam_id)] = disc_id
 
         active_users = []
         for steam_id in steam_id_map:
@@ -77,7 +77,7 @@ class CSGOGameMonitor(GameMonitor):
         match_id = self.active_game[guild_id]["id"]
 
         current_sharecodes = {
-            disc_id: self.database.users_by_game[self.game][disc_id].latest_match_token
+            disc_id: self.database.users_by_game[self.game][disc_id].latest_match_token[0]
             for disc_id in self.users_in_game[guild_id]
         }
 
@@ -92,19 +92,18 @@ class CSGOGameMonitor(GameMonitor):
 
                 user_data = self.database.users_by_game[self.game][disc_id]
                 next_code = self.api_client.get_next_sharecode(
-                    user_data.steam_id,
-                    user_data.match_auth_code,
-                    user_data.latest_match_token
+                    user_data.ingame_id[0],
+                    user_data.match_auth_code[0],
+                    user_data.latest_match_token[0]
                 )
 
                 logger.info(f"New match sharing code for '{disc_id}': '{next_code}'")
 
                 if next_code is not None and next_code != current_sharecodes[disc_id]:
-                    self.database.set_new_csgo_sharecode(disc_id, next_code)
                     code_retrieved[disc_id] = True
                     new_sharecode = next_code
 
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1)
 
             if all(code_retrieved[disc_id] for disc_id in code_retrieved):
                 break
@@ -125,8 +124,9 @@ class CSGOGameMonitor(GameMonitor):
         else:
             game_info = self.api_client.get_game_details(new_sharecode)
             # Define a value that determines whether the played game was (most likely) a CS2 match
-            max_rounds = max(game_info["matches"][0]["roundstatsall"][-1]["teamScores"])
-            map_id = self.api_client.get_map_id(game_info["matches"][0]["roundstatsall"][-1]["reservation"].get("gameType"))
+            last_round = game_info["matches"][0]["roundstatsall"][-1]
+            max_rounds = max(last_round["teamScores"])
+            map_id = self.api_client.get_map_id(last_round["reservation"].get("gameType"))
 
             cs2 = not game_info["demo_parsed"] and (max_rounds == 13 or map_id is None)
 
@@ -147,7 +147,7 @@ class CSGOGameMonitor(GameMonitor):
                 # Game was (presumably) a CS2 game
                 status_code = self.POSTGAME_STATUS_CS2
 
-            elif game_info["gameDuration"] < self.min_game_minutes * 60:
+            elif last_round["matchDuration"] < self.min_game_minutes * 60:
                 # Game was too short to count. Probably an early surrender.
                 status_code = self.POSTGAME_STATUS_SURRENDER
 

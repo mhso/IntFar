@@ -7,6 +7,7 @@ from mhooge_flask.logging import logger
 from mhooge_flask.database import SQLiteDatabase
 
 from api.game_stats import GameStats, get_outlier_stat
+from api.game_data import get_stat_quantity_descriptions
 from api.user import User
 from api.util import TimeZone, generate_user_secret, SUPPORTED_GAMES
 
@@ -229,15 +230,18 @@ class Database(SQLiteDatabase):
             self.execute_query(query_1, game_id, commit=False)
             self.execute_query(query_2, game_id)
 
-    def set_new_csgo_sharecode(self, disc_id, sharecode):
+    def set_new_csgo_sharecode(self, disc_id, steam_id, sharecode):
         game = "csgo"
         users_table = self._get_users_table(game)
 
-        query = f"UPDATE {users_table} SET latest_match_token=? WHERE disc_id=?"
+        query = f"UPDATE {users_table} SET latest_match_token=? WHERE disc_id=? AND ingame_id=?"
 
         with self:
-            self.execute_query(query, sharecode, disc_id)
-            self.users_by_game[game][disc_id].latest_match_token = sharecode
+            self.execute_query(query, sharecode, disc_id, steam_id)
+            for index, ingame_id in enumerate(self.users_by_game[game][disc_id].ingame_id):
+                if ingame_id == steam_id:
+                    self.users_by_game[game][disc_id].latest_match_token[index] = sharecode
+                    break
 
     def get_latest_game(self, game, time_after=None, time_before=None, guild_id=None):
         stats_table = self._get_participants_table(game)
@@ -1513,6 +1517,9 @@ class Database(SQLiteDatabase):
 
         with self:
             int_fars = self.execute_query(query).fetchall()
+            if int_fars == []:
+                return 0, None
+
             prev_intfar = int_fars[0][0]
             for count, int_far in enumerate(int_fars[1:], start=1):
                 if int_far[0] is None or prev_intfar != int_far[0]:
@@ -1580,7 +1587,7 @@ class Database(SQLiteDatabase):
             count_offset = 1 if offset == 0 else 0
 
             for count, row in enumerate(games[offset:], start=count_offset):
-                if row[0] != win:
+                if (row[0] <= 0) != win:
                     return count
 
             total_offset = -offset if offset > 0 else 1
@@ -1800,6 +1807,10 @@ class Database(SQLiteDatabase):
         doinks_weight = 1
         winrate_weight = 2
         total = 4
+
+        # for stat in get_stat_quantity_descriptions(game):
+        #     self.get_best_or_worst_stat()
+
         performance_range = 10
         equation = (
             f"(((1 - COALESCE(intfars.c / played.c, 0)) * {intfar_weight} + " +

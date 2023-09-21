@@ -234,6 +234,10 @@ class DiscordClient(discord.Client):
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
         elif status_code == game_monitor.POSTGAME_STATUS_OK:
+            for disc_id in game_monitor.users_in_game[guild_id]:
+                steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
+                self.database.set_new_csgo_sharecode(disc_id, steam_id, game_info["matchID"])
+
             await self.handle_game_over(game_monitor.game, game_info, guild_id)
 
     async def handle_game_over(self, game: str, game_info: dict, guild_id: int):
@@ -630,14 +634,18 @@ class DiscordClient(discord.Client):
         :param doinks:          List of Discord IDs of people who got doinks
         :param guild_id:        ID of the Discord server where the game took place
         """
-        game_won = bool(game_stats.win)
         guild_id = game_stats.guild_id
         tokens_name = self.config.betting_tokens
-        tokens_gained = (
-            self.config.betting_tokens_for_win
-            if game_won
-            else self.config.betting_tokens_for_loss
-        )
+
+        if game_stats.win == 1:
+            game_desc = "Game won!"
+            tokens_gained = self.config.betting_tokens_for_win
+        elif game_stats.win == -1:
+            game_desc = "Game lost."
+            tokens_gained = self.config.betting_tokens_for_loss
+        else:
+            game_desc = "Game tied."
+            tokens_gained = 0
 
         bet_multiplier = 1
 
@@ -646,10 +654,10 @@ class DiscordClient(discord.Client):
             bet_multiplier = self.config.clash_multiplier
             tokens_gained *= bet_multiplier
 
-        game_desc = "Game won!" if game_won else "Game lost."
+        tokens_gained_desc = f"Everybody gains **{tokens_gained}** {tokens_name}" if tokens_gained != 0 else f"No one gets any {tokens_name}"
         response = (
             "=" * 38 +
-            f"\n{game_desc} Everybody gains **{tokens_gained}** {tokens_name}."
+            f"\n{game_desc} {tokens_gained_desc}."
         )
         response_bets = "**\n--- Results of bets made that game ---**\n"
         max_tokens_holder = self.database.get_max_tokens_details()[1]
@@ -809,17 +817,18 @@ class DiscordClient(discord.Client):
                     return player_stats
                 
             return None
-
+        
         for index, record_list in enumerate((best_records, worst_records)):
             best = index == 0
 
             for stat, value, disc_id, prev_value, prev_id in record_list:
                 player_stats = get_stats_for_player(disc_id)
+                stat_quantity_desc = player_stats.STAT_QUANTITY_DESC()
 
                 stat_fmt = api_util.round_digits(value)
                 stat_name_fmt = stat.replace('_', ' ')
 
-                readable_stat = f"{player_stats.stat_quantity_desc[stat][index]} {stat_name_fmt}"
+                readable_stat = f"{stat_quantity_desc[stat][index]} {stat_name_fmt}"
                 name = self.get_mention_str(disc_id, parsed_game_stats.guild_id)
                 prev_name = self.get_discord_nick(prev_id, parsed_game_stats.guild_id)
                 emote = "poggers" if best else "im_nat_kda_player_yo"
@@ -1248,7 +1257,7 @@ class DiscordClient(discord.Client):
         """
         mentions_by_streak = {}
         broken_streaks = {}
-        game_won = bool(awards_handler.parsed_game_stats.win)
+        game_won = awards_handler.parsed_game_stats.win == 1
 
         for stats in awards_handler.parsed_game_stats.filtered_player_stats:
             disc_id = stats.disc_id

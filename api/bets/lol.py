@@ -2,6 +2,10 @@ from api.betting import BettingHandler, BetResolver, Bet
 from api.game_stats import GameStats, get_outlier
 
 class LoLBetResolver(BetResolver):
+    def resolve_game_outcome(self):
+        bet_on_win = self.bet.event_id == "game_win"
+        return (self.game_stats.win == -1) ^ bet_on_win
+
     def resolve_intfar_reason(self):
         reason_str = self.game_stats.intfar_reason
         reasons = ["intfar_kda", "intfar_deaths", "intfar_kp", "intfar_vision"]
@@ -43,6 +47,10 @@ class LoLBetResolver(BetResolver):
         return self.target_id in stat_outlier_ties and len(stat_outlier_ties) == 1
 
     @property
+    def should_resolve_with_game_outcome(self) -> list[str]:
+        return ["game_win", "game_loss"]
+
+    @property
     def should_resolve_with_intfar_reason(self):
         return ["intfar_kda", "intfar_deaths", "intfar_kp", "intfar_vision"]
 
@@ -67,6 +75,8 @@ class LoLBettingHandler(BettingHandler):
     @property
     def all_bets(self):
         return super().all_bets + [
+            Bet("game_win", "winning the game", Bet.TARGET_INVALID, 2),
+            Bet("game_loss", "losing the game", Bet.TARGET_INVALID, 2),
             Bet("intfar_kda", "someone being Int-Far by low KDA", Bet.TARGET_OPTIONAL, 4),
             Bet("intfar_deaths", "someone being Int-Far by many deaths", Bet.TARGET_OPTIONAL, 4),
             Bet("intfar_kp", "someone being Int-Far by low KP", Bet.TARGET_OPTIONAL, 10),
