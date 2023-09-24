@@ -255,8 +255,18 @@ class TestFuncs:
         api_client = SteamAPIClient("csgo", self.config)
         user = self.database.users_by_game["csgo"][267401734513491969]
         print(user.latest_match_token[0])
-        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], user.latest_match_token[0])
-        print(next_code) 
+        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], "CSGO-bGpZq-cYoXP-HOGKT-CjWvt-jDWPA")
+        print(next_code)
+
+    def test_cs_parse(self):
+        self.config.steam_2fa_code = input("Steam 2FA Code: ")
+        sharecode = "CSGO-bGpZq-cYoXP-HOGKT-CjWvt-jDWPA"
+        api_client = SteamAPIClient("csgo", self.config)
+
+        game_stats = api_client.get_game_details(sharecode)
+        parser = get_stat_parser("csgo", game_stats, api_client, self.database.users_by_game["csgo"], 619073595561213953)
+        data = parser.parse_data()
+
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

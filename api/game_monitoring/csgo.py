@@ -112,6 +112,7 @@ class CSGOGameMonitor(GameMonitor):
         # Get new CS sharecode, if we didn't already get it when searching for active games
         code_retrieved = {disc_id: False for disc_id in current_sharecodes}
         new_sharecode = None
+        game_info = None
         for disc_id in current_sharecodes:
             if self.users_in_game[guild_id][disc_id].latest_match_token[0] == current_sharecodes[disc_id]:
                 # New sharecode has not been recieved for player
@@ -122,7 +123,7 @@ class CSGOGameMonitor(GameMonitor):
                     user_data.latest_match_token[0]
                 )
 
-                logger.info(f"Got match sharing code for '{disc_id}': '{next_code}'")
+                logger.info(f"Match share code for '{disc_id}' was: '{user_data.latest_match_token[0]}', now: '{next_code}'")
 
                 if next_code is not None and next_code != current_sharecodes[disc_id]:
                     code_retrieved[disc_id] = True
@@ -132,7 +133,7 @@ class CSGOGameMonitor(GameMonitor):
                 logger.info(f"User '{disc_id}' already has a new sharecode saved from earlier.")
                 new_sharecode = self.users_in_game[guild_id][disc_id].latest_match_token[0]
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
 
         if not all(code_retrieved[disc_id] for disc_id in code_retrieved):
             logger.bind(game_id=match_id, sharecodes=list(current_sharecodes.values()), guild_id=guild_id).error(
@@ -142,16 +143,15 @@ class CSGOGameMonitor(GameMonitor):
 
         else:
             game_info = self.api_client.get_game_details(new_sharecode)
+            if game_info is None:
+                raise ValueError("Could not get game_info for some reason!")
+
             # Define a value that determines whether the played game was (most likely) a CS2 match
             last_round = game_info["matches"][0]["roundstatsall"][-1]
             max_rounds = max(last_round["teamScores"])
             map_id = self.api_client.get_map_id(last_round["reservation"].get("gameType"))
 
-            cs2 = not game_info["demo_parsed"] and (max_rounds == 13 or map_id is None)
-
-            logger.info(game_info["demo_parsed"])
-            logger.info(max_rounds)
-            logger.info(map_id)
+            cs2 = (game_info["demo_parse_status"] == "error") and (max_rounds == 13 or all(score == 15 for score in last_round["teamScores"]))
 
             if self.database.game_exists(self.game, game_info["matchID"]):
                 status_code = self.POSTGAME_STATUS_DUPLICATE

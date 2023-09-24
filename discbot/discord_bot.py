@@ -238,6 +238,13 @@ class DiscordClient(discord.Client):
                 steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
                 self.database.set_new_csgo_sharecode(disc_id, steam_id, game_info["matchID"])
 
+            if game_info["demo_parse_status"] == "missing":
+                response = (
+                    "Demo file was not found on Valve's servers! Nothing we can do :( "
+                    "Only basic data like kills, deaths, assists, etc. will be saved."
+                )
+                await self.channels_to_write[guild_id].send(response)
+
             await self.handle_game_over(game_monitor.game, game_info, guild_id)
 
     async def handle_game_over(self, game: str, game_info: dict, guild_id: int):
@@ -254,10 +261,8 @@ class DiscordClient(discord.Client):
             stat_parser = get_stat_parser(game, game_info, self.api_clients[game], self.database.users_by_game[game], guild_id)
             parsed_game_stats = stat_parser.parse_data()
         except ValueError as exc:
-            # Game data was not formatted correctly for some reason (Rito pls).
-            logger.bind(game_id=game_info["gameId"]).exception(
-                "Game data is not well formed!"
-            )
+            # Game data was not formatted correctly for some reason (Rito/Volvo pls).
+            logger.bind(game_id=game_info["gameId"]).exception("Error when parsing game data!")
 
             # Send error message to Discord and re-raise exception.
             await self.send_error_msg(guild_id)
@@ -269,8 +274,13 @@ class DiscordClient(discord.Client):
         # Get class for handling award qualifiers for the current game
         awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
 
+        response = self.insert_emotes(
+            f"Good day for a **{api_util.SUPPORTED_GAMES[game]}** game " + "{emote_happy_nono}"
+        )
+
         # Determine who was the Int-Far (if anyone was).
-        intfar, response = self.get_intfar_data(awards_handler)
+        intfar, intfar_response = self.get_intfar_data(awards_handler)
+        response += "\n" + intfar_response
 
         # Determine who was awarded doinks.
         doinks, doinks_response = self.get_doinks_data(awards_handler)
@@ -1539,8 +1549,10 @@ class DiscordClient(discord.Client):
 
             await asyncio.sleep(time_to_sleep)
 
-        for game in api_util.SUPPORTED_GAMES:
-            await self.declare_monthly_intfar(game, ifotm_monitor)
+        # for game in api_util.SUPPORTED_GAMES:
+        #     await self.declare_monthly_intfar(game, ifotm_monitor)
+
+        await self.declare_monthly_intfar("lol", ifotm_monitor)
 
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
         asyncio.create_task(self.polling_loop())

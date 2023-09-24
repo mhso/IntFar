@@ -47,7 +47,7 @@ def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> li
             stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.users_by_game["csgo"], _GUILD_ID)
             parsed_data: CSGOGameStats = stats_parser.parse_data()
             max_rounds = max(parsed_data.rounds_us, parsed_data.rounds_them)
-            cs2 = not data["demo_parsed"] and (max_rounds == 13 or parsed_data.map_id is None)
+            cs2 = (data["demo_parse_status"] == "error") and (max_rounds == 13 or parsed_data.rounds_us == parsed_data.rounds_them == 15)
             if cs2:
                 print(f"Game {curr_sharecode} seems to be a CS2 game...")
             if len(parsed_data.filtered_player_stats) > 1 and not cs2 and max_rounds > 9:

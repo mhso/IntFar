@@ -50,6 +50,12 @@
                 </a>
             </div>
             {% endif %}
+            <hr>
+            <div class="navbar-menu-dropdown-item">
+                <a href="{% if game == 'lol' %}{{ url_for('csgo.index.index') }}{% else %}{{ url_for('lol.index.index') }}{% endif %}">
+                    {% if game == 'lol' %}Counter Strike: Global Offensive{% else %}League of Legends{% endif %}
+                </a>
+            </div>
         </div>
 
     </div>

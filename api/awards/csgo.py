@@ -177,25 +177,25 @@ class CSGOAwardQualifiers(AwardQualifiers):
             if stats.headshot_pct >= 60 and stats.kills >= 10:
                 mention_list.append((2, stats.headshot_pct))
 
-            if stats.adr >= 120:
+            if stats.adr is not None and stats.adr >= 120:
                 mention_list.append((3, stats.adr))
 
-            if stats.utility_damage >= 300:
+            if stats.utility_damage is not None and stats.utility_damage >= 300:
                 mention_list.append((4, stats.utility_damage))
 
             if stats.mvps >= 8:
                 mention_list.append((5, stats.mvps))
 
-            if stats.entries >= 10:
+            if stats.entries is not None and stats.entries >= 10:
                 mention_list.append((6, stats.entries))
 
-            if stats.aces > 0:
+            if stats.aces is not None and stats.aces > 0:
                 mention_list.append((7, stats.aces))
 
-            if stats.one_v_fours_won > 0:
+            if stats.one_v_fours_won is not None and stats.one_v_fours_won > 0:
                 mention_list.append((8, stats.one_v_fours_won))
 
-            if stats.one_v_fives_won > 0:
+            if stats.one_v_fives_won is not None and stats.one_v_fives_won > 0:
                 mention_list.append((9, stats.one_v_fives_won))
 
             if mention_list != []:
@@ -230,16 +230,16 @@ class CSGOAwardQualifiers(AwardQualifiers):
         for stats in self.parsed_game_stats.filtered_player_stats:
             mentions[stats.disc_id] = []
 
-            if stats.team_kills > 1:
+            if stats.team_kills is not None and stats.team_kills > 1:
                 mentions[stats.disc_id].append((0, stats.team_kills))
 
-            if stats.teammates_flashed > 15:
+            if stats.teammates_flashed is not None and stats.teammates_flashed > 15:
                 mentions[stats.disc_id].append((1, stats.teammates_flashed))
 
-            if stats.suicides > 0:
+            if stats.suicides is not None and stats.suicides > 0:
                 mentions[stats.disc_id].append((2, stats.suicides))
 
-            if stats.accuracy < 10:
+            if stats.accuracy is not None and stats.accuracy < 10:
                 mentions[stats.disc_id].append((3, stats.accuracy))
 
             total_rounds = self.parsed_game_stats.rounds_us + self.parsed_game_stats.rounds_them
@@ -266,10 +266,10 @@ class CSGOAwardQualifiers(AwardQualifiers):
             if stats.assists > 10:
                 cool_stats[stats.disc_id].append((0, stats.assists))
 
-            if stats.enemies_flashed > 20:
+            if stats.enemies_flashed is not None and stats.enemies_flashed > 20:
                 cool_stats[stats.disc_id].append((1, stats.enemies_flashed))
 
-            if stats.quads > 1:
+            if stats.quads is not None and stats.quads > 1:
                 cool_stats[stats.disc_id].append((2, stats.quads))
 
             clutches_attempted_keys = [
@@ -286,13 +286,14 @@ class CSGOAwardQualifiers(AwardQualifiers):
                 "one_v_fours_won",
                 "one_v_fives_won",
             ]
-            num_clutches_attempted = sum(getattr(stats, stat) for stat in clutches_attempted_keys)
-            num_clutches_won = sum(getattr(stats, stat) for stat in clutches_won_keys)
+            if all(getattr(stats, stat) is not None for stat in clutches_attempted_keys + clutches_won_keys):
+                num_clutches_attempted = sum(getattr(stats, stat) for stat in clutches_attempted_keys)
+                num_clutches_won = sum(getattr(stats, stat) for stat in clutches_won_keys)
 
-            if num_clutches_attempted > 2 and num_clutches_won / num_clutches_attempted > 0.60:
-                clutch_pct = int((num_clutches_won / num_clutches_attempted) * 100)
-                clutch_desc = f"{clutch_pct}% of {num_clutches_attempted}"
-                cool_stats[stats.disc_id].append((3, clutch_desc))
+                if num_clutches_attempted > 2 and num_clutches_won / num_clutches_attempted > 0.60:
+                    clutch_pct = int((num_clutches_won / num_clutches_attempted) * 100)
+                    clutch_desc = f"{clutch_pct}% of {num_clutches_attempted}"
+                    cool_stats[stats.disc_id].append((3, clutch_desc))
 
         return cool_stats
 

@@ -49,6 +49,7 @@ class SteamAPIClient(GameAPIClient):
             4104: "inferno",
             2056: "ancient",
             520: "dust2",
+            1032: "train",
         }
         self.get_latest_data()
         self.csgo_app_id = 730
@@ -94,6 +95,11 @@ class SteamAPIClient(GameAPIClient):
     def _download_demo_file(self, filename: str, url: str):
         try:
             data = requests.get(url, stream=True)
+
+            if data.status_code == 404:
+                logger.bind(demo_url=url).error("CS Demo file was not found on Valve's servers!")
+                return None
+
             with open(f"{filename}.dem.bz2", "wb") as fp:
                 for chunk in data.iter_content(chunk_size=128):
                     fp.write(chunk)
@@ -118,21 +124,35 @@ class SteamAPIClient(GameAPIClient):
         try:
             # Download and save the demo file to disk
             demo_file = self._download_demo_file(demo_file, demo_url)
-            with open(demo_bz2_file, "rb") as fp:
-                all_bytes = fp.read()
 
-            # Decompress the gz2 compressed demo file
-            decompressed = bz2.decompress(all_bytes)
-            with open(demo_dem_file, "wb") as fp:
-                fp.write(decompressed)
+            if demo_file is None:
+                demo_game_data = {"demo_parse_status": "missing"}
 
-            # Parse the demo using awpy
-            parser = DemoParser(demo_dem_file)
-            demo_game_data = parser.parse()
-        except Exception:
-            demo_game_data = {}
+            else:
+                with open(demo_bz2_file, "rb") as fp:
+                    all_bytes = fp.read()
+
+                # Decompress the gz2 compressed demo file
+                decompressed = bz2.decompress(all_bytes)
+                with open(demo_dem_file, "wb") as fp:
+                    fp.write(decompressed)
+
+                # Parse the demo using awpy
+                parser = DemoParser(demo_dem_file)
+                demo_game_data = parser.parse()
+                demo_game_data["demo_parse_status"] = "parsed"
+
+        except OSError: # Demo file was corrupt
+            logger.bind(demo_url=demo_url).exception("Error when compressing/decompressing demo!")
+            demo_game_data = {"demo_parse_status": "malformed"}
+
+        except Exception: # Probably parsing error
             if parser and parser.parse_error:
-                logger.error("Demo parsing error")
+                logger.bind(demo_url=demo_url).error("Demo parsing error from awpy.")
+            else:
+                logger.bind(demo_url=demo_url).exception("Generic error when parsing demo.")
+
+            demo_game_data = {"demo_parse_status": "error"}
 
         finally:
             # Clean up the files after use
@@ -158,8 +178,6 @@ class SteamAPIClient(GameAPIClient):
         demo_url = round_stats[-1]["map"]
 
         parsed_data = self.parse_demo(demo_url)
-        demo_parsed = parsed_data != {}
-        parsed_data["demo_parsed"] = demo_parsed
         parsed_data.update(game_info)
         parsed_data["matchID"] = match_token
 
@@ -187,7 +205,7 @@ class SteamAPIClient(GameAPIClient):
 
         response = requests.get(url)
         if response.status_code not in (200, 202):
-            logger.bind(steam_id=steam_id, steam_id_key=auth_code, match_token=match_token).exception(
+            logger.bind(steam_id=steam_id, steam_id_key=auth_code, match_token=match_token, status_code=response.status_code).exception(
                 "Erroneous response code when getting next sharecode form Steam web API."
             )
             return None

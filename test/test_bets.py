@@ -59,7 +59,7 @@ class TestWrapper(TestRunner):
 
             self.assert_equals(guild_id, g_id, "Guild ID.")
             self.assert_equals(amounts[0], int(bet_amount[0]), "Bet amount.")
-            self.assert_equals(event_ids[0], bet_handler.all_bets[bet_str[0]], "Bet event ID.")
+            self.assert_equals(event_ids[0], bet_handler.get_bet(bet_str[0]).event_id, "Bet event ID.")
             self.assert_equals(bet_timestamp, 0, "Bet timestamp.")
             self.assert_equals(targets[0], None, "Bet target.")
 
@@ -70,7 +70,8 @@ class TestWrapper(TestRunner):
                 bet_timestamp,
                 event_ids,
                 targets,
-                game_data
+                game_data,
+                1
             )
 
             base_return = self.db_client.get_base_bet_return(event_ids[0])

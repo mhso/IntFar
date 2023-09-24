@@ -18,7 +18,7 @@ from discbot.commands.util import ADMIN_DISC_ID
 
 SOUNDS_PATH = "app/static/sounds/"
 
-def get_available_sounds(ordering="alphabetical"):
+def get_available_sounds(ordering="newest"):
     sounds = [
         (os.path.basename(sound).split(".")[0], os.stat(sound).st_ctime)
         for sound in glob(f"{SOUNDS_PATH}/*.mp3")

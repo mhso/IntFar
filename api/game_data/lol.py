@@ -65,6 +65,7 @@ class LoLGameStats(GameStats):
     enemy_baron_kills: int = None
     enemy_dragon_kills: int = None
     enemy_herald_kills: int = None
+    timeline_data: dict = None
 
     @classmethod
     def STATS_TO_SAVE(cls):

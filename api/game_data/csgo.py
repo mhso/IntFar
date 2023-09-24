@@ -573,9 +573,11 @@ class CSGOGameStats(GameStats):
 class CSGOGameStatsParser(GameStatsParser):
     def parse_data(self) -> GameStats:
         round_stats = self.raw_data["matches"][0]["roundstatsall"]
+        demo_parsed = self.raw_data["demo_parse_status"] == "parsed"
 
-        if self.raw_data["demo_parsed"]: # Parse stats from demo if demo was valid/recent
-            # Determine if we started on t side
+        if demo_parsed:
+            # Parse stats from demo if demo was valid/recent.
+            # First determine if we started on t side
             started_t = False
             t_side_players = [player["steamID"] for player in self.raw_data["gameRounds"][0]["tSide"]["players"]]
             for steam_id in t_side_players:
@@ -628,6 +630,9 @@ class CSGOGameStatsParser(GameStatsParser):
             account_id_map = {self.api_client.get_account_id(int(steam_id)): steam_id for steam_id in player_stats}
 
             map_id = self.raw_data["mapName"].split("_")[-1]
+            game_type = round_stats[-1]["reservation"]["gameType"]
+            print("game_type:", game_type, flush=True)
+            print("map_id:", map_id)
 
         else: # Parse (a subset of) stats from basic game data
             # Get players in game from the round were most players are present (in case of disconnects)
@@ -643,7 +648,7 @@ class CSGOGameStatsParser(GameStatsParser):
             account_id_map = {}
             players_in_game = []
             started_t = False
-            for disc_id in self.all_users:
+            for disc_id in self.all_users.keys():
                 for steam_id, steam_name in zip(self.all_users[disc_id].ingame_id, self.all_users[disc_id].ingame_name):
                     account_id = self.api_client.get_account_id(int(steam_id))
                     try:
@@ -700,6 +705,8 @@ class CSGOGameStatsParser(GameStatsParser):
 
             # Get map ID
             map_id = self.api_client.get_map_id(game_type)
+            print("game_type:", game_type, flush=True)
+            print("map_id:", map_id, flush=True)
 
         # Get total kills by our teamn
         kills_by_our_team = sum(
@@ -711,14 +718,14 @@ class CSGOGameStatsParser(GameStatsParser):
         mvps = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["mvps"]))
         for account_id in mvps:
             if account_id in account_id_map:
-                key = account_id_map[account_id] if self.raw_data["demo_parsed"] else account_id 
+                key = account_id_map[account_id] if demo_parsed else account_id 
                 player_stats[key]["mvps"] = mvps[account_id]
 
         # Get scores of each player
         scores = dict(zip(round_stats[-1]["reservation"]["accountIds"], round_stats[-1]["scores"]))
         for account_id in scores:
             if account_id in account_id_map:
-                key = account_id_map[account_id] if self.raw_data["demo_parsed"] else account_id 
+                key = account_id_map[account_id] if demo_parsed else account_id 
                 player_stats[key]["scores"] = scores[account_id]
 
         # Get the biggest lead and deficit throughout the course of the game

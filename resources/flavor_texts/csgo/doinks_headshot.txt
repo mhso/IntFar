@@ -2,4 +2,4 @@ roleplaying as Scream, getting {value}% headshots!
 being a living, breathing, headshot machine with {value}% headshots!
 one-tapping heads left and right, getting a headshot percent of {value}%!
 being a surgeon with a gun, headshotting {value} of enemies killed!
-ensure the enemy team gets no open casket funerals, getting {value}% headshots!
+ensuring the enemy team gets no open casket funerals, getting {value}% headshots!
