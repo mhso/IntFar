@@ -19,3 +19,4 @@ for module_tests in args.tests:
         tests_to_run = None
 
     test_runner.run_tests(tests_to_run)
+    test_runner.after_all()

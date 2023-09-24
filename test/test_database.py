@@ -106,11 +106,8 @@ class TestWrapper(TestRunner):
         self.assert_no_exception(database.get_min_or_max_league_winrate_champ, "Get min or max winrate champ best.", MY_DISC_ID, True)
         self.assert_no_exception(database.get_min_or_max_league_winrate_champ, "Get min or max winrate champ worst.", MY_DISC_ID, False)
 
-        best_map_wr, best_map_games, best_map_id = database.get_min_or_max_csgo_winrate_map(MY_DISC_ID, True)
-        worst_map_wr, worst_map_games, worst_map_id = database.get_min_or_max_csgo_winrate_map(MY_DISC_ID, False)
-
-        print(best_map_wr, best_map_games, best_map_id)
-        print(worst_map_wr, worst_map_games, worst_map_id)
+        self.assert_no_exception(database.get_min_or_max_csgo_winrate_map, "Get min or max winrate map best.", MY_DISC_ID, True)
+        self.assert_no_exception(database.get_min_or_max_csgo_winrate_map, "Get min or max winrate map worst.", MY_DISC_ID, False)
 
         self.assert_no_exception(database.get_league_champs_played, "Get champs played")
         self.assert_no_exception(database.get_league_champs_played, "Get champs played", MY_DISC_ID)
@@ -136,15 +133,6 @@ class TestWrapper(TestRunner):
         self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, test_game_id)
         self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, None, MY_DISC_ID)
         self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, test_game_id, MY_DISC_ID)
-
-        game_stats = database.get_game_stats(GAME, game_stats_to_save, test_game_id)
-        player_stats = database.get_player_stats(GAME, player_stats_to_save, test_game_id)
-
-        game_stats_dict = dict(zip(game_stats_to_save, game_stats[0]))
-        player_stats_dict = {tup[0]: dict(zip(player_stats_to_save, tup)) for tup in player_stats}
-
-        print(game_stats_dict)
-        print(player_stats_dict)
 
     @test
     def test_doinks_queries(self):

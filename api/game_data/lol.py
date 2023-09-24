@@ -16,13 +16,14 @@ class LoLPlayerStats(PlayerStats):
     vision_wards: int = None
     vision_score: int = None
     steals: int = None
-    lane: str=None
-    role: str=None
-    pentakills: int=None
-    total_time_dead: int=None
-    turret_kills: int=None
-    inhibitor_kills: int=None
-    puuid: str=None
+    lane: str = None
+    role: str = None
+    quadrakills: int = None
+    pentakills: int = None
+    total_time_dead: int = None
+    turret_kills: int = None
+    inhibitor_kills: int = None
+    puuid: str = None
 
     @classmethod
     def STATS_TO_SAVE(cls):
@@ -204,6 +205,7 @@ class LoLGameStatsParser(GameStatsParser):
                         steals=participant["stats"]["objectivesStolen"],
                         lane=participant["stats"]["role"],
                         role=participant["stats"]["role"],
+                        quadrakills=participant["stats"]["quadraKills"],
                         pentakills=participant["stats"]["pentaKills"],
                         total_time_dead=participant["stats"]["totalTimeSpentDead"],
                         turret_kills=participant["stats"]["turretKills"],
@@ -272,6 +274,7 @@ class LoLGameStatsParser(GameStatsParser):
             enemy_baron_kills=enemy_baron_kills,
             enemy_dragon_kills=enemy_dragon_kills,
             enemy_herald_kills=enemy_herald_kills,
+            timeline_data=self.raw_data["timeline"]
         )
 
     def get_relevant_stats(self) -> GameStats:
@@ -334,11 +337,12 @@ class LoLGameStatsParser(GameStatsParser):
                     steals=participant["objectivesStolen"],
                     lane=participant["teamPosition"],
                     role=participant["role"],
+                    quadrakills=participant["quadraKills"],
                     pentakills=participant["pentaKills"],
                     total_time_dead=participant["totalTimeSpentDead"],
                     turret_kills=participant["turretKills"],
                     inhibitor_kills=participant["inhibitorKills"],
-                    puuid=participant["puuid"]
+                    puuid=participant["puuid"],
                 )
 
                 if participant["firstBloodKill"]:
@@ -404,6 +408,7 @@ class LoLGameStatsParser(GameStatsParser):
             enemy_baron_kills=enemy_baron_kills,
             enemy_dragon_kills=enemy_dragon_kills,
             enemy_herald_kills=enemy_herald_kills,
+            timeline_data=self.raw_data["timeline"]
         )
 
     def get_active_game_summary(self, active_id):

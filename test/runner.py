@@ -44,6 +44,10 @@ class TestRunner:
             self.__setattr__(k, v)
 
     @abstractmethod
+    def after_all(self):
+        pass
+
+    @abstractmethod
     def before_test(self):
         pass
 

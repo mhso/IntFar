@@ -5,6 +5,7 @@ from glob import glob
 from uuid import uuid4
 from time import sleep
 import os
+import json
 
 from api.game_api.csgo import SteamAPIClient
 from api.game_data.csgo import CSGOGameStats, CSGOPlayerStats, CSGOGameStatsParser
@@ -39,6 +40,10 @@ def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> li
             print("Sharecode:", curr_sharecode)
 
             data = steam_api.get_game_details(curr_sharecode)
+
+            with open(f"{curr_sharecode}.json", "w", encoding="utf-8") as fp:
+                json.dump(data, fp)
+
             stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.users_by_game["csgo"], _GUILD_ID)
             parsed_data: CSGOGameStats = stats_parser.parse_data()
             max_rounds = max(parsed_data.rounds_us, parsed_data.rounds_them)

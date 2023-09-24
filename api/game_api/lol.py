@@ -220,6 +220,10 @@ class RiotAPIClient(GameAPIClient):
         duration = data["gameDuration"]
         data["gameDuration"] = duration if "gameEndTimestamp" in data else duration / 1000 
 
+        # Get timeline data
+        timeline_data = self.get_game_timeline(game_id)
+        data["timeline"] = timeline_data
+
         return data
 
     def get_game_timeline(self, game_id, tries=0):

@@ -1,7 +1,7 @@
 import json
 import argparse
 from glob import glob
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
 from api.lan import get_average_stats, LAN_PARTIES
@@ -31,13 +31,15 @@ class TestFuncs:
         id_me = 267401734513491969
         id_anton = 347489125877809155
 
-        print(award_qualifiers.get_performance_score(self.database, id_myggen))
-        print(award_qualifiers.get_performance_score(self.database, id_murt))
-        print(award_qualifiers.get_performance_score(self.database, id_me))
-        print(award_qualifiers.get_performance_score(self.database, id_anton))
-        print(award_qualifiers.get_performance_score(self.database, id_thomas))
-        print(award_qualifiers.get_performance_score(self.database, id_dave))
-        print(award_qualifiers.get_performance_score(self.database, id_tobber))
+        game = "csgo"
+
+        print(self.database.get_performance_score(game, id_myggen))
+        print(self.database.get_performance_score(game, id_murt))
+        print(self.database.get_performance_score(game, id_me))
+        print(self.database.get_performance_score(game, id_anton))
+        print(self.database.get_performance_score(game, id_thomas))
+        print(self.database.get_performance_score(game, id_dave))
+        print(self.database.get_performance_score(game, id_tobber))
 
     def test_cool_stats(self):
         game_ids = self.database.get_game_ids()
@@ -254,7 +256,7 @@ class TestFuncs:
         user = self.database.users_by_game["csgo"][267401734513491969]
         print(user.latest_match_token[0])
         next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], user.latest_match_token[0])
-        print(next_code)
+        print(next_code) 
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

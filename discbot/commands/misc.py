@@ -116,7 +116,7 @@ async def handle_lol_summary_msg(client, message, target_id):
     total_champs = len(client.api_clients[game].champ_ids)
 
     longest_win_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 1)
-    longest_loss_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 0)
+    longest_loss_streak = client.database.get_longest_win_or_loss_streak(game, target_id, -1)
 
     best_champ_wr, best_champ_games, best_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, True)
     worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, False)
@@ -186,7 +186,7 @@ async def handle_csgo_summary_msg(client, message, target_id):
     total_maps = len(client.api_clients[game].map_names)
 
     longest_win_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 1)
-    longest_loss_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 0)
+    longest_loss_streak = client.database.get_longest_win_or_loss_streak(game, target_id, -1)
 
     best_map_wr, best_map_games, best_map_id = client.database.get_min_or_max_csgo_winrate_map(target_id, True)
     worst_map_wr, worst_map_games, worst_map_id = client.database.get_min_or_max_csgo_winrate_map(target_id, False)

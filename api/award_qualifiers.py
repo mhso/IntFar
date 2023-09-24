@@ -165,6 +165,10 @@ class AwardQualifiers(ABC):
         ...
 
     @abstractmethod
+    def get_cool_timeline_events(self) -> list[tuple]:
+        ...
+
+    @abstractmethod
     def get_intfar_qualifiers(self) -> list[tuple]:
         ...
 

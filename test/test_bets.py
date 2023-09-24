@@ -1,9 +1,10 @@
 from time import time
 from test.runner import TestRunner, test
-from api import betting
+from api.bets import get_betting_handler
+from api.betting import BettingHandler
 from api.database import Database
 from api.config import Config
-from api.util import format_tokens_amount
+from api.util import format_tokens_amount, SUPPORTED_GAMES
 
 LOUD = False
 
@@ -11,10 +12,13 @@ class TestWrapper(TestRunner):
     def __init__(self):
         super().__init__()
         conf = Config()
-        conf.database = "test.db"
+        conf.database = "resources/test.db"
         database_client = Database(conf)
-        bet_handler = betting.BettingHandler(conf, database_client)
-        self.before_all(bet_handler=self.bet_handler, db_client=database_client)
+        bet_handlers = {
+            game: get_betting_handler(game, conf, database_client)
+            for game in SUPPORTED_GAMES
+        }
+        self.before_all(bet_handlers=bet_handlers, db_client=database_client)
 
     def before_test(self):
         self.db_client.reset_bets()
@@ -30,55 +34,57 @@ class TestWrapper(TestRunner):
         target_name = [None]
         game_data = (None, None, None, [(0, {"gameWon": True})], 1)
 
-        balance = self.db_client.get_token_balance(disc_id)
-        self.assert_equals(balance, 100, "Token balance before bet placed.")
+        for game in SUPPORTED_GAMES:
+            bet_handler: BettingHandler = self.bet_handlers[game]
+            balance = self.db_client.get_token_balance(disc_id)
+            self.assert_equals(balance, 100, "Token balance before bet placed.")
 
-        success, response, _ = self.bet_handler.place_bet(
-            disc_id, guild_id, bet_amount, game_timestamp, bet_str, bet_target, target_name
-        )
+            success, response, _ = bet_handler.place_bet(
+                disc_id, guild_id, bet_amount, game_timestamp, bet_str, bet_target, target_name
+            )
 
-        if LOUD:
-            print(response)
+            if LOUD:
+                print(response)
 
-        balance = self.db_client.get_token_balance(disc_id)
+            balance = self.db_client.get_token_balance(disc_id)
 
-        self.assert_true(success, "Bet placed.")
-        self.assert_equals(balance, 100 - int(bet_amount[0]), "Token balance after bet placed.")
+            self.assert_true(success, "Bet placed.")
+            self.assert_equals(balance, 100 - int(bet_amount[0]), "Token balance after bet placed.")
 
-        active_bets = self.db_client.get_bets(True, disc_id)
+            active_bets = self.db_client.get_bets(game, True, disc_id)
 
-        self.assert_equals(len(active_bets), 1, "# Active bets after bet placed.")
+            self.assert_equals(len(active_bets), 1, "# Active bets after bet placed.")
 
-        bet_ids, g_id, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
+            bet_ids, g_id, _, amounts, event_ids, targets, bet_timestamp, _, _ = active_bets[0]
 
-        self.assert_equals(guild_id, g_id, "Guild ID.")
-        self.assert_equals(amounts[0], int(bet_amount[0]), "Bet amount.")
-        self.assert_equals(event_ids[0], betting.BETTING_IDS[bet_str[0]], "Bet event ID.")
-        self.assert_equals(bet_timestamp, 0, "Bet timestamp.")
-        self.assert_equals(targets[0], None, "Bet target.")
+            self.assert_equals(guild_id, g_id, "Guild ID.")
+            self.assert_equals(amounts[0], int(bet_amount[0]), "Bet amount.")
+            self.assert_equals(event_ids[0], bet_handler.all_bets[bet_str[0]], "Bet event ID.")
+            self.assert_equals(bet_timestamp, 0, "Bet timestamp.")
+            self.assert_equals(targets[0], None, "Bet target.")
 
-        success, bet_value = self.bet_handler.resolve_bet(
-            disc_id,
-            bet_ids,
-            amounts,
-            bet_timestamp,
-            event_ids,
-            targets,
-            game_data
-        )
+            success, bet_value = bet_handler.resolve_bet(
+                disc_id,
+                bet_ids,
+                amounts,
+                bet_timestamp,
+                event_ids,
+                targets,
+                game_data
+            )
 
-        base_return = self.db_client.get_base_bet_return(event_ids[0])
+            base_return = self.db_client.get_base_bet_return(event_ids[0])
 
-        self.assert_equals(bet_value, int(bet_amount[0]) * base_return, "Bet value.")
-        self.assert_true(success, "Bet was won.")
+            self.assert_equals(bet_value, int(bet_amount[0]) * base_return, "Bet value.")
+            self.assert_true(success, "Bet was won.")
 
-        new_balance = self.db_client.get_token_balance(disc_id)
+            new_balance = self.db_client.get_token_balance(disc_id)
 
-        self.assert_equals(new_balance, 100 - int(bet_amount[0]) + bet_value, "Token balance after win.")
+            self.assert_equals(new_balance, 100 - int(bet_amount[0]) + bet_value, "Token balance after win.")
 
-        active_bets = self.db_client.get_bets(True, disc_id)
+            active_bets = self.db_client.get_bets(True, disc_id)
 
-        self.assert_equals(active_bets, None, "No active bets after bet resolved.")
+            self.assert_equals(active_bets, None, "No active bets after bet resolved.")
 
     @test
     def test_game_won_fail(self):

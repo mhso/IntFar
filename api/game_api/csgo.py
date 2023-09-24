@@ -113,6 +113,7 @@ class SteamAPIClient(GameAPIClient):
         demo_bz2_file = f"{demo_file}.dem.bz2"
         demo_dem_file = f"{demo_file}.dem"
         demo_json_file = f"{demo_file}.json"
+        parser = None
 
         try:
             # Download and save the demo file to disk
@@ -130,6 +131,9 @@ class SteamAPIClient(GameAPIClient):
             demo_game_data = parser.parse()
         except Exception:
             demo_game_data = {}
+            if parser and parser.parse_error:
+                logger.error("Demo parsing error")
+
         finally:
             # Clean up the files after use
             for filename in (demo_bz2_file, demo_dem_file, demo_json_file):
@@ -202,7 +206,7 @@ class SteamAPIClient(GameAPIClient):
         return self.map_names.get(map_id)
 
     def get_map_id(self, game_type):
-        return self.game_types.get(game_type)
+        return self.game_types.get(int(game_type))
 
     def get_steam_display_name(self, steam_id):
         url = _ENDPOINT_PLAYER_SUMMARY.replace(

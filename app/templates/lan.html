@@ -51,7 +51,7 @@
                 {% if games_played %}
                 <div id="lan-latest-game-wrapper">
                     <h2>Latest Game</h2>
-                    <p>Game {% if latest_win %}<span class="lan-won">won</span>{% else %}<span class="lan-lost">lost</span>{% endif %} <span id="lan-game-duration">{{ duration_since_game }}</span> ago.</p>
+                    <p>Game {% if latest_win == 1 %}<span class="lan-won">won</span>{% else %}<span class="lan-lost">lost</span>{% endif %} <span id="lan-game-duration">{{ duration_since_game }}</span> ago.</p>
                     {% if latest_intfar_name %}
                     <p>
                         <span class="lan-emph">{{ latest_intfar_name }}</span> got Int-Far for <span class="lan-emph">{{ latest_intfar_reason }}</span>

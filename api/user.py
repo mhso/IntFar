@@ -11,3 +11,7 @@ class User(dict):
         for param in all_params:
             setattr(self, param, all_params[param])
             self.__setitem__(param, all_params[param])
+
+    @staticmethod
+    def clone(user):
+        return User(**user)

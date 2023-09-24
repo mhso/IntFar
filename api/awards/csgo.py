@@ -72,7 +72,7 @@ class CSGOAwardQualifiers(AwardQualifiers):
             "kills": "30 kills or more",
             "headshot": "Headshot percentage of 60% or higher (min. 10 kills)",
             "adr": "120 or more ADR",
-            "utility": "250 or more utility damage",
+            "utility": "300 or more utility damage",
             "mvp": "8 or more MVPs",
             "entries": "10 or more entry-frags",
             "ace": "Getting an ace",
@@ -138,7 +138,6 @@ class CSGOAwardQualifiers(AwardQualifiers):
         return [
             "timeline_comeback",
             "timeline_throw",
-            "timeline_goldkeeper",
         ]
 
     @classmethod
@@ -156,7 +155,7 @@ class CSGOAwardQualifiers(AwardQualifiers):
             - Getting 30 kills or more
             - Having a headshot percentage of 60% or more
             - Having an ADR of 120 or more
-            - Doing 250 or more damage with utility
+            - Doing 300 or more damage with utility
             - Getting 8 or more MVPs
             - Getting 10 or more entry frags
             - Getting one or more aces
@@ -175,13 +174,13 @@ class CSGOAwardQualifiers(AwardQualifiers):
             if stats.kills >= 30:
                 mention_list.append((1, stats.kills))
 
-            if stats.headshot_pct >= 60:
+            if stats.headshot_pct >= 60 and stats.kills >= 10:
                 mention_list.append((2, stats.headshot_pct))
 
             if stats.adr >= 120:
                 mention_list.append((3, stats.adr))
 
-            if stats.utility_damage >= 250:
+            if stats.utility_damage >= 300:
                 mention_list.append((4, stats.utility_damage))
 
             if stats.mvps >= 8:
@@ -234,17 +233,17 @@ class CSGOAwardQualifiers(AwardQualifiers):
             if stats.team_kills > 1:
                 mentions[stats.disc_id].append((0, stats.team_kills))
 
-            if stats.teammates_flashed > 3:
+            if stats.teammates_flashed > 15:
                 mentions[stats.disc_id].append((1, stats.teammates_flashed))
 
             if stats.suicides > 0:
                 mentions[stats.disc_id].append((2, stats.suicides))
 
-            if stats.accuracy < 5:
+            if stats.accuracy < 10:
                 mentions[stats.disc_id].append((3, stats.accuracy))
 
             total_rounds = self.parsed_game_stats.rounds_us + self.parsed_game_stats.rounds_them
-            if stats.deaths / total_rounds > 0.8:
+            if stats.deaths / total_rounds > 0.85:
                 mentions[stats.disc_id].append((4, int((stats.deaths / total_rounds) * 100)))
 
         return mentions
@@ -256,7 +255,8 @@ class CSGOAwardQualifiers(AwardQualifiers):
             - Having more than 10 assists
             - Having more than 20 enemies flashed
             - Having more than 1 4K
-            - Winning more than 70% of clutches (and being in more than 2)
+            - Winning more than 60% of clutches (and being in more than 2)
+            - Doing the big comeback or the big throw
         """
         cool_stats = {}
 
@@ -289,12 +289,31 @@ class CSGOAwardQualifiers(AwardQualifiers):
             num_clutches_attempted = sum(getattr(stats, stat) for stat in clutches_attempted_keys)
             num_clutches_won = sum(getattr(stats, stat) for stat in clutches_won_keys)
 
-            if num_clutches_attempted > 2 and num_clutches_won / num_clutches_attempted > 0.70:
+            if num_clutches_attempted > 2 and num_clutches_won / num_clutches_attempted > 0.60:
                 clutch_pct = int((num_clutches_won / num_clutches_attempted) * 100)
                 clutch_desc = f"{clutch_pct}% of {num_clutches_attempted}"
                 cool_stats[stats.disc_id].append((3, clutch_desc))
 
         return cool_stats
+
+    def get_cool_timeline_events(self):
+        """
+        Returns a list of cool/embarrasing events that happened during the course of the game.
+        These events include:
+            - We lost the game after being up by more than 8 rounds (the big throw)
+            - We won the game after being down by more than 8 rounds (the epic comeback)
+        """
+        timeline_events = []
+
+        if self.parsed_game_stats.biggest_deficit > 8 and self.parsed_game_stats.win == 1:
+            # Epic comeback!
+            timeline_events.append((0, self.parsed_game_stats.biggest_deficit, None))
+
+        if self.parsed_game_stats.biggest_lead > 8 and self.parsed_game_stats.win != 1:
+            # Huge throw...
+            timeline_events.append((1, self.parsed_game_stats.biggest_lead, None))
+
+        return timeline_events
 
     def _intfar_by_kda(self):
         """

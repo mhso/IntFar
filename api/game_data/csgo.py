@@ -540,6 +540,8 @@ class CSGOGameStats(GameStats):
     rounds_us: int = None
     rounds_them: int = None
     cs2: bool = False
+    biggest_lead: int = None
+    biggest_deficit: int = None
 
     @classmethod
     def STATS_TO_SAVE(cls):
@@ -696,6 +698,7 @@ class CSGOGameStatsParser(GameStatsParser):
             if rounds_us == rounds_them:
                 win_score = 0
 
+            # Get map ID
             map_id = self.api_client.get_map_id(game_type)
 
         # Get total kills by our teamn
@@ -717,6 +720,24 @@ class CSGOGameStatsParser(GameStatsParser):
             if account_id in account_id_map:
                 key = account_id_map[account_id] if self.raw_data["demo_parsed"] else account_id 
                 player_stats[key]["scores"] = scores[account_id]
+
+        # Get the biggest lead and deficit throughout the course of the game
+        biggest_lead = 0
+        biggest_deficit = 0
+        for round_data in round_stats:
+            rounds_ct = round_data["teamScores"][0]
+            rounds_t = round_data["teamScores"][1]
+
+            rounds_us = rounds_t if started_t else rounds_ct
+            rounds_them = rounds_ct if started_t else rounds_t
+
+            lead = rounds_us - rounds_them
+            deficit = rounds_them - rounds_us
+
+            if lead > biggest_lead:
+                biggest_lead = lead
+            elif deficit > biggest_deficit:
+                biggest_deficit = deficit
 
         # Add it all to player stats
         all_player_stats = []
@@ -795,6 +816,8 @@ class CSGOGameStatsParser(GameStatsParser):
             started_t=int(started_t),
             rounds_us=rounds_us,
             rounds_them=rounds_them,
+            biggest_lead=biggest_lead,
+            biggest_deficit=biggest_deficit
         )
 
     def parse_from_database(self, database, game_id: int) -> GameStats:

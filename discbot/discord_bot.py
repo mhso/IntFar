@@ -292,18 +292,10 @@ class DiscordClient(discord.Client):
         if max_tokens_id != new_max_tokens_id: # Assign new 'goodest_boi' title.
             await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
 
-        if game == "lol":
-            try:
-                # Get timeline data events for the game.
-                timeline_data = self.api_clients[game].get_game_timeline(game_info["gameId"])
-                if timeline_data is not None:
-                    timeline_response = self.get_cool_timeline_data(
-                        awards_handler, timeline_data
-                    )
-                    if timeline_response is not None:
-                        response = timeline_response + "\n" + response
-            except Exception:
-                logger.exception("Exception when getting timeline data")
+        # Get timeline data events for the game.
+        timeline_response = self.get_cool_timeline_data(awards_handler)
+        if timeline_response is not None:
+            response = timeline_response + "\n" + response
 
         # Get other cool stats about players.
         cool_stats_response = self.get_cool_stats_data(awards_handler)
@@ -1233,9 +1225,8 @@ class DiscordClient(discord.Client):
 
         return cool_stats_msg
 
-    def get_cool_timeline_data(self, awards_handler: AwardQualifiers, timeline_data: dict):
-        filtered_timeline = awards_handler.parsed_game_stats.get_filtered_timeline_stats(timeline_data)
-        timeline_mentions = awards_handler.get_cool_timeline_events(filtered_timeline)
+    def get_cool_timeline_data(self, awards_handler: AwardQualifiers):
+        timeline_mentions = awards_handler.get_cool_timeline_events()
         cool_events_msg = self.get_cool_timeline_msg(awards_handler, timeline_mentions)
 
         return cool_events_msg

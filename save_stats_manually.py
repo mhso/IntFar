@@ -123,7 +123,7 @@ class TestMock(DiscordClient):
                         records_response = self.get_beaten_records_msg(
                             parsed_game_stats, best_records, worst_records
                         )
-                        response = records_response + response
+                        response = records_response + "\n" + response
                 except Exception:
                     logger.bind(game_id=game_id).exception(
                         f"Error when saving stats for {game_id}. Probably already exists."

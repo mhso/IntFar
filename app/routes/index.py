@@ -306,10 +306,10 @@ def active_game_ended():
 
     flask.current_app.config["ACTIVE_GAME"][int(data["guild_id"])][game] = None
 
-    if flask.current_app.config["GAME_PREDICTION"].get(int(data["game_id"])) is not None:
+    if flask.current_app.config["GAME_PREDICTION"].get(data["game_id"]) is not None:
         remove("resources/predictions_temp.json")
 
-    flask.current_app.config["GAME_PREDICTION"][int(data["game_id"])] = None
+    flask.current_app.config["GAME_PREDICTION"][data["game_id"]] = None
 
     return flask.make_response(("Success! Active game ID deleted.", 200))
 

@@ -161,7 +161,7 @@ def get_data(lan_info):
         # Games played and won.
         game_results = [win for win, _ in games_stats]
         games_played = len(games_stats)
-        games_won = len(list(filter(None, game_results)))
+        games_won = len(list(filter(lambda x: x == 1, game_results)))
         first_game_timestamp = games_stats[0][1]
         games_lost = games_played - games_won
         pct_won = (games_won / games_played) * 100
