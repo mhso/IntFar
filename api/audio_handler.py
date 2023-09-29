@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import math
+from datetime import datetime
 
 from discord import PCMVolumeTransformer
 from discord.player import FFmpegPCMAudio
@@ -388,8 +389,9 @@ class AudioHandler:
 
     def get_sounds(self, ordering):
         sounds = []
-        for sound in get_available_sounds(ordering):
-            sounds.append(f"- `{sound[0]}`")
+        for sound, timestamp in get_available_sounds(ordering):
+            dt_fmt = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
+            sounds.append(f"- `{sound}` ({dt_fmt})")
 
         return sounds
 

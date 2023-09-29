@@ -92,6 +92,31 @@ class LoLGameMonitor(GameMonitor):
             None
         )
 
+    async def get_finished_game_status(self, game_info: dict, guild_id: int):
+        if self.database.game_exists(self.game, game_info["gameId"]):
+            logger.warning(
+                "We triggered end of game stuff again... Strange!"
+            )
+            return self.POSTGAME_STATUS_DUPLICATE
+
+        if len(self.users_in_game.get(guild_id, [])) == 1:
+            return self.POSTGAME_STATUS_SOLO
+
+        if self.api_client.is_urf(game_info["gameMode"]):
+            # Gamemode was URF.
+            return self.POSTGAME_STATUS_URF
+
+        if not self.api_client.map_is_sr(game_info["mapId"]):
+            # Game is not on summoners rift.
+            return self.POSTGAME_STATUS_NOT_SR
+
+        if game_info["gameDuration"] < self.min_game_minutes * 60:
+            # Game was too short to count. Probably a remake.
+            return self.POSTGAME_STATUS_REMAKE
+
+        self.active_game[guild_id]["queue_id"] = game_info["queueId"]
+        return self.POSTGAME_STATUS_OK
+
     async def get_finished_game_info(self, guild_id):
         game_id = self.active_game[guild_id]["id"]
 
@@ -102,7 +127,6 @@ class LoLGameMonitor(GameMonitor):
         custom_game = self.active_game[guild_id].get("game_type", "") == "CUSTOM_GAME"
 
         game_info = None
-
         if not custom_game:
             game_info = self.api_client.get_game_details(game_id, tries=2)
 
@@ -127,31 +151,10 @@ class LoLGameMonitor(GameMonitor):
             logger.bind(game_id=game_id, guild_id=guild_id).error(
                 "Game info is STILL None after 3 retries! Saving to missing games..."
             )
+            game_info = {"gameId": game_id}
             status_code = self.POSTGAME_STATUS_MISSING
 
-        elif self.database.game_exists(self.game, game_info["gameId"]):
-            status_code = self.POSTGAME_STATUS_DUPLICATE
-            logger.warning(
-                "We triggered end of game stuff again... Strange!"
-            )
-
-        elif len(self.users_in_game.get(guild_id, [])) == 1:
-            status_code = self.POSTGAME_STATUS_SOLO
-
-        elif self.api_client.is_urf(game_info["gameMode"]):
-            # Gamemode was URF.
-            status_code = self.POSTGAME_STATUS_URF
-
-        elif not self.api_client.map_is_sr(game_info["mapId"]):
-            # Game is not on summoners rift.
-            status_code = self.POSTGAME_STATUS_NOT_SR
-
-        elif game_info["gameDuration"] < self.min_game_minutes * 60:
-            # Game was too short to count. Probably a remake.
-            status_code = self.POSTGAME_STATUS_REMAKE
-
         else:
-            status_code = self.POSTGAME_STATUS_OK
-            self.active_game[guild_id]["queue_id"] = game_info["queueId"]
+            status_code = await self.get_finished_game_status(game_info, guild_id)
 
         return game_info, status_code

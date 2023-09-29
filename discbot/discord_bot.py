@@ -135,7 +135,7 @@ class DiscordClient(discord.Client):
             # Send error message to Discord to indicate things went bad.
             await self.send_error_msg(guild_id)
 
-        if status_code == game_monitor.POSTGAME_STATUS_MISSING:
+        elif status_code == game_monitor.POSTGAME_STATUS_MISSING:
             self.database.save_missed_game(game, game_info["gameId"], guild_id, int(time()))
 
             # Send message pinging me about the error.
@@ -210,6 +210,10 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         :param status_code: Integer that describes the status of the finished game
         """        
+        for disc_id in game_monitor.users_in_game[guild_id]:
+            steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
+            self.database.set_new_csgo_sharecode(disc_id, steam_id, game_info["matchID"])
+
         if status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
             # Game was too short, most likely an early surrender
             response = (
@@ -234,9 +238,6 @@ class DiscordClient(discord.Client):
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
         elif status_code == game_monitor.POSTGAME_STATUS_OK:
-            for disc_id in game_monitor.users_in_game[guild_id]:
-                steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
-                self.database.set_new_csgo_sharecode(disc_id, steam_id, game_info["matchID"])
 
             if game_info["demo_parse_status"] == "missing":
                 response = (
@@ -1258,13 +1259,14 @@ class DiscordClient(discord.Client):
         """
         mentions_by_streak = {}
         broken_streaks = {}
-        game_won = awards_handler.parsed_game_stats.win == 1
+        game_result = awards_handler.parsed_game_stats.win
+        opposite = -game_result
 
         for stats in awards_handler.parsed_game_stats.filtered_player_stats:
             disc_id = stats.disc_id
 
-            current_streak = self.database.get_current_win_or_loss_streak(awards_handler.game, disc_id, game_won)
-            prev_streak = self.database.get_current_win_or_loss_streak(awards_handler.game, disc_id, not game_won) - 1
+            current_streak = self.database.get_current_win_or_loss_streak(awards_handler.game, disc_id, game_result)
+            prev_streak = self.database.get_current_win_or_loss_streak(awards_handler.game, disc_id, opposite) - 1
 
             if current_streak >= self.config.stats_min_win_loss_streak:
                 # We are currently on a win/loss streak
@@ -1287,7 +1289,7 @@ class DiscordClient(discord.Client):
         for streak in mentions_by_streak:
             mention_list = mentions_by_streak[streak]
 
-            flavor = "win_streak" if game_won else "loss_streak"
+            flavor = "win_streak" if game_result == 1 else "loss_streak"
             quantifier = "is" if len(mention_list) == 1 else "are"
             nicknames_str = ", ".join(mention_list)
             num_streak_flavors = len(awards_handler.flavor_texts[flavor])
@@ -1306,7 +1308,7 @@ class DiscordClient(discord.Client):
         for streak in broken_streaks:
             mention_list = broken_streaks[streak]
 
-            flavor = "broken_loss_streak" if game_won else "broken_win_streak"
+            flavor = "broken_loss_streak" if game_result == 1 else "broken_win_streak"
             nicknames_str = ", ".join(mention_list)
 
             response += "\n" + awards_handler.get_flavor_text(

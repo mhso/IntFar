@@ -31,15 +31,15 @@ class TestFuncs:
         id_me = 267401734513491969
         id_anton = 347489125877809155
 
-        game = "csgo"
+        game = "lol"
 
-        print(self.database.get_performance_score(game, id_myggen))
-        print(self.database.get_performance_score(game, id_murt))
-        print(self.database.get_performance_score(game, id_me))
-        print(self.database.get_performance_score(game, id_anton))
-        print(self.database.get_performance_score(game, id_thomas))
-        print(self.database.get_performance_score(game, id_dave))
-        print(self.database.get_performance_score(game, id_tobber))
+        print("Myggen:", self.database.get_performance_score(game, id_myggen))
+        print("Murt:", self.database.get_performance_score(game, id_murt))
+        print("Mikkel:", self.database.get_performance_score(game, id_me))
+        print("Anton:", self.database.get_performance_score(game, id_anton))
+        print("Thommy:", self.database.get_performance_score(game, id_thomas))
+        print("Dave:", self.database.get_performance_score(game, id_dave))
+        print("Tobber:", self.database.get_performance_score(game, id_tobber))
 
     def test_cool_stats(self):
         game_ids = self.database.get_game_ids()
@@ -260,13 +260,15 @@ class TestFuncs:
 
     def test_cs_parse(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
-        sharecode = "CSGO-bGpZq-cYoXP-HOGKT-CjWvt-jDWPA"
+        sharecode = "CSGO-FzPbx-2UZYV-RL5SD-8tjh5-hKMkO"
         api_client = SteamAPIClient("csgo", self.config)
 
         game_stats = api_client.get_game_details(sharecode)
+        with open(f"data_{sharecode}.json", "w", encoding="utf-8") as fp:
+            json.dump(game_stats, fp)
+
         parser = get_stat_parser("csgo", game_stats, api_client, self.database.users_by_game["csgo"], 619073595561213953)
         data = parser.parse_data()
-
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

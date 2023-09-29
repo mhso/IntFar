@@ -50,6 +50,8 @@ class SteamAPIClient(GameAPIClient):
             2056: "ancient",
             520: "dust2",
             1032: "train",
+            32776: "mirage",
+            8388616: "anubis"
         }
         self.get_latest_data()
         self.csgo_app_id = 730

@@ -60,6 +60,10 @@ class GameMonitor(ABC):
     async def get_finished_game_info(self, guild_id: int) -> tuple[dict, int]:
         ...
 
+    @abstractmethod
+    async def get_finished_game_status(self, game_info: dict, guild_id: int) -> int:
+        ...
+
     async def check_game_status(self, guild_id: int, guild_name: str) -> int:
         """
         Check whether people that are active in voice channels are currently in a game.
@@ -181,7 +185,7 @@ class GameMonitor(ABC):
                 # Call end-of-game callback
                 await self.game_over_callback(self.game, game_info, guild_id, status_code)
 
-                self.active_game[guild_id] = None
+                del self.active_game[guild_id]
                 del self.users_in_game[guild_id] # Reset the list of users who are in a game.
 
                 asyncio.create_task(self.poll_for_game_start(guild_id, guild_name))

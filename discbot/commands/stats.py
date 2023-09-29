@@ -181,8 +181,9 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
             ) = client.database.get_most_extreme_stat(game, stat, maximize)
         else:
             (
-                stat_count, # <- How many times the stat has occured.
-                min_or_max_value, # <- Highest/lowest occurance of the stat value.
+                stat_count, # <- How many times the stat has occured
+                game_count, # <- How many games were the stat was relevant
+                min_or_max_value, # <- Highest/lowest occurance of the stat value
                 game_id
             ) = client.database.get_best_or_worst_stat(game, stat, target_id, maximize)
 
@@ -199,7 +200,7 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
             if stat == "first_blood":
                 quant = "most" if best else "least"
                 response = f"The person who has gotten first blood the {quant} "
-                response += f"is {recepient} with **{min_or_max_value}** games "
+                response += f"is {recepient} with **{min_or_max_value}** games out of **{game_count}** games played "
                 response += client.insert_emotes(emote_to_use)
             else:
                 response = f"The {readable_stat} ever in a game was **{min_or_max_value}** "
@@ -223,7 +224,7 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
 
             response = (
                 f"{recepient} has gotten {readable_stat} in a game " +
-                f"**{stat_count}** times " + client.insert_emotes(emote_to_use) + "\n"
+                f"**{stat_count}** times out of **{game_count}** games played " + client.insert_emotes(emote_to_use) + "\n"
                 f"{game_specific_desc}"
             )
             if min_or_max_value is not None:

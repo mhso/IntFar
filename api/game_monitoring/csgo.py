@@ -24,12 +24,43 @@ class CSGOGameMonitor(GameMonitor):
     def min_game_minutes(self):
         return 10
 
-    async def get_active_game_info(self, guild_id):
-        if not self.api_client.logged_on_once:
-            # Steam is not logged on, don't try to track games
-            return None, {}, None
+    async def _get_next_sharecode(self, users: dict[int, User]):
+        """
+        Get the newest sharecode for all users in 'users'.
+        Retrieves codes for 
+        """
+        code_retrieved = {disc_id: False for disc_id in users}
+        next_code = None
+        for disc_id in users:
+            user_data = users[disc_id]
 
-        # Create a bunch of maps for different IDs
+            curr_code = user_data.latest_match_token[0]
+            while curr_code is not None:
+                curr_code = self.api_client.get_next_sharecode(
+                    user_data.ingame_id[0],
+                    user_data.match_auth_code[0],
+                    curr_code
+                )
+                if curr_code is not None:
+                    next_code = curr_code
+
+                await asyncio.sleep(2)
+
+            if next_code is not None and next_code != user_data.latest_match_token[0]:
+                logger.info(f"Match share code for '{disc_id}' was: '{user_data.latest_match_token[0]}', now: '{next_code}'")
+                code_retrieved[disc_id] = True
+
+        if all(code_retrieved.values()):
+            return next_code
+
+        return None
+
+    async def get_active_game_info(self, guild_id):
+        if True:#if not self.api_client.logged_on_once:
+            # Steam is not logged on, don't try to track games
+            return None, {}, self.GAME_STATUS_NOCHANGE
+
+        # Create a bunch of maps for different ID representations
         user_dict = (
             self.users_in_voice.get(guild_id, {})
             if self.users_in_game.get(guild_id) is None
@@ -65,23 +96,11 @@ class CSGOGameMonitor(GameMonitor):
             user.ingame_name = [steam_name]
             users_in_current_game[disc_id] = user
 
-        if self.active_game is not None:
+        if self.active_game.get(guild_id) is not None:
             # Check if game is over
-            code_retrieved = {disc_id: False for disc_id in user_dict}
-            next_code = None
-            for disc_id in user_dict:
-                user_data = user_dict[disc_id]
-                next_code = self.api_client.get_next_sharecode(
-                    user_data.ingame_id[0],
-                    user_data.match_auth_code[0],
-                    user_data.latest_match_token[0]
-                )
+            next_code = await self._get_next_sharecode(user_dict)
 
-                if next_code is not None and next_code != user_data.latest_match_token[0]:
-                    logger.info(f"New sharecode in get_active_game_info: {next_code}")
-                    code_retrieved[disc_id] = True
-        
-            if all(code_retrieved[disc_id] for disc_id in code_retrieved):
+            if next_code is not None:
                 # New sharecodes recieved for all players. Game is over!
                 for disc_id in users_in_current_game:
                     users_in_current_game[disc_id].latest_match_token[0] = next_code
@@ -101,80 +120,62 @@ class CSGOGameMonitor(GameMonitor):
             None
         )
 
-    async def get_finished_game_info(self, guild_id):
-        match_id = self.active_game[guild_id]["id"]
+    async def get_finished_game_status(self, game_info: dict, guild_id: int):
+        # Define a value that determines whether the played game was (most likely) a CS2 match
+        last_round = game_info["matches"][0]["roundstatsall"][-1]
+        max_rounds = max(last_round["teamScores"])
 
-        current_sharecodes = {
-            disc_id: self.database.users_by_game[self.game][disc_id].latest_match_token[0]
+        cs2 = (game_info["demo_parse_status"] == "error") and (max_rounds == 13 or all(score == 15 for score in last_round["teamScores"]))
+
+        if self.database.game_exists(self.game, game_info["matchID"]):
+            logger.warning(
+                "We triggered end of game stuff again... Strange!"
+            )
+            return self.POSTGAME_STATUS_DUPLICATE
+
+        if len(self.users_in_game.get(guild_id, [])) == 1:
+            return self.POSTGAME_STATUS_SOLO
+
+        if max_rounds < 10:
+            # Game was a short match
+            return self.POSTGAME_STATUS_SHORT_MATCH
+
+        if cs2:
+            # Game was (presumably) a CS2 game
+            return self.POSTGAME_STATUS_CS2
+
+        if last_round["matchDuration"] < self.min_game_minutes * 60:
+            # Game was too short to count. Probably an early surrender.
+            return self.POSTGAME_STATUS_SURRENDER
+
+        return self.POSTGAME_STATUS_OK
+
+    async def get_finished_game_info(self, guild_id: int):
+        # Get users who haven't yet received a new sharecode
+        users_missing = {
+            disc_id: self.users_in_game[guild_id][disc_id]
             for disc_id in self.users_in_game[guild_id]
+            if self.users_in_game[guild_id][disc_id].latest_match_token[0] == self.database.users_by_game[self.game][disc_id].latest_match_token[0]
         }
 
         # Get new CS sharecode, if we didn't already get it when searching for active games
-        code_retrieved = {disc_id: False for disc_id in current_sharecodes}
-        new_sharecode = None
-        game_info = None
-        for disc_id in current_sharecodes:
-            if self.users_in_game[guild_id][disc_id].latest_match_token[0] == current_sharecodes[disc_id]:
-                # New sharecode has not been recieved for player
-                user_data = self.database.users_by_game[self.game][disc_id]
-                next_code = self.api_client.get_next_sharecode(
-                    user_data.ingame_id[0],
-                    user_data.match_auth_code[0],
-                    user_data.latest_match_token[0]
-                )
+        if users_missing != {}:
+            next_code = await self._get_next_sharecode(users_missing)
+        else:
+            next_code = list(self.users_in_game[guild_id].values())[0].latest_match_token[0]
 
-                logger.info(f"Match share code for '{disc_id}' was: '{user_data.latest_match_token[0]}', now: '{next_code}'")
-
-                if next_code is not None and next_code != current_sharecodes[disc_id]:
-                    code_retrieved[disc_id] = True
-                    if new_sharecode is None:
-                        new_sharecode = next_code
-            else:
-                logger.info(f"User '{disc_id}' already has a new sharecode saved from earlier.")
-                new_sharecode = self.users_in_game[guild_id][disc_id].latest_match_token[0]
-
-            await asyncio.sleep(2)
-
-        if not all(code_retrieved[disc_id] for disc_id in code_retrieved):
-            logger.bind(game_id=match_id, sharecodes=list(current_sharecodes.values()), guild_id=guild_id).error(
+        if next_code is None:
+            logger.bind(sharecodes=list(users_missing.values()), guild_id=guild_id).error(
                 "Next match sharecode STILL not received for everyone after game ended! Saving to missing games..."
             )
+            game_info = None
             status_code = self.POSTGAME_STATUS_MISSING
 
         else:
-            game_info = self.api_client.get_game_details(new_sharecode)
+            game_info = self.api_client.get_game_details(next_code)
             if game_info is None:
                 raise ValueError("Could not get game_info for some reason!")
 
-            # Define a value that determines whether the played game was (most likely) a CS2 match
-            last_round = game_info["matches"][0]["roundstatsall"][-1]
-            max_rounds = max(last_round["teamScores"])
-            map_id = self.api_client.get_map_id(last_round["reservation"].get("gameType"))
-
-            cs2 = (game_info["demo_parse_status"] == "error") and (max_rounds == 13 or all(score == 15 for score in last_round["teamScores"]))
-
-            if self.database.game_exists(self.game, game_info["matchID"]):
-                status_code = self.POSTGAME_STATUS_DUPLICATE
-                logger.warning(
-                    "We triggered end of game stuff again... Strange!"
-                )
-
-            elif len(self.users_in_game.get(guild_id, [])) == 1:
-                status_code = self.POSTGAME_STATUS_SOLO
-
-            elif max_rounds < 10:
-                # Game was a short match
-                status_code = self.POSTGAME_STATUS_SHORT_MATCH
-
-            elif cs2:
-                # Game was (presumably) a CS2 game
-                status_code = self.POSTGAME_STATUS_CS2
-
-            elif last_round["matchDuration"] < self.min_game_minutes * 60:
-                # Game was too short to count. Probably an early surrender.
-                status_code = self.POSTGAME_STATUS_SURRENDER
-
-            else:
-                status_code = self.POSTGAME_STATUS_OK
+            status_code = await self.get_finished_game_status(game_info, guild_id)
 
         return game_info, status_code

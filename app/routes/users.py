@@ -270,22 +270,9 @@ def get_game_stats(game, disc_id, database):
     has_most_best = len(most_best_stats_candidates) == 1 and most_best_stats_candidates[0] == disc_id
 
     for best in (True, False):
+        list_to_add_to = best_stats if best else worst_stats
         for stat in stat_descs:
             maximize = not ((stat != "deaths") ^ best)
-            (
-                stat_count,
-                min_or_max_value,
-                _
-            ) = database.get_best_or_worst_stat(game, stat, disc_id, maximize)
-
-            best_or_worst_ever_id = database.get_most_extreme_stat(game, stat, maximize)[0]
-            stat_is_gold = best_or_worst_ever_id == disc_id
-            if stat_is_gold:
-                if best:
-                    any_gold_best = True
-                else:
-                    any_gold_worst = True
-
             pretty_stat = stat.replace("_", " ").capitalize() if len(stat) > 3 else stat.upper()
             quantity_type = 0 if best else 1
             pretty_quantity = stat_descs[stat][quantity_type]
@@ -295,25 +282,32 @@ def get_game_stats(game, disc_id, database):
                 min_or_max_value = stat_count
                 pretty_desc = pretty_stat
 
+            stat_data = database.get_best_or_worst_stat(game, stat, disc_id, maximize)
+            if stat_data is None:
+                list_to_add_to.append(([pretty_desc, "N/A", "N/A"], False))
+                continue
+
+            stat_count, _, min_or_max_value, _ = stat_data
+
+            best_or_worst_ever_id = database.get_most_extreme_stat(game, stat, maximize)[0]
+            stat_is_gold = best_or_worst_ever_id == disc_id
+            if stat_is_gold:
+                if best:
+                    any_gold_best = True
+                else:
+                    any_gold_worst = True
+
             if min_or_max_value is None:
                 min_or_max_value = "NA"
             else:
                 min_or_max_value = api_util.round_digits(min_or_max_value)
 
-            if best:
-                best_stats.append(
-                    (
-                        [pretty_desc, stat_count, min_or_max_value],
-                        stat_is_gold
-                    )
+            list_to_add_to.append(
+                (
+                    [pretty_desc, stat_count, min_or_max_value],
+                    stat_is_gold
                 )
-            else:
-                worst_stats.append(
-                    (
-                        [pretty_desc, stat_count, min_or_max_value],
-                        stat_is_gold
-                    )
-                )
+            )
 
     return {
         "game_stats": [(best_stats, any_gold_best), (worst_stats, any_gold_worst)],

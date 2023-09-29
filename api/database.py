@@ -316,7 +316,7 @@ class Database(SQLiteDatabase):
         users_table = self._get_users_table(game)
         aggregator = "MAX" if maximize else "MIN"
 
-        player_condition = ""
+        min_condition = f"AND {stat} <> 0" if stat != "deaths" else ""
         player_select = ""
         params = []
 
@@ -345,21 +345,44 @@ class Database(SQLiteDatabase):
             """
         else:
             if disc_id is not None:
-                player_condition = "WHERE disc_id = ?"
+                player_condition = "WHERE best.disc_id = ?"
                 params = [disc_id]
             else:
-                player_select = "disc_id,"
-                player_condition = "GROUP BY sub.disc_id"
+                player_select = "best.disc_id,"
+                player_condition = "GROUP BY best.disc_id"
 
             query = f"""
                 SELECT
                     {player_select}
-                    COUNT(*) AS c,
-                    {aggregator}(c) AS extreme,
-                    game_id
+                    best.c AS best,
+                    games.c AS games,
+                    best.extreme,
+                    best.game_id
                 FROM (
                     SELECT
-                        {aggregator}({stat}) AS c,
+                        sub.disc_id,
+                        COUNT(*) AS c,
+                        {aggregator}(sub.c) AS extreme,
+                        sub.game_id
+                    FROM (
+                        SELECT
+                            {aggregator}({stat}) AS c,
+                            p.game_id,
+                            p.disc_id
+                        FROM {stats_table} AS p
+                        JOIN {users_table} AS u
+                        ON u.disc_id = p.disc_id
+                        WHERE
+                            u.active = 1
+                            AND {stat} IS NOT NULL
+                            {min_condition}
+                        GROUP BY game_id
+                    ) sub
+                    GROUP BY sub.disc_id
+                ) best,
+                (
+                    SELECT
+                        COUNT(*) AS c,
                         p.game_id,
                         p.disc_id
                     FROM {stats_table} AS p
@@ -368,8 +391,8 @@ class Database(SQLiteDatabase):
                     WHERE
                         u.active = 1
                         AND {stat} IS NOT NULL
-                    GROUP BY game_id
-                ) sub
+                    GROUP BY p.disc_id
+                ) games
                 {player_condition}
             """
 
@@ -432,12 +455,14 @@ class Database(SQLiteDatabase):
                         g.map_id,
                         p.disc_id
                     FROM {stats_table} AS p
-                    JOIN {games_table} AS g
+                    INNER JOIN {games_table} AS g
                         ON g.game_id = p.game_id
-                    JOIN {users_table} AS u
+                    INNER JOIN {users_table} AS u
                         ON u.disc_id = p.disc_id
-                    WHERE u.active = 1
-                    GROUP BY p.game_id
+                    WHERE
+                        u.active = 1
+                        AND {stat} IS NOT NULL
+                    GROUP BY g.game_id
                 ) sub
                 WHERE disc_id = ?
                 GROUP BY map_id
@@ -1586,7 +1611,7 @@ class Database(SQLiteDatabase):
 
             return max_count
 
-    def get_current_win_or_loss_streak(self, game: str, disc_id: int, win: bool, offset=0):
+    def get_current_win_or_loss_streak(self, game: str, disc_id: int, win: int, offset=0):
         games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         users_table = self._get_users_table(game)
@@ -1611,7 +1636,7 @@ class Database(SQLiteDatabase):
             count_offset = 1 if offset == 0 else 0
 
             for count, row in enumerate(games[offset:], start=count_offset):
-                if (row[0] <= 0) != win:
+                if row[0] != win:
                     return count
 
             total_offset = -offset if offset > 0 else 1
@@ -1835,7 +1860,7 @@ class Database(SQLiteDatabase):
         stat_keys = get_stat_quantity_descriptions(game)
         stat_joins = []
 
-        prev_join = "intfars.intfar_id"
+        prev_join = "doinks.disc_id"
         for stat in stat_keys:
             query_best = self.get_best_or_worst_query(game, stat, maximize=stat != "deaths")[0]
 
@@ -1845,7 +1870,7 @@ class Database(SQLiteDatabase):
         stat_join_queries = "\n".join(stat_joins)
 
         stat_equations = [
-            f"COALESCE({stat}_best.c / played.c, 0) * {stats_weight}" for stat in stat_keys
+            f"COALESCE({stat}_best.best / {stat}_best.games, 0) * {stats_weight}" for stat in stat_keys
         ]
 
         stat_equations_str = " + ".join(stat_equations)
@@ -1887,11 +1912,20 @@ class Database(SQLiteDatabase):
                 ) wins
                 ON wins.disc_id = played.disc_id
                 LEFT JOIN (
-                    SELECT
-                        CAST(COUNT(*) AS real) AS c,
-                        intfar_id
-                    FROM {games_table} AS g
-                    GROUP BY intfar_id
+                    SELECT COALESCE(c, 0.0) AS c, p.disc_id AS intfar_id FROM 
+                    {stats_table} AS p
+                    LEFT JOIN {stats_table} AS g
+                    ON g.game_id = p.game_id
+                    LEFT JOIN (
+                        SELECT
+                            CAST(COUNT(*) AS real) AS c,
+                            intfar_id
+                        FROM {games_table} AS g
+                        GROUP BY intfar_id
+                        HAVING intfar_id IS NOT NULL
+                    ) sub
+                    ON p.disc_id = sub.intfar_id
+                    GROUP BY p.disc_id
                 ) intfars
                 ON intfars.intfar_id = wins.disc_id
                 LEFT JOIN (
@@ -1924,7 +1958,7 @@ class Database(SQLiteDatabase):
             if disc_id is None:
                 return performance_scores
 
-            rank = 0
+            rank = len(self.users_by_game[game]) - 1
             score = 0
             for index, (score_id, score_value) in enumerate(performance_scores):
                 if score_id == disc_id:
