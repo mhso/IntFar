@@ -7,18 +7,14 @@ from time import sleep
 import os
 import json
 
-from api.game_api.csgo import SteamAPIClient
-from api.game_data.csgo import CSGOGameStats, CSGOPlayerStats, CSGOGameStatsParser
+from api.game_api.cs2 import SteamAPIClient
+from api.game_data.cs2 import CS2GameStats, CS2PlayerStats, CS2GameStatsParser
 from api.config import Config
 from api.database import Database, DBException
 
-"""
-Array.from(document.getElementsByClassName("csgo_scoreboard_btn_gotv")).forEach((x) => console.log(x.parentNode.href));
-"""
-
 _GUILD_ID = 619073595561213953
 
-def group_data(data) -> list[CSGOGameStats]:
+def group_data(data) -> list[CS2GameStats]:
     # Group duplicate game data by timestamp
     grouped_by_date = {}
     for entry in data:
@@ -29,12 +25,12 @@ def group_data(data) -> list[CSGOGameStats]:
 
     return merged
 
-def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> list[CSGOGameStats]:
+def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> list[CS2GameStats]:
     all_data = []
-    for disc_id in database.users_by_game["csgo"]:
-        steam_id = database.users_by_game["csgo"][disc_id].ingame_id[0]
-        auth_code = database.users_by_game["csgo"][disc_id].match_auth_code[0]
-        curr_sharecode = database.users_by_game["csgo"][disc_id].latest_match_token[0]
+    for disc_id in database.users_by_game["cs2"]:
+        steam_id = database.users_by_game["cs2"][disc_id].ingame_id[0]
+        auth_code = database.users_by_game["cs2"][disc_id].match_auth_code[0]
+        curr_sharecode = database.users_by_game["cs2"][disc_id].latest_match_token[0]
         print(f"Progress for {disc_id}:")
         while curr_sharecode is not None:
             print("Sharecode:", curr_sharecode)
@@ -44,8 +40,8 @@ def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> li
             with open(f"{curr_sharecode}.json", "w", encoding="utf-8") as fp:
                 json.dump(data, fp)
 
-            stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.users_by_game["csgo"], _GUILD_ID)
-            parsed_data: CSGOGameStats = stats_parser.parse_data()
+            stats_parser = CS2GameStatsParser("cs2", data, steam_api, database.users_by_game["cs2"], _GUILD_ID)
+            parsed_data: CS2GameStats = stats_parser.parse_data()
             max_rounds = max(parsed_data.rounds_us, parsed_data.rounds_them)
             cs2 = (data["demo_parse_status"] == "error") and (max_rounds == 13 or parsed_data.rounds_us == parsed_data.rounds_them == 15)
             if cs2:
@@ -61,13 +57,13 @@ def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> li
 
 def parse_demo(steam_api: SteamAPIClient, database: Database, demo_url):
     data = steam_api.parse_demo(demo_url)
-    stats_parser = CSGOGameStatsParser("csgo", data, steam_api, database.users_by_game["csgo"], _GUILD_ID)
+    stats_parser = CS2GameStatsParser("cs2", data, steam_api, database.users_by_game["cs2"], _GUILD_ID)
 
     return stats_parser.parse_data()
 
-def get_data_from_file(database: Database, steam_api: SteamAPIClient) -> list[CSGOGameStats]:
-    folder = "misc/old_csgo_games"
-    all_match_files = glob(f"{folder}/csgo_matches*")
+def get_data_from_file(database: Database, steam_api: SteamAPIClient) -> list[CS2GameStats]:
+    folder = "misc/old_cs2_games"
+    all_match_files = glob(f"{folder}/cs2_matches*")
     all_demo_files = glob(f"{folder}/gotv_demos*")
 
     match_files_by_name = {
@@ -138,8 +134,8 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient) -> list[CS
                                     )
 
                                 all_data.append(
-                                    CSGOGameStats(
-                                        "csgo",
+                                    CS2GameStats(
+                                        "cs2",
                                         match_id,
                                         timestamp,
                                         duration,
@@ -194,9 +190,9 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient) -> list[CS
 
                         if table_lines % 2 == 0:
                             name = line.strip()
-                            disc_id = database.discord_id_from_ingame_info("csgo", ingame_name=name)
+                            disc_id = database.discord_id_from_ingame_info("cs2", ingame_name=name)
                             if disc_id is not None:
-                                game_user_info = database.users_by_game["csgo"][disc_id]
+                                game_user_info = database.users_by_game["cs2"][disc_id]
                                 our_team_t = table_lines > 9
                                 player_info = {
                                     "disc_id": disc_id,
@@ -234,7 +230,7 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient) -> list[CS
                             )
 
                             player_stats.append(
-                                CSGOPlayerStats(
+                                CS2PlayerStats(
                                     match_id,
                                     disc_id,
                                     kills,
@@ -274,13 +270,13 @@ def run(source: str, database: Database, steam_api: SteamAPIClient):
 
     if source == "sharecode":
         # Update newest match token for players
-        for disc_id in database.users_by_game["csgo"]:
+        for disc_id in database.users_by_game["cs2"]:
             newest_code = None
             for entry in data:
                 if entry.find_player_stats(disc_id, entry.filtered_player_stats) is not None:
                     newest_code = entry.game_id
 
-            database.set_new_csgo_sharecode(disc_id, newest_code)
+            database.set_new_cs2_sharecode(disc_id, newest_code)
 
     print(f"DONE! Saved data for {len(data)} games")
 
@@ -295,6 +291,6 @@ if __name__ == "__main__":
     config = Config()
     config.steam_2fa_code = args.steam_2fa_code
     database = Database(config)
-    steam_api = SteamAPIClient("csgo", config)
+    steam_api = SteamAPIClient("cs2", config)
 
     run(args.source, database, steam_api)

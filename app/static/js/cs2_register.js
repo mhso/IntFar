@@ -1,9 +1,9 @@
 function formSubmit(event) {
     event.preventDefault();
     
-    let inputIds = ["csgo-register-id", "csgo-register-token", "csgo-register-code"]
+    let inputIds = ["cs2-register-id", "cs2-register-token", "cs2-register-code"]
     let inputLengths = [17, 34, 15];
-    const inputErrorClass = "csgo-input-error";
+    const inputErrorClass = "cs2-input-error";
     
     let anyErrors = false;
 
@@ -29,18 +29,18 @@ function formSubmit(event) {
     }
 
     // Validate the contents of the given input values
-    let steamInput = document.getElementById("csgo-register-id");
+    let steamInput = document.getElementById("cs2-register-id");
     if (!steamInput.classList.contains(inputErrorClass)) {
         let steamIdPrefix = "765";
         if (!steamInput.value.startsWith(steamIdPrefix)) {
-            let errorLabel = document.getElementById("csgo-register-id-error");
+            let errorLabel = document.getElementById("cs2-register-id-error");
             errorLabel.textContent = "Invalid Steam ID. It should start with '" + steamIdPrefix + "'.";
             anyErrors = true;
             steamInput.classList.add(inputErrorClass);
         }
     }
 
-    let matchTokenInput = document.getElementById("csgo-register-token");
+    let matchTokenInput = document.getElementById("cs2-register-token");
     if (!matchTokenInput.classList.contains(inputErrorClass)) {
         let dashSplit = matchTokenInput.value.split("-");
         let splitLengths = [4, 5, 5, 5, 5, 5];
@@ -59,19 +59,19 @@ function formSubmit(event) {
         }
         if (errors) {
             anyErrors = true;
-            let errorLabel = document.getElementById("csgo-register-token-error");
+            let errorLabel = document.getElementById("cs2-register-token-error");
             errorLabel.textContent = "Invalid Recent Match Token. It should be of the form 'CSGO-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX'.";
             authCodeInput.classList.add(inputErrorClass);
         }
     }
 
-    let authCodeInput = document.getElementById("csgo-register-code");
+    let authCodeInput = document.getElementById("cs2-register-code");
     if (!authCodeInput.classList.contains(inputErrorClass)) {
         let dashSplit = authCodeInput.value.split("-");
         let splitLengths = [4, 5, 4];
         for (let i = 0; i < splitLengths.length; i++) {
             if (i >= dashSplit.length || splitLengths[i] != dashSplit[i].length) {
-                let errorLabel = document.getElementById("csgo-register-code-error");
+                let errorLabel = document.getElementById("cs2-register-code-error");
                 errorLabel.textContent = "Invalid Match History Code. It should be of the form 'XXXX-XXXXX-XXXX'.";
                 anyErrors = true;
                 authCodeInput.classList.add(inputErrorClass);
@@ -82,14 +82,14 @@ function formSubmit(event) {
 
     if (!anyErrors) {
         for (let i = 0; i < inputIds.length; i++) {
-            document.getElementById(inputIds[i]).classList.add("csgo-input-success");
+            document.getElementById(inputIds[i]).classList.add("cs2-input-success");
         }
 
-        let form = document.getElementById("csgo-register-form");
+        let form = document.getElementById("cs2-register-form");
         form.submit();
     }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById("csgo-register-form").addEventListener("submit", formSubmit);
+    document.getElementById("cs2-register-form").addEventListener("submit", formSubmit);
 });

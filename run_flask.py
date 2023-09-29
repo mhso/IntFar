@@ -29,7 +29,7 @@ def run_app(
         Route("soundboard", "soundboard_page", "soundboard"),
         Route("lan", "lan_page", "lan"),
         Route("lists", "lists_page", "lol/lists"),
-        Route("register_csgo", "register_csgo_page", "csgo/register"),
+        Route("register_cs2", "register_cs2_page", "cs2/register"),
         Route("quiz", "quiz_page", "quiz"),
     ]
 

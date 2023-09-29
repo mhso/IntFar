@@ -174,13 +174,13 @@ async def handle_lol_summary_msg(client, message, target_id):
 
     await message.channel.send(response)
 
-async def handle_csgo_summary_msg(client, message, target_id):
-    game = "csgo"
+async def handle_cs2_summary_msg(client, message, target_id):
+    game = "cs2"
 
     # Shows information about various stats a person has accrued.
     nickname = client.get_discord_nick(target_id, message.guild.id)
     games_played = client.database.get_intfar_stats(game, target_id)[0]
-    maps_played = client.database.get_csgo_maps_played(target_id)
+    maps_played = client.database.get_cs2_maps_played(target_id)
 
     total_winrate = client.database.get_total_winrate(game, target_id)
     total_maps = len(client.api_clients[game].map_names)
@@ -188,12 +188,12 @@ async def handle_csgo_summary_msg(client, message, target_id):
     longest_win_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 1)
     longest_loss_streak = client.database.get_longest_win_or_loss_streak(game, target_id, -1)
 
-    best_map_wr, best_map_games, best_map_id = client.database.get_min_or_max_csgo_winrate_map(target_id, True)
-    worst_map_wr, worst_map_games, worst_map_id = client.database.get_min_or_max_csgo_winrate_map(target_id, False)
+    best_map_wr, best_map_games, best_map_id = client.database.get_min_or_max_cs2_winrate_map(target_id, True)
+    worst_map_wr, worst_map_games, worst_map_id = client.database.get_min_or_max_cs2_winrate_map(target_id, False)
 
     if best_map_id == worst_map_id:
         # Person has not played 10 games with any champ. Try to get stats with 5 minimum games.
-        worst_map_wr, worst_map_games, worst_map_id = client.database.get_min_or_max_csgo_winrate_map(
+        worst_map_wr, worst_map_games, worst_map_id = client.database.get_min_or_max_cs2_winrate_map(
             target_id, False, min_games=5
         )
 
@@ -247,8 +247,8 @@ async def handle_csgo_summary_msg(client, message, target_id):
 async def handle_summary_msg(client, message, game, target_id):
     if game == "lol":
         return await handle_lol_summary_msg(client, message, target_id)
-    elif game == "csgo":
-        return await handle_csgo_summary_msg(client, message, target_id)
+    elif game == "cs2":
+        return await handle_cs2_summary_msg(client, message, target_id)
 
 async def handle_performance_msg(client, message, game, target_id=None):
     performance_data = client.database.get_performance_score(game, target_id)
@@ -292,7 +292,7 @@ async def handle_winrate_msg(client, message, game, champ_or_map, target_id):
             winrate, games = client.database.get_league_champ_winrate(target_id, played_id)
             qualified_name = client.api_clients[game].get_champ_name(played_id)
         else:
-            winrate, games = client.database.get_csgo_map_winrate(target_id, played_id)
+            winrate, games = client.database.get_cs2_map_winrate(target_id, played_id)
             qualified_name = client.api_clients[game].get_map_name(played_id)
 
     if winrate is not None:

@@ -1359,25 +1359,25 @@ table {
 }
 
 /****************##############****************\
-|                 Register CSGO                 |
+|                 Register CS2                 |
 \****************##############****************/
-#csgo-register-wrapper h1 {
+#cs2-register-wrapper h1 {
     margin-top: 30px;
     margin-bottom: 30px;
     font-weight: 1000;
 }
 
-#csgo-register-wrapper h2 {
+#cs2-register-wrapper h2 {
     font-size: 1.5rem;
 }
 
-#csgo-register-not-logged-in {
+#cs2-register-not-logged-in {
     text-align: center;
     font-size: 18px;
     margin-top: 100px;
 }
 
-#csgo-register-form {
+#cs2-register-form {
     text-align: center;
     font-size: 18px;
     width: 675px;
@@ -1387,12 +1387,12 @@ table {
     border: 2px solid white;
 }
 
-#csgo-register-form > div {
+#cs2-register-form > div {
     border-bottom: 1px solid white;
     padding: 30px;
 }
 
-#csgo-register-form input {
+#cs2-register-form input {
     border-radius: 10px;
     margin-left: 5px;
     margin-right: 5px;
@@ -1402,55 +1402,55 @@ table {
     width: 420px;
 }
 
-#csgo-register-id {
+#cs2-register-id {
     width: 350px !important;
 }
 
-#csgo-register-code {
+#cs2-register-code {
     margin-top: 15px
 }
 
-.csgo-register-helper > ol {
+.cs2-register-helper > ol {
     width: 400px;
     margin: 0 auto;
     text-align: left;
 }
 
-.csgo-register-emph {
+.cs2-register-emph {
     font-style: italic;
     font-weight: 1000;
 }
 
-.csgo-register-help-img {
+.cs2-register-help-img {
     width: 100%;
     height: auto;
     border: 1px ridge white;
     margin: 10px 0;
 }
 
-.csgo-register-error-label {
+.cs2-register-error-label {
     display: block;
     margin-top: 5px;
     color: red;
     font-size: 15px;
 }
 
-#csgo-register-submit-error {
+#cs2-register-submit-error {
     font-size: 20px;
     margin-top: 1rem;
     margin-bottom: 0;
     color: red;
 }
 
-.csgo-input-error {
+.cs2-input-error {
     border: 1px solid red;
 }
 
-.csgo-input-success {
+.cs2-input-success {
     border: 1px solid green;
 }
 
-#csgo-register-submit {
+#cs2-register-submit {
     font-size: 22px;
     background-color: #1712ae;
     color: white;
@@ -1461,15 +1461,15 @@ table {
     margin: 15px 0;
 }
 
-#csgo-register-success-wrapper {
+#cs2-register-success-wrapper {
     text-align: center;
 }
 
-.csgo-submit-success {
+.cs2-submit-success {
     color: #00ef0f;
     font-size: 20px;
 }
 
-.csgo-submit-error {
+.cs2-submit-error {
     color: red;
 }

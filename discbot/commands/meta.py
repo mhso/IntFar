@@ -239,7 +239,7 @@ async def handle_website_msg(client, message):
         f"{api_util.get_website_link()}\n" +
         "Write `!website_verify` to sign in to the website, " +
         "allowing you to create bets, see stats, upload sounds, and more! "
-        "You can also more easily sign up for CSGO here!"
+        "You can also more easily sign up for CS2 here!"
     )
 
     await message.channel.send(client.insert_emotes(response))

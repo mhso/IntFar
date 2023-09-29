@@ -37,7 +37,7 @@ class TestMock(DiscordClient):
     def set_sharecode_mock(self, disc_id, steam_id, sharecode):
         pass
 
-    def get_users_in_csgo_game(self, game_info):
+    def get_users_in_cs2_game(self, game_info):
         users_in_game = {}
         all_users = self.database.users_by_game[self.game]
         round_stats = game_info["matches"][0]["roundstatsall"]
@@ -59,6 +59,18 @@ class TestMock(DiscordClient):
 
         return users_in_game
 
+    def get_users_in_lol_game(self, game_info):
+        users_in_game = {}
+        all_users = self.database.users_by_game[self.game]
+
+        for participant in game_info["participants"]:
+            for disc_id in all_users.keys():
+                if participant["summonerId"] in all_users[disc_id].ingame_id:
+                    users_in_game[disc_id] = all_users[disc_id]
+                    break
+
+        return users_in_game
+
     async def on_ready(self):
         await super(TestMock, self).on_ready()
 
@@ -75,7 +87,7 @@ class TestMock(DiscordClient):
                 self.channels_to_write[guild_id] = MockChannel()
 
             if not self.save_sharecode:
-                self.database.set_new_csgo_sharecode = self.set_sharecode_mock
+                self.database.set_new_cs2_sharecode = self.set_sharecode_mock
 
             try:
                 game_info = self.api_clients[self.game].get_game_details(self.game_id)
@@ -83,8 +95,10 @@ class TestMock(DiscordClient):
                 logger.exception("Failed to get game info for some reason!")
                 exit(0)
 
-            if self.game == "csgo":
-                game_monitor.users_in_game[guild_id] = self.get_users_in_csgo_game(game_info)
+            if self.game == "cs2":
+                game_monitor.users_in_game[guild_id] = self.get_users_in_cs2_game(game_info)
+            elif self.game == "lol":
+                game_monitor.users_in_game[guild_id] = self.get_users_in_lol_game(game_info)
 
             status = await game_monitor.get_finished_game_status(game_info, guild_id)
 

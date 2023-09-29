@@ -19,7 +19,7 @@ class TestWrapper(TestRunner):
 
         self.steam_2fa_code = input("Steam 2FA Code: ")
         self.steam_process = subprocess.Popen(
-            f". venv/Scripts/activate; python run_steam.py csgo {self.steam_2fa_code}",
+            f". venv/Scripts/activate; python run_steam.py cs2 {self.steam_2fa_code}",
             executable="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,

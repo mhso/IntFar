@@ -4,7 +4,7 @@ from api.award_qualifiers import AwardQualifiers
 from api.game_stats import get_outlier
 from api.util import round_digits
 
-class CSGOAwardQualifiers(AwardQualifiers):
+class CS2AwardQualifiers(AwardQualifiers):
     @classmethod
     def INTFAR_REASONS(cls):
         return {

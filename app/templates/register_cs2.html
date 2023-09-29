@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+{% set subtitle = 'Register for CS2' %}
+{% include 'head.html' %}
+{% import "navbar.html" as navbar %}
+<body>
+    <div id="cs2-register-wrapper" class="container-flex">
+        {{ navbar.navbar(game, game_name, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
+        <h1>Register for CS2</h1>
+
+        {% if not logged_in_user %}
+        <div id="cs2-register-not-logged-in">
+            <p>You must be logged in to the website to register for CS2.</p>
+            <p>Write <span class="discord-command">!website_verify</span> in Discord to login.</p>
+        </div>
+        {% elif register_msg and not register_status == 0 %}
+        <div id="cs2-register-success-wrapper">
+            <p class="cs2-submit-success">Easy peasy, lemon squeezy!</p>
+            {% if register_status == 2 %}
+            <p>{{ register_msg }}</p>
+            {% else %}
+            <p><strong>One more step!</strong> Accept the Steam friend request from Int-Far</p>
+            <p>Then he can creep on you and point out all your mistakes!</p>
+            {% endif %}
+            <a href="{{ url_for('cs2.index.index') }}">
+                <button class="standard-btn" style="margin-top: 20px;">CS2 Home</button>
+            </a>
+        </div>
+        {% else %}
+        <div class="row">
+            <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
+            <div class="col-12 col-md-10 col-lg-8 col-xxl-6">
+            <form id="cs2-register-form" method="POST">
+                {% if register_status == 0 %}
+                <p id="cs2-register-submit-error">Error: {{ register_msg }}</p>
+                {% endif %}
+
+                <div>
+                    <input id="cs2-register-id" name="steam_id" type="text" placeholder="Steam ID">
+                    <label id="cs2-register-id-error" class="cs2-register-error-label" for="steam_id"></label>
+
+                    <div class="cs2-register-helper">
+                        <h2>How do I find my Steam ID?</h2>
+                        <ol>
+                            <li>Open Steam</li>
+                            <li>Go to 'Settings' > 'Account Details'</li>
+                            <li>
+                                <span class="cs2-register-emph">Steam ID</span> is shown at the top left
+                                <img src="{{ url_for('static', filename='img/cs2_help_steamid.png') }}" class="cs2-register-help-img">
+                            </li>
+                            <li>Paste this in the field above
+                        </ol>
+                    </div>
+                </div>
+
+                <div>
+                    <input id="cs2-register-token" name="match_token" type="text" placeholder="Recent Match Token">
+                    <label id="cs2-register-token-error" class="cs2-register-error-label" for="match_token"></label>
+
+                    <input id="cs2-register-code" name="match_auth_code" type="text" placeholder="Match Authentication Code">
+                    <label id="cs2-register-code-error" class="cs2-register-error-label" for="match_auth_code"></label>
+
+                    <div class="cs2-register-helper">
+                        <h2>How do I find my CS2 Match History Authentication Code and Token?</h2>
+                        <ol>
+                            <li>Go to <a style="color: cyan" href="https://help.steampowered.com/en/wizard/HelpWithGameIssue/?appid=730&issueid=128" target="_blank">this link</a></li>
+                            <li>Log in if you aren't logged in already</li>
+                            <li>Under 'Access to Your Match History' click <span class="cs2-register-emph">Create Authentication Code</span></li>
+                            <li>
+                                Paste the two codes shown here into the respective fields above
+                                <img src="{{ url_for('static', filename='img/cs2_help_match_code.png') }}" class="cs2-register-help-img">
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+
+                <button id="cs2-register-submit" type="submit">Register</button>
+            </form>
+            </div>
+            <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
+        </div>
+        <script src="{{ url_for('static', filename='js/cs2_register.js') }}"></script>
+        {% endif %}
+    </div>
+</body>
+</html>

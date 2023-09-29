@@ -5,7 +5,7 @@ import sys
 import json
 
 from api.config import Config
-from api.game_api.csgo import SteamAPIClient
+from api.game_api.cs2 import SteamAPIClient
 from argparse import ArgumentParser
 
 parser = ArgumentParser()

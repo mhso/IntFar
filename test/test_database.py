@@ -106,8 +106,8 @@ class TestWrapper(TestRunner):
         self.assert_no_exception(database.get_min_or_max_league_winrate_champ, "Get min or max winrate champ best.", MY_DISC_ID, True)
         self.assert_no_exception(database.get_min_or_max_league_winrate_champ, "Get min or max winrate champ worst.", MY_DISC_ID, False)
 
-        self.assert_no_exception(database.get_min_or_max_csgo_winrate_map, "Get min or max winrate map best.", MY_DISC_ID, True)
-        self.assert_no_exception(database.get_min_or_max_csgo_winrate_map, "Get min or max winrate map worst.", MY_DISC_ID, False)
+        self.assert_no_exception(database.get_min_or_max_cs2_winrate_map, "Get min or max winrate map best.", MY_DISC_ID, True)
+        self.assert_no_exception(database.get_min_or_max_cs2_winrate_map, "Get min or max winrate map worst.", MY_DISC_ID, False)
 
         self.assert_no_exception(database.get_league_champs_played, "Get champs played")
         self.assert_no_exception(database.get_league_champs_played, "Get champs played", MY_DISC_ID)

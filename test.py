@@ -11,7 +11,7 @@ from api import award_qualifiers, config, database, util
 from api.awards import get_awards_handler
 from api.game_data import get_stat_parser
 from api.game_api.lol import RiotAPIClient
-from api.game_api.csgo import SteamAPIClient
+from api.game_api.cs2 import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
 from discbot.montly_intfar import MonthlyIntfar, MONTH_NAMES
 from discbot.discord_bot import DiscordClient

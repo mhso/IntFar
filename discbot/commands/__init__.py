@@ -289,8 +289,8 @@ def initialize_commands():
     register_desc = (
         "Sign up for the Int-Far™ Tracker™ for the given game " +
         "by providing your ingame info. For LoL, this is just your summoner name. "
-        "For CSGO, this is your Steam ID, latest match token, and match authentication code. "
-        "(For CSGO, signing up on the website is a lot easier)."
+        "For CS2, this is your Steam ID, latest match token, and match authentication code. "
+        "(For CS2, signing up on the website is a lot easier)."
     )
     register_command(
         register_name,
@@ -438,7 +438,7 @@ def initialize_commands():
         "Fx. `!average lol kda` to see your average KDA over all games. "
         "This command accepts different parameters for different games. "
         "For LoL, you can see KDA on champs (fx. `!average kda jhin`), "
-        "for CSGO, you can see KDA on maps (fx. `!average kda inferno`). "
+        "for CS2, you can see KDA on maps (fx. `!average kda inferno`). "
         "(Minimum 10 total games is required to get average KDA)"
     )
     register_command(
@@ -531,7 +531,7 @@ def initialize_commands():
     bet_name = "bet"
     bet_desc = (
         "Bet a specific amount of credits on one or more events happening " +
-        "in the current or next game. Fx. `!bet lol 100 game_win`, `!bet csgo all intfar slurp` " +
+        "in the current or next game. Fx. `!bet lol 100 game_win`, `!bet cs2 all intfar slurp` " +
         "or `!bet lol 20 game_win & 30 no_intfar` (bet on game win *AND* no Int-Far in a League game)."
     )
     register_command(
@@ -978,7 +978,7 @@ def initialize_commands():
     wr_desc = (
         "Show you or someone else's winrate. This command accepts different parameters "
         "for different games. For LoL you can see winrates on champions (f.x `!wr aphelios nønø`). "
-        "In CSGO you can see winrates on maps (f.x. `!wr cache`)."
+        "In CS2 you can see winrates on maps (f.x. `!wr cache`)."
     )
     register_command(
         wr_name,

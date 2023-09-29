@@ -22,7 +22,7 @@ from api.game_data import get_stat_parser
 from api.game_stats import GameStats
 from api.game_monitoring import get_game_monitor
 from api.game_monitoring.lol import LoLGameMonitor
-from api.game_monitoring.csgo import CSGOGameMonitor
+from api.game_monitoring.cs2 import CS2GameMonitor
 from api.database import DBException, Database
 from api.betting import BettingHandler
 from api.audio_handler import AudioHandler
@@ -155,7 +155,7 @@ class DiscordClient(discord.Client):
             await self.channels_to_write[guild_id].send(response)
 
         else:
-            funcs = {"lol": self.on_lol_game_over, "csgo": self.on_csgo_game_over}
+            funcs = {"lol": self.on_lol_game_over, "cs2": self.on_cs2_game_over}
             await funcs[game](game_monitor, game_info, guild_id, status_code)
 
     async def on_lol_game_over(self, game_monitor: LoLGameMonitor, game_info: dict, guild_id: int, status_code: int):
@@ -201,18 +201,18 @@ class DiscordClient(discord.Client):
 
             await self.handle_game_over(game_monitor.game, game_info, guild_id)
 
-    async def on_csgo_game_over(self, game_monitor: CSGOGameMonitor, game_info: dict, guild_id: int, status_code: int):
+    async def on_cs2_game_over(self, game_monitor: CS2GameMonitor, game_info: dict, guild_id: int, status_code: int):
         """
-        Method called when a CSGO game is finished.
+        Method called when a CS2 game is finished.
 
         :param data:        Dictionary containing un-filtered data about a finished
-                            game fetched from CSGO and parsed with awpy
+                            game fetched from CS2 and parsed with awpy
         :param guild_id:    ID of the Discord server where the game took place
         :param status_code: Integer that describes the status of the finished game
         """        
         for disc_id in game_monitor.users_in_game[guild_id]:
             steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
-            self.database.set_new_csgo_sharecode(disc_id, steam_id, game_info["matchID"])
+            self.database.set_new_cs2_sharecode(disc_id, steam_id, game_info["matchID"])
 
         if status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
             # Game was too short, most likely an early surrender
@@ -1851,7 +1851,7 @@ class DiscordClient(discord.Client):
     async def close(self):
         super().close()
 
-        self.api_clients["csgo"].close()
+        self.api_clients["cs2"].close()
 
 def run_client(config, database, betting_handlers, api_clients, ai_pipe, flask_pipe, main_pipe):
     client = DiscordClient(

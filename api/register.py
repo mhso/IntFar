@@ -1,6 +1,6 @@
 from api.database import Database
 from api.game_api.lol import RiotAPIClient
-from api.game_api.csgo import SteamAPIClient
+from api.game_api.cs2 import SteamAPIClient
 from api.game_api_client import GameAPIClient
 
 from mhooge_flask.logging import logger
@@ -22,7 +22,7 @@ def register_for_lol(database: Database, api_client: RiotAPIClient, disc_id: int
         ingame_id=summ_id
     )
 
-def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: int, steam_id: int, match_auth_code: str=None, match_token: str=None):
+def register_for_cs2(database: Database, api_client: SteamAPIClient, disc_id: int, steam_id: int, match_auth_code: str=None, match_token: str=None):
     if steam_id is None:
         return 0, "You must supply a Steam ID."
 
@@ -64,7 +64,7 @@ def register_for_csgo(database: Database, api_client: SteamAPIClient, disc_id: i
 
 _REGISTER_METHODS = {
     "lol": register_for_lol,
-    "csgo": register_for_csgo
+    "cs2": register_for_cs2
 }
 
 def register_for_game(database: Database, api_client: GameAPIClient, disc_id: int, *game_params) -> tuple[int, str]:

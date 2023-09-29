@@ -43,16 +43,16 @@
                     Lists
                 </a>
             </div>
-            {% if game == 'csgo' %}
+            {% if game == 'cs2' %}
             <div class="navbar-menu-dropdown-item">
-                <a href="{{ url_for('register_csgo_page.home') }}">
+                <a href="{{ url_for('register_cs2_page.home') }}">
                     Register
                 </a>
             </div>
             {% endif %}
             <hr>
             <div class="navbar-menu-dropdown-item">
-                <a href="{% if game == 'lol' %}{{ url_for('csgo.index.index') }}{% else %}{{ url_for('lol.index.index') }}{% endif %}">
+                <a href="{% if game == 'lol' %}{{ url_for('cs2.index.index') }}{% else %}{{ url_for('lol.index.index') }}{% endif %}">
                     {% if game == 'lol' %}Counter Strike: Global Offensive{% else %}League of Legends{% endif %}
                 </a>
             </div>

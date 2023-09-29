@@ -23,7 +23,7 @@ class Database(SQLiteDatabase):
         # Populate summoner names and ids lists with currently registered summoners.
         params = {
             "lol": [],
-            "csgo": ["match_auth_code", "latest_match_token"]
+            "cs2": ["match_auth_code", "latest_match_token"]
         }
         with self:
             self.all_users: dict[int, User] = self.get_base_users()
@@ -230,8 +230,8 @@ class Database(SQLiteDatabase):
             self.execute_query(query_1, game_id, commit=False)
             self.execute_query(query_2, game_id)
 
-    def set_new_csgo_sharecode(self, disc_id, steam_id, sharecode):
-        game = "csgo"
+    def set_new_cs2_sharecode(self, disc_id, steam_id, sharecode):
+        game = "cs2"
         users_table = self._get_users_table(game)
 
         query = f"UPDATE {users_table} SET latest_match_token=? WHERE disc_id=? AND ingame_id=?"
@@ -437,8 +437,8 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_csgo_map_count_for_stat(self, stat, maximize, disc_id):
-        game = "csgo"
+    def get_cs2_map_count_for_stat(self, stat, maximize, disc_id):
+        game = "cs2"
         games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         users_table = self._get_users_table(game)
@@ -472,8 +472,8 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_average_stat_csgo(self, stat, disc_id=None, map_id=None, min_games=10):
-        game = "csgo"
+    def get_average_stat_cs2(self, stat, disc_id=None, map_id=None, min_games=10):
+        game = "cs2"
         games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         users_table = self._get_users_table(game)
@@ -922,8 +922,8 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query, *params).fetchone()[0]
 
-    def get_csgo_maps_played(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
-        game = "csgo"
+    def get_cs2_maps_played(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        game = "cs2"
         games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
@@ -1167,8 +1167,8 @@ class Database(SQLiteDatabase):
 
             return result
 
-    def get_csgo_map_winrate(self, disc_id, map_id):
-        game = "csgo"
+    def get_cs2_map_winrate(self, disc_id, map_id):
+        game = "cs2"
         games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
 
@@ -1206,8 +1206,8 @@ class Database(SQLiteDatabase):
             params = [disc_id, map_id] * 2
             return self.execute_query(query, *params).fetchone()
 
-    def get_min_or_max_csgo_winrate_map(self, disc_id, best, included_maps=None, return_top_n=1, min_games=10):
-        game = "csgo"
+    def get_min_or_max_cs2_winrate_map(self, disc_id, best, included_maps=None, return_top_n=1, min_games=10):
+        game = "cs2"
         games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
 
@@ -1275,7 +1275,7 @@ class Database(SQLiteDatabase):
 
             if result is None and min_games == 10:
                 # If no champs are found with min 10 games, try again with 5.
-                return self.get_min_or_max_csgo_winrate_map(disc_id, best, included_maps, return_top_n, min_games=5)
+                return self.get_min_or_max_cs2_winrate_map(disc_id, best, included_maps, return_top_n, min_games=5)
 
             return result
 

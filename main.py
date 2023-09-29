@@ -15,7 +15,7 @@ from api.util import SUPPORTED_GAMES
 from api.proxy import ProxyManager
 
 from api.game_api.lol import RiotAPIClient
-from api.game_api.csgo import SteamAPIClient
+from api.game_api.cs2 import SteamAPIClient
 from api.bets import get_betting_handler
 #from ai import model
 
@@ -75,11 +75,11 @@ def main():
         load_opus("/usr/local/lib/libopus.so")
 
     logger.info("Initializing game API clients...")
-    proxy_manager = ProxyManager(SteamAPIClient, "csgo", conf)
+    proxy_manager = ProxyManager(SteamAPIClient, "cs2", conf)
 
     api_clients = {
         "lol": RiotAPIClient("lol", conf),
-        "csgo": proxy_manager.create_proxy()
+        "cs2": proxy_manager.create_proxy()
     }
 
     logger.info("Initializing database...")

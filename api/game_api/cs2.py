@@ -36,7 +36,7 @@ _ENDPOINT_PLAYER_SUMMARY = (
 
 class SteamAPIClient(GameAPIClient):
     """
-    Class for interacting with Steam and CSGO web and Game Coordinator APIs.
+    Class for interacting with Steam and CS2 web and Game Coordinator APIs.
     """
     def __init__(self, game: str, config: Config):
         super().__init__(game, config)
@@ -54,7 +54,7 @@ class SteamAPIClient(GameAPIClient):
             8388616: "anubis"
         }
         self.get_latest_data()
-        self.csgo_app_id = 730
+        self.cs2_app_id = 730
 
         self.steam_client = SteamClient()
         self.cs_client = CSGOClient(self.steam_client)
@@ -67,7 +67,7 @@ class SteamAPIClient(GameAPIClient):
         if self.config.steam_2fa_code is not None:
             self.login()
         else:
-            logger.warning("No Steam 2FA code provided. Steam/CSGO functionality wont work!")
+            logger.warning("No Steam 2FA code provided. Steam/CS2 functionality wont work!")
 
     def get_latest_data(self):
         url = "https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive/Maps"
@@ -92,7 +92,7 @@ class SteamAPIClient(GameAPIClient):
                 self.map_names[short_name] = full_name
 
         except requests.RequestException:
-            logger.exception("Exception when downloading CSGO maps from", url)
+            logger.exception("Exception when downloading CS2 maps from", url)
 
     def _download_demo_file(self, filename: str, url: str):
         try:
@@ -107,7 +107,7 @@ class SteamAPIClient(GameAPIClient):
                     fp.write(chunk)
 
         except requests.RequestException:
-            logger.exception("Exception when downloading CSGO demo file from", url)
+            logger.exception("Exception when downloading CS2 demo file from", url)
             return None
 
         return filename
@@ -261,7 +261,7 @@ class SteamAPIClient(GameAPIClient):
 
         for player in response.json().get("response", {}).get("players", []):
             if player["steamid"] == str(steam_id):
-                return int(player.get("gameid", "0")) == self.csgo_app_id
+                return int(player.get("gameid", "0")) == self.cs2_app_id
 
         return False
 

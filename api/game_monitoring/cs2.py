@@ -8,9 +8,9 @@ from api.config import Config
 from api.database import Database
 from api.user import User
 from api.game_monitor import GameMonitor
-from api.game_api.csgo import SteamAPIClient
+from api.game_api.cs2 import SteamAPIClient
 
-class CSGOGameMonitor(GameMonitor):
+class CS2GameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_DUPLICATE = 5
     POSTGAME_STATUS_SHORT_MATCH = 6
@@ -114,7 +114,7 @@ class CSGOGameMonitor(GameMonitor):
                 "map_id": "Unknown",
                 "map_name": "Unknown",
                 "game_type": "Competitive",
-                "game_mode": "CSGO",
+                "game_mode": "CS2",
             },
             users_in_current_game,
             None

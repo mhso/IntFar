@@ -1,7 +1,7 @@
 from api.betting import BettingHandler, BetResolver, Bet
 from api.game_stats import GameStats, get_outlier
 
-class CSGOBetResolver(BetResolver):
+class CS2BetResolver(BetResolver):
     def resolve_game_outcome(self):
         bet_outcomes = ["game_loss", "game_tie", "game_win"]
         index = bet_outcomes.index(self.bet.event_id) - 1
@@ -82,7 +82,7 @@ class CSGOBetResolver(BetResolver):
             "most_flash_assists"
         ]
 
-class CSGOBettingHandler(BettingHandler):
+class CS2BettingHandler(BettingHandler):
     @property
     def all_bets(self) -> list[Bet]:
         return super().all_bets + [
@@ -111,4 +111,4 @@ class CSGOBettingHandler(BettingHandler):
         ]
 
     def get_bet_resolver(self, bet: Bet, game_stats: GameStats, target_id: int = None) -> BetResolver:
-        return CSGOBetResolver(bet, game_stats, target_id)
+        return CS2BetResolver(bet, game_stats, target_id)

@@ -1,6 +1,6 @@
 import api.util as api_util
 from api.game_data import get_stat_quantity_descriptions, stats_from_database
-from api.game_data.csgo import RANKS
+from api.game_data.cs2 import RANKS
 
 async def handle_stats_msg(client, message, game):
     valid_stats = ", ".join(f"'{cmd}'" for cmd in get_stat_quantity_descriptions(game))
@@ -65,13 +65,13 @@ async def handle_average_msg_lol(client, message, stat, champ_id=None, disc_id=N
 
     await message.channel.send(client.insert_emotes(response))
 
-async def handle_average_msg_csgo(client, message, stat, map_id=None, disc_id=None):
+async def handle_average_msg_cs2(client, message, stat, map_id=None, disc_id=None):
     map_name = None
     if map_id is not None:
-        map_name = client.api_clients["csgo"].get_map_name(map_id)
+        map_name = client.api_clients["cs2"].get_map_name(map_id)
 
     minimum_games = 10 if map_id is None else 5
-    values = client.database.get_average_stat_csgo(stat, disc_id, map_id, minimum_games)
+    values = client.database.get_average_stat_cs2(stat, disc_id, map_id, minimum_games)
 
     for_all = disc_id is None
     readable_stat = stat.replace("_", " ")
@@ -128,8 +128,8 @@ async def handle_average_msg(client, message, game, stat, champ_or_map=None, dis
 
     if game == "lol":
         await handle_average_msg_lol(client, message, stat, champ_or_map, disc_id)
-    elif game == "csgo":
-        await handle_average_msg_csgo(client, message, stat, champ_or_map, disc_id)
+    elif game == "cs2":
+        await handle_average_msg_cs2(client, message, stat, champ_or_map, disc_id)
 
 def get_game_summary(client, game, game_id, target_id, guild_id):
     game_stats = stats_from_database(
@@ -215,8 +215,8 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
                 )
                 champ_name = client.api_clients[game].get_champ_name(champ_id)
                 game_specific_desc = f"The champion he most often gets {readable_stat} with is **{champ_name}** (**{champ_count}** games).\n"
-            elif game == "csgo":
-                map_id, map_count = client.database.get_csgo_map_count_for_stat(
+            elif game == "cs2":
+                map_id, map_count = client.database.get_cs2_map_count_for_stat(
                     stat, best, target_id
                 )
                 map_name = client.api_clients[game].get_map_name(map_id)
