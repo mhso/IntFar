@@ -2,30 +2,6 @@ import os
 from api.database import Database
 from api.config import Config
 
-BETTING_IDS = {
-    "game_win": 0,
-    "game_loss": 1,
-    "no_intfar": 2,
-    "intfar": 3,
-    "intfar_kda": 4,
-    "intfar_deaths": 5,
-    "intfar_kp": 6,
-    "intfar_vision": 7,
-    "doinks": 8,
-    "doinks_kda": 9,
-    "doinks_kills": 10,
-    "doinks_damage": 11,
-    "doinks_penta": 12,
-    "doinks_vision": 13,
-    "doinks_kp": 14,
-    "doinks_monsters": 15,
-    "doinks_cs": 16,
-    "most_kills": 17,
-    "most_damage": 18,
-    "most_kp": 19,
-    "highest_kda": 20
-}
-
 conf_1 = Config()
 
 database_client_1 = Database(conf_1)
@@ -64,6 +40,7 @@ with database_client_1.get_connection() as db_1:
 
         for user in users_csgo:
             db_2.cursor().execute("INSERT OR IGNORE INTO users_csgo VALUES (?, ?, ?, ?, ?, ?, ?)", user)
+            db_2.cursor().execute("INSERT OR IGNORE INTO users_cs2 VALUES (?, ?, ?, ?, ?, ?, ?)", user)
 
         query = "INSERT INTO games_lol VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         for data in data_games_lol:

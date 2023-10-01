@@ -367,8 +367,8 @@ class LoLGameStatsParser(GameStatsParser):
                 else int((float(stats.kills + stats.assists) / float(kills_per_team[our_team])) * 100.0)
             )
 
-        game_win = True
         team_id = None
+        game_win = 1
         our_baron_kills = 0
         our_dragon_kills = 0
         our_herald_kills = 0
@@ -382,7 +382,7 @@ class LoLGameStatsParser(GameStatsParser):
                 our_baron_kills = objectives["baron"]["kills"]
                 our_dragon_kills = objectives["dragon"]["kills"]
                 our_herald_kills = objectives["riftHerald"]["kills"]
-                game_win = team["win"]
+                game_win = 1 if team["win"] else -1
                 team_id = team["teamId"]
             else:
                 enemy_baron_kills = objectives["baron"]["kills"]
@@ -394,7 +394,7 @@ class LoLGameStatsParser(GameStatsParser):
             game_id=self.raw_data["gameId"],
             timestamp=int(self.raw_data["gameCreation"] / 1000),
             duration=int(self.raw_data["gameDuration"]),
-            win=int(game_win),
+            win=game_win,
             guild_id=self.guild_id,
             players_in_game=active_users,
             all_player_stats=player_stats,

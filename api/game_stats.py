@@ -71,7 +71,7 @@ class GameStats(ABC):
         ]
 
     @classmethod
-    def get_stats_from_db(cls, game: str, game_id: int, database, player_stats_cls: PlayerStats):
+    def get_stats_from_db(cls, game: str, game_id: int, database, player_stats_cls: PlayerStats) -> tuple[dict, dict]:
         game_stats_to_save = cls.STATS_TO_SAVE()
         player_stats_to_save = player_stats_cls.STATS_TO_SAVE()
 
@@ -95,7 +95,7 @@ class GameStats(ABC):
     def __post_init__(self):
         self.filtered_player_stats = list(filter(lambda x: x.disc_id is not None, self.all_player_stats))
 
-    def find_player_stats(self, disc_id: int, player_list: list[PlayerStats]):
+    def find_player_stats(self, disc_id: int, player_list: list[PlayerStats]) -> PlayerStats:
         for player_stats in player_list:
             if player_stats.disc_id == disc_id:
                 return player_stats

@@ -18,7 +18,7 @@ from discbot import commands
 from discbot.commands.meta import handle_usage_msg
 from api.award_qualifiers import AwardQualifiers
 from api.awards import get_awards_handler
-from api.game_data import get_stat_parser
+from api.game_data import get_stat_parser, get_empty_game_data
 from api.game_stats import GameStats
 from api.game_monitoring import get_game_monitor
 from api.game_monitoring.lol import LoLGameMonitor
@@ -221,13 +221,6 @@ class DiscordClient(discord.Client):
             )
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
-        elif status_code == game_monitor.POSTGAME_STATUS_CS2:
-            # Game was most likely played on CS2
-            response = (
-                "That seems to have been a CS2 game, we can't handle that (yet) so no stats are saved {emote_unlimited_chins}"
-            )
-            await self.channels_to_write[guild_id].send(self.insert_emotes(response))
-
         elif status_code == game_monitor.POSTGAME_STATUS_SURRENDER:
             # Game was too short, most likely an early surrender
             response = (
@@ -238,13 +231,22 @@ class DiscordClient(discord.Client):
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
         elif status_code == game_monitor.POSTGAME_STATUS_OK:
-
-            if game_info["demo_parse_status"] == "missing":
-                response = (
+            demo_status = game_info["demo_parse_status"]
+            demo_response = None
+            if demo_status == "missing":
+                demo_response = (
                     "Demo file was not found on Valve's servers! Nothing we can do :( "
                     "Only basic data like kills, deaths, assists, etc. will be saved."
                 )
-                await self.channels_to_write[guild_id].send(response)
+            elif demo_status == "unsupported":
+                demo_response = (
+                    "Valve does not support demos for CS2 yet, nothing we can do :( "
+                    "Only basic data like kills, deaths, assists, etc. will be saved."
+                )
+
+            if demo_response is not None:
+                logger.bind(sharecode=game_info["matchID"]).warning("Demo could not be parsed! Only basic data saved.")
+                await self.channels_to_write[guild_id].send(demo_response)
 
             await self.handle_game_over(game_monitor.game, game_info, guild_id)
 
@@ -707,7 +709,7 @@ class DiscordClient(discord.Client):
                         bet_multiplier
                     )
 
-                    response_bets += " - "
+                    response_bets += "- "
                     total_cost = 0 # Track total cost of the current bet.
                     for index, (amount, event, target) in enumerate(zip(amounts, events, targets)):
                         person = None
@@ -1490,13 +1492,14 @@ class DiscordClient(discord.Client):
         prev_month = month - 1 if month != 1 else 12
         month_name = api_util.MONTH_NAMES[prev_month-1]
 
-        intfar_data = self.database.get_intfars_of_the_month()
+        intfar_data = self.database.get_intfars_of_the_month(game)
 
         if intfar_data == []:
             # No one has played enough games to quality for IFOTM this month
             return
 
-        intro_desc = get_awards_handler(game, self.config, None).get_flavor_text("ifotm", month - 1) + "\n\n"
+        game_stats = get_empty_game_data(game)
+        intro_desc = get_awards_handler(game, self.config, game_stats).get_flavor_text("ifotm", month - 1) + "\n\n"
         intro_desc += f"{api_util.SUPPORTED_GAMES[game]} Int-Far of the month for {month_name} is...\n"
         intro_desc += "***DRUM ROLL***\n"
 

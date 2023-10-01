@@ -29,7 +29,7 @@ class TestMock(DiscordClient):
         self.guild_to_use = GUILDS.get(args.guild)
         self.task = args.task if not self.missing else "all"
         self.loud = not args.silent if not self.missing else False
-        self.save_sharecode = args.save_sharecode
+        self.forget_sharecode = args.forget_sharecode
         self.play_sound = args.sound.lower() in ("yes", "true", "1") if not self.missing else False
         self.users_in_game = args.users
         self.ai_model = kwargs.get("ai_model")
@@ -86,7 +86,7 @@ class TestMock(DiscordClient):
             if not self.loud:
                 self.channels_to_write[guild_id] = MockChannel()
 
-            if not self.save_sharecode:
+            if self.forget_sharecode:
                 self.database.set_new_cs2_sharecode = self.set_sharecode_mock
 
             try:
@@ -117,7 +117,7 @@ parser.add_argument("--game_id", type=str)
 parser.add_argument("--guild", type=str, choices=GUILDS)
 parser.add_argument("--task", type=str, choices=("all", "bets", "stats", "train"))
 parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
-parser.add_argument("--save_sharecode", action="store_true")
+parser.add_argument("--forget_sharecode", "-fs", action="store_true")
 parser.add_argument("--steam_2fa_code", type=str)
 parser.add_argument("--users", type=int, nargs="+")
 parser.add_argument("-s", "--silent", action="store_true")

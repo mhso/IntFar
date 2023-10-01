@@ -20,3 +20,6 @@ def get_stats_for_player(game) -> list[str]:
 
 def get_stat_quantity_descriptions(game) -> dict[str, tuple[str, str]]:
     return _PLAYER_STATS_HOLDERS[game].STAT_QUANTITY_DESC()
+
+def get_empty_game_data(game) -> GameStats:
+    return _GAME_STATS_HOLDERS[game](game, 0, 0, 0, 0, 0, [], [])

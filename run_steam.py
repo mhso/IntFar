@@ -1,10 +1,10 @@
-from gevent import monkey
+from gevent import monkey, sleep
 monkey.patch_all()
 
-import sys
 import json
 
 from api.config import Config
+from api.database import Database
 from api.game_api.cs2 import SteamAPIClient
 from argparse import ArgumentParser
 
@@ -17,49 +17,48 @@ args = parser.parse_args()
 
 config = Config()
 config.steam_2fa_code = args.steam_2fa_code
-
-log_stuff = open("sub_log.txt", "w", encoding="utf-8")
+database = Database(config)
 
 try:
     client = SteamAPIClient(args.game, config)
+    target_name = client.__class__.__name__
+    sleep_time = 0.5
+    close = False
 
     while True:
-        cmd = input().strip()
+        for cmd_id, command, args_str in database.get_queued_commands(target_name):
+            args = args_str.split(",")
+            if command == "close":
+                close = True
+                break
 
-        log_stuff.write(f"Command: {cmd}\n")
+            if len(args) == 1 and args[0] == "":
+                args = []
 
-        attr, *raw_args = cmd.split(":")
-        args_str = ":".join(raw_args)
-        args = args_str.split(";")
+            try:
+                result = getattr(client, command)
+                if callable(result):
+                    result = result(*args)
+            except AttributeError:
+                result = None
 
-        log_stuff.write(f"Attribute: {attr}\n")
-        log_stuff.write(f"Args: {args_str}\n")
+            if isinstance(result, dict) or isinstance(result, list):
+                dtype = "json"
+                encoded_val = json.dumps(result)
+            elif result is None:
+                dtype = "null"
+                encoded_val = str(result)
+            else:
+                dtype = "str"
+                encoded_val = str(result)
 
-        if attr == "close":
+            result_str = f"{dtype}:{encoded_val}"
+            database.set_command_result(cmd_id, target_name, result_str)
+
+        if close:
             break
 
-        try:
-            result = getattr(client, attr)
-            if callable(result):
-                result = result(*args)
-        except AttributeError:
-            result = None
-
-        log_stuff.write(f"Result: {result}\n\n")
-
-        if isinstance(result, dict) or isinstance(result, list):
-            dtype = "json"
-            encoded_val = json.dumps(result)
-        elif result is None:
-            dtype = "null"
-            encoded_val = str(result)
-        else:
-            dtype = "str"
-            encoded_val = str(result)
-
-        sys.stdout.write(f"{dtype}:{encoded_val}\n")
-        sys.stdout.flush()
+        sleep(sleep_time)
 
 finally:
-    log_stuff.close()
     client.close()

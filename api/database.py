@@ -2785,6 +2785,40 @@ class Database(SQLiteDatabase):
         with self:
             return self.execute_query(query).fetchall()
 
+    def get_command_result(self, cmd_id, target):
+        with self:
+            query = "SELECT result FROM command_queue WHERE id=? AND target=?"
+            result = self.execute_query(query, cmd_id, target).fetchone()
+
+            if result is not None and result[0] is not None:
+                query_delete = "DELETE FROM command_queue WHERE id=? AND target=?"
+                self.execute_query(query_delete, cmd_id, target)
+
+            return None if result is None else result[0]
+
+    def set_command_result(self, cmd_id, target, result):
+        with self:
+            query = "UPDATE command_queue SET result=? WHERE id=? AND target=?"
+            self.execute_query(query, result, cmd_id, target)
+
+    def get_queued_commands(self, target):
+        with self:
+            query = "SELECT id, command, arguments FROM command_queue WHERE target=? AND result IS NULL"
+
+            return self.execute_query(query, target).fetchall()
+
+    def enqueue_command(self, cmd_id, target, command, *arguments):
+        with self:
+            query = "INSERT INTO command_queue(id, target, command, arguments) VALUES (?, ?, ?, ?)"
+            argument_str = ",".join(arguments)
+
+            self.execute_query(query, cmd_id, target, command, argument_str)
+
+    def clear_command_queue(self):
+        with self:
+            query = "DELETE FROM command_queue"
+            self.execute_query(query)
+
     def clear_tables(self):
         with self:
             query_tables = "SELECT name FROM sqlite_master WHERE type='table'"

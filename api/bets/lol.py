@@ -4,7 +4,8 @@ from api.game_stats import GameStats, get_outlier
 class LoLBetResolver(BetResolver):
     def resolve_game_outcome(self):
         bet_on_win = self.bet.event_id == "game_win"
-        return (self.game_stats.win == -1) ^ bet_on_win
+        outcome = self.game_stats.win
+        return (bet_on_win and outcome == 1) or (not bet_on_win and outcome == -1)
 
     def resolve_intfar_reason(self):
         reason_str = self.game_stats.intfar_reason

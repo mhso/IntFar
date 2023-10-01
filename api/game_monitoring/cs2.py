@@ -14,8 +14,7 @@ class CS2GameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_DUPLICATE = 5
     POSTGAME_STATUS_SHORT_MATCH = 6
-    POSTGAME_STATUS_CS2 = 7
-    POSTGAME_STATUS_SURRENDER = 8
+    POSTGAME_STATUS_SURRENDER = 7
 
     def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, steam_api: SteamAPIClient):
         super().__init__(game, config, database, game_over_callback, steam_api)
@@ -56,7 +55,7 @@ class CS2GameMonitor(GameMonitor):
         return None
 
     async def get_active_game_info(self, guild_id):
-        if True:#if not self.api_client.logged_on_once:
+        if not self.api_client.is_logged_in():
             # Steam is not logged on, don't try to track games
             return None, {}, self.GAME_STATUS_NOCHANGE
 
@@ -125,8 +124,6 @@ class CS2GameMonitor(GameMonitor):
         last_round = game_info["matches"][0]["roundstatsall"][-1]
         max_rounds = max(last_round["teamScores"])
 
-        cs2 = (game_info["demo_parse_status"] == "error") and (max_rounds == 13 or all(score == 15 for score in last_round["teamScores"]))
-
         if self.database.game_exists(self.game, game_info["matchID"]):
             logger.warning(
                 "We triggered end of game stuff again... Strange!"
@@ -139,10 +136,6 @@ class CS2GameMonitor(GameMonitor):
         if max_rounds < 10:
             # Game was a short match
             return self.POSTGAME_STATUS_SHORT_MATCH
-
-        if cs2:
-            # Game was (presumably) a CS2 game
-            return self.POSTGAME_STATUS_CS2
 
         if last_round["matchDuration"] < self.min_game_minutes * 60:
             # Game was too short to count. Probably an early surrender.

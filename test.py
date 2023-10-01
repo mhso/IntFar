@@ -167,32 +167,34 @@ class TestFuncs:
         prev_month = month - 1 if month != 1 else 12
         month_name = MONTH_NAMES[prev_month-1]
 
-        details = db_client.get_intfars_of_the_month()
+        details = db_client.get_intfars_of_the_month("lol")
 
-        if details == []:
-            # No one has played enough games to quality for IFOTM this month
-            response = (
-                f"No one has played a minimum of {self.config.ifotm_min_games} games "
-                "this month, or those who do have no Int-Fars, so no Int-Far of the Month "
-                f"will be crowned for {month_name}. Dead game, I guess :("
-            )
-            print(response)
-            return
+        print(details)
 
-        intfar_details = [
-            ("Disc ID: " + str(disc_id), games, intfars, ratio)
-            for (disc_id, games, intfars, ratio) in details
-        ]
+        # if details == []:
+        #     # No one has played enough games to quality for IFOTM this month
+        #     response = (
+        #         f"No one has played a minimum of {self.config.ifotm_min_games} games "
+        #         "this month, or those who do have no Int-Fars, so no Int-Far of the Month "
+        #         f"will be crowned for {month_name}. Dead game, I guess :("
+        #     )
+        #     print(response)
+        #     return
 
-        intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n\n"
-        intro_desc += "*DRUM ROLL*\n\n"
-        desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
-        winners = [tupl[0] for tupl in details[:num_winners]]
-        desc += ":clap: :clap: :clap: :clap: :clap: \n"
-        desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
-        desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
-        print(intro_desc + desc)
-        print(winners)
+        # intfar_details = [
+        #     ("Disc ID: " + str(disc_id), games, intfars, ratio)
+        #     for (disc_id, games, intfars, ratio) in details
+        # ]
+
+        # intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n\n"
+        # intro_desc += "*DRUM ROLL*\n\n"
+        # desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
+        # winners = [tupl[0] for tupl in details[:num_winners]]
+        # desc += ":clap: :clap: :clap: :clap: :clap: \n"
+        # desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
+        # desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
+        # print(intro_desc + desc)
+        # print(winners)
 
     def test_lifetime_stats(self):
         id_dave = 115142485579137029
@@ -252,22 +254,22 @@ class TestFuncs:
         print(api_client.map_names)
 
     def test_cs_sharecode(self):
-        api_client = SteamAPIClient("csgo", self.config)
-        user = self.database.users_by_game["csgo"][267401734513491969]
+        api_client = SteamAPIClient("cs2", self.config)
+        user = self.database.users_by_game["cs2"][267401734513491969]
         print(user.latest_match_token[0])
-        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], "CSGO-bGpZq-cYoXP-HOGKT-CjWvt-jDWPA")
+        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], "CSGO-4yLe7-LO8ar-fKACw-pWAdH-pJGrL")
         print(next_code)
 
     def test_cs_parse(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
-        sharecode = "CSGO-FzPbx-2UZYV-RL5SD-8tjh5-hKMkO"
-        api_client = SteamAPIClient("csgo", self.config)
+        sharecode = "CSGO-wfUGK-jkVRX-ZhonZ-S4x3b-FkBAA"
+        api_client = SteamAPIClient("cs2", self.config)
 
         game_stats = api_client.get_game_details(sharecode)
         with open(f"data_{sharecode}.json", "w", encoding="utf-8") as fp:
             json.dump(game_stats, fp)
 
-        parser = get_stat_parser("csgo", game_stats, api_client, self.database.users_by_game["csgo"], 619073595561213953)
+        parser = get_stat_parser("cs2", game_stats, api_client, self.database.users_by_game["cs2"], 619073595561213953)
         data = parser.parse_data()
 
 if __name__ == "__main__":

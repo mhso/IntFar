@@ -50,10 +50,12 @@ class Proxy(object):
         return self.conn.recv()
 
 class ProxyManager(object):
-    def __init__(self, target_cls, game, config):
+    def __init__(self, target_cls, game, database, config):
         self.proxies = []
+        self.database = database
 
         self.target_cls = target_cls
+        self.target_name = self.target_cls.__name__
 
         subfolder = "bin" if config.env == "production" else "Scripts"
         executable = "/bin/bash" if config.env == "production" else "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
@@ -61,8 +63,6 @@ class ProxyManager(object):
         self.steam_process = subprocess.Popen(
             f". venv/{subfolder}/activate; python run_steam.py {game} {config.steam_2fa_code}",
             executable=executable,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
             shell=True,
             text=True
         )
@@ -72,6 +72,10 @@ class ProxyManager(object):
         self.listen_thread.start()
 
     def _listen(self):
+        command_id = 0
+        timeout = 60
+        time_to_sleep = 0.5
+
         while not self._stop_event.is_set():
             for proxy in wait(self.proxies, timeout=0.01):
                 command, *args = proxy.recv()
@@ -80,14 +84,20 @@ class ProxyManager(object):
                     proxy.send("exiting...")
                     break
 
-                serialized_cmd = f"{command}:{';'.join(map(str, args))}\n"
+                result = None
+                self.database.enqueue_command(command_id, self.target_name, command, *args)
+                wait_time = 0
+                while wait_time < timeout:
+                    result = self.database.get_command_result(command_id, self.target_name)
 
-                self.steam_process.stdin.write(serialized_cmd)
-                self.steam_process.stdin.flush()
+                    if result is not None:
+                        break
 
-                result = self.steam_process.stdout.readline()
-                if result.endswith("\n"):
-                    result = result.strip()
+                    wait_time += time_to_sleep
+                    sleep(time_to_sleep)
+
+                if result is None:
+                    result = "null:None"
 
                 dtype, *values = result.split(":")
                 if dtype == "null":
@@ -98,6 +108,8 @@ class ProxyManager(object):
                         value_str = json.loads(value_str)
 
                     proxy.send(value_str)
+
+                command_id += 1
 
     def create_proxy(self):
         conn_1, conn_2 = Pipe(True)
@@ -112,8 +124,7 @@ class ProxyManager(object):
         if self.proxies:
             self.proxies[0].close()
 
-        self.steam_process.stdin.write("close")
-        self.steam_process.stdin.flush()
+        self.database.enqueue_command(-1, self.target_name, "close")
 
         while self.steam_process.returncode is None:
             sleep(0.1)

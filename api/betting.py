@@ -32,6 +32,10 @@ class BetResolver(ABC):
         self.target_id = target_id
 
     @abstractmethod
+    def resolve_game_outcome(self):
+        ...
+
+    @abstractmethod
     def resolve_intfar_reason(self):
         ...
 
@@ -56,7 +60,7 @@ class BetResolver(ABC):
             for player_stats in self.game_stats.filtered_player_stats
         }
         if self.target_id is None:
-            return len(doinks) > 0
+            return any(doink_str for doink_str in doinks.values())
 
         return self.target_id in doinks
 
@@ -184,9 +188,11 @@ class BettingHandler(ABC):
         return reason_count, num_games
 
     def get_stats_return(self, stat, target_id):
-        best_in_stat_count = self.database.get_best_or_worst_stat(self.game, stat, target_id)[0]
-        num_games = self.database.get_intfar_stats(self.game, target_id)[0]
-        return best_in_stat_count, num_games
+        result = self.database.get_best_or_worst_stat(self.game, stat, target_id)
+        if result is None:
+            return 0, 0
+
+        return result[0], result[1]
 
     def award_tokens_for_playing(self, disc_id, tokens_gained):
         self.database.update_token_balance(disc_id, tokens_gained, True)
@@ -283,7 +289,7 @@ class BettingHandler(ABC):
         events: list[str],
         targets: list[int],
         game_stats: GameStats,
-        bet_multiplier: int
+        bet_multiplier: int = 1
     ) -> tuple[bool, int]:
         """
         Resolves the given bet for the given player. This determines whether the bet
@@ -350,7 +356,7 @@ class BettingHandler(ABC):
 
     def _get_bet_placed_text(
         self,
-        bet_data: tuple[int, int, int, str, str],
+        bet_data: list[tuple[int, int, int, str, str]],
         all_in: bool,
         duration: int,
         ticket: int = None
@@ -372,7 +378,7 @@ class BettingHandler(ABC):
             response += f"You bet on **all** the following happening in a {game_name} game:"
 
             for amount, _, _, base_return, bet_desc in bet_data:
-                response += f"\n - `{bet_desc}` for **{format_tokens_amount(amount)}** {tokens_name} "
+                response += f"\n- `{bet_desc}` for **{format_tokens_amount(amount)}** {tokens_name} "
                 response += f"(**{base_return}x** return)."
             response += f"\nThis bet uses the following ticket ID: **{ticket}**. "
             response += "You will need this ticket to cancel the bet.\n"

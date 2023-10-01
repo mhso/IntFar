@@ -1,3 +1,5 @@
+PRAGMA journal_mode = 'wal';
+
 CREATE TABLE [users] (
     [disc_id] INTEGER PRIMARY KEY,
     [secret] NVARCHAR(32) NOT NULL,
@@ -211,4 +213,11 @@ CREATE TABLE [list_items] (
     [champ_id] INTEGER NOT NULL,
     [list_id] INTEGER NOT NULL,
     UNIQUE(champ_id, list_id)
+);
+CREATE TABLE [command_queue] (
+    [id] INTEGER NOT NULL,
+    [target] NVARCHAR(64) NOT NULL,
+    [command] NVARCHAR(64) NOT NULL,
+    [arguments] NVARCHAR(128) NOT NULL,
+    [result] NVARCHAR(128) NULL
 );

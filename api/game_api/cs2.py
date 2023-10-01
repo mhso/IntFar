@@ -51,7 +51,8 @@ class SteamAPIClient(GameAPIClient):
             520: "dust2",
             1032: "train",
             32776: "mirage",
-            8388616: "anubis"
+            8388616: "anubis",
+            268435464: "overpass"
         }
         self.get_latest_data()
         self.cs2_app_id = 730
@@ -76,7 +77,7 @@ class SteamAPIClient(GameAPIClient):
             response = requests.get(url)
             html = BeautifulSoup(response.text, "html.parser")
 
-            former_header = html.find(id="Former_Maps")
+            former_header = html.find(id="UI-related")
 
             maps_table = former_header.find_previous("table")
             table_rows = maps_table.find_all("tr")
@@ -91,8 +92,11 @@ class SteamAPIClient(GameAPIClient):
                 short_name = split[-1].strip()
                 self.map_names[short_name] = full_name
 
+            if self.map_names == {}:
+                logger.exception(f"Could not get active CS2 maps from {url}")
+
         except requests.RequestException:
-            logger.exception("Exception when downloading CS2 maps from", url)
+            logger.exception(f"Exception when downloading CS2 maps from {url}")
 
     def _download_demo_file(self, filename: str, url: str):
         try:
@@ -177,13 +181,19 @@ class SteamAPIClient(GameAPIClient):
         resp, = self.cs_client.wait_event("full_match_info")
         game_info = json.loads(MessageToJson(resp))
         round_stats = game_info["matches"][0]["roundstatsall"]
-        demo_url = round_stats[-1]["map"]
+        with open(f"data_{match_token}.json", "w", encoding="utf-8") as fp:
+            json.dump(game_info, fp)
 
-        parsed_data = self.parse_demo(demo_url)
-        parsed_data.update(game_info)
-        parsed_data["matchID"] = match_token
+        if "map" in round_stats[-1]:
+            demo_url = round_stats[-1]["map"]
 
-        return parsed_data
+            game_info.update(self.parse_demo(demo_url))
+        else:
+            game_info["demo_parse_status"] = "unsupported"
+
+        game_info["matchID"] = match_token
+
+        return game_info
 
     def get_active_game(self, steam_id) -> dict:
         self.cs_client.request_watch_info_friends([self.get_account_id(steam_id)])
@@ -223,6 +233,9 @@ class SteamAPIClient(GameAPIClient):
         return SteamID(int(steam_id)).account_id
 
     def get_map_name(self, map_id):
+        print(map_id, flush=True)
+        print(type(map_id), flush=True)
+        print(len(map_id), flush=True)
         return self.map_names.get(map_id)
 
     def get_map_id(self, game_type):
@@ -345,6 +358,9 @@ class SteamAPIClient(GameAPIClient):
             self.config.steam_password,
             two_factor_code=self.config.steam_2fa_code
         )
+
+    def is_logged_in(self):
+        return self.steam_client.logged_on
 
     def close(self):
         if self.steam_client.logged_on:

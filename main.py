@@ -74,17 +74,10 @@ def main():
     if conf.env == "production":
         load_opus("/usr/local/lib/libopus.so")
 
-    logger.info("Initializing game API clients...")
-    proxy_manager = ProxyManager(SteamAPIClient, "cs2", conf)
-
-    api_clients = {
-        "lol": RiotAPIClient("lol", conf),
-        "cs2": proxy_manager.create_proxy()
-    }
-
     logger.info("Initializing database...")
     sync_manager = Manager()
     database_client = Database(conf)
+    database_client.clear_command_queue()
 
     # Convert database user dicts to synchronized proxies so they're synced across processes
     database_client.all_users = sync_manager.dict(database_client.all_users)
@@ -94,6 +87,14 @@ def main():
             for game in SUPPORTED_GAMES
         }
     )
+
+    logger.info("Initializing game API clients...")
+    proxy_manager = ProxyManager(SteamAPIClient, "cs2", database_client, conf)
+
+    api_clients = {
+        "lol": RiotAPIClient("lol", conf),
+        "cs2": proxy_manager.create_proxy()
+    }
 
     betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
 
