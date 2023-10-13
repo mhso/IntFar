@@ -50,6 +50,7 @@ class SteamAPIClient(GameAPIClient):
             2056: "ancient",
             520: "dust2",
             1032: "train",
+            16392: "vertigo",
             32776: "mirage",
             8388616: "anubis",
             268435464: "overpass"
@@ -233,9 +234,6 @@ class SteamAPIClient(GameAPIClient):
         return SteamID(int(steam_id)).account_id
 
     def get_map_name(self, map_id):
-        print(map_id, flush=True)
-        print(type(map_id), flush=True)
-        print(len(map_id), flush=True)
         return self.map_names.get(map_id)
 
     def get_map_id(self, game_type):

@@ -36,7 +36,7 @@ CREATE TABLE [games_lol] (
     [duration] INTEGER,
     [intfar_id] INTEGER,
     [intfar_reason] NVARCHAR(4),
-    [win] INTEGER(1),
+    [win] INTEGER(2),
     [guild_id] INTEGER,
     [first_blood] INTEGER
 );
@@ -46,7 +46,7 @@ CREATE TABLE [games_csgo] (
     [duration] INTEGER,
     [intfar_id] INTEGER,
     [intfar_reason] NVARCHAR(32),
-    [win] INTEGER(1),
+    [win] INTEGER(2),
     [guild_id] INTEGER,
     [map_id] NVARCHAR(32),
     [started_t] INTEGER(1),
@@ -76,10 +76,10 @@ CREATE TABLE [missed_games] (
 CREATE TABLE [participants_lol] (
     [game_id] NVARCHAR(64) NOT NULL,
     [disc_id] INTEGER NOT NULL,
-    [doinks] NVARCHAR(10),
     [kills] INTEGER,
     [deaths] INTEGER,
     [assists] INTEGER,
+    [doinks] NVARCHAR(10),
     [kda] REAL,
     [kp] INTEGER,
     [champ_id] INTEGER NOT NULL,
@@ -95,10 +95,10 @@ CREATE TABLE [participants_lol] (
 CREATE TABLE [participants_csgo] (
     [game_id] NVARCHAR(64) NOT NULL,
     [disc_id] INTEGER NOT NULL,
-    [doinks] NVARCHAR(10),
     [kills] INTEGER,
     [deaths] INTEGER,
     [assists] INTEGER,
+    [doinks] NVARCHAR(10),
     [kda] REAL,
     [kp] INTEGER,
     [mvps] INTEGER,

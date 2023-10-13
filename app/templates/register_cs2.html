@@ -5,7 +5,7 @@
 {% import "navbar.html" as navbar %}
 <body>
     <div id="cs2-register-wrapper" class="container-flex">
-        {{ navbar.navbar(game, game_name, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
+        {{ navbar.navbar(game, all_games, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
         <h1>Register for CS2</h1>
 
         {% if not logged_in_user %}

@@ -30,7 +30,7 @@ async def handle_set_event_sound(client, message, game, sound, event):
         client.database.remove_event_sound(game, message.author.id, event)
         response = f"Removed sound from triggering when getting {event_fmt}."
 
-    elif audio_handler.is_valid_sound(sound):
+    elif not audio_handler.is_valid_sound(sound):
         response = f"Invalid sound: `{sound}`. See `!sounds` for a list of valid sounds."
 
     else:

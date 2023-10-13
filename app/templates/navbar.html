@@ -1,11 +1,11 @@
-{% macro navbar(game, game_name, discord_id, name, avatar, active_game_data, admin_id) -%}
+{% macro navbar(game, all_games, discord_id, name, avatar, active_game_data, admin_id) -%}
 <div class="intfar-navbar row">
     <div class="navbar-menu order-1 order-lg-1 col-10 col-sm-9 col-lg-4 col-xl-4">
         <div id="navbar-menu-toggle" onclick="toggleDropdownMenu();">
             <img src="{{ url_for('static', filename='img/menu.png') }}">
         </div>
         
-        {% if game_name %}<div id="navbar-game-name">{{ game_name }}</div>{% endif %}
+        {% if all_games %}<div id="navbar-game-name">{{ all_games[game] }}</div>{% endif %}
 
         <div id="navbar-menu-dropdown">
             <div class="navbar-menu-dropdown-item">
@@ -51,11 +51,15 @@
             </div>
             {% endif %}
             <hr>
+            {% for other_game in all_games %}
+            {% if other_game != game %}
             <div class="navbar-menu-dropdown-item">
-                <a href="{% if game == 'lol' %}{{ url_for('cs2.index.index') }}{% else %}{{ url_for('lol.index.index') }}{% endif %}">
-                    {% if game == 'lol' %}Counter Strike: Global Offensive{% else %}League of Legends{% endif %}
+                <a href="{{ url_for(other_game + '.index.index') }}">
+                    {{ all_games[other_game] }}
                 </a>
             </div>
+            {% endif %}
+            {% endfor %}
         </div>
 
     </div>

@@ -351,6 +351,8 @@ table {
     color: inherit;
     padding: 5px;
     width: 100%;
+    background-color: #0000008f;
+    border: 1px solid white;
 }
 
 .empty-list {
@@ -422,6 +424,15 @@ table {
 #feed-wrapper {
     max-height: 300px;
     overflow-y: auto;
+    border: 1px solid white;
+}
+
+#feed-wrapper > .nice-table {
+    border: none;
+}
+
+.nice-table tr:nth-child(2n) {
+    background-color: #1f1f1fde;
 }
 
 .feed-entry > td:nth-child(2) {
@@ -430,6 +441,7 @@ table {
 
 .intfar-list-entry > th:nth-child(5) {
     text-align: right;
+    padding-right: 10px;
 }
 
 .list-first {
@@ -439,6 +451,14 @@ table {
 
 .list-first.intfar-list-entry {
     text-align: left;
+}
+
+td:first-child {
+    padding-left: 10px;
+}
+
+td:last-child {
+    padding-right: 10px;
 }
 
 .list-entry > td:nth-child(1) img {

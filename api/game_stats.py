@@ -35,7 +35,7 @@ class PlayerStats(ABC):
     def STAT_QUANTITY_DESC(cls) -> dict[str, tuple[str, str]]:
         return {
             "kills": ("most", "fewest"),
-            "deaths": ("most", "fewest"),
+            "deaths": ("fewest", "most"),
             "assists": ("most", "fewest"),
             "kda": ("highest", "lowest"),
             "kp": ("highest", "lowest")

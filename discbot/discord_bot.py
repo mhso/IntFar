@@ -1394,7 +1394,7 @@ class DiscordClient(discord.Client):
                         game_monitor.poll_for_game_start(guild_id, guild_name, poll_immediately)
                     )
 
-            logger.info(f"Active users in {guild_name}: {len(users_in_voice)}")
+            logger.info(f"Active users in {guild_name} for {game}: {len(users_in_voice[game])}")
 
     async def user_left_voice(self, disc_id: int, guild_id: int):
         """

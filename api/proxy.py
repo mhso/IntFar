@@ -106,6 +106,12 @@ class ProxyManager(object):
                     value_str = ":".join(values)
                     if dtype == "json":
                         value_str = json.loads(value_str)
+                    elif dtype == "int":
+                        value_str = int(value_str)
+                    elif dtype == "bool":
+                        value_str = bool(value_str)
+                    else:
+                        value_str = str(value_str)
 
                     proxy.send(value_str)
 

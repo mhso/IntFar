@@ -31,7 +31,7 @@ class TestFuncs:
         id_me = 267401734513491969
         id_anton = 347489125877809155
 
-        game = "lol"
+        game = "cs2"
 
         print("Myggen:", self.database.get_performance_score(game, id_myggen))
         print("Murt:", self.database.get_performance_score(game, id_murt))
@@ -257,12 +257,12 @@ class TestFuncs:
         api_client = SteamAPIClient("cs2", self.config)
         user = self.database.users_by_game["cs2"][267401734513491969]
         print(user.latest_match_token[0])
-        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], "CSGO-4yLe7-LO8ar-fKACw-pWAdH-pJGrL")
+        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], "CSGO-DARih-4Y65Q-AHxyw-e9ZBZ-FFzQN")
         print(next_code)
 
     def test_cs_parse(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
-        sharecode = "CSGO-wfUGK-jkVRX-ZhonZ-S4x3b-FkBAA"
+        sharecode = "CSGO-qZ7Xk-WiBSq-Utoyr-Nxt5y-mVt8O"
         api_client = SteamAPIClient("cs2", self.config)
 
         game_stats = api_client.get_game_details(sharecode)

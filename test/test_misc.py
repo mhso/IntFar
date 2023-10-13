@@ -212,70 +212,89 @@ class TestWrapper(TestRunner):
     @test
     def test_current_game_streak(self):
         disc_id = 267401734513491969
+        game_to_test = "cs2"
 
-        def insert_game(database, game_id, win):
+        def insert_game(database, game, game_id, win):
+            timestamp = game_id * 100
             query_games = f"""
-                INSERT INTO games (game_id, win)
-                VALUES (?, ?)
+                INSERT INTO games_{game} (game_id, timestamp, win)
+                VALUES (?, ?, ?)
             """
             query_participants = f"""
-                INSERT INTO participants (game_id, disc_id, champ_id)
-                VALUES (?, ?, 202)
+                INSERT INTO participants_{game} (game_id, disc_id)
+                VALUES (?, ?)
             """
 
-            database.execute_query(query_games, game_id, win)
+            database.execute_query(query_games, game_id, timestamp, win)
             database.execute_query(query_participants, game_id, disc_id)
 
         with Database(self.config) as database:
             database.clear_tables()
 
-            streak = database.get_current_win_or_loss_streak(1, disc_id)
+            streak = database.get_current_win_or_loss_streak(game_to_test, 1, disc_id)
             self.assert_equals(streak, 1, "Win streak is 1 at start")
     
-            query_summoners = f"""
-                INSERT INTO registered_summoners (disc_id, summ_name, summ_id, secret)
-                VALUES (?, 'Senile Felines', '1337', '42')
+            query_users = f"""
+                INSERT INTO users_{game_to_test} (disc_id, ingame_name, ingame_id, match_auth_code, latest_match_token, active)
+                VALUES (?, 'Senile Felines', '1337', '42', '420', 1)
             """
-            database.execute_query(query_summoners, disc_id)
+            database.execute_query(query_users, disc_id)
 
             game_id = 0
 
             # Test a 3 game win streak
             for _ in range(2):
-                insert_game(database, game_id, 1)
+                insert_game(database, game_to_test, game_id, 1)
                 game_id += 1
 
-            streak = database.get_current_win_or_loss_streak(disc_id, True)
+            streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, 1)
             self.assert_equals(streak, 3, "Win streak is 3")
 
             # Test 4 game win streak
-            insert_game(database, game_id, 1)
-            streak = database.get_current_win_or_loss_streak(disc_id, True)
+            insert_game(database, game_to_test, game_id, 1)
+            streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, 1)
             self.assert_equals(streak, 4, "Win streak is 4")
 
             game_id += 1
 
             # Insert loss, test 1 game win streak
-            insert_game(database, game_id, 0)
-            streak = database.get_current_win_or_loss_streak(disc_id, True)
+            insert_game(database, game_to_test, game_id, -1)
+            streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, 1)
             self.assert_equals(streak, 1, "Win streak is 1 after loss")
 
-            prev_streak = database.get_current_win_or_loss_streak(disc_id, True, offset=1)
+            prev_streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, 1, offset=1)
             self.assert_equals(prev_streak, 3, "Prev streak was 3 wins after loss")
 
-            streak = database.get_current_win_or_loss_streak(disc_id, False)
+            streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, -1)
             self.assert_equals(streak, 2, "Loss streak is 2")
 
             game_id += 1
 
             for _ in range(3):
-                insert_game(database, game_id, 0)
+                insert_game(database, game_to_test, game_id, -1)
                 game_id += 1
 
-            streak = database.get_current_win_or_loss_streak(disc_id, False)
+            streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, -1)
             self.assert_equals(streak, 5, "Loss streak is 5")
 
-            insert_game(database, game_id, 1)
+            insert_game(database, game_to_test, game_id, 1)
+            game_id += 1
 
-            prev_streak = database.get_current_win_or_loss_streak(disc_id, False, offset=1)
+            prev_streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, -1, offset=1)
             self.assert_equals(prev_streak, 4, "Prev streak was 4 losses after win")
+
+            # Insert 3 wins
+            for _ in range(3):
+                insert_game(database, game_to_test, game_id, 1)
+                game_id += 1
+
+            # Insert a draw
+            insert_game(database, game_to_test, game_id, 0)
+            game_id += 1
+
+            # Test 1 game win streak
+            streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, 1)
+            self.assert_equals(streak, 1, "Win streak is 1 after draw")
+
+            prev_streak = database.get_current_win_or_loss_streak(game_to_test, disc_id, 1, offset=1)
+            self.assert_equals(prev_streak, 3, "Prev streak was 3 wins after draw")

@@ -4,7 +4,7 @@
 {% import "navbar.html" as navbar %}
 <body>
     <div id="no-user-wrapper">
-        {{ navbar.navbar(game, game_name, false, 'Unknown', false, active_game_data) }}
+        {{ navbar.navbar(game, all_games, false, 'Unknown', false, active_game_data) }}
         <h1>You are not logged in!</h1>
         <p>You can fix this (assuming you are a member of League Nibbas or Danish Circus).</p>
         <p>

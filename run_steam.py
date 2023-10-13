@@ -42,15 +42,15 @@ try:
             except AttributeError:
                 result = None
 
+            encoded_val = str(result)
+
             if isinstance(result, dict) or isinstance(result, list):
                 dtype = "json"
                 encoded_val = json.dumps(result)
             elif result is None:
                 dtype = "null"
-                encoded_val = str(result)
             else:
-                dtype = "str"
-                encoded_val = str(result)
+                dtype = type(result).__name__
 
             result_str = f"{dtype}:{encoded_val}"
             database.set_command_result(cmd_id, target_name, result_str)

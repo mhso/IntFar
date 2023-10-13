@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from time import time
@@ -6,6 +6,8 @@ from typing import Union, cast, Literal, Optional
 
 import pandas as pd
 from awpy.types import GameRound, PlayerStatistics
+
+from mhooge_flask.logging import logger
 
 from api.game_stats import GameStats, PlayerStats, GameStatsParser
 from api.util import format_duration

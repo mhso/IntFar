@@ -37,7 +37,7 @@ def get_available_sounds(ordering="newest"):
     return sorted(sounds, key=order_func)
 
 def is_valid_sound(sound):
-    return sound in [tup[0] for tup in get_available_sounds()]
+    return sound.strip() in [tup[0] for tup in get_available_sounds()]
 
 def get_sound_owners():
     owner_file_path = os.path.join(os.path.abspath(SOUNDS_PATH), "owners.json")

@@ -249,7 +249,7 @@ def get_persistent_data():
     shown_games = filter_hidden_games(game_info, logged_in_user)
 
     data["game"] = game
-    data["game_name"] = SUPPORTED_GAMES[game]
+    data["all_games"] = SUPPORTED_GAMES
     data["active_game_data"] = shown_games
 
     return data

@@ -379,8 +379,8 @@ class Database(SQLiteDatabase):
                         GROUP BY game_id
                     ) sub
                     GROUP BY sub.disc_id
-                ) best,
-                (
+                ) best
+                INNER JOIN (
                     SELECT
                         COUNT(*) AS c,
                         p.game_id,
@@ -392,7 +392,8 @@ class Database(SQLiteDatabase):
                         u.active = 1
                         AND {stat} IS NOT NULL
                     GROUP BY p.disc_id
-                ) games
+                ) AS games
+                ON games.disc_id = best.disc_id
                 {player_condition}
             """
 
@@ -1625,9 +1626,9 @@ class Database(SQLiteDatabase):
                 ON p.disc_id = u.disc_id
             WHERE
                 p.disc_id = ?
-                AND u.active
+                AND u.active = 1
             GROUP BY g.game_id
-            ORDER BY g.game_id DESC
+            ORDER BY timestamp DESC
         """
 
         with self:
@@ -1921,8 +1922,8 @@ class Database(SQLiteDatabase):
                             CAST(COUNT(*) AS real) AS c,
                             intfar_id
                         FROM {games_table} AS g
+                        WHERE intfar_id IS NOT NULL
                         GROUP BY intfar_id
-                        HAVING intfar_id IS NOT NULL
                     ) sub
                     ON p.disc_id = sub.intfar_id
                     GROUP BY p.disc_id
@@ -1930,7 +1931,7 @@ class Database(SQLiteDatabase):
                 ON intfars.intfar_id = wins.disc_id
                 LEFT JOIN (
                     SELECT
-                        CAST(SUM(LENGTH(REPLACE(doinks_sub.doinks, '0', ''))) AS real) AS c,
+                        CAST(SUM(LENGTH(REPLACE(COALESCE(doinks_sub.doinks, ''), '0', ''))) AS real) AS c,
                         doinks_sub.disc_id
                     FROM (
                         SELECT
@@ -2810,14 +2811,13 @@ class Database(SQLiteDatabase):
     def enqueue_command(self, cmd_id, target, command, *arguments):
         with self:
             query = "INSERT INTO command_queue(id, target, command, arguments) VALUES (?, ?, ?, ?)"
-            argument_str = ",".join(arguments)
+            argument_str = ",".join(str(arg) for arg in arguments)
 
             self.execute_query(query, cmd_id, target, command, argument_str)
 
     def clear_command_queue(self):
         with self:
-            query = "DELETE FROM command_queue"
-            self.execute_query(query)
+            self.execute_query("DELETE FROM command_queue")
 
     def clear_tables(self):
         with self:
