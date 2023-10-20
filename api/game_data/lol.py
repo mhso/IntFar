@@ -26,8 +26,8 @@ class LoLPlayerStats(PlayerStats):
     puuid: str = None
 
     @classmethod
-    def STATS_TO_SAVE(cls):
-        return super().STATS_TO_SAVE() + [
+    def stats_to_save(cls):
+        return super().stats_to_save() + [
             "champ_id",
             "damage",
             "cs",
@@ -39,8 +39,8 @@ class LoLPlayerStats(PlayerStats):
         ]
 
     @classmethod
-    def STAT_QUANTITY_DESC(cls):
-        stat_quantities = dict(super().STAT_QUANTITY_DESC())
+    def stat_quantity_desc(cls):
+        stat_quantities = dict(super().stat_quantity_desc())
         stat_quantities.update(
             damage=("most", "least"),
             cs=("most", "least"),
@@ -51,6 +51,31 @@ class LoLPlayerStats(PlayerStats):
             steals=("most", "least"),
         )
         return stat_quantities
+
+    @classmethod
+    def formatted_stat_names(cls):
+        formatted = dict(super().formatted_stat_names())
+        for stat in cls.stat_quantity_desc():
+            if stat in formatted or stat == "champ_id":
+                continue
+
+            if stat == "cs":
+                fmt_stat = stat.upper()
+            elif stat == "cs_per_min":
+                fmt_stat = "CS per min"
+            else:
+                fmt_stat = " ".join(map(lambda s: s.capitalize(), stat.split("_")))
+
+            formatted[stat] = fmt_stat
+
+        return formatted
+
+    @classmethod
+    def get_formatted_stat_value(cls, stat, value) -> dict[str, str]:
+        if isinstance(value, float) and stat in ("damage", "gold"):
+            return str(int(value))
+
+        return super().get_formatted_stat_value(stat, value)
 
 @dataclass
 class LoLGameStats(GameStats):
@@ -68,8 +93,8 @@ class LoLGameStats(GameStats):
     timeline_data: dict = None
 
     @classmethod
-    def STATS_TO_SAVE(cls):
-        return super().STATS_TO_SAVE() + ["first_blood"]
+    def stats_to_save(cls):
+        return super().stats_to_save() + ["first_blood"]
 
     def get_filtered_timeline_stats(self, timeline_data: dict):
         """
@@ -100,7 +125,7 @@ class LoLGameStats(GameStats):
 
         :param disc_id: Discord ID of the player for whom to get the summary for
         """
-        player_stats: LoLPlayerStats = self.find_player_stats(disc_id, self.filtered_player_stats)
+        player_stats: LoLPlayerStats = GameStats.find_player_stats(disc_id, self.filtered_player_stats)
 
         date = datetime.fromtimestamp(self.timestamp).strftime("%Y/%m/%d")
         dt_1 = datetime.fromtimestamp(time())

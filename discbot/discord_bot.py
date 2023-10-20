@@ -828,7 +828,7 @@ class DiscordClient(discord.Client):
 
             for stat, value, disc_id, prev_value, prev_id in record_list:
                 player_stats = get_stats_for_player(disc_id)
-                stat_quantity_desc = player_stats.STAT_QUANTITY_DESC()
+                stat_quantity_desc = player_stats.stat_quantity_desc()
 
                 stat_fmt = api_util.round_digits(value)
                 stat_name_fmt = stat.replace('_', ' ')
@@ -1429,14 +1429,14 @@ class DiscordClient(discord.Client):
         role = nibs_guild.get_role(role_id)
         await member.remove_roles(role)
 
-    async def reset_monthly_intfar_roles(self, guild):
+    async def reset_monthly_intfar_roles(self, game, guild):
         """
         When a new year has started, we remove Int-Far of the Month roles
         from all users who got them the previous year.
         """
         for month in range(12):
             month_name = api_util.MONTH_NAMES[month]
-            role_name = f"Int-Far of the Month - {month_name}"
+            role_name = f"Int-Far of the Month ({game}) - {month_name}"
 
             for role in guild.roles:
                 if role.name == role_name:
@@ -1444,7 +1444,7 @@ class DiscordClient(discord.Client):
                         logger.info(f"Removing {role.name} from {member.name}.")
                         await member.remove_roles(role)
 
-    async def assign_monthly_intfar_role(self, month, winner_ids):
+    async def assign_monthly_intfar_role(self, game, month, winner_ids):
         nibs_guild = None
         for guild in self.guilds:
             if guild.id == api_util.MAIN_GUILD_ID:
@@ -1454,7 +1454,7 @@ class DiscordClient(discord.Client):
         prev_month = month - 1 if month != 1 else 12
 
         if prev_month == 1: # Prev month was January, reset previous years IFOTM roles.
-            await self.reset_monthly_intfar_roles(nibs_guild)
+            await self.reset_monthly_intfar_roles(game, nibs_guild)
 
         # Colors:
         # Light blue, dark blue, cyan, mint,
@@ -1468,7 +1468,7 @@ class DiscordClient(discord.Client):
 
         month_name = api_util.MONTH_NAMES[prev_month-1]
         color = discord.Color.from_rgb(*colors[prev_month-1])
-        role_name = f"Int-Far of the Month - {month_name}"
+        role_name = f"Int-Far of the Month ({game}) - {month_name}"
 
         role = None
         for guild_role in nibs_guild.roles:
@@ -1488,6 +1488,10 @@ class DiscordClient(discord.Client):
                 logger.bind(intfar_id=intfar_id).error("Int-Far to add badge to was None!")
 
     async def declare_monthly_intfar(self, game, monthly_monitor):
+        """
+        Retrieve the top three people who have gotten the most Int-Far awards this month
+        for the given game and send out a message congratulating/shaming them.
+        """
         month = monthly_monitor.time_at_announcement.month
         prev_month = month - 1 if month != 1 else 12
         month_name = api_util.MONTH_NAMES[prev_month-1]
@@ -1521,7 +1525,7 @@ class DiscordClient(discord.Client):
         current_month = monthly_monitor.time_at_announcement.month
         winners = [tupl[0] for tupl in intfar_data[:num_winners]]
 
-        await self.assign_monthly_intfar_role(current_month, winners)
+        await self.assign_monthly_intfar_role(game, current_month, winners)
 
     async def polling_loop(self):
         """
@@ -1554,8 +1558,8 @@ class DiscordClient(discord.Client):
 
             await asyncio.sleep(time_to_sleep)
 
-        # for game in api_util.SUPPORTED_GAMES:
-        #     await self.declare_monthly_intfar(game, ifotm_monitor)
+        for game in api_util.SUPPORTED_GAMES:
+            await self.declare_monthly_intfar(game, ifotm_monitor)
 
         await self.declare_monthly_intfar("lol", ifotm_monitor)
 

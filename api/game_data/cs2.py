@@ -472,8 +472,8 @@ class CS2PlayerStats(PlayerStats):
     rank: int = None
 
     @classmethod
-    def STATS_TO_SAVE(cls):
-        return super().STATS_TO_SAVE() + [
+    def stats_to_save(cls):
+        return super().stats_to_save() + [
             "mvps",
             "score",
             "headshot_pct",
@@ -503,8 +503,8 @@ class CS2PlayerStats(PlayerStats):
         ]
 
     @classmethod
-    def STAT_QUANTITY_DESC(cls):
-        stat_quantities = dict(super().STAT_QUANTITY_DESC())
+    def stat_quantity_desc(cls):
+        stat_quantities = dict(super().stat_quantity_desc())
         stat_quantities.update(
             mvps=("most", "fewest"),
             score=("highest", "lowest"),
@@ -534,6 +534,38 @@ class CS2PlayerStats(PlayerStats):
         )
         return stat_quantities
 
+    @classmethod
+    def formatted_stat_names(cls):
+        formatted = dict(super().formatted_stat_names())
+        for stat in cls.stat_quantity_desc():
+            if stat in formatted:
+                continue
+
+            if stat == "cs":
+                fmt_stat = "MVPs"
+            elif stat == "adr":
+                fmt_stat = stat.upper()
+            elif stat == "team_kills":
+                fmt_stat = "Teamkills"
+            else:
+                fmt_stat = " ".join(map(lambda s: s.capitalize(), stat.split("_")))
+
+            formatted[stat] = fmt_stat
+
+        return formatted
+
+    @classmethod
+    def get_formatted_stat_value(cls, stat, value) -> dict[str, str]:
+        if isinstance(value, float) and stat in ("mvps", "score", "adr", "utility_damage"):
+            return str(int(value))
+
+        fmt_value = super().get_formatted_stat_value(stat, value)
+
+        if stat == "headshot_pct":
+            return fmt_value + "%"
+
+        return fmt_value
+
 @dataclass
 class CS2GameStats(GameStats):
     map_id: str = None
@@ -546,8 +578,8 @@ class CS2GameStats(GameStats):
     biggest_deficit: int = None
 
     @classmethod
-    def STATS_TO_SAVE(cls):
-        return super().STATS_TO_SAVE() + [
+    def stats_to_save(cls):
+        return super().stats_to_save() + [
             "map_id",
             "started_t",
             "rounds_us",
@@ -560,7 +592,7 @@ class CS2GameStats(GameStats):
 
         :param disc_id: Discord ID of the player for whom to get the summary for
         """
-        player_stats: CS2PlayerStats = self.find_player_stats(disc_id, self.filtered_player_stats)
+        player_stats: CS2PlayerStats = GameStats.find_player_stats(disc_id, self.filtered_player_stats)
 
         date = datetime.fromtimestamp(self.timestamp).strftime("%Y/%m/%d")
         dt_1 = datetime.fromtimestamp(time())

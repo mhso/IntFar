@@ -270,7 +270,7 @@ def run(source: str, database: Database, steam_api: SteamAPIClient):
         for disc_id in database.users_by_game["cs2"]:
             newest_code = None
             for entry in data:
-                if entry.find_player_stats(disc_id, entry.filtered_player_stats) is not None:
+                if entry.FIND_PLAYER_STATS(disc_id, entry.filtered_player_stats) is not None:
                     newest_code = entry.game_id
 
             database.set_new_cs2_sharecode(disc_id, newest_code)

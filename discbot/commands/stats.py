@@ -1,5 +1,10 @@
 import api.util as api_util
-from api.game_data import get_stat_quantity_descriptions, stats_from_database
+from api.game_data import (
+    get_stat_quantity_descriptions,
+    stats_from_database,
+    get_formatted_stat_names,
+    get_formatted_stat_value
+)
 from api.game_data.cs2 import RANKS
 
 async def handle_stats_msg(client, message, game):
@@ -239,3 +244,23 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
         response = f"Not a valid stat: '{stat}' {emote}. See `!stats` for a list of valid stats."
         await message.channel.send(response)
         return
+
+async def handle_match_history_msg(client, message, game, target_id=None):
+    formatted_stat_names = get_formatted_stat_names(game)
+    stats_to_get = list(formatted_stat_names)
+
+    all_stats = client.database.get_player_stats(game, stats_to_get, disc_id=target_id)
+    stats_to_get.remove("disc_id")
+
+    formatted_stats = []
+    for stat_names, stat_tuple in all_stats:
+        for stat, value in zip(stat_names, stat_tuple):
+            fmt_stat = formatted_stat_names[stat]
+            fmt_value = get_formatted_stat_value(game, stat, value)
+
+            desc = f"- **{fmt_stat}**: {fmt_value}"
+            formatted_stats.append(desc)
+
+    header = f"Match history for **{api_util.SUPPORTED_GAMES[game]}**:"
+
+    await client.paginate(message.channel, formatted_stats, 0, 10, header)

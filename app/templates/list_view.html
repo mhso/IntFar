@@ -49,7 +49,7 @@
                 {% if user_owns_list %}
                 <button class="show-form-btn list-view-btn" onclick="toggleView('add-item-wrapper', true);">Add Champion</button>
                 <div id="add-item-wrapper">
-                    <form id="add-item-form" method="POST" enctype="multipart/form-data" action="{{ url_for('lol.lists.add_item', list_id=list_id) }}">
+                    <form id="add-item-form" method="POST" enctype="multipart/form-data" action="{{ url_for('lists.add_item', list_id=list_id) }}">
                         <select class="form-select" id="champs-select" name="champion">
                             {% for champ_id, champ_name in champions %}
                             <option value="{{ champ_id }}">{{ champ_name }}</option>

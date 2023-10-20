@@ -71,7 +71,7 @@ async def handle_random_sound_msg(client, message):
 
     await message.channel.send(f"Playing random sound: `{sound}`")
 
-    success, status = await client.audio_handler.play_sound(voice_state, sound)
+    success, status = await client.audio_handler.play_sound(sound, voice_state)
 
     if not success:
         await message.channel.send(client.insert_emotes(status))

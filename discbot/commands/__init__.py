@@ -431,6 +431,20 @@ def initialize_commands():
         mandatory_params=[GameParam("game")],
     )
 
+    # match history command
+    match_history_name = "match_history"
+    match_history_desc = (
+        "See the match history of you (or someone) else for the given game."
+    )
+    register_command(
+        match_history_name,
+        match_history_desc,
+        handle_match_history_msg,
+        access_level="self",
+        mandatory_params=[GameParam("game")],
+        optional_params=[TargetParam("person")],
+    )
+
     # average command
     average_name = "average"
     average_desc = (

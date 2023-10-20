@@ -16,7 +16,7 @@ class PlayerStats(ABC):
     kp: str = None
 
     @classmethod
-    def STATS_TO_SAVE(cls) -> list[str]:
+    def stats_to_save(cls) -> list[str]:
         """
         Defines which fields from this class should be saved in the database
         """
@@ -32,7 +32,7 @@ class PlayerStats(ABC):
         ]
 
     @classmethod
-    def STAT_QUANTITY_DESC(cls) -> dict[str, tuple[str, str]]:
+    def stat_quantity_desc(cls) -> dict[str, tuple[str, str]]:
         return {
             "kills": ("most", "fewest"),
             "deaths": ("fewest", "most"),
@@ -40,6 +40,31 @@ class PlayerStats(ABC):
             "kda": ("highest", "lowest"),
             "kp": ("highest", "lowest")
         }
+
+    @classmethod
+    def formatted_stat_names(cls) -> dict[str, str]:
+        formatted = {}
+        for stat in cls.stat_quantity_desc():
+            if stat in ("kda", "kp"):
+                fmt_stat = stat.upper()
+            else:
+                fmt_stat = stat.capitalize()
+
+            formatted[stat] = fmt_stat
+
+        return formatted
+
+    @classmethod
+    def get_formatted_stat_value(cls, stat, value) -> dict[str, str]:
+        if isinstance(value, float):
+            fmt_val = f"{value:.2f}"
+        else:
+            fmt_val = str(value)
+
+        if stat == "kp":
+            fmt_val = f"{fmt_val}%"
+
+        return fmt_val
 
 @dataclass
 class GameStats(ABC):
@@ -56,7 +81,7 @@ class GameStats(ABC):
     filtered_player_stats: list[PlayerStats] = field(default=None, init=False)
 
     @classmethod
-    def STATS_TO_SAVE(cls) -> list[str]:
+    def stats_to_save(cls) -> list[str]:
         """
         Defines which fields from this class should be saved in the database
         """
@@ -72,8 +97,8 @@ class GameStats(ABC):
 
     @classmethod
     def get_stats_from_db(cls, game: str, game_id: int, database, player_stats_cls: PlayerStats) -> tuple[dict, dict]:
-        game_stats_to_save = cls.STATS_TO_SAVE()
-        player_stats_to_save = player_stats_cls.STATS_TO_SAVE()
+        game_stats_to_save = cls.stats_to_save()
+        player_stats_to_save = player_stats_cls.stats_to_save()
 
         game_stats = database.get_game_stats(game, game_stats_to_save, game_id)
         player_stats = database.get_player_stats(game, player_stats_to_save, game_id)
@@ -82,6 +107,17 @@ class GameStats(ABC):
         player_stats_dict = {tup[0]: dict(zip(player_stats_to_save, tup)) for tup in player_stats}
 
         return game_stats_dict, player_stats_dict
+
+    @classmethod
+    def find_player_stats(cls, disc_id: int, player_list: list[PlayerStats]) -> PlayerStats:
+        """
+        Find the stats for a player given their disc_id and a list of player_stats.
+        """
+        for player_stats in player_list:
+            if player_stats.disc_id == disc_id:
+                return player_stats
+
+        return None
 
     @abstractmethod
     def get_finished_game_summary(self, disc_id: int) -> str:
@@ -94,13 +130,6 @@ class GameStats(ABC):
 
     def __post_init__(self):
         self.filtered_player_stats = list(filter(lambda x: x.disc_id is not None, self.all_player_stats))
-
-    def find_player_stats(self, disc_id: int, player_list: list[PlayerStats]) -> PlayerStats:
-        for player_stats in player_list:
-            if player_stats.disc_id == disc_id:
-                return player_stats
-
-        return None
 
 class GameStatsParser(ABC):
     def __init__(self, game: str, raw_data: dict, api_client: GameAPIClient, all_users: dict[int, User], guild_id: int):
