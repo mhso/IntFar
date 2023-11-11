@@ -321,6 +321,8 @@ class AudioHandler:
                 return success, status
 
             return True, None
+        
+        return False, "No sounds given"
 
     async def skip_sound(self, voice_state):
         # Check if user is in a voice channel.

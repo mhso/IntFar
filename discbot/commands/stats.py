@@ -1,4 +1,7 @@
+from datetime import datetime
+from time import time
 import api.util as api_util
+from api.awards import get_intfar_reasons, get_doinks_reasons
 from api.game_data import (
     get_stat_quantity_descriptions,
     stats_from_database,
@@ -137,20 +140,25 @@ async def handle_average_msg(client, message, game, stat, champ_or_map=None, dis
         await handle_average_msg_cs2(client, message, stat, champ_or_map, disc_id)
 
 def get_game_summary(client, game, game_id, target_id, guild_id):
+    """
+    Return a string describing the outcome of the game with the given game_id,
+    for the given player, in the given guild.
+    """
     game_stats = stats_from_database(
         game,
-        game_id,
         client.database,
         client.api_clients[game],
         client.database.users_by_game[game],
-        guild_id
-    )
+        guild_id,
+        game_id,
+    )[0]
     return game_stats.get_finished_game_summary(target_id)
 
 async def handle_stat_msg(client, message, game, best, stat, target_id):
     """
-    Get the value of the requested stat for the requested player.
-    F.x. '!best lol damage Obama'.
+    Get the highest or lowest value of the requested stat for the given player
+    and write it to Discord. If target_id is None, instead gets the highest/lowest
+    value of all time for the given stat.
     """
     stat_descs = get_stat_quantity_descriptions(game)
     if stat in stat_descs: # Check if the requested stat is a valid stat.
@@ -247,20 +255,91 @@ async def handle_stat_msg(client, message, game, best, stat, target_id):
 
 async def handle_match_history_msg(client, message, game, target_id=None):
     formatted_stat_names = get_formatted_stat_names(game)
-    stats_to_get = list(formatted_stat_names)
 
-    all_stats = client.database.get_player_stats(game, stats_to_get, disc_id=target_id)
-    stats_to_get.remove("disc_id")
+    all_game_stats = stats_from_database(
+        game,
+        client.database,
+        client.api_clients[game],
+        client.database.users_by_game[game],
+        message.guild.id,
+    )
 
-    formatted_stats = []
-    for stat_names, stat_tuple in all_stats:
-        for stat, value in zip(stat_names, stat_tuple):
+    formatted_entries = []
+    for game_stats in all_game_stats:
+        date = datetime.fromtimestamp(game_stats.timestamp).strftime("%Y/%m/%d")
+        dt_1 = datetime.fromtimestamp(time())
+        dt_2 = datetime.fromtimestamp(time() + game_stats.duration)
+        fmt_duration = api_util.format_duration(dt_1, dt_2)
+
+        player_stats = game_stats.find_player_stats(target_id, game_stats.filtered_player_stats)
+
+        if player_stats is None: # Target player was not in the game
+            continue
+
+        if game == "lol":
+            map_or_champ = player_stats.champ_name
+        else:
+            map_or_champ = game_stats.map_name
+
+        win_str = "Won" if game_stats.win == 1 else "Lost"
+
+        # Int-Far description
+        if game_stats.intfar_id == target_id:
+            reasons = " and ".join(
+                f"**{r}**" for c, r in zip(
+                    game_stats.intfar_reason, get_intfar_reasons(game).values()
+                )
+                if c == "1"
+            )
+            intfar_description = f"Int-Far for {reasons}"
+        else:
+            intfar_description = "Not **Int-Far**"
+
+        # Doinks description
+        if player_stats.doinks is not None:
+            reasons = " and ".join(
+                f"**{r}**" for c, r in zip(
+                    player_stats.doinks, get_doinks_reasons(game).values()
+                )
+                if c == "1"
+            )
+            doinks_description = f"Big Doinks for {reasons}"
+        else:
+            emote = client.insert_emotes("{emote_Doinks}")
+            doinks_description = f"No {emote}"
+
+        match_str = (
+            f"- **{win_str}** game lasting **{fmt_duration}** on **{date}** playing **{map_or_champ}**\n"
+            f"- {doinks_description}\n"
+            f"- {intfar_description}\n"
+            "```css\n"
+        )
+
+        # Get the formatted stat names and stat values and figure out the max width
+        # of the stat names to pad all stat entries to the same width
+        formatted_stats = []
+        formatted_values = []
+        for stat in player_stats.__dict__:
+            if stat not in formatted_stat_names:
+                continue
+
             fmt_stat = formatted_stat_names[stat]
-            fmt_value = get_formatted_stat_value(game, stat, value)
+            fmt_value = get_formatted_stat_value(game, stat, player_stats.__dict__[stat])
 
-            desc = f"- **{fmt_stat}**: {fmt_value}"
-            formatted_stats.append(desc)
+            formatted_stats.append(fmt_stat)
+            formatted_values.append(fmt_value)
 
-    header = f"Match history for **{api_util.SUPPORTED_GAMES[game]}**:"
+        max_width = max(len(s) for s in formatted_stats)
 
-    await client.paginate(message.channel, formatted_stats, 0, 10, header)
+        for stat, value in zip(formatted_stats, formatted_values):
+            padding = " " * (max_width - len(stat))
+
+            match_str += f"\n{stat}:{padding} {value}"
+
+        match_str += "\n```"
+
+        formatted_entries.append(match_str)
+
+    header = f"--- Match history for **{api_util.SUPPORTED_GAMES[game]}** ---"
+
+    await client.paginate(message.channel, formatted_entries, 0, 1, header)

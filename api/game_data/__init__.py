@@ -9,7 +9,7 @@ _PLAYER_STATS_HOLDERS: dict[str, PlayerStats] = find_subclasses_in_dir(_PATH, Pl
 def get_stat_parser(game, raw_data, api_client, all_users, guild_id) -> GameStatsParser:
     return _GAME_STAT_PARSERS[game](game, raw_data, api_client, all_users, guild_id)
 
-def stats_from_database(game, game_id, database, api_client, all_users, guild_id) -> GameStats:
+def stats_from_database(game, database, api_client, all_users, guild_id, game_id=None) -> list[GameStats]:
     return get_stat_parser(game, None, api_client, all_users, guild_id).parse_from_database(database, game_id)
 
 def get_stats_for_game(game) -> list[str]:

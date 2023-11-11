@@ -16,7 +16,87 @@ class AwardQualifiers(ABC):
 
     @classmethod
     @abstractmethod
+    def INTFAR_REASONS(cls) -> dict[str, str]:
+        """
+        Get a dictionary with keys being shorthand reasons for getting Int-Far
+        and values being a more descriptive reason.
+        """
+
+    @classmethod
+    @abstractmethod
+    def INTFAR_CRITERIAS(cls) -> dict[str, dict[str, float]]:
+        """
+        Get a dictionary with keys being shorthand reasons for getting Int-Far
+        and values being a dictionary of different criterias needing to be met
+        for someone to be awarded Int-Far for that reason.
+        """
+
+    @classmethod
+    @abstractmethod
+    def INTFAR_CRITERIAS_DESC(cls) -> dict[str, list[str]]:
+        """
+        Get a dictionary with keys being shorthand reasons for getting Int-Far
+        and values being a dictionary of list of descriptions of criterias
+        needing to be met for someone to be awarded Int-Far for that reason.
+        """
+
+    @classmethod
+    @abstractmethod
+    def DOINKS_REASONS(cls) -> dict[str, str]:
+        """
+        Get a dictionary with keys being shorthand reasons for getting Doinks
+        and values being a more descriptive reason.
+        """
+
+    @classmethod
+    @abstractmethod
+    def INTFAR_FLAVOR_TEXTS(cls) -> list[str]:
+        """
+        Get a list of filenames for flavor texts related to getting Int-Far.
+        """
+
+    @classmethod
+    @abstractmethod
+    def HONORABLE_MENTIONS_FLAVOR_TEXTS(cls) -> list[str]:
+        """
+        Get a list of filenames for flavor texts related to honorable mentions.
+        """
+
+    @classmethod
+    @abstractmethod
+    def COOL_STATS_FLAVOR_TEXTS(cls) -> list[str]:
+        """
+        Get a list of filenames for flavor texts related to cool stats.
+        """
+
+    @classmethod
+    @abstractmethod
+    def DOINKS_FLAVOR_TEXTS(cls) -> list[str]:
+        """
+        Get a list of filenames for flavor texts related to doinks.
+        """
+
+    @classmethod
+    @abstractmethod
+    def GAME_SPECIFIC_FLAVORS(cls) -> list[str]:
+        """
+        Get a list of game specific flavor texts that subclasses of this class
+        can override.
+        """
+        return {
+            "intfar": cls.INTFAR_FLAVOR_TEXTS(),
+            "doinks": cls.DOINKS_FLAVOR_TEXTS(),
+            "honorable": cls.HONORABLE_MENTIONS_FLAVOR_TEXTS(),
+            "stats": cls.COOL_STATS_FLAVOR_TEXTS(),
+        }
+
+    @classmethod
+    @abstractmethod
     def ALL_FLAVOR_TEXTS(cls) -> list[str]:
+        """
+        Get a list of filenames for all flavor texts for the game
+        that subclasses this class.
+        """
         return [
             "intfar",
             "no_intfar",
@@ -28,56 +108,6 @@ class AwardQualifiers(ABC):
             "broken_loss_streak",
             "ifotm"
         ]
-
-    @classmethod
-    @abstractmethod
-    def INTFAR_REASONS(cls) -> dict[str, str]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def INTFAR_CRITERIAS(cls) -> dict[str, dict[str, float]]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def INTFAR_CRITERIAS_DESC(cls) -> dict[str, list[str]]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def DOINKS_REASONS(cls) -> dict[str, str]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def INTFAR_FLAVOR_TEXTS(cls) -> list[str]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def HONORABLE_MENTIONS_FLAVOR_TEXTS(cls) -> list[str]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def COOL_STATS_FLAVOR_TEXTS(cls) -> list[str]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def DOINKS_FLAVOR_TEXTS(cls) -> list[str]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def GAME_SPECIFIC_FLAVORS(cls) -> list[str]:
-        return {
-            "intfar": cls.INTFAR_FLAVOR_TEXTS(),
-            "doinks": cls.DOINKS_FLAVOR_TEXTS(),
-            "honorable": cls.HONORABLE_MENTIONS_FLAVOR_TEXTS(),
-            "stats": cls.COOL_STATS_FLAVOR_TEXTS(),
-        }
 
     def get_flavor_text(self, flavor: str, outer_index, inner_index=None, **params_to_replace) -> str:
         if inner_index is not None:
@@ -98,6 +128,7 @@ class AwardQualifiers(ABC):
                     value = f"{value:.2f}"
                 flavor_text = flavor_text.replace("{" + key + "}", str(value))
 
+        # Replace various placeholder strings with actual values
         if "{game}" in flavor_text: # Replace game name if it is present in the text
             flavor_text = flavor_text.replace("{game}", SUPPORTED_GAMES[self.game])
 
@@ -162,7 +193,6 @@ class AwardQualifiers(ABC):
         """
         Returns a list of miscellaneous interesting stats for each player in the game.
         """
-        ...
 
     @abstractmethod
     def get_cool_timeline_events(self) -> list[tuple]:

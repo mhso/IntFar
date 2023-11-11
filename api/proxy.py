@@ -78,7 +78,11 @@ class ProxyManager(object):
 
         while not self._stop_event.is_set():
             for proxy in wait(self.proxies, timeout=0.01):
-                command, *args = proxy.recv()
+                try:
+                    command, *args = proxy.recv()
+                except (OSError, BrokenPipeError) as exc:
+                    self.close()
+                    break
 
                 if command == "close":
                     proxy.send("exiting...")

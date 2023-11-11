@@ -44,7 +44,7 @@ class PlayerStats(ABC):
     @classmethod
     def formatted_stat_names(cls) -> dict[str, str]:
         formatted = {}
-        for stat in cls.stat_quantity_desc():
+        for stat in PlayerStats.stat_quantity_desc():
             if stat in ("kda", "kp"):
                 fmt_stat = stat.upper()
             else:
@@ -58,6 +58,8 @@ class PlayerStats(ABC):
     def get_formatted_stat_value(cls, stat, value) -> dict[str, str]:
         if isinstance(value, float):
             fmt_val = f"{value:.2f}"
+        elif value is None:
+            fmt_val = "0"
         else:
             fmt_val = str(value)
 
@@ -96,17 +98,30 @@ class GameStats(ABC):
         ]
 
     @classmethod
-    def get_stats_from_db(cls, game: str, game_id: int, database, player_stats_cls: PlayerStats) -> tuple[dict, dict]:
+    def get_stats_from_db(cls, game: str, database, player_stats_cls: PlayerStats, game_id: int = None) -> tuple[list[dict], list[dict]]:
+        """
+        Get stats from all games or a single game as well as stats for players in the game(s).
+        """
         game_stats_to_save = cls.stats_to_save()
         player_stats_to_save = player_stats_cls.stats_to_save()
 
         game_stats = database.get_game_stats(game, game_stats_to_save, game_id)
         player_stats = database.get_player_stats(game, player_stats_to_save, game_id)
 
-        game_stats_dict = dict(zip(game_stats_to_save, game_stats[0]))
-        player_stats_dict = {tup[0]: dict(zip(player_stats_to_save, tup)) for tup in player_stats}
+        game_stats_dicts = [dict(zip(game_stats_to_save, stats)) for stats in game_stats]
 
-        return game_stats_dict, player_stats_dict
+        player_stats_by_game_id = {}
+        for tup in player_stats:
+            game_id = tup[0]
+            disc_id = tup[1]
+            if game_id not in player_stats_by_game_id:
+                player_stats_by_game_id[game_id] = {}
+
+            player_stats_by_game_id[game_id][disc_id] = dict(zip(player_stats_to_save, tup))
+                                  
+        player_stats_dicts = list(player_stats_by_game_id.values())
+
+        return game_stats_dicts, player_stats_dicts
 
     @classmethod
     def find_player_stats(cls, disc_id: int, player_list: list[PlayerStats]) -> PlayerStats:
@@ -148,7 +163,11 @@ class GameStatsParser(ABC):
         ...
 
     @abstractmethod
-    def parse_from_database(self, database, game_id: int) -> GameStats:
+    def parse_from_database(self, database, game_id: int = None) -> list[GameStats]:
+        """
+        Get data for a given game, or all games if `game_id` is None, from the database
+        and return a list of GameStats objects with the game data.
+        """
         ...
 
 def get_outlier(

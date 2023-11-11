@@ -211,7 +211,7 @@ function updateDuration() {
     }
 }
 
-function pollUntilAnswer(attempt=0, limit=20, waitTime=1000) {
+function pollUntilAnswer(game, attempt=0, limit=20, waitTime=1000) {
     console.log("Waiting for restart " + attempt + "/" + limit + "...");
 
     if (attempt == limit) {
@@ -219,7 +219,7 @@ function pollUntilAnswer(attempt=0, limit=20, waitTime=1000) {
         alert("Something went wrong when restarting :(");
     }
 
-    let baseUrl = getBaseURL();
+    let baseUrl = getBaseURL(game);
 
     let timeBefore = Date.now();
 
@@ -250,13 +250,13 @@ function pollUntilAnswer(attempt=0, limit=20, waitTime=1000) {
 
         // Wait a bit before polling again.
         setTimeout(function() {
-            pollUntilAnswer(attempt + 1, limit, waitTime);
+            pollUntilAnswer(game, attempt + 1, limit, waitTime);
         }, timeToWait);
     });
 }
 
-function restartIntfar() {
-    let baseUrl = getBaseURL();
+function restartIntfar(game) {
+    let baseUrl = getBaseURL(game);
 
     let button = document.getElementById("admin-restart-btn");
     let initBtn = button.getElementsByClassName("admin-restart-init").item(0)
@@ -268,7 +268,7 @@ function restartIntfar() {
         method: "POST"
     });
 
-    pollUntilAnswer();
+    pollUntilAnswer(game);
 }
 
 window.addEventListener("resize", function() {

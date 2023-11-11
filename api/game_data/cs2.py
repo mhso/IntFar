@@ -861,24 +861,33 @@ class CS2GameStatsParser(GameStatsParser):
             biggest_deficit=biggest_deficit
         )
 
-    def parse_from_database(self, database, game_id: int) -> GameStats:
-        game_stats, player_stats = CS2GameStats.get_stats_from_db(self.game, game_id, database, CS2PlayerStats)
-        game_stats["map_name"] = self.api_client.get_map_name(game_stats["map_id"])
+    def parse_from_database(self, database, game_id: int = None) -> list[GameStats]:
+        """
+        Get data for a given game, or all games if `game_id` is None, from the database
+        and return a list of GameStats objects with the game data.
+        """
+        all_game_stats, all_player_stats = CS2GameStats.get_stats_from_db(self.game, database, CS2PlayerStats, game_id)
 
-        all_player_stats = []
-        players_in_game = []
-        for disc_id in player_stats:
-            all_player_stats.append(CS2PlayerStats(**player_stats[disc_id]))
+        all_stats = []
+        for game_stats, player_stats in zip(all_game_stats, all_player_stats):
+            game_stats["map_name"] = self.api_client.get_map_name(game_stats["map_id"])
 
-            user_game_info = self.all_users[disc_id]
-            game_info = {
-                "disc_id": disc_id,
-                "steam_name": user_game_info.ingame_name[0],
-                "steam_id": user_game_info.ingame_id[0],
-            }
-            players_in_game.append(game_info)
+            all_player_stats = []
+            players_in_game = []
+            for disc_id in player_stats:
+                all_player_stats.append(CS2PlayerStats(**player_stats[disc_id]))
 
-        return CS2GameStats(self.game, **game_stats, players_in_game=players_in_game, all_player_stats=all_player_stats)
+                user_game_info = self.all_users[disc_id]
+                game_info = {
+                    "disc_id": disc_id,
+                    "steam_name": user_game_info.ingame_name[0],
+                    "steam_id": user_game_info.ingame_id[0],
+                }
+                players_in_game.append(game_info)
+
+            all_stats.append(CS2GameStats(self.game, **game_stats, players_in_game=players_in_game, all_player_stats=all_player_stats))
+
+        return all_stats
 
     def get_active_game_summary(self, active_id: int) -> str:
         """

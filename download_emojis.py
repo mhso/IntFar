@@ -36,6 +36,6 @@ def download_emojis(disc_client):
 
         sleep(1)
 
-client.add_event_listener("onready", download_emojis, client)
+client.add_event_listener("ready", download_emojis, client)
 
 client.run(conf.discord_token)

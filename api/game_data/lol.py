@@ -62,7 +62,7 @@ class LoLPlayerStats(PlayerStats):
             if stat == "cs":
                 fmt_stat = stat.upper()
             elif stat == "cs_per_min":
-                fmt_stat = "CS per min"
+                fmt_stat = "CS Per Min"
             else:
                 fmt_stat = " ".join(map(lambda s: s.capitalize(), stat.split("_")))
 
@@ -147,25 +147,33 @@ class LoLGameStatsParser(GameStatsParser):
 
         return self.get_relevant_stats()
 
-    def parse_from_database(self, database, game_id: int) -> GameStats:
-        game_stats, player_stats = LoLGameStats.get_stats_from_db(self.game, game_id, database, LoLPlayerStats)
+    def parse_from_database(self, database, game_id: int = None) -> list[GameStats]:
+        """
+        Get data for a given game, or all games if `game_id` is None, from the database
+        and return a list of GameStats objects with the game data.
+        """
+        all_game_stats, all_player_stats = LoLGameStats.get_stats_from_db(self.game, database, LoLPlayerStats, game_id)
 
-        all_player_stats = []
-        players_in_game = []
-        for disc_id in player_stats:
-            player_stats[disc_id]["champ_name"] = self.api_client.get_champ_name(player_stats[disc_id]["champ_id"])
-            all_player_stats.append(LoLPlayerStats(**player_stats[disc_id]))
+        all_stats = []
+        for game_stats, player_stats in zip(all_game_stats, all_player_stats):
+            all_player_stats = []
+            players_in_game = []
+            for disc_id in player_stats:
+                player_stats[disc_id]["champ_name"] = self.api_client.get_champ_name(player_stats[disc_id]["champ_id"])
+                all_player_stats.append(LoLPlayerStats(**player_stats[disc_id]))
 
-            user_game_info = self.all_users[disc_id]
-            summ_info = {
-                "disc_id": disc_id,
-                "summ_name": user_game_info.ingame_name[0],
-                "summ_id": user_game_info.ingame_id[0],
-                "champion_id": player_stats[disc_id],
-            }
-            players_in_game.append(summ_info)
+                user_game_info = self.all_users[disc_id]
+                summ_info = {
+                    "disc_id": disc_id,
+                    "summ_name": user_game_info.ingame_name[0],
+                    "summ_id": user_game_info.ingame_id[0],
+                    "champion_id": player_stats[disc_id],
+                }
+                players_in_game.append(summ_info)
 
-        return LoLGameStats(self.game, **game_stats, players_in_game=players_in_game, all_player_stats=all_player_stats)
+            all_stats.append(LoLGameStats(self.game, **game_stats, players_in_game=players_in_game, all_player_stats=all_player_stats))
+
+        return all_stats
 
     def get_relevant_stats_v4(self) -> GameStats:
         """

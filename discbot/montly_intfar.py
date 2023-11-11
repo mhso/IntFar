@@ -13,6 +13,7 @@ class MonthlyIntfar:
         current_month = current_time.month
         next_month = 1 if current_month == 12 else current_month + 1
         next_year = current_time.year if next_month != 1 else current_time.year + 1
+
         # If today is the first day of the month and the time if before 14:00,
         # we should announce the Int-Far at the current month (and year).
         # Otherwise, we should announce it at the first day of the next month.
@@ -25,6 +26,9 @@ class MonthlyIntfar:
         self.time_at_announcement = current_time.replace(
             year_to_announce, month_to_announce, 1, hour_of_announce, 0, 0, 0, self.cph_timezone
         )
+
+        # Games for which we shouldn't announce IFOTM (yet)
+        self.disabled_games = ["cs2"]
 
     def should_announce(self):
         """

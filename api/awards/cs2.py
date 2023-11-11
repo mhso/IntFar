@@ -7,6 +7,7 @@ from api.util import round_digits
 class CS2AwardQualifiers(AwardQualifiers):
     @classmethod
     def INTFAR_REASONS(cls):
+        super().__doc__
         return {
             "kda": "Low KDA",
             "mvps": "No MVPs",
@@ -16,6 +17,7 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     @classmethod
     def INTFAR_CRITERIAS(cls):
+        super().__doc__
         return {
             "kda": {
                 "lower_threshold": 0.5,
@@ -39,6 +41,7 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     @classmethod
     def INTFAR_CRITERIAS_DESC(cls):
+        super().__doc__
         criterias = cls.INTFAR_CRITERIAS()
         return {
             "kda": [
@@ -67,6 +70,7 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     @classmethod
     def DOINKS_REASONS(cls):
+        super().__doc__
         return {
             "kda": "KDA larger than or equal to 2.5",
             "kills": "30 kills or more",
@@ -81,17 +85,8 @@ class CS2AwardQualifiers(AwardQualifiers):
         }
 
     @classmethod
-    def ALL_FLAVOR_TEXTS(cls):
-        return (
-            super().ALL_FLAVOR_TEXTS() +
-            cls.INTFAR_FLAVOR_TEXTS() +
-            cls.HONORABLE_MENTIONS_FLAVOR_TEXTS() +
-            cls.COOL_STATS_FLAVOR_TEXTS() +
-            cls.DOINKS_FLAVOR_TEXTS()
-        )
-
-    @classmethod
     def INTFAR_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "lowest_kda",
             "no_mvps",
@@ -101,6 +96,7 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     @classmethod
     def HONORABLE_MENTIONS_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "mentions_teamkills",
             "mentions_teamflashes",
@@ -111,6 +107,7 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     @classmethod
     def COOL_STATS_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "stats_assists",
             "stats_flashes",
@@ -120,6 +117,7 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     @classmethod
     def DOINKS_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "doinks_kda",
             "doinks_kills",
@@ -135,6 +133,7 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     @classmethod
     def TIMELINE_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "timeline_comeback",
             "timeline_throw",
@@ -142,9 +141,23 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     @classmethod
     def GAME_SPECIFIC_FLAVORS(cls):
+        super().__doc__
         flavors = dict(super().GAME_SPECIFIC_FLAVORS()) 
         flavors["timeline"] = cls.TIMELINE_FLAVOR_TEXTS()
         return flavors
+
+    @classmethod
+    def ALL_FLAVOR_TEXTS(cls):
+        """
+        Get a list of filenames for all flavor texts for CS2.
+        """
+        return (
+            super().ALL_FLAVOR_TEXTS() +
+            cls.INTFAR_FLAVOR_TEXTS() +
+            cls.HONORABLE_MENTIONS_FLAVOR_TEXTS() +
+            cls.COOL_STATS_FLAVOR_TEXTS() +
+            cls.DOINKS_FLAVOR_TEXTS()
+        )
 
     def get_big_doinks(self) -> tuple[dict[int, list[tuple]], dict[int, str]]:
         """

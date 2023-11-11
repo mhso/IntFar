@@ -7,6 +7,7 @@ from api.game_stats import get_outlier
 class LoLAwardQualifiers(AwardQualifiers):
     @classmethod
     def INTFAR_REASONS(cls):
+        super().__doc__
         return {
             "kda": "Low KDA",
             "deaths": "Many deaths",
@@ -16,6 +17,7 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def INTFAR_CRITERIAS(cls):
+        super().__doc__
         return {
             "kda": {
                 "lower_threshold": 1.3,
@@ -40,6 +42,7 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def INTFAR_CRITERIAS_DESC(cls):
+        super().__doc__
         criterias = cls.INTFAR_CRITERIAS()
         return {
             "kda": [
@@ -69,6 +72,7 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def DOINKS_REASONS(cls):
+        super().__doc__
         return {
             "kda": "KDA larger than or equal to 10",
             "kills": "20 kills or more",
@@ -81,18 +85,8 @@ class LoLAwardQualifiers(AwardQualifiers):
         }
 
     @classmethod
-    def ALL_FLAVOR_TEXTS(cls):
-        return (
-            super().ALL_FLAVOR_TEXTS() + 
-            cls.INTFAR_FLAVOR_TEXTS() +
-            cls.HONORABLE_MENTIONS_FLAVOR_TEXTS() +
-            cls.COOL_STATS_FLAVOR_TEXTS() +
-            cls.TIMELINE_FLAVOR_TEXTS() +
-            cls.DOINKS_FLAVOR_TEXTS()
-        )
-
-    @classmethod
     def INTFAR_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "lowest_kda",
             "most_deaths",
@@ -102,6 +96,7 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def HONORABLE_MENTIONS_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "mentions_no_vision_ward",
             "mentions_low_damage",
@@ -111,6 +106,7 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def COOL_STATS_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "stats_time_spent_dead",
             "stats_objectives_stolen",
@@ -120,6 +116,7 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def DOINKS_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "doinks_kda",
             "doinks_kills",
@@ -133,17 +130,34 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     @classmethod
     def TIMELINE_FLAVOR_TEXTS(cls):
+        super().__doc__
         return [
             "timeline_comeback",
             "timeline_throw",
             "timeline_goldkeeper",
+            "timeline_pentasteal",
         ]
 
     @classmethod
     def GAME_SPECIFIC_FLAVORS(cls):
+        super().__doc__
         flavors = dict(super().GAME_SPECIFIC_FLAVORS()) 
         flavors["timeline"] = cls.TIMELINE_FLAVOR_TEXTS()
         return flavors
+
+    @classmethod
+    def ALL_FLAVOR_TEXTS(cls):
+        """
+        Get a list of filenames for all flavor texts for LoL.
+        """
+        return (
+            super().ALL_FLAVOR_TEXTS() + 
+            cls.INTFAR_FLAVOR_TEXTS() +
+            cls.HONORABLE_MENTIONS_FLAVOR_TEXTS() +
+            cls.COOL_STATS_FLAVOR_TEXTS() +
+            cls.TIMELINE_FLAVOR_TEXTS() +
+            cls.DOINKS_FLAVOR_TEXTS()
+        )
 
     def get_big_doinks(self):
         """
@@ -292,6 +306,7 @@ class LoLAwardQualifiers(AwardQualifiers):
             - We lost the game after being up by more than 8k gold (the big throw)
             - We won the game after being down by more than 8k gold (the epic comeback)
             - Someone had more than 4000 gold at one point
+            - Someone stole a pentakill from someone else
         """
         timeline_data = self.parsed_game_stats.get_filtered_timeline_stats(self.parsed_game_stats.timeline_data)
 
@@ -307,6 +322,12 @@ class LoLAwardQualifiers(AwardQualifiers):
         biggest_gold_deficit = 0
         too_much_gold = {}
         game_win = self.parsed_game_stats.win == 1
+        any_quadrakills = any(
+            player_stats.quadrakills > 0
+            for player_stats in self.parsed_game_stats.filtered_player_stats
+        )
+        curr_multikill = {}
+        stolen_pentas = {}
 
         # Calculate stats from timeline frames.
         for frame_data in timeline_data["frames"]:
@@ -327,9 +348,11 @@ class LoLAwardQualifiers(AwardQualifiers):
                 else:
                     enemy_total_gold += total_gold
 
+                if disc_id is None:
+                    continue
+
                 if (
-                    disc_id is not None
-                    and curr_gold > self.config.timeline_min_curr_gold
+                    curr_gold > self.config.timeline_min_curr_gold
                     and total_gold < self.config.timeline_min_total_gold
                 ):
                     # Player has enough current gold to warrant a mention.
@@ -343,6 +366,37 @@ class LoLAwardQualifiers(AwardQualifiers):
             else: # Record max gold lead during the game.
                 biggest_gold_lead = max(gold_diff, biggest_gold_lead)
 
+            if not any_quadrakills:
+                continue
+
+            for disc_id in curr_multikill:
+                if frame_data["timestamp"] - curr_multikill[disc_id]["timestamp"] > 10_000: # 10 secs
+                    curr_multikill[disc_id]["streak"] = 0
+
+            # Keep track of multikills for each player
+            for event in frame_data.get("events", []):
+                if event["type"] != "CHAMPION_KILL":
+                    continue
+
+                disc_id = participant_dict.get(int(event["killerId"]))
+                if disc_id is None:
+                    continue
+
+                if disc_id not in curr_multikill:
+                    curr_multikill[disc_id] = {"streak": 0, "timestamp": 0}
+
+                curr_multikill[disc_id]["streak"] += 1
+                curr_multikill[disc_id]["timestamp"] = event["timestamp"]
+
+            # Check if someone stole a penta from someone else
+            people_with_quadras = list(filter(lambda x: x[1]["streak"] == 4, curr_multikill.items()))
+
+            if people_with_quadras != []:
+                person_with_quadra, streak_dict = people_with_quadras[0]
+                for disc_id in curr_multikill:
+                    if disc_id != person_with_quadra and curr_multikill[disc_id]["timestamp"] > streak_dict["timestamp"]:
+                        stolen_pentas[disc_id] = stolen_pentas.get(disc_id, 0) + 1
+
         if biggest_gold_deficit > self.config.timeline_min_deficit and game_win: # Epic comeback!
             timeline_events.append((0, biggest_gold_deficit, None))
         elif biggest_gold_lead > self.config.timeline_min_lead and not game_win: # Huge throw...
@@ -350,6 +404,9 @@ class LoLAwardQualifiers(AwardQualifiers):
 
         for disc_id in too_much_gold:
             timeline_events.append((2, too_much_gold[disc_id], disc_id))
+
+        for disc_id in stolen_pentas:
+            timeline_events.append((3, stolen_pentas[disc_id], disc_id))
 
         return timeline_events
 

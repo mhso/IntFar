@@ -9,7 +9,7 @@ from api.lan import get_average_stats, LAN_PARTIES
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, util
 from api.awards import get_awards_handler
-from api.game_data import get_stat_parser
+from api.game_data import get_stat_parser, get_formatted_stat_names, get_formatted_stat_value
 from api.game_api.lol import RiotAPIClient
 from api.game_api.cs2 import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
@@ -129,15 +129,16 @@ class TestFuncs:
         print(response)
 
     def test_timeline(self):
-        game_id = 6010114516
+        game_id = 6667986692
+        game = "lol"
         game_data = self.riot_api.get_game_details(game_id)
-        timeline_data = self.riot_api.get_game_timeline(game_id)
-        relevant = get_relevant_stats(self.database.summoners, [], game_data)[0]
-        filtered = get_filtered_stats(relevant)
-        filtered_timeline = get_filtered_timeline_stats(filtered, timeline_data)
+        parser = get_stat_parser(game, game_data, self.riot_api, self.database.users_by_game["lol"], 803987403932172359)
+        parsed_game_stats = parser.parse_data()
+        awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
 
-        stats = award_qualifiers.get_cool_timeline_events(filtered_timeline, CONFIG)
-        print(stats)
+        timeline_stats = awards_handler.get_cool_timeline_events()
+        print(timeline_stats)
+        print(awards_handler.get_flavor_text("timeline", 3, "random", value=1))
 
     def test_normalize_sound(self):
         files = glob("app/static/sounds/*.mp3")
@@ -225,7 +226,7 @@ class TestFuncs:
     def test_pyppeteer_stream(self):
         url = "https://www.youtube.com/watch?v=esdTLuEtwNM"
         client = DiscordClient(CONFIG, DATABASE, None, RIOT_API)
-        client.add_event_listener("onready", self.play_sound, url, client)
+        client.add_event_listener("ready", self.play_sound, url, client)
         client.run(CONFIG.discord_token)
 
     def test_monthly_intfar(self):
@@ -271,6 +272,11 @@ class TestFuncs:
 
         parser = get_stat_parser("cs2", game_stats, api_client, self.database.users_by_game["cs2"], 619073595561213953)
         data = parser.parse_data()
+
+    def test_format_stats(self):
+        stat_names = get_formatted_stat_names("lol")
+        for stat in stat_names:
+            print(stat, stat_names[stat])
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

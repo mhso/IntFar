@@ -59,6 +59,6 @@ if __name__ == "__main__":
 
     GUILD_MAP["test"] = 512363920044982272
 
-    discord_client.add_event_listener("onready", write_message, discord_client, message, channel_id)
+    discord_client.add_event_listener("ready", write_message, discord_client, message, channel_id)
 
     discord_client.run(conf.discord_token)

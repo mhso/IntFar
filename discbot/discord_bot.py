@@ -195,8 +195,8 @@ class DiscordClient(discord.Client):
                 # Game was played as part of a clash tournament, so it awards more betting tokens.
                 multiplier = self.config.clash_multiplier
                 await self.channels_to_write[guild_id].send(
-                    "**>>>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
-                    f"{multiplier} TIMES AS MUCH!!! <<<<<**"
+                    "**>>> THAT WAS A CLASH GAME! REWARDS ARE WORTH " +
+                    f"{multiplier}x AS MUCH!!! <<<**"
                 )
 
             await self.handle_game_over(game_monitor.game, game_info, guild_id)
@@ -271,7 +271,10 @@ class DiscordClient(discord.Client):
             await self.send_error_msg(guild_id)
             raise exc
 
-        self.game_monitors[game].users_in_game[guild_id] = parsed_game_stats.players_in_game
+        self.game_monitors[game].users_in_game[guild_id] = {
+            player_data["disc_id"]: player_data
+            for player_data in parsed_game_stats.players_in_game
+        }
         logger.debug(f"Users in game after: {parsed_game_stats.players_in_game}")
 
         # Get class for handling award qualifiers for the current game
@@ -520,14 +523,17 @@ class DiscordClient(discord.Client):
         }
 
         for guild in self.guilds:
-            if guild.id in api_util.GUILD_IDS:
-                for channel in guild.voice_channels:
-                    members_in_voice = channel.members
-                    for member in members_in_voice:
-                        for game in api_util.SUPPORTED_GAMES:
-                            user_info = self.database.game_user_data_from_discord_id(game, member.id)
-                            if user_info is not None:
-                                users_in_voice[guild.id][game][member.id] = user_info
+            if guild.id not in api_util.GUILD_IDS:
+                continue
+
+            for channel in guild.voice_channels:
+                members_in_voice = channel.members
+                for member in members_in_voice:
+                    for game in api_util.SUPPORTED_GAMES:
+                        member_id = int(member.id)
+                        user_info = self.database.game_user_data_from_discord_id(game, member_id)
+                        if user_info is not None:
+                            users_in_voice[guild.id][game][member_id] = user_info
 
         return users_in_voice
 
@@ -764,6 +770,7 @@ class DiscordClient(discord.Client):
         """
         Play potential Int-Far and Doinks sounds after a game has finished.
 
+        :param game:        The name of the game that was played
         :param intfar:      Discord ID of the person that is Int-Far (or None)
         :param doinks:      List of Discord IDs of people who got doinks
         :param guild_id:    ID of the Discord server where the game took place
@@ -771,11 +778,12 @@ class DiscordClient(discord.Client):
         users_in_voice = self.get_users_in_voice()
         voice_state = None
 
-        # Check if any users from the game are in a voice channel.
+        # Check if any users from the game are in a voice channel
         for game_disc_id in self.game_monitors[game].users_in_game[guild_id]:
             for voice_disc_id in users_in_voice[guild_id][game]:
-                if game_disc_id == voice_disc_id:
-                    # Get voice state for member in voice chat.
+                logger.info(f"game_disc_id={game_disc_id}({type(game_disc_id)}),voice_disc_id={voice_disc_id}({type(voice_disc_id)})")
+                if game_disc_id == int(voice_disc_id):
+                    # Get voice state for member in voice chat
                     member = self.get_member_safe(game_disc_id, guild_id)
                     if member is None:
                         continue
@@ -783,16 +791,18 @@ class DiscordClient(discord.Client):
                     voice_state = member.voice
                     break
 
+        logger.info(f"Voice stats is None: {voice_state is None}")
+
         if voice_state is not None:
-            # One or more users from the game is in a voice channel.
+            # One or more users from the game is in a voice channel
             sounds_to_play = []
 
-            # Add Int-Far sound to queue (if it exists).
+            # Add Int-Far sound to queue (if it exists)
             intfar_sound = self.database.get_event_sound(game, intfar, "intfar")
             if intfar_sound is not None:
                 sounds_to_play.append(intfar_sound)
 
-            # Add each doinks sound to queue (if any exist).
+            # Add each doinks sound to queue (if any exist)
             for disc_id in doinks:
                 doinks_sound = self.database.get_event_sound(game, disc_id, "doinks")
                 if doinks_sound is not None:
@@ -1498,8 +1508,9 @@ class DiscordClient(discord.Client):
 
         intfar_data = self.database.get_intfars_of_the_month(game)
 
-        if intfar_data == []:
+        if intfar_data == [] or game in monthly_monitor.disabled_games:
             # No one has played enough games to quality for IFOTM this month
+            # or game isn't one for which we announce IFOTM
             return
 
         game_stats = get_empty_game_data(game)
@@ -1560,8 +1571,6 @@ class DiscordClient(discord.Client):
 
         for game in api_util.SUPPORTED_GAMES:
             await self.declare_monthly_intfar(game, ifotm_monitor)
-
-        await self.declare_monthly_intfar("lol", ifotm_monitor)
 
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
         asyncio.create_task(self.polling_loop())
@@ -1636,8 +1645,8 @@ class DiscordClient(discord.Client):
                 CHANNEL_IDS.append(guild.text_channels[0].id)
                 self.channels_to_write[guild.id] = guild.text_channels[0]
 
-        # Call any potential listeners on the 'onready' event
-        for (callback, args) in self.event_listeners.get("onready", []):
+        # Call any potential listeners on the 'ready' event
+        for (callback, args) in self.event_listeners.get("ready", []):
             evaluated = callback(*args)
             if asyncio.iscoroutine(evaluated):
                 await evaluated

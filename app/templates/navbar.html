@@ -73,7 +73,7 @@
     </div>
     <div class="navbar-user order-2 order-lg-3 col-2 col-sm-3 col-lg-2 col-xl-3">
         {% if discord_id and discord_id == admin_id %}
-        <button id="admin-restart-btn" onclick="restartIntfar();">
+        <button id="admin-restart-btn" onclick="restartIntfar('{{ game }}');">
             <img class="admin-restart-init" src="{{ url_for('static', filename='img/restart_green.png') }}">
             <img class="admin-restart-waiting" src="{{ url_for('static', filename='img/restart.png') }}">
             <img class="admin-restart-success" src="{{ url_for('static', filename='img/success_thick.png') }}">

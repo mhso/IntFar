@@ -16,7 +16,7 @@ parser.add_argument("steam_2fa_code")
 args = parser.parse_args()
 
 config = Config()
-config.steam_2fa_code = args.steam_2fa_code
+config.steam_2fa_code = args.steam_2fa_code if args.steam_2fa_code != "None" else None
 database = Database(config)
 
 try:

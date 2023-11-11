@@ -1993,7 +1993,13 @@ class Database(SQLiteDatabase):
 
         return min_stat_id, min_stat, max_stat_id, max_stat, best_ever, best_ever_id, worst_ever, worst_ever_id
 
-    def record_stats(self, parsed_game_stats: GameStats):
+    def record_stats(self, parsed_game_stats: GameStats) -> tuple[list[tuple], list[tuple]]:
+        """
+        Save all the stats in the given GameStats object to the database.
+        Also determines whether any stat "records" have been beaten (i.e. whether
+        someone has gotten a new lowest or highest value for a stat) and returns
+        those stats along with who beat set the new record.
+        """
         beaten_records_best = []
         beaten_records_worst = []
 
@@ -2080,6 +2086,7 @@ class Database(SQLiteDatabase):
                 {stats_to_select}
             FROM {games_table} AS g
             {delim_str}
+            ORDER BY timestamp DESC
         """
 
         with self:
@@ -2088,25 +2095,28 @@ class Database(SQLiteDatabase):
     def get_player_stats(self, game, stats, game_id=None, disc_id=None, time_after=None, time_before=None, guild_id=None):
         games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
+        users_table = self._get_users_table(game)
 
-        prefix = "WHERE"
+        prefix = "AND"
         game_id_delimeter = ""
         params = []
         if game_id is not None:
-            game_id_delimeter = "WHERE g.game_id=?"
+            game_id_delimeter = "AND g.game_id=?"
             params = [game_id]
-            prefix = "AND"
  
-        delim_str, delim_params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id, prefix)
+        delim_str, delim_params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, prefix)
         params = params + delim_params
-
-        if disc_id is None:
-            stats.insert(0, "disc_id")
 
         stats_copy = list(stats)
 
+        if disc_id is None and "disc_id" not in stats:
+            stats.insert(1, "disc_id")
+
+        if stats_copy[1] == "disc_id":
+            stats_copy[1] = "p.disc_id"
+
         try:
-            # game_id will be ambigious, so we need to specify a table alias
+            # game_id will be ambigious, so we need to specify table alias
             index = stats_copy.index("game_id")
             stats_copy[index] = "g.game_id"
         except ValueError:
@@ -2120,8 +2130,12 @@ class Database(SQLiteDatabase):
             FROM {stats_table} AS p
             INNER JOIN {games_table} AS g
             ON g.game_id = p.game_id
+            INNER JOIN {users_table} AS u
+            ON u.disc_id = p.disc_id
+            WHERE u.active = 1
             {game_id_delimeter}
             {delim_str}
+            ORDER BY timestamp DESC
         """
 
         with self:
