@@ -6,6 +6,10 @@ from api.game_api_client import GameAPIClient
 
 @dataclass
 class PlayerStats(ABC):
+    """
+    Dataclass representing parsed stats for each player from a finished match.
+    The base class contains shared player stats for all games supported by Int-Far.
+    """
     game_id: int
     disc_id: int
     kills: int
@@ -33,6 +37,10 @@ class PlayerStats(ABC):
 
     @classmethod
     def stat_quantity_desc(cls) -> dict[str, tuple[str, str]]:
+        """
+        Get a dictionary mapping stats to a tuple of the relevant words describing
+        the best/worst quantity for that stat. Fx. "kills" -> ("most", "fewest")
+        """
         return {
             "kills": ("most", "fewest"),
             "deaths": ("fewest", "most"),
@@ -70,6 +78,10 @@ class PlayerStats(ABC):
 
 @dataclass
 class GameStats(ABC):
+    """
+    Dataclass representing parsed stats for a finished match.
+    The base class contains shared match stats for all games supported by Int-Far.
+    """
     game: str
     game_id: int
     timestamp: int
@@ -100,7 +112,8 @@ class GameStats(ABC):
     @classmethod
     def get_stats_from_db(cls, game: str, database, player_stats_cls: PlayerStats, game_id: int = None) -> tuple[list[dict], list[dict]]:
         """
-        Get stats from all games or a single game as well as stats for players in the game(s).
+        Load stats from the database for all games or a single game
+        as well as stats for players in the game(s).
         """
         game_stats_to_save = cls.stats_to_save()
         player_stats_to_save = player_stats_cls.stats_to_save()
@@ -118,7 +131,7 @@ class GameStats(ABC):
                 player_stats_by_game_id[game_id] = {}
 
             player_stats_by_game_id[game_id][disc_id] = dict(zip(player_stats_to_save, tup))
-                                  
+
         player_stats_dicts = list(player_stats_by_game_id.values())
 
         return game_stats_dicts, player_stats_dicts
@@ -137,9 +150,13 @@ class GameStats(ABC):
     @abstractmethod
     def get_finished_game_summary(self, disc_id: int) -> str:
         """
-        Get a brief text that summaries a player's performance in a finished game.
+        Get a brief text that summarizes a player's performance in a finished game.
 
+        ### Parameters
         :param disc_id: Discord ID of the player for whom to get the summary for
+
+        ### Returns
+        String describing how the given player performed in the game.
         """
         ...
 

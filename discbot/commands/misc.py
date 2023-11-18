@@ -301,5 +301,7 @@ async def handle_winrate_msg(client, message, game, champ_or_map, target_id):
             response = f"{user_name} has not played any games on {qualified_name}."
         else:
             response = f"{user_name} has a **{winrate:.2f}%** winrate on {qualified_name} in **{int(games)}** games.\n"
+    else:
+        response = f"{user_name} has not played any games on {qualified_name}."
 
     await message.channel.send(response)

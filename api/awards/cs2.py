@@ -161,9 +161,9 @@ class CS2AwardQualifiers(AwardQualifiers):
 
     def get_big_doinks(self) -> tuple[dict[int, list[tuple]], dict[int, str]]:
         """
-        Returns a string describing people who have been redeemed by playing
-        exceptionally well.
-        Criteria for getting doinks:
+        Returns a string describing people who have earned Doinks
+        by playing exceptionally well.
+        Criteria for getting doinks in CS2:
             - Having a KDA of 2.5 or more
             - Getting 30 kills or more
             - Having a headshot percentage of 60% or more
@@ -356,12 +356,11 @@ class CS2AwardQualifiers(AwardQualifiers):
             if lowest_kda < kda_criteria and stats.deaths > death_criteria:
                 potential_intfars.append(intfar)
 
-        # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
-
-        if potential_intfars == [] or all_intfars_randos:
+        if potential_intfars == []:
             return (None, None)
 
+        # Check if all Int-Far candidates are randos (not registered with Int-Far)
+        all_intfars_randos = not any(potential_intfars)
         if all_intfars_randos:
             logger.info("Int-Far for low KDA goes to a random!")
 
@@ -401,12 +400,11 @@ class CS2AwardQualifiers(AwardQualifiers):
             if least_mvps < mvp_criteria and stats.kda < kda_criteria:
                 potential_intfars.append(intfar)
 
-        # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
-
-        if potential_intfars == [] or all_intfars_randos:
+        if potential_intfars == []:
             return (None, None)
 
+        # Check if all Int-Far candidates are randos (not registered with Int-Far)
+        all_intfars_randos = not any(potential_intfars)
         if all_intfars_randos:
             logger.info("Int-Far for least MVPs goes to a random!")
 

@@ -961,15 +961,21 @@ class DiscordClient(discord.Client):
 
         return None if not any_stats else self.insert_emotes(stats_str)
 
-    def get_cool_timeline_msg(self, awards_handler: AwardQualifiers, timeline_mentions: list[tuple]):
+    def get_cool_timeline_msg(self, awards_handler: AwardQualifiers, timeline_mentions: list[tuple[int, int, int]]):
         """
         Return a message describing interesting events that happened during the game
         that relate to the Riot timeline API. This includes whether the team came
         back from a large gold deficit or threw a huge gold lead.
 
-        :param timeline_mentions:   List of info about interesting timeline related
-                                    events that happened during the game
-        :param guild_id:            ID of the Discord server where the game took place
+        ### Parameters
+        :param awards_handler:      AwardQualifiers instance for getting relevant timeline
+                                    flavor texts from the given mentions
+        :param timeline_mentions:   List of timeline events that occured during the game.
+                                    This is a tuple of (event_index, value, discord_id)
+
+        ### Returns
+        String describing timeline events that occured during the game
+        or None if no timeline events occurred.
         """
         timeline_str = "=" * 38 + "\n"
         any_stats = False

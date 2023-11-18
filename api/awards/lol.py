@@ -161,9 +161,9 @@ class LoLAwardQualifiers(AwardQualifiers):
 
     def get_big_doinks(self):
         """
-        Returns a string describing people who have been redeemed by playing
-        exceptionally well.
-        Criteria for getting doinks:
+        Returns a string describing people who have earned Doinks
+        by playing exceptionally well.
+        Criteria for getting doinks in LoL:
             - Having a KDA of 10 or more
             - Getting 20 kills or more
             - Doing more damage than the rest of the team combined
@@ -437,12 +437,12 @@ class LoLAwardQualifiers(AwardQualifiers):
             if lowest_kda < kda_criteria and stats.deaths > death_criteria:
                 potential_intfars.append(intfar)
 
-        # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
 
-        if potential_intfars == [] or all_intfars_randos:
+        if potential_intfars == []:
             return (None, None)
 
+        # Check if all Int-Far candidates are randos (not registered with Int-Far)
+        all_intfars_randos = not any(potential_intfars)
         if all_intfars_randos:
             logger.info("Int-Far for low KDA goes to a random!")
 
@@ -475,12 +475,11 @@ class LoLAwardQualifiers(AwardQualifiers):
             if highest_deaths > death_criteria and stats.kda < kda_criteria:
                 potential_intfars.append(intfar)
 
-        # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
-
-        if potential_intfars == [] or all_intfars_randos:
+        if potential_intfars == []:
             return (None, None)
 
+        # Check if all Int-Far candidates are randos (not registered with Int-Far)
+        all_intfars_randos = not any(potential_intfars)
         if all_intfars_randos:
             logger.info("Int-Far for many deaths goes to a random!")
 

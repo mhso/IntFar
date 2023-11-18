@@ -169,7 +169,7 @@ class AwardQualifiers(ABC):
             moduli = [1000, 1000, 100, 100]
             conditions = [
                 None,
-                bool(self.parsed_game_stats.win),
+                self.parsed_game_stats.win == 1,
                 self.parsed_game_stats.intfar_id == stats.disc_id,
                 stats.doinks is not None
             ]

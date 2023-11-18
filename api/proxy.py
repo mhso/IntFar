@@ -134,7 +134,8 @@ class ProxyManager(object):
         if self.proxies:
             self.proxies[0].close()
 
-        self.database.enqueue_command(-1, self.target_name, "close")
+        if self.steam_process.returncode is None:
+            self.database.enqueue_command(-1, self.target_name, "close")
 
-        while self.steam_process.returncode is None:
-            sleep(0.1)
+            while self.steam_process.returncode is None:
+                sleep(0.1)

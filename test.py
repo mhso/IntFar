@@ -84,13 +84,13 @@ class TestFuncs:
             print(champ)
 
     def test_intfar_stuff(self):
-        game_id = 6595962524
+        game_id = 6678873918
         guild_id = 803987403932172359
         game_data = self.riot_api.get_game_details(game_id)
         parser = get_stat_parser("lol", game_data, self.riot_api, self.database.users_by_game["lol"], guild_id)
         parsed_stats = parser.parse_data()
 
-        intfar_data = get_awards_handler("lol", self.config, parsed_stats).get_intfar_qualifiers()
+        intfar_data = get_awards_handler("lol", self.config, parsed_stats).get_intfar()
         print(intfar_data)
 
     def test_lan_rework(self):
