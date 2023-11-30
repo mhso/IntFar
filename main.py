@@ -81,9 +81,9 @@ def main():
 
     # Convert database user dicts to synchronized proxies so they're synced across processes
     database_client.all_users = sync_manager.dict(database_client.all_users)
-    database_client.users_by_game = sync_manager.dict(
+    database_client.game_users = sync_manager.dict(
         {
-            game: sync_manager.dict(database_client.users_by_game[game])
+            game: sync_manager.dict(database_client.game_users[game])
             for game in SUPPORTED_GAMES
         }
     )

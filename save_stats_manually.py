@@ -39,7 +39,7 @@ class TestMock(DiscordClient):
 
     def get_users_in_cs2_game(self, game_info):
         users_in_game = {}
-        all_users = self.database.users_by_game[self.game]
+        all_users = self.database.game_users[self.game]
         round_stats = game_info["matches"][0]["roundstatsall"]
 
         max_player_round = 0
@@ -61,7 +61,7 @@ class TestMock(DiscordClient):
 
     def get_users_in_lol_game(self, game_info):
         users_in_game = {}
-        all_users = self.database.users_by_game[self.game]
+        all_users = self.database.game_users[self.game]
 
         for participant in game_info["participants"]:
             for disc_id in all_users.keys():

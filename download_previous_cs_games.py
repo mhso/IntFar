@@ -27,10 +27,10 @@ def group_data(data) -> list[CS2GameStats]:
 
 def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> list[CS2GameStats]:
     all_data = []
-    for disc_id in database.users_by_game["cs2"]:
-        steam_id = database.users_by_game["cs2"][disc_id].ingame_id[0]
-        auth_code = database.users_by_game["cs2"][disc_id].match_auth_code[0]
-        curr_sharecode = database.users_by_game["cs2"][disc_id].latest_match_token[0]
+    for disc_id in database.game_users["cs2"]:
+        steam_id = database.game_users["cs2"][disc_id].ingame_id[0]
+        auth_code = database.game_users["cs2"][disc_id].match_auth_code[0]
+        curr_sharecode = database.game_users["cs2"][disc_id].latest_match_token[0]
         print(f"Progress for {disc_id}:")
         while curr_sharecode is not None:
             print("Sharecode:", curr_sharecode)
@@ -40,7 +40,7 @@ def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> li
             with open(f"{curr_sharecode}.json", "w", encoding="utf-8") as fp:
                 json.dump(data, fp)
 
-            stats_parser = CS2GameStatsParser("cs2", data, steam_api, database.users_by_game["cs2"], _GUILD_ID)
+            stats_parser = CS2GameStatsParser("cs2", data, steam_api, database.game_users["cs2"], _GUILD_ID)
             parsed_data: CS2GameStats = stats_parser.parse_data()
             max_rounds = max(parsed_data.rounds_us, parsed_data.rounds_them)
             if len(parsed_data.filtered_player_stats) > 1 and max_rounds > 9:
@@ -54,7 +54,7 @@ def get_data_from_sharecode(database: Database, steam_api: SteamAPIClient) -> li
 
 def parse_demo(steam_api: SteamAPIClient, database: Database, demo_url):
     data = steam_api.parse_demo(demo_url)
-    stats_parser = CS2GameStatsParser("cs2", data, steam_api, database.users_by_game["cs2"], _GUILD_ID)
+    stats_parser = CS2GameStatsParser("cs2", data, steam_api, database.game_users["cs2"], _GUILD_ID)
 
     return stats_parser.parse_data()
 
@@ -189,7 +189,7 @@ def get_data_from_file(database: Database, steam_api: SteamAPIClient) -> list[CS
                             name = line.strip()
                             disc_id = database.discord_id_from_ingame_info("cs2", ingame_name=name)
                             if disc_id is not None:
-                                game_user_info = database.users_by_game["cs2"][disc_id]
+                                game_user_info = database.game_users["cs2"][disc_id]
                                 our_team_t = table_lines > 9
                                 player_info = {
                                     "disc_id": disc_id,
@@ -267,7 +267,7 @@ def run(source: str, database: Database, steam_api: SteamAPIClient):
 
     if source == "sharecode":
         # Update newest match token for players
-        for disc_id in database.users_by_game["cs2"]:
+        for disc_id in database.game_users["cs2"]:
             newest_code = None
             for entry in data:
                 if entry.FIND_PLAYER_STATS(disc_id, entry.filtered_player_stats) is not None:

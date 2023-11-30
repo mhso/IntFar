@@ -6,6 +6,7 @@ from sqlite3 import DatabaseError, OperationalError, ProgrammingError
 from mhooge_flask.logging import logger
 from mhooge_flask.database import SQLiteDatabase
 
+from api.config import Config
 from api.game_stats import GameStats, get_outlier_stat
 from api.game_data import get_stat_quantity_descriptions
 from api.user import User
@@ -16,18 +17,26 @@ class DBException(OperationalError, ProgrammingError):
         super().__init__(args)
 
 class Database(SQLiteDatabase):
-    def __init__(self, config):
+    def __init__(self, game: str, config: Config, schema_file: str):
+        self.game = game
         self.config = config
-        super().__init__(self.config.database, "resources/schema.sql", False)
+        super().__init__(self.config.database, schema_file, False)
 
         # Populate summoner names and ids lists with currently registered summoners.
-        params = {
+        self._game_params = {
             "lol": [],
             "cs2": ["match_auth_code", "latest_match_token"]
         }
+
+    @property
+    def all_users(self) -> dict[int, User]:
         with self:
-            self.all_users: dict[int, User] = self.get_base_users()
-            self.users_by_game: dict[str, dict[int, User]] = {game: self.get_all_registered_users(game, *params[game]) for game in SUPPORTED_GAMES}
+            return self.get_base_users()
+
+    @property
+    def game_users(self) -> dict[int, User]:
+        with self:
+            return self.get_all_registered_users(self.game, *self._game_params[self.game])
 
     def _group_users(self, user_data, *params):
         user_entries = {}
@@ -45,20 +54,11 @@ class Database(SQLiteDatabase):
 
         return {disc_id: User(**user_entries[disc_id]) for disc_id in user_entries}
 
-    def _get_games_table(self, game):
-        return f"games_{game}"
-
-    def _get_participants_table(self, game):
-        return f"participants_{game}"
-
-    def _get_users_table(self, game):
-        return f"users_{game}"
-
     def user_exists(self, game, discord_id):
         if game is None:
-            return any(discord_id in self.users_by_game[game] for game in self.users_by_game.keys())
+            return any(discord_id in self.game_users[game] for game in self.game_users.keys())
 
-        return discord_id in self.users_by_game[game]
+        return discord_id in self.game_users[game]
 
     def get_base_users(self):
         query = "SELECT disc_id, secret FROM users"
@@ -123,11 +123,11 @@ class Database(SQLiteDatabase):
                     del reduced_params["ingame_id"]
 
                     self.all_users = self.get_base_users()
-                    self.users_by_game[game][discord_id] = self.get_all_registered_users(game, **reduced_params)
+                    self.game_users[game][discord_id] = self.get_all_registered_users(game, **reduced_params)
                     status_code = 2 # User reactivated
 
                 else:
-                    new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.users_by_game.keys())
+                    new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.game_users.keys())
                     main = 1
                     if new_user:
                         # User has never signed up for any game before
@@ -138,7 +138,7 @@ class Database(SQLiteDatabase):
                     else:
                         secret = self.all_users[discord_id].secret
 
-                    user_info = self.users_by_game[game].get(discord_id)
+                    user_info = self.game_users[game].get(discord_id)
 
                     game_user_name = game_params["ingame_name"]
                     game_user_id = game_params["ingame_id"]
@@ -170,7 +170,7 @@ class Database(SQLiteDatabase):
                         user_params["disc_id"] = discord_id
                         user_params["secret"] = secret
                         self.all_users[discord_id] = User(discord_id, secret)
-                        self.users_by_game[game][discord_id] = User(**user_params)
+                        self.game_users[game][discord_id] = User(**user_params)
                         status = f"User '{game_user_name}' with ID '{game_user_id}' succesfully added for {SUPPORTED_GAMES[game]}!"
 
                     values_list = [discord_id] + list(game_params.values()) + [main]
@@ -195,13 +195,13 @@ class Database(SQLiteDatabase):
             query = f"UPDATE {game_table} SET active=0 WHERE disc_id=?"
             self.execute_query(query, disc_id)
 
-        del self.users_by_game[game][disc_id]
+        del self.game_users[game][disc_id]
 
     def discord_id_from_ingame_info(self, game, exact_match=True, **search_params):
         matches = []
-        for disc_id in self.users_by_game[game].keys():
+        for disc_id in self.game_users[game].keys():
             for search_param in search_params:
-                for ingame_info in self.users_by_game[game][disc_id].get(search_param, []):
+                for ingame_info in self.game_users[game][disc_id].get(search_param, []):
                     info_str = str(ingame_info)
                     value = str(search_params[search_param])
                     if exact_match and info_str.lower() == value.lower():
@@ -212,7 +212,7 @@ class Database(SQLiteDatabase):
         return matches[0] if len(matches) == 1 else None
 
     def game_user_data_from_discord_id(self, game, disc_id):
-        return self.users_by_game[game].get(disc_id, None)
+        return self.game_users[game].get(disc_id, None)
 
     def game_exists(self, game, game_id):
         games_table = self._get_games_table(game)
@@ -238,9 +238,9 @@ class Database(SQLiteDatabase):
 
         with self:
             self.execute_query(query, sharecode, disc_id, steam_id)
-            for index, ingame_id in enumerate(self.users_by_game[game][disc_id].ingame_id):
+            for index, ingame_id in enumerate(self.game_users[game][disc_id].ingame_id):
                 if ingame_id == steam_id:
-                    self.users_by_game[game][disc_id].latest_match_token[index] = sharecode
+                    self.game_users[game][disc_id].latest_match_token[index] = sharecode
                     break
 
     def get_latest_game(self, game, time_after=None, time_before=None, guild_id=None):
@@ -1359,7 +1359,7 @@ class Database(SQLiteDatabase):
         stats_table = self._get_participants_table(game)
         query_persons = f"SELECT Count(*) FROM {stats_table} as p GROUP BY game_id"
 
-        users = (len(self.users_by_game[game]),)
+        users = (len(self.game_users[game]),)
         with self:
             game_data = self.get_games_count(game)
             longest_game = self.get_longest_game(game)
@@ -1959,7 +1959,7 @@ class Database(SQLiteDatabase):
             if disc_id is None:
                 return performance_scores
 
-            rank = len(self.users_by_game[game]) - 1
+            rank = len(self.game_users[game]) - 1
             score = 0
             for index, (score_id, score_value) in enumerate(performance_scores):
                 if score_id == disc_id:

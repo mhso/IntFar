@@ -195,7 +195,7 @@ async def handle_active_bets_msg(client, message, game, target_id):
         if target_id is None:
             # Check active bets for everyone
             any_bet = False
-            for disc_id in client.database.users_by_game[game].keys():
+            for disc_id in client.database.game_users[game].keys():
                 bets_for_person = get_bet_description(game, disc_id, False)
                 if bets_for_person is not None:
                     if any_bet:

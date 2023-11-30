@@ -18,9 +18,9 @@ async def handle_game_msg(client, message, game, target_id):
     ingame_ids = None
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    for disc_id in client.database.users_by_game[game].keys():
+    for disc_id in client.database.game_users[game].keys():
         if disc_id == target_id:
-            ingame_ids = client.database.users_by_game[game][disc_id].ingame_id
+            ingame_ids = client.database.game_users[game][disc_id].ingame_id
             break
 
     response = ""
@@ -37,7 +37,7 @@ async def handle_game_msg(client, message, game, target_id):
         await asyncio.sleep(1)
 
     if game_data is not None:
-        stat_parser = get_stat_parser(game, game_data, client.api_clients[game], client.database.users_by_game[game], message.guild.id)
+        stat_parser = get_stat_parser(game, game_data, client.api_clients[game], client.database.game_users[game], message.guild.id)
         response = f"{target_name} is "
         summary = stat_parser.get_active_game_summary(active_id)
         response += summary

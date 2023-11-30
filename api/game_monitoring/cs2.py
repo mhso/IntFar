@@ -90,7 +90,7 @@ class CS2GameMonitor(GameMonitor):
             else:
                 steam_name = user_dict[disc_id].ingame_name[0]
 
-            user = User.clone(self.database.users_by_game[self.game][disc_id])
+            user = User.clone(self.database.game_users[self.game][disc_id])
             user.ingame_id = [steam_id]
             user.ingame_name = [steam_name]
             users_in_current_game[disc_id] = user
@@ -148,7 +148,7 @@ class CS2GameMonitor(GameMonitor):
         users_missing = {
             disc_id: self.users_in_game[guild_id][disc_id]
             for disc_id in self.users_in_game[guild_id]
-            if self.users_in_game[guild_id][disc_id].latest_match_token[0] == self.database.users_by_game[self.game][disc_id].latest_match_token[0]
+            if self.users_in_game[guild_id][disc_id].latest_match_token[0] == self.database.game_users[self.game][disc_id].latest_match_token[0]
         }
 
         # Get new CS sharecode, if we didn't already get it when searching for active games

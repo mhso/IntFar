@@ -23,28 +23,28 @@ class TestWrapper(TestRunner):
     def test_user_queries(self):
         database: Database = self.database
 
-        users_before = len(database.users_by_game[GAME])
+        users_before = len(database.game_users[GAME])
         self.assert_no_exception(database.add_user, "Add New User.", GAME, 123, ingame_name="name", ingame_id="id")
-        users_after = len(database.users_by_game[GAME])
+        users_after = len(database.game_users[GAME])
 
         self.assert_equals(users_after, users_before + 1, "User was added.")
 
         self.assert_no_exception(database.discord_id_from_ingame_info, "User from ingame info", GAME, ingame_name="name")
 
-        users_before = len(database.users_by_game[GAME])
+        users_before = len(database.game_users[GAME])
         self.assert_no_exception(database.add_user, "Add Smurf.", GAME, 123, ingame_name="name", ingame_id="id2")
-        users_after = len(database.users_by_game[GAME])
+        users_after = len(database.game_users[GAME])
 
         self.assert_equals(users_after, users_before, "Smurf was added.")
 
         self.assert_no_exception(database.remove_user, "Remove User.", GAME, 123)
-        users_after = len(database.users_by_game[GAME])
+        users_after = len(database.game_users[GAME])
 
         self.assert_equals(users_after, users_before - 1, "User was removed.")
 
-        users_before = len(database.users_by_game[GAME])
+        users_before = len(database.game_users[GAME])
         self.assert_no_exception(database.add_user, "Re-add User.", GAME, 123, ingame_name="name", ingame_id="id")
-        users_after = len(database.users_by_game[GAME])
+        users_after = len(database.game_users[GAME])
 
         self.assert_equals(users_after, users_before + 1, "User was re-added.")
 

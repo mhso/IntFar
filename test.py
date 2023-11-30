@@ -87,7 +87,7 @@ class TestFuncs:
         game_id = 6678873918
         guild_id = 803987403932172359
         game_data = self.riot_api.get_game_details(game_id)
-        parser = get_stat_parser("lol", game_data, self.riot_api, self.database.users_by_game["lol"], guild_id)
+        parser = get_stat_parser("lol", game_data, self.riot_api, self.database.game_users["lol"], guild_id)
         parsed_stats = parser.parse_data()
 
         intfar_data = get_awards_handler("lol", self.config, parsed_stats).get_intfar()
@@ -132,7 +132,7 @@ class TestFuncs:
         game_id = 6667986692
         game = "lol"
         game_data = self.riot_api.get_game_details(game_id)
-        parser = get_stat_parser(game, game_data, self.riot_api, self.database.users_by_game["lol"], 803987403932172359)
+        parser = get_stat_parser(game, game_data, self.riot_api, self.database.game_users["lol"], 803987403932172359)
         parsed_game_stats = parser.parse_data()
         awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
 
@@ -256,7 +256,7 @@ class TestFuncs:
 
     def test_cs_sharecode(self):
         api_client = SteamAPIClient("cs2", self.config)
-        user = self.database.users_by_game["cs2"][267401734513491969]
+        user = self.database.game_users["cs2"][267401734513491969]
         print(user.latest_match_token[0])
         next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], "CSGO-DARih-4Y65Q-AHxyw-e9ZBZ-FFzQN")
         print(next_code)
@@ -270,7 +270,7 @@ class TestFuncs:
         with open(f"data_{sharecode}.json", "w", encoding="utf-8") as fp:
             json.dump(game_stats, fp)
 
-        parser = get_stat_parser("cs2", game_stats, api_client, self.database.users_by_game["cs2"], 619073595561213953)
+        parser = get_stat_parser("cs2", game_stats, api_client, self.database.game_users["cs2"], 619073595561213953)
         data = parser.parse_data()
 
     def test_format_stats(self):

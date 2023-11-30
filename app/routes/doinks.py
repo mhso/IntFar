@@ -21,7 +21,7 @@ def get_doinks_awards(game, database):
         "func", "get_discord_nick", None
     )
 
-    for disc_id in database.users_by_game[game].keys():
+    for disc_id in database.game_users[game].keys():
         doinks_reasons = database.get_doinks_stats(game, disc_id)
         total_doinks = database.get_doinks_count(game, disc_id)[1]
         unique_doinks = set()

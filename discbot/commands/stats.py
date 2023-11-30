@@ -148,7 +148,7 @@ def get_game_summary(client, game, game_id, target_id, guild_id):
         game,
         client.database,
         client.api_clients[game],
-        client.database.users_by_game[game],
+        client.database.game_users[game],
         guild_id,
         game_id,
     )[0]
@@ -260,7 +260,7 @@ async def handle_match_history_msg(client, message, game, target_id=None):
         game,
         client.database,
         client.api_clients[game],
-        client.database.users_by_game[game],
+        client.database.game_users[game],
         message.guild.id,
     )
 
