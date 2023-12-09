@@ -281,6 +281,9 @@ class RiotAPIClient(GameAPIClient):
         # Try to find candidates that have the search_term in ther name.
         for champ_id in self.champ_names:
             lowered = self.champ_names[champ_id].lower()
+            if search_name == lowered:
+                return champ_id
+
             if search_name in lowered:
                 candidates.append(champ_id)
                 break

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/head.html' %}
+    <body>
+        <div id="bg-image"></div>
+
+        <div id="selection-wrapper">
+            {% include 'jeopardy/logo.html' %}
+
+            <!-- Categories -->
+            <div id="categories-wrapper">
+                {% for category in categories %}
+                <div class="category-entry">
+                    <div class="category-header">
+                        <span>{{ questions[category]["name"] }}</span>
+                    </div>
+                    {% for category_data in questions[category]["tiers"] %}
+                    {% set final_value = category_data["value"] * round %}
+                    <div class="question-box{% if not category_data['active'] %} inactive{% endif %}"{% if category_data['active'] %} onclick="goToQuestion(event.target, '{{ category }}', {{ loop.index }})"{% endif %}>
+                        <span>{{ final_value }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Contestants -->
+            <div id="selection-footer">
+                <div id="selection-contestants">
+                    {% for player_dict in player_data %}
+                    <div class="selection-contestant-entry" style="background-color: #{{ player_dict['color'] }};">
+                        <p class="selection-contestant-entry-name">{{ player_dict["name"] }}</p>
+                        <p class="selection-contestant-entry-score">{{ player_dict["score"] }} GBP</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </body>
+
+    <script>
+        setContestantTextColors();
+        setVariables({{ round }}, {{ player_data | tojson }}, {{ player_turns | tojson }}, {{ question_num }});
+
+        {% if round == 1 and not player_turns %}
+        setTimeout(function() {
+            let turn = chooseStartingPlayer();
+            setPlayerTurn(turn);
+        }, 1000);
+        {% endif %}
+    </script>
+</html>

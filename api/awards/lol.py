@@ -327,7 +327,8 @@ class LoLAwardQualifiers(AwardQualifiers):
             for player_stats in self.parsed_game_stats.filtered_player_stats
         )
         curr_multikill = {}
-        stolen_pentas = {}
+        stolen_penta_victims = {}
+        stolen_penta_scrubs = {}
 
         # Calculate stats from timeline frames.
         for frame_data in timeline_data["frames"]:
@@ -395,7 +396,10 @@ class LoLAwardQualifiers(AwardQualifiers):
                 person_with_quadra, streak_dict = people_with_quadras[0]
                 for disc_id in curr_multikill:
                     if disc_id != person_with_quadra and curr_multikill[disc_id]["timestamp"] > streak_dict["timestamp"]:
-                        stolen_pentas[disc_id] = stolen_pentas.get(disc_id, 0) + 1
+                        stolen_penta_scrubs[disc_id] = stolen_penta_scrubs.get(disc_id, 0) + 1
+                        victim_list = stolen_penta_victims.get(disc_id, [])
+                        victim_list.append(person_with_quadra)
+                        stolen_penta_victims[disc_id] = victim_list
 
         if biggest_gold_deficit > self.config.timeline_min_deficit and game_win: # Epic comeback!
             timeline_events.append((0, biggest_gold_deficit, None))
@@ -405,8 +409,19 @@ class LoLAwardQualifiers(AwardQualifiers):
         for disc_id in too_much_gold:
             timeline_events.append((2, too_much_gold[disc_id], disc_id))
 
-        for disc_id in stolen_pentas:
-            timeline_events.append((3, stolen_pentas[disc_id], disc_id))
+        for disc_id in stolen_penta_scrubs:
+            pentakills = "pentakill" if stolen_penta_scrubs[disc_id] == 1 else "pentakills"
+            victim_summ_names = []
+            for victim_id in stolen_penta_victims[disc_id]:
+                for summ_info in self.parsed_game_stats.players_in_game:
+                    if summ_info["disc_id"] == victim_id:
+                        victim_summ_names.append(summ_info["summ_name"])
+                        break
+
+            victims = " and ".join(victim_summ_names)
+            desc = f"{stolen_penta_scrubs[disc_id]} {pentakills} from {victims}"
+    
+            timeline_events.append((3, desc, disc_id))
 
         return timeline_events
 

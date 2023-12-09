@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/head.html' %}
+    
+    <body>
+        <div id="bg-image"></div>
+
+        <div id="menu-wrapper">
+            {% include 'jeopardy/logo.html' %}
+
+            <h2>Deltagere</h2>
+            <div id="menu-contestants">
+            </div>
+
+            <div id="menu-buttons">
+                <button onclick="addPlayerDiv();">Tilføj Deltager</button>
+                <button onclick="resetUsedQuestions(this);">Reset Spørgsmål</button>
+            </div>
+            
+            <img id="menu-naafiri" src="{{ url_for('static', filename='img/naafiri_dance.gif') }}">
+            <img id="menu-alistar" src="{{ url_for('static', filename='img/alistar_dance.gif') }}">
+            <img id="menu-teemo" src="{{ url_for('static', filename='img/teemo_dance.gif') }}">
+            <img id="menu-ivern" src="{{ url_for('static', filename='img/ivern_dance.gif') }}">
+            <img id="menu-quinn" src="{{ url_for('static', filename='img/quinn_thonk.gif') }}">
+        </div>
+    </body>
+
+    <script>
+        window.onkeydown = function(e) {
+            if (e.key == "NumLock") {
+                beginJeopardy();
+            }
+        }
+    </script>
+</html>

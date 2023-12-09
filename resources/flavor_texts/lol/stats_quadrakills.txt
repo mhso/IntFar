@@ -1,3 +1,3 @@
 tried so hard and got so far, but in the end got {value} quadrakill{quantifier} instead of penta {emote_joe}
-got the penta stolen from them {value} time{quantifier} and had to settle for quadra {emote_joe}
-went sicko mode with {value} quadrakill{quantifier} {emote_joe}
+felt the penta slipping from their grasp {value} time{quantifier} and had to settle for quadra {emote_joe}
+went sicko mode with {value} spicy quadrakill{quantifier} {emote_joe}

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/head.html' %}
+    
+    <body>
+        <div id="bg-image"></div>
+
+        <div id="question-wrapper">
+            {% include 'jeopardy/logo.html' %}
+
+            <h1>{{ category_name }}</h1>
+        </div>
+    </body>
+
+    <script>
+        window.onkeydown = function(e) {
+            if (e.key == "NumLock") {
+                beginBuzzInCountdown();
+            }
+        }
+    </script>
+</html>

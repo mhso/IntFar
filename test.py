@@ -278,6 +278,18 @@ class TestFuncs:
         for stat in stat_names:
             print(stat, stat_names[stat])
 
+    def test_quadra_steal(self):
+        game_id = "6700149519"
+        game = "lol"
+
+        game_stats = self.riot_api.get_game_details(game_id)
+        parser = get_stat_parser(game, game_stats, self.riot_api, self.database.users_by_game[game], 512363920044982272)
+        parsed_game_stats = parser.parse_data()
+        awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
+
+        timeline_events = awards_handler.get_cool_timeline_events()
+        print(timeline_events)
+
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
 
