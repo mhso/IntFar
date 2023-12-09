@@ -5,6 +5,7 @@
         <div id="bg-image"></div>
 
         <div id="selection-wrapper">
+            <!-- Logo -->
             {% include 'jeopardy/logo.html' %}
 
             <!-- Categories -->
@@ -25,27 +26,23 @@
             </div>
 
             <!-- Contestants -->
-            <div id="selection-footer">
-                <div id="selection-contestants">
-                    {% for player_dict in player_data %}
-                    <div class="selection-contestant-entry" style="background-color: #{{ player_dict['color'] }};">
-                        <p class="selection-contestant-entry-name">{{ player_dict["name"] }}</p>
-                        <p class="selection-contestant-entry-score">{{ player_dict["score"] }} GBP</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
+            {% include 'jeopardy/contestants_footer.html' %}
         </div>
     </body>
 
     <script>
         setContestantTextColors();
-        setVariables({{ round }}, {{ player_data | tojson }}, {{ player_turns | tojson }}, {{ question_num }});
+        setVariables(
+            {{ round }},
+            {{ player_data | tojson }},
+            {{ player_turns | tojson }},
+            {{ question_num }}
+        );
 
         {% if round == 1 and not player_turns %}
         setTimeout(function() {
             let turn = chooseStartingPlayer();
-            setPlayerTurn(turn);
+            setPlayerTurn(turn, true);
         }, 1000);
         {% endif %}
     </script>

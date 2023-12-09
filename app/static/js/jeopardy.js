@@ -1,10 +1,16 @@
 const POINT_GAIN_CORRECT = [2, 3, 4];
 const POINT_LOSSES_WRONG = [0, 1, 2];
+const TIME_FOR_BUZZING = 5;
+const TIME_FOR_ANSWERING = 10;
+const TIME_FOR_WAGERING = 60;
+const TIME_FOR_FINAL_ANSWER = 30;
 
 var countdownInterval;
 var activeRound;
 var activeQuestionNum;
 var activeAnswer;
+var activeValue;
+var activePlayer = null;
 var questionAnswered = false;
 
 var playerNames = [];
@@ -20,78 +26,72 @@ function getCurrentQuestion() {
     return question;
 }
 
-function incrementScore(delta) {
-    let cookieSplit = document.cookie.split(";");
-    let newCookie = null;
-    let team = activeTeamBlue ? "blue" : "red";
-    for (let i = 0; i < cookieSplit.length; i++) {
-        let kv = cookieSplit[i].trim();
-        let kvSplit = kv.split("=");
-        if (kvSplit[0] == "score_" + team) {
-            let score = Number.parseInt(kvSplit[1]);
-            newCookie = "score_" + team + "=" + (score + delta);
-        }
-    }
-    if (newCookie == null) {
-        console.log("Error: Couldn't increment score (cookie not found)!")
-    }
-    else {
-        let date = new Date();
-        date.setTime(date.getTime() + (6 * 60 * 60 * 1000));
-        document.cookie = newCookie + "; expires=" + date.toUTCString() + "; path=/intfar/quiz; samesite=strict";
-    }
-}
-
 function getRandomSound(sounds) {
     let index = Math.floor(Math.random() * sounds.length);
     return sounds.item(index);
 }
 
 function playCorrectSound() {
-    let sounds = document.getElementsByClassName("quiz-sound-correct");
+    let sounds = document.getElementsByClassName("question-sound-correct");
     let sound = getRandomSound(sounds);
     sound.play();
 }
 
 function playWrongSound() {
-    let sounds = document.getElementsByClassName("quiz-sound-wrong");
+    let sounds = document.getElementsByClassName("question-sound-wrong");
     let sound = getRandomSound(sounds);
     sound.play();
 }
 
-function correctAnswer() {
-    let pointsGained = POINT_GAIN_CORRECT[activeRound-1];
+function revealAnswerImageIfPresent() {
+    let elem = document.getElementById("question-answer-image");
+    if (elem != null) {
+        elem.opacity = 1;
+    }
+}
 
-    let reasonElem = document.getElementById("quiz-correct-reason");
-    reasonElem.textContent = reasonElem.textContent + " (+" + pointsGained + " point)"
-    let elem = document.getElementById("quiz-answer-correct");
+function correctAnswer() {
+    let elem = document.getElementById("question-answer-correct");
+
+    let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
+    valueElem.textContent = "(+" + activeValue + " GBP)";
+
+    revealAnswerImageIfPresent();
+
     elem.classList.remove("d-none");
     setTimeout(function() {
         elem.style.setProperty("opacity", 1);
         playCorrectSound();
     }, 100);
 
-    incrementScore(pointsGained);
+    playerScores[activePlayer] += activeValue;
 }
 
 function wrongAnswer(reason) {
-    let pointsLost = POINT_LOSSES_WRONG[activeRound-1];
+    let elem = document.getElementById("question-answer-wrong");
 
-    let reasonElem = document.getElementById("quiz-wrong-reason");
-    let reasonText = reason;
-    if (pointsLost > 0) {
-        reasonText += " (-" + pointsLost + " point)";
-    }
-    reasonElem.textContent = reasonText;
-    let elem = document.getElementById("quiz-answer-wrong");
+    let reasonElem = document.getElementById("question-wrong-reason-text");
+    reasonElem.textContent = reason;
+
+    revealAnswerImageIfPresent();
+
     elem.classList.remove("d-none");
     setTimeout(function() {
         elem.style.setProperty("opacity", 1);
         playWrongSound();
     }, 100);
 
+    if (activePlayer != null) {
+        // Deduct points from player if someone buzzed in
+        let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
+        valueElem.textContent = "(-" + activeValue + " GBP)";
+        playerScores[activePlayer] -= activeValue;
+    }
 
-    incrementScore(-pointsLost);
+    if (playerTurns.length > 1) {
+        // Player turn is now the previous player who had the turn
+        playerTurns.pop();
+    }
 }
 
 function getBaseURL() {
@@ -132,20 +132,23 @@ function getQuestionURL(round, category, difficulty) {
 }
 
 function startNextRound() {
-    let question = getCurrentQuestion();
-    let endpoint = null;
-    if (activeRound < 3) {
-        endpoint = "/intfar/quiz/" + activeRound + "/" + (question + 1);
-    }
-    else {
-        endpoint = "/intfar/quiz/selection/" + (question + 1);
-    }
-    window.location.href = getBaseURL() + endpoint;
+    window.location.href = getSelectionURL(activeRound, activeQuestionNum + 1);
 }
 
 function keyIsNumeric(key, min, max) {
     let keys = Array.apply(null, Array(max - min + 1)).map(function (x, i) { return "" + (i + min); });
-    return keys.includes(key)
+    return keys.includes(key);
+}
+
+function stopCountdown() {
+    clearInterval(countdownInterval);
+    let countdownElem = document.getElementById("question-countdown-wrapper");
+    countdownElem.classList.add("d-none");
+    countdownElem.style.opacity = 0;
+}
+
+function isQuestionMultipleChoice() {
+    return document.getElementsByClassName("question-answer-entry").length > 0;
 }
 
 function answerQuestion(event) {
@@ -158,25 +161,38 @@ function answerQuestion(event) {
             }
         }
 
-        let elem = document.getElementById("quiz-answer-" + event.key);
-        let answerElem = elem.getElementsByClassName("quiz-answer-text").item(0);
-        // Clear countdown.
-        clearInterval(countdownInterval);
-        document.getElementById("quiz-countdown-wrapper").classList.add("d-none");
-        // Highlight element as having been selected as the answer.
-        let delay = 2500
-        elem.classList.add("quiz-answering");
-        setTimeout(function() {
-            elem.classList.remove("quiz-answering");
-            if (answerElem.textContent == activeAnswer) {
-                elem.classList.add("quiz-answered-correct");
+        let elem = document.getElementById("question-answer-" + event.key);
+        let answerElem = elem.getElementsByClassName("question-answer-text").item(0);
+
+        // Clear countdown and name of who is answering
+        stopCountdown();
+
+        if (isQuestionMultipleChoice()) {
+            // Highlight element as having been selected as the answer.
+            let delay = 2500
+            elem.classList.add("question-answering");
+            setTimeout(function() {
+                elem.classList.remove("question-answering");
+                if (answerElem.textContent == activeAnswer) {
+                    elem.classList.add("question-answered-correct");
+                    correctAnswer();
+                }
+                else {
+                    elem.classList.add("question-answered-wrong");
+                    wrongAnswer("Forkert");
+                }
+            }, delay);
+        }
+        else {
+            if (event.key == 1) {
+                elem.classList.add("question-answered-correct");
                 correctAnswer();
             }
             else {
-                elem.classList.add("quiz-answered-wrong");
+                elem.classList.add("question-answered-wrong");
                 wrongAnswer("Forkert");
             }
-        }, delay);
+        }
     }
 }
 
@@ -190,36 +206,38 @@ function setCountdownBar(countdownBar, milis, green, red, maxMilis) {
     countdownBar.style.backgroundColor = "rgb(" + red.toFixed(0) + ", " + green.toFixed(0) + ", 0)";
 }
 
-function startCountdown() {
+function startCountdown(duration) {
     if (questionAnswered) { // Question has already been answered very quickly.
         return;
     }
 
-    let countdownWrapper = document.getElementById("quiz-countdown-wrapper");
+    let countdownWrapper = document.getElementById("question-countdown-wrapper");
+    if (countdownWrapper.classList.contains("d-none")) {
+        countdownWrapper.classList.remove("d-none");
+    }
     countdownWrapper.style.opacity = 1;
-    let countdownBar = document.getElementById("quiz-countdown-filled");
-    let countdownText = document.getElementById("quiz-countdown-text");
+    let countdownBar = document.getElementById("question-countdown-filled");
+    let countdownText = document.getElementById("question-countdown-text");
 
     let green = 255
     let red = 136;
 
     let secs = 0;
     let iteration = 0;
-    let maxSecs = 30;
     let delay = 50;
 
-    let totalSteps = (maxSecs * 1000) / delay;
+    let totalSteps = (duration * 1000) / delay;
     let colorDelta = (green + red) / totalSteps;
 
-    setCountdownText(countdownText, secs, maxSecs);
-    setCountdownBar(countdownBar, (secs * 1000) + (iteration * delay), green, red, maxSecs * 1000);
+    setCountdownText(countdownText, secs, duration);
+    setCountdownBar(countdownBar, (secs * 1000) + (iteration * delay), green, red, duration * 1000);
 
     countdownInterval = setInterval(function() {
         iteration += 1;
         if (iteration * delay == 1000) {
             iteration = 0;
             secs += 1;
-            setCountdownText(countdownText, secs, maxSecs);
+            setCountdownText(countdownText, secs, duration);
         }
         if (red < 255) {
             red += colorDelta;
@@ -228,29 +246,49 @@ function startCountdown() {
             green -= colorDelta;
         }
 
-        setCountdownBar(countdownBar, (secs * 1000) + (iteration * delay), green, red, maxSecs * 1000);
+        setCountdownBar(countdownBar, (secs * 1000) + (iteration * delay), green, red, duration * 1000);
 
-        if (secs == maxSecs) {
-            clearInterval(countdownInterval);
-            countdownWrapper.classList.add("d-none")
-            wrongAnswer("Ikke mere tid")
+        if (secs >= duration) {
+            stopCountdown();
+            wrongAnswer("Ikke mere tid");
         }
     }, delay);
 }
 
-function showQuestion() {
-    let questionElem = document.getElementById("quiz-question-header");
+function questionAsked() {
+    if (activeRound < 3) {
+        // Enable participants to buzz in if we are in round 1 or 2
+        window.onkeydown = function(e) {
+            if (keyIsNumeric(e.key, 1, 4)) {
+                // Buzzer has been hit, let the player answer.
+                activePlayer = e.key - 1;
+                document.getElementById("question-buzzer-sound").play();
 
-    questionElem.style.opacity = 1;
-    window.onkeydown = function(e) {
-        if (e.key == "NumLock") {
-            showAnswerChoice(0);
+                // Clear buzz-in countdown.
+                stopCountdown();
+
+                // Show who was fastest at buzzing in
+                setPlayerTurn(activePlayer, false);
+
+                // Add a small delay before we can answer
+                setTimeout(() => {
+                    startCountdown(TIME_FOR_ANSWERING);
+
+                    window.onkeydown = function(e) {
+                        answerQuestion(e);
+                    }
+                }, 1000);
+            }
         }
     }
+
+    setTimeout(function() {
+        startCountdown(TIME_FOR_BUZZING);
+    }, 500);
 }
 
 function showAnswerChoice(index) {
-    let choiceElem = document.getElementsByClassName("quiz-answer-entry").item(index);
+    let choiceElem = document.getElementsByClassName("question-answer-entry").item(index);
     choiceElem.style.opacity = 1;
 
     if (index < 3) {
@@ -265,31 +303,21 @@ function showAnswerChoice(index) {
     }
 }
 
-function questionAsked() {
-    // Enable participants to answer only when NumLock has been pressed.
-    window.onkeydown = function(e) {
-        if (activeRound == 2) {
-            if (e.key == "Enter") {
-                activeTeamBlue = true;
+function showQuestion() {
+    document.getElementById("question-question-header").style.opacity = 1;
+    document.getElementById("question-question-image").style.opacity = 1;
+
+    if (isQuestionMultipleChoice()) {
+        // If question is multiple-choice, show each choice one by one
+        window.onkeydown = function(e) {
+            if (e.key == "NumLock") {
+                showAnswerChoice(0);
             }
-            else if (e.key == "Escape") {
-                activeTeamBlue = false;
-            }
-            if (e.key == "Enter" || e.key == "Escape") {
-                // Buzzer has been hit, let the team answer.
-                document.getElementById("quiz-buzzer-sound").play();
-                window.onkeydown = function(e) {
-                    answerQuestion(e);
-                }
-            }
-        }
-        else {
-            answerQuestion(e);
         }
     }
-    setTimeout(function() {
-        startCountdown();
-    }, 1500);
+    else {
+        questionAsked();
+    }
 }
 
 function scaleAnswerChoices() {
@@ -309,7 +337,8 @@ function scaleAnswerChoices() {
     }
 }
 
-function setVariables(round, playerData, turns, questionNum) {
+function setVariables(round, playerData, turns, questionNum=null, answer=null, value=null) {
+    console.log(round, playerData, turns, questionNum, answer, value);
     activeRound = round;
     playerData.forEach((data) => {
         playerNames.push(data["name"]);
@@ -318,6 +347,8 @@ function setVariables(round, playerData, turns, questionNum) {
     });
     playerTurns = turns;
     activeQuestionNum = questionNum;
+    activeAnswer = answer;
+    activeValue = value;
 }
 
 function categorySelection() {
@@ -329,9 +360,9 @@ function categorySelection() {
             if (!elem.classList.contains("quiz-category-inactive")) {
                 let category = elem.dataset.category;
                 let question = getCurrentQuestion();
-    
+
                 elem.classList.add("quiz-category-selected");
-    
+
                 setTimeout(function() {
                     let url = getBaseURL() + "/intfar/quiz/" + category + "/" + question;
                     window.location.href = url;
@@ -375,14 +406,19 @@ function setContestantTextColors() {
     }
 }
 
-function setPlayerTurn(player) {
-    let playerEntries = document.getElementsByClassName("selection-contestant-entry");
-    playerEntries.item(player).style.height = "100%";
-    playerTurns.push(player);
+function setPlayerTurn(player, save) {
+    let playerEntries = document.getElementsByClassName("footer-contestant-entry");
+    for (let i = 0; i < playerEntries.length; i++) {
+        let size = i == player ? "100%" : "60%";
+        playerEntries.item(i).style.height = size;
+    }
+    if (save) {
+        playerTurns.push(player);
+    }
 }
 
 function chooseStartingPlayer() {
-    let playerEntries = document.getElementsByClassName("selection-contestant-entry");
+    let playerEntries = document.getElementsByClassName("footer-contestant-entry");
     let minIters = 20;
     let maxIters = 32;
     let iters = minIters + (maxIters - minIters) * Math.random();
@@ -395,9 +431,8 @@ function chooseStartingPlayer() {
         let wait = minWait + (maxWait - minWait) * (iter / iters);
 
         setTimeout(() => {
-            playerEntries.item(player).style.height = "100px";
+            setPlayerTurn(player, false);
             player = iter % playerEntries.length;
-            playerEntries.item(player).style.height = "100%";
 
             if (iter < iters) {
                 showStartPlayerCandidate(iter + 1);

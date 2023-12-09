@@ -6,7 +6,7 @@ import flask
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
-TRACK_UNUSED = True
+TRACK_UNUSED = False
 ROUND_NAMES = [
     "Jeopardy!",
     "Double Jeopardy!",
@@ -74,7 +74,7 @@ def get_player_data(request_args):
         if name_key in request_args:
             player_data.append({
                 "name": request_args[name_key],
-                "score": request_args[score_key],
+                "score": int(request_args[score_key]),
                 "color": request_args[color_key]
             })
 
@@ -113,15 +113,70 @@ def question_view(jeopardy_round, category, tier):
         with open(used_questions_file, "w", encoding="utf-8") as fp:
             json.dump(used_questions, fp, indent=4)
 
+    # Sounds for answering questions correctly/wrong.
+    sounds = [
+        [
+            "easy_money",
+            "how_lovely",
+            "outta_my_face",
+            "yeah",
+            "peanut",
+            "never_surrender",
+            "exactly",
+            "hell_yeah",
+            "ult",
+            "wheeze",
+            "demon",
+            "myoo",
+            "rimelig_stor",
+            "worst_laugh",
+            "nyong",
+            "climax",
+            "cackle",
+            "kabim",
+            "kvinder",
+            "uhu",
+            "porn",
+            "package_boy"
+        ],
+        [
+            "mmnonono",
+            "what",
+            "whatemagonodo",
+            "yoda",
+            "daisy",
+            "bass",
+            "despair",
+            "ahhh",
+            "spil",
+            "fedtmand",
+            "no_way",
+            "hehehe",
+            "braindead",
+            "big_nej",
+            "junge",
+            "sad_animal",
+            "hold_da_op",
+            "dåser",
+            "oh_no",
+            "i_dont_know_dude",
+            "disappoint",
+            "nej"
+        ]
+    ]
+
     # Get player names and scores from query parameters
     player_data, player_turns = get_player_data(flask.request.args)
 
     all_data = {
         "round": jeopardy_round,
+        "round_name": ROUND_NAMES[jeopardy_round-1],
         "category_name": questions[category]["name"],
         "question": question,
         "player_data": player_data,
-        "player_turns": player_turns
+        "player_turns": player_turns,
+        "question_value": questions[category]["tiers"][tier]["value"] * jeopardy_round,
+        "sounds": sounds
     }
 
     return app_util.make_template_context("jeopardy/question.html", **all_data)
@@ -159,10 +214,9 @@ def active_jeopardy(jeopardy_round, question_num):
         category = "bois"
         return None # Handle 'Final Jeopardy!' round
 
-    if TRACK_UNUSED:
-        for category in used_questions:
-            for tier, info in enumerate(used_questions[category]):
-                questions[category]["tiers"][tier]["active"] = info["active"]
+    for category in used_questions:
+        for tier, info in enumerate(used_questions[category]):
+            questions[category]["tiers"][tier]["active"] = (not TRACK_UNUSED or info["active"])
 
     ordered_categories = [None] * 6
     for category in questions:
@@ -174,7 +228,7 @@ def active_jeopardy(jeopardy_round, question_num):
 
     all_data = {
         "round": jeopardy_round,
-        "round_name": ROUND_NAMES[jeopardy_round],
+        "round_name": ROUND_NAMES[jeopardy_round-1],
         "question_num": question_num,
         "questions": questions,
         "categories": ordered_categories,

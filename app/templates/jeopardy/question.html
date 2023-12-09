@@ -6,16 +6,88 @@
         <div id="bg-image"></div>
 
         <div id="question-wrapper">
+            <!-- Logo -->
             {% include 'jeopardy/logo.html' %}
 
-            <h1>{{ category_name }}</h1>
+            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span> til <span id="question-reward-span">{{ question_value }} GBP</span></h2>
+
+            <div id="question-wrapper-inner">
+                <h3 id="question-question-header">{{ question["question"] }}</h3>
+
+                <!-- Question images -->
+                {% if "image" in question %}
+                <div id="question-question-image-wrapper">
+                    <img id="question-question-image" src="{{ url_for('static', filename='img/jeopardy/' + question['image'] ) }}"{% if "width" in question %} style="width: {{ question['width'] }}px"{% endif %}>
+                    {% if "answer_image" in question %}
+                    <img id="question-answer-image" src="{{ url_for('static', filename='img/jeopardy/' + question['answer_image'] ) }}" style="width: {{ question['width'] }}px">
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Answer choices -->
+                {% if "choices" in question %}
+                {% for option in question["choices"] %}
+                <div id="question-answer-{{ loop.index }}" class="question-answer-entry">
+                    <p>
+                        <span class="question-answer-number">{{ loop.index}}:</span> <span class="question-answer-text">{{ option }}</span>
+                    </p>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <br>
+
+            <!-- Countdown wrapper -->
+            <div id="question-countdown-wrapper">
+                <div id="question-countdown-filled"></div>
+                <div id="question-countdown-text">30</div>
+            </div>
+
+            <!-- Correct answer -->
+            <div id="question-answer-correct" class="d-none">
+                <div id="question-correct-reason">Korrekt! <span class="question-answer-value"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/happy_nono.png') }}"></div>
+            </div>
+
+            <!-- Wrong answer -->
+            <div id="question-answer-wrong" class="d-none">
+                <div id="question-wrong-reason"><span id="question-wrong-reason-text"></span> <span class="question-answer-value"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/nat_fine.png') }}"></div>
+                <p>Rigtige svar var:</p>
+                <p class="question-emph">{{ question["answer"] }}</p>
+            </div>
+
+            <!-- Contestants -->
+            {% include 'jeopardy/contestants_footer.html' %}
         </div>
     </body>
 
+    <!-- Buzzer sound -->
+    <audio id="question-buzzer-sound">
+        <source src="{{ url_for('static', filename='sounds/buzzer.mp3') }}" type="audio/mpeg">
+    </audio>
+
+    <!-- Correct/wrong answers sounds -->
+    {% for sound_list in sounds %}
+    {% set correct_sound = loop.first %}
+    {% for sound_file in sound_list %}
+    <audio class="question-sound-{% if correct_sound %}correct{% else %}wrong{% endif %}">
+        <source src="{{ url_for('static', filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
+    </audio>
+    {% endfor %}
+    {% endfor %}
+
     <script>
+        setVariables(
+            {{ round }},
+            {{ player_data | tojson }},
+            {{ player_turns | tojson }},
+            null,
+            "{{ question["answer"] }}",
+            {{ question_value }}
+        );
         window.onkeydown = function(e) {
             if (e.key == "NumLock") {
-                beginBuzzInCountdown();
+                showQuestion();
             }
         }
     </script>

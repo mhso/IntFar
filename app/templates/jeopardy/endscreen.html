@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/head.html' %}
+
+    <body>
+        <div id="bg-image"></div>
+
+        <div id="endscreen-wrapper">
+            {% include 'jeopardy/logo.html' %}
+
+            <video id="score-confetti-video" muted loop>
+                <source src="{{ url_for('static', filename='img/confetti.webm') }}", type="video/webm">
+            </video>
+        </div>
+    
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                setTimeout(function() {
+                    document.getElementById("score-confetti-video").play();
+                }, 1000);
+                addWinnerSoundEvent();
+            });
+        </script>
+    </body>
+</html>

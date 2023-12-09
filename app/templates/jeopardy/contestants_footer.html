@@ -1,0 +1,10 @@
+<div id="contestants-footer">
+    <div id="footer-contestants">
+        {% for player_dict in player_data %}
+        <div class="footer-contestant-entry" style="background-color: #{{ player_dict['color'] }};">
+            <p class="footer-contestant-entry-name">{{ player_dict["name"] }}</p>
+            <p class="footer-contestant-entry-score">{{ player_dict["score"] }} GBP</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
