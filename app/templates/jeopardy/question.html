@@ -9,21 +9,34 @@
             <!-- Logo -->
             {% include 'jeopardy/logo.html' %}
 
+            <!-- Category header -->
             <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span> til <span id="question-reward-span">{{ question_value }} GBP</span></h2>
 
-            <div id="question-wrapper-inner">
-                <h3 id="question-question-header">{{ question["question"] }}</h3>
+            <!-- Question header -->
+            {% if "question" in question %}
+            <h3 id="question-question-header">{{ question["question"] }}</h3>
+            {% endif %}
 
-                <!-- Question images -->
-                {% if "image" in question %}
-                <div id="question-question-image-wrapper">
-                    <img id="question-question-image" src="{{ url_for('static', filename='img/jeopardy/' + question['image'] ) }}"{% if "width" in question %} style="width: {{ question['width'] }}px"{% endif %}>
-                    {% if "answer_image" in question %}
-                    <img id="question-answer-image" src="{{ url_for('static', filename='img/jeopardy/' + question['answer_image'] ) }}" style="width: {{ question['width'] }}px">
-                    {% endif %}
-                </div>
+            <!-- Question images -->
+            {% if "image" in question %}
+            <div id="question-question-image-wrapper">
+                <img id="question-question-image" src="{{ url_for('static', filename='img/jeopardy/' + question['image'] ) }}"{% if "height" in question %} style="height: {{ question['height'] }}px"{% endif %}>
+                {% if "answer_image" in question %}
+                <img id="question-answer-image" src="{{ url_for('static', filename='img/jeopardy/' + question['answer_image'] ) }}" style="height: {{ question['height'] }}px;">
                 {% endif %}
+            </div>
+            {% endif %}
 
+            <!-- Question video -->
+            {% if "video" in question %}
+            <div id="question-question-image-wrapper">
+                <video id="question-question-video" style="height: {{ question['height'] }}px;">
+                    <source src="{{ url_for('static', filename='img/jeopardy/' + question['video']) }}" type="video/webm">
+                </video>
+            </div>
+            {% endif %}
+
+            <div id="question-wrapper-inner">
                 <!-- Answer choices -->
                 {% if "choices" in question %}
                 {% for option in question["choices"] %}
@@ -35,8 +48,6 @@
                 {% endfor %}
                 {% endif %}
             </div>
-
-            <br>
 
             <!-- Countdown wrapper -->
             <div id="question-countdown-wrapper">
@@ -52,13 +63,12 @@
             <!-- Wrong answer -->
             <div id="question-answer-wrong" class="d-none">
                 <div id="question-wrong-reason"><span id="question-wrong-reason-text"></span> <span class="question-answer-value"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/nat_fine.png') }}"></div>
-                <p>Rigtige svar var:</p>
-                <p class="question-emph">{{ question["answer"] }}</p>
+                <p id="question-actual-answer" class="d-none">Rigtige svar var '<span class="question-emph">{{ question["answer"] }}</span>'</p>
             </div>
-
-            <!-- Contestants -->
-            {% include 'jeopardy/contestants_footer.html' %}
         </div>
+    
+        <!-- Contestants -->
+        {% include 'jeopardy/contestants_footer.html' %}
     </body>
 
     <!-- Buzzer sound -->
@@ -80,9 +90,9 @@
         setVariables(
             {{ round }},
             {{ player_data | tojson }},
-            {{ player_turns | tojson }},
+            {{ player_turn }},
             null,
-            "{{ question["answer"] }}",
+            "{{ question['answer'] }}",
             {{ question_value }}
         );
         window.onkeydown = function(e) {
@@ -90,5 +100,7 @@
                 showQuestion();
             }
         }
+
+        placeAnswerImageIfPresent();
     </script>
 </html>

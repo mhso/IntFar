@@ -9,21 +9,37 @@
             {% include 'jeopardy/logo.html' %}
 
             <!-- Categories -->
-            <div id="categories-wrapper">
+            {% if round < 3 %}
+            <div id="selection-categories-wrapper">
                 {% for category in categories %}
-                <div class="category-entry">
-                    <div class="category-header">
+                <div class="selection-category-entry">
+                    <div class="selection-category-header">
                         <span>{{ questions[category]["name"] }}</span>
                     </div>
                     {% for category_data in questions[category]["tiers"] %}
                     {% set final_value = category_data["value"] * round %}
-                    <div class="question-box{% if not category_data['active'] %} inactive{% endif %}"{% if category_data['active'] %} onclick="goToQuestion(event.target, '{{ category }}', {{ loop.index }})"{% endif %}>
+                    <div class="selection-question-box{% if not category_data['active'] %} inactive{% endif %}"{% if category_data['active'] %} onclick="goToQuestion(event.target, '{{ category }}', {{ loop.index }})"{% endif %}>
                         <span>{{ final_value }}</span>
                     </div>
                     {% endfor %}
                 </div>
                 {% endfor %}
             </div>
+            {% else %}
+            <div id="selection-finale-wrapper">
+                <h1>Final Jeopardy!</h1>
+                <h2>Kategorien er: <span id="selection-finale-category">{{ questions[categories[0]]["name"] }}</span></h2>
+                <h3>Tid til at satse hele baduljen!</h3>
+            </div>
+
+            <script>
+                window.onkeydown = function() {
+                    if (e.key == "NumLock") {
+                        window.location.href = getQuestionURL(3, '{{ categories[0] }}', 1);
+                    }
+                }
+            </script>
+            {% endif %}
 
             <!-- Contestants -->
             {% include 'jeopardy/contestants_footer.html' %}
@@ -35,11 +51,11 @@
         setVariables(
             {{ round }},
             {{ player_data | tojson }},
-            {{ player_turns | tojson }},
+            {{ player_turn }},
             {{ question_num }}
         );
 
-        {% if round == 1 and not player_turns %}
+        {% if round == 1 and player_turn == -1 %}
         setTimeout(function() {
             let turn = chooseStartingPlayer();
             setPlayerTurn(turn, true);

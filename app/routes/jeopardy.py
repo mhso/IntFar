@@ -7,6 +7,7 @@ import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
 TRACK_UNUSED = False
+QUESTIONS_PER_ROUND = 30
 ROUND_NAMES = [
     "Jeopardy!",
     "Double Jeopardy!",
@@ -78,11 +79,9 @@ def get_player_data(request_args):
                 "color": request_args[color_key]
             })
 
-    player_turns = list(map(int, request_args["turns"].split(",")))
-    if len(player_turns) == 1 and player_turns[0] == -1:
-        player_turns = []
+    player_turn = int(request_args["turn"])
 
-    return player_data, player_turns
+    return player_data, player_turn
 
 @jeopardy_page.route("/<jeopardy_round>/<category>/<tier>")
 def question_view(jeopardy_round, category, tier):
@@ -112,6 +111,10 @@ def question_view(jeopardy_round, category, tier):
 
         with open(used_questions_file, "w", encoding="utf-8") as fp:
             json.dump(used_questions, fp, indent=4)
+
+    # If question is multiple-choice, randomize order of choices
+    if "choices" in question:
+        random.shuffle(question["choices"])
 
     # Sounds for answering questions correctly/wrong.
     sounds = [
@@ -166,7 +169,7 @@ def question_view(jeopardy_round, category, tier):
     ]
 
     # Get player names and scores from query parameters
-    player_data, player_turns = get_player_data(flask.request.args)
+    player_data, player_turn = get_player_data(flask.request.args)
 
     all_data = {
         "round": jeopardy_round,
@@ -174,7 +177,7 @@ def question_view(jeopardy_round, category, tier):
         "category_name": questions[category]["name"],
         "question": question,
         "player_data": player_data,
-        "player_turns": player_turns,
+        "player_turn": player_turn,
         "question_value": questions[category]["tiers"][tier]["value"] * jeopardy_round,
         "sounds": sounds
     }
@@ -189,11 +192,62 @@ def active_jeopardy(jeopardy_round, question_num):
 
     jeopardy_round = int(jeopardy_round)
     question_num = int(question_num)
-    total_questions = 30
 
-    if question_num == total_questions:
+    # Get player names and scores from query parameters
+    player_data, player_turn = get_player_data(flask.request.args)
+
+    if jeopardy_round == 3:
+        # Game over! Go to endscreen
+        player_data.sort(key=lambda x: x["score"], reverse=True)
+
+        ties = 0
+        for index, data in enumerate(player_data[1:], start=1):
+            if player_data[index-1]["score"] > data["score"]:
+                break
+
+            ties += 1
+
+        if ties == 0:
+            winner_desc = f"{player_data[0]['name']} wonnered!!! All hail the king!"
+
+        elif ties == 1:
+            winner_desc = (
+                f'<span style="color: #{player_data[0]["color"]}">{player_data[0]["name"]}</span> '
+                f'og <span style="color: #{player_data[1]["color"]}">{player_data[1]["name"]}</span> '
+                "har lige mange point, de har begge to vundet!!!"
+            )
+
+        elif ties > 1:
+            players_tied = ", ".join(
+                f'<span style="color: #{data["color"]}">{data["name"]}</span>' for data in player_data[:ties-1]
+            ) + f', og <span style="color: #{player_data[ties]["color"]}">{player_data[ties]["name"]}</span>'
+
+            winner_desc = (
+                f"{players_tied} har alle lige mange point! De har alle sammen vundet!!!"
+            )
+
+        all_data = {
+            "player_data": player_data,
+            "winner_desc": winner_desc
+        }
+
+        return app_util.make_template_context("jeopardy/endscreen.html", **all_data)
+
+    if question_num == QUESTIONS_PER_ROUND:
         # Round 1 done, onwards to next one
         jeopardy_round += 1
+
+        if jeopardy_round == 2:
+            # The player with the lowest score at the start of round 2 gets the turn
+            lowest_score = player_data[0]["score"]
+            lowers_score_index = 0
+
+            for index, data in enumerate(player_data):
+                if data["score"] < lowest_score:
+                    lowest_score = data["score"]
+                    lowers_score_index = index
+
+            player_turn = lowers_score_index
 
     questions_file = "app/static/jeopardy_questions.json"
     used_questions_file = "app/static/jeopardy_used.json"
@@ -210,21 +264,17 @@ def active_jeopardy(jeopardy_round, question_num):
             for tier_info in used_questions[category]:
                 tier_info["active"] = True
 
-    if jeopardy_round == 3:
-        category = "bois"
-        return None # Handle 'Final Jeopardy!' round
+    if jeopardy_round < 3:
+        for category in used_questions:
+            for tier, info in enumerate(used_questions[category]):
+                questions[category]["tiers"][tier]["active"] = (not TRACK_UNUSED or info["active"])
 
-    for category in used_questions:
-        for tier, info in enumerate(used_questions[category]):
-            questions[category]["tiers"][tier]["active"] = (not TRACK_UNUSED or info["active"])
-
-    ordered_categories = [None] * 6
-    for category in questions:
-        if questions[category]["order"] < 6:
-            ordered_categories[questions[category]["order"]] = category
-
-    # Get player names and scores from query parameters
-    player_data, player_turns = get_player_data(flask.request.args)
+        ordered_categories = [None] * 6
+        for category in questions:
+            if questions[category]["order"] < 6:
+                ordered_categories[questions[category]["order"]] = category
+    else:
+        ordered_categories = ["bois"]
 
     all_data = {
         "round": jeopardy_round,
@@ -233,7 +283,7 @@ def active_jeopardy(jeopardy_round, question_num):
         "questions": questions,
         "categories": ordered_categories,
         "player_data": player_data,
-        "player_turns": player_turns
+        "player_turn": player_turn
     }
 
     return app_util.make_template_context("jeopardy/selection.html", **all_data)

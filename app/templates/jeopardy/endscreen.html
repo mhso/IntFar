@@ -4,21 +4,43 @@
 
     <body>
         <div id="bg-image"></div>
+        <div id="endscreen-techno-overlay" class="d-none"></div>
 
         <div id="endscreen-wrapper">
             {% include 'jeopardy/logo.html' %}
 
-            <video id="score-confetti-video" muted loop>
+            <h1>GG WP!</h1>
+
+            <!-- Winner description -->
+            <p id="endscreen-winner-desc">
+                {% autoescape false %}
+                {{ winner_desc }}
+                {% endautoescape %}
+            </p>
+
+            <!-- Scores table -->
+            <table id="endscreen-scores-table">
+                {% for data in player_data %}
+                <tr>
+                    <td class="endscreen-score-name" style="color: #{{ data['color'] }};">{{ data['name'] }}</td>
+                    <td class="endscreen-score-score">{{ data['score'] }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <video id="endscreen-confetti-video" muted loop>
                 <source src="{{ url_for('static', filename='img/confetti.webm') }}", type="video/webm">
             </video>
         </div>
+
+        <!-- Shooting Star celebratory music -->
+        <audio id="endscreen-music">
+            <source src="{{ url_for('static', filename='shooting_star.mp3') }}" type="audio/mpeg">
+        </audio>
     
         <script>
             document.addEventListener('DOMContentLoaded', function () {
-                setTimeout(function() {
-                    document.getElementById("score-confetti-video").play();
-                }, 1000);
-                addWinnerSoundEvent();
+                startWinnerParty();
             });
         </script>
     </body>

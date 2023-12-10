@@ -49,6 +49,10 @@ h3 {
     font-size: 1.5rem;
 }
 
+.d-none {
+    display: none !important;
+}
+
 #logo-wrapper {
     width: 500px;
     margin: 0 auto;
@@ -60,7 +64,7 @@ h3 {
 }
 
 #jeopardy-logo {
-    width: 420px;
+    width: 460px;
     margin-top: -10px;
 }
 
@@ -189,7 +193,7 @@ h3 {
     width: 100%;
 }
 
-#categories-wrapper {
+#selection-categories-wrapper {
     display: flex;
     flex-direction: row;
     justify-content: center;
@@ -197,11 +201,11 @@ h3 {
     width: 100%;
 }
 
-.category-entry {
+.selection-category-entry {
     margin: 0 6px;
 }
 
-.category-header {
+.selection-category-header {
     color: white;
     font-size: 1.8rem;
     margin-bottom: 20px;
@@ -210,36 +214,54 @@ h3 {
     line-height: 92px;
 }
 
-.question-box {
+.selection-question-box {
     position: relative;
     color: rgb(203, 163, 84);
     font-size: 1.8rem;
     margin: 12px 0;
     height: 100px;
-    line-height: 92px;
+    line-height: 88px;
     font-weight: 800;
     border-radius: 10px;
     cursor: pointer;
     border: 2px solid black;
 }
 
-.question-box.inactive {
+.selection-question-box.inactive {
     background-color: gray;
     cursor: default;
     color: black;
 }
 
-.category-header, .question-box {
+.selection-category-header, .selection-question-box {
     background-color: rgb(15, 12, 118);
     width: 10vw;
     text-align: center;
 }
 
-.category-header > span, .question-box > span {
+.selection-category-header > span, .selection-question-box > span {
     display: inline-block;
     vertical-align: middle;
     line-height: normal;
 }
+
+#selection-finale-wrapper {
+    text-align: center;
+    margin-top: 200px;
+}
+
+#selection-finale-wrapper > h1 {
+    font-size: 5rem;
+    color: #00abff;
+}
+
+#selection-finale-category {
+    font-weight: 1000;
+}
+
+/****************##############****************\
+|                    FOOTER                    |
+\****************##############****************/
 
 #contestants-footer {
     position: absolute;
@@ -298,6 +320,24 @@ h3 {
 
 #question-wrapper > #logo-wrapper {
     width: 100%;
+    top: 0;
+    position: absolute;
+}
+
+#question-wrapper > #logo-wrapper > #lol-logo {
+    width: 420px;
+    float: left;
+    position: relative;
+    top: 10px;
+    left: 10px;
+}
+
+#question-wrapper > #logo-wrapper > #jeopardy-logo {
+    width: 420px;
+    float: right;
+    position: relative;
+    top: 30px;
+    right: 30px;
 }
 
 .question-divider {
@@ -311,6 +351,7 @@ h3 {
     font-size: 2.5rem;
     text-align: center;
     transition: opacity 1.5s;
+    margin-top: 20px;
     opacity: 0;
 }
 
@@ -330,16 +371,20 @@ h3 {
 
 #question-wrapper-inner {
     margin: 0 auto;
-    margin-top: 20px;
     width: 650px;
+}
+
+#question-category-header, #question-question-header {
+    margin: 0 auto;
 }
 
 #question-category-header {
     color: white;
     font-family: 'Courier New', Courier, monospace;
-    font-size: 3rem;
+    font-size: 4rem;
     text-decoration: underline;
-    margin-top: 50px;
+    margin-top: 80px;
+    width: 900px;
 }
 
 #question-question-header {
@@ -347,21 +392,41 @@ h3 {
     font-style: italic;
     opacity: 0;
     transition: opacity 1.5s;
+    margin-top: 20px;
     background-color: rgba(0, 0, 0, 0.7);
     padding: 10px;
+    width: 650px;
 }
 
 #question-question-image-wrapper {
     width: 100%;
+    position: relative;
     text-align: center;
-    margin-top: 15px;
+    margin: 0 auto;
+    margin-top: 20px;
     margin-bottom: 30px;
 }
 
-#question-question-image {
-    width: 100px;
+#question-question-image, #question-answer-image {
+    display: block;
+    height: 100px;
     opacity: 0;
     transition: opacity 1.5s;
+    margin: 0 auto;
+}
+
+#question-answer-image {
+    z-index: 5;
+    position: absolute;
+    top: 0;
+    border: 2px solid gold;
+}
+
+#question-question-video {
+    display: block;
+    opacity: 0;
+    transition: opacity 1s;
+    margin: 0 auto;
 }
 
 #question-answers-wrapper {
@@ -417,7 +482,7 @@ h3 {
     animation-direction: alternate;
 }
 
-.question-answerd-correct {
+.question-answered-correct {
     background-color: rgb(31, 187, 31);
 }
 
@@ -483,17 +548,45 @@ h3 {
     padding-top: 3px;
 }
 
-.quiz-category-entry > h3 {
-    margin-top: 0.5rem;
+/****************##############****************\
+|                  ENDSCREEN                   |
+\****************##############****************/
+
+#endscreen-winner-desc {
+    font-size: 30px;
+    margin-top: 30px;
+    margin-bottom: 50px;
 }
 
-.quiz-category-selected {
-    background-color: #0a06fa;
-    transition: all 1s;
+#endscreen-scores-table {
+    margin: 0 auto;
+    font-size: 24px;
+    background-color: #000000d1;
+    border: 1px solid white;
 }
 
-.quiz-category-inactive {
-    background-color: gray;
+#endscreen-scores-table td {
+    padding: 10px 20px;
+    border-bottom: 1px solid white;
+    border-top: 1px solid white;
+}
+
+.endscreen-score-name {
+    text-align: left;
+}
+
+.endscreen-score-score {
+    text-align: right;
+}
+
+#endscreen-techno-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
 }
 
 #scoreboard-wrapper {
@@ -546,7 +639,8 @@ h3 {
     margin-top: 30px;
 }
 
-#scoreboard-wrapper > video {
+#endscreen-confetti-video {
+    pointer-events: none;
     width: 100%;
     position: fixed;
     left: 0;
