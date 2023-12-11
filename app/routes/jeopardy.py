@@ -13,6 +13,7 @@ ROUND_NAMES = [
     "Double Jeopardy!",
     "Final Jeopardy!"
 ]
+FINALE_CATEGORY = "bois"
 
 jeopardy_page = flask.Blueprint("jeopardy", __name__, template_folder="templates")
 
@@ -98,9 +99,10 @@ def question_view(jeopardy_round, category, tier):
         used_questions = json.load(fp)
 
     question_possibilities = []
-    for question in questions[category]["tiers"][tier]["questions"]:
-        if not TRACK_UNUSED or question["id"] not in used_questions[category][tier]["used"]:
+    for index, question in enumerate(questions[category]["tiers"][tier]["questions"]):
+        if not TRACK_UNUSED or index not in used_questions[category][tier]["used"]:
             question_possibilities.append(question)
+            question["id"] = index
 
     question_index = random.randint(0, len(question_possibilities)-1)
     question = question_possibilities[question_index]
@@ -196,46 +198,10 @@ def active_jeopardy(jeopardy_round, question_num):
     # Get player names and scores from query parameters
     player_data, player_turn = get_player_data(flask.request.args)
 
-    if jeopardy_round == 3:
-        # Game over! Go to endscreen
-        player_data.sort(key=lambda x: x["score"], reverse=True)
-
-        ties = 0
-        for index, data in enumerate(player_data[1:], start=1):
-            if player_data[index-1]["score"] > data["score"]:
-                break
-
-            ties += 1
-
-        if ties == 0:
-            winner_desc = f"{player_data[0]['name']} wonnered!!! All hail the king!"
-
-        elif ties == 1:
-            winner_desc = (
-                f'<span style="color: #{player_data[0]["color"]}">{player_data[0]["name"]}</span> '
-                f'og <span style="color: #{player_data[1]["color"]}">{player_data[1]["name"]}</span> '
-                "har lige mange point, de har begge to vundet!!!"
-            )
-
-        elif ties > 1:
-            players_tied = ", ".join(
-                f'<span style="color: #{data["color"]}">{data["name"]}</span>' for data in player_data[:ties-1]
-            ) + f', og <span style="color: #{player_data[ties]["color"]}">{player_data[ties]["name"]}</span>'
-
-            winner_desc = (
-                f"{players_tied} har alle lige mange point! De har alle sammen vundet!!!"
-            )
-
-        all_data = {
-            "player_data": player_data,
-            "winner_desc": winner_desc
-        }
-
-        return app_util.make_template_context("jeopardy/endscreen.html", **all_data)
-
     if question_num == QUESTIONS_PER_ROUND:
         # Round 1 done, onwards to next one
         jeopardy_round += 1
+        question_num = 0
 
         if jeopardy_round == 2:
             # The player with the lowest score at the start of round 2 gets the turn
@@ -287,3 +253,65 @@ def active_jeopardy(jeopardy_round, question_num):
     }
 
     return app_util.make_template_context("jeopardy/selection.html", **all_data)
+
+@jeopardy_page.route("/finale/<question_id>")
+def final_jeopardy(question_id):
+    question_id = int(question_id)
+
+    questions_file = "app/static/jeopardy_questions.json"
+
+    with open(questions_file, encoding="utf-8") as fp:
+        questions = json.load(fp)
+
+    question = questions[FINALE_CATEGORY]["tiers"][-1]["questions"][question_id]
+    category_name = questions[FINALE_CATEGORY]["name"]
+
+    player_data = get_player_data()[0]
+
+    all_data = {
+        "question": question,
+        "category": category_name,
+        "player_data": player_data
+    }
+
+    return app_util.make_template_context("jeopardy/finale.html", **all_data)
+
+@jeopardy_page.route("/endscreen")
+def jeopardy_endscreen():
+    player_data = get_player_data(flask.request.args)[0]
+
+    # Game over! Go to endscreen
+    player_data.sort(key=lambda x: x["score"], reverse=True)
+
+    ties = 0
+    for index, data in enumerate(player_data[1:], start=1):
+        if player_data[index-1]["score"] > data["score"]:
+            break
+
+        ties += 1
+
+    if ties == 0:
+        winner_desc = f"{player_data[0]['name']} wonnered!!! All hail the king!"
+
+    elif ties == 1:
+        winner_desc = (
+            f'<span style="color: #{player_data[0]["color"]}">{player_data[0]["name"]}</span> '
+            f'og <span style="color: #{player_data[1]["color"]}">{player_data[1]["name"]}</span> '
+            "har lige mange point, de har begge to vundet!!!"
+        )
+
+    elif ties > 1:
+        players_tied = ", ".join(
+            f'<span style="color: #{data["color"]}">{data["name"]}</span>' for data in player_data[:ties-1]
+        ) + f', og <span style="color: #{player_data[ties]["color"]}">{player_data[ties]["name"]}</span>'
+
+        winner_desc = (
+            f"{players_tied} har alle lige mange point! De har alle sammen vundet!!!"
+        )
+
+    all_data = {
+        "player_data": player_data,
+        "winner_desc": winner_desc
+    }
+
+    return app_util.make_template_context("jeopardy/endscreen.html", **all_data)

@@ -10,7 +10,7 @@
             {% include 'jeopardy/logo.html' %}
 
             <!-- Category header -->
-            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span> til <span id="question-reward-span">{{ question_value }} GBP</span></h2>
+            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if round < 3 %} til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}</h2>
 
             <!-- Question header -->
             {% if "question" in question %}
@@ -93,7 +93,8 @@
             {{ player_turn }},
             null,
             "{{ question['answer'] }}",
-            {{ question_value }}
+            {{ question_value }},
+            {{ question['id'] }}
         );
         window.onkeydown = function(e) {
             if (e.key == "NumLock") {

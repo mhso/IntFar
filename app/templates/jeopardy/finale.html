@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/head.html' %}
+    <body>
+        <div id="bg-image"></div>
+
+        <div id="finale-wrapper">
+            <!-- Logo -->
+            {% include 'jeopardy/logo.html' %}
+
+            <!-- Category and question -->
+            <h2>{{ category }}</h2>
+            <h3>{{ question["question"] }}</h3>
+
+            <div id="finale-wagers-wrapper">
+                <h4>Hvad der satses</h4>
+                {% for data in player_data %}
+                <span class="finale-wager-name">{{ data["name"] }}</span><input class="finale-wager-amount">
+                {% endfor %}
+            </div>
+
+            <h2 id="finale-answer" class="d-none">{{ question["answer"] }}</h2>
+
+            <div id="finale-results-wrapper">
+                <ul>
+                    {% for data in player_data %}
+                    <li>
+                        <span class="finale-wager-name d-none">{{ data["name"] }}</span> <span class="finale-wager-desc d-none"></span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <p id="endscreen-teaser" class="d-none">Hvilket betyder...</p>
+        </div>
+    </body>
+
+    <script>
+        setVariables(
+            3,
+            {{ player_data | tojson }},
+            null,
+            1
+        );
+
+        indow.onkeydown = function(e) {
+            if (e.key == "NumLock") {
+                showFinaleResult();
+            }
+        }
+    </script>
+</html>

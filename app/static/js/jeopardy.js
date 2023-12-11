@@ -7,6 +7,7 @@ const CONTESTANT_KEYS = ["z",  "q", "p", "m"]
 var countdownInterval;
 var activeRound;
 var activeQuestionNum;
+var activeQuestionId;
 var activeAnswer;
 var activeValue;
 var answeringPlayer = null;
@@ -18,12 +19,47 @@ var playerNames = [];
 let playerColors = [];
 var playerScores = [];
 
-function getCurrentQuestion() {
-    let currentUrl = window.location.href;
-    let split = currentUrl.split("/");
-    let lastIndex = split[split.length-1] == "" ? split.length - 2 : split.length - 1;
-    let question = Number.parseInt(split[lastIndex]);
-    return question;
+function getBaseURL() {
+    return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
+}
+
+function getQueryParams() {
+    // Encode player information and turns into URL query strings
+    let playerNameQueries = new Array();
+    playerNames.forEach((name, index) => {
+        playerNameQueries.push(`p${index+1}=${encodeURIComponent(name)}`);
+    });
+    let namesQueryStr = playerNameQueries.join("&");
+
+    let playerScoreQueries = new Array();
+    playerScores.forEach((score, index) => {
+        playerScoreQueries.push(`s${index+1}=${encodeURIComponent(score)}`);
+    });
+    let scoresQueryStr = playerScoreQueries.join("&");
+
+    let playerColorQueries = new Array();
+    playerColors.forEach((color, index) => {
+        playerColorQueries.push(`c${index+1}=${encodeURIComponent(color)}`);
+    });
+    let colorsQueryStr = playerColorQueries.join("&");
+
+    return `${namesQueryStr}&${scoresQueryStr}&${colorsQueryStr}&turn=${playerTurn}`
+}
+
+function getSelectionURL(round, question) {
+    return `${getBaseURL()}/intfar/jeopardy/${round}/${question}?${getQueryParams()}`;
+}
+
+function getQuestionURL(round, category, difficulty) {
+    return `${getBaseURL()}/intfar/jeopardy/${round}/${category}/${difficulty}?${getQueryParams()}`;
+}
+
+function getFinaleURL(question_id) {
+    return `${getBaseURL()}/intfar/jeopardy/${question_id}?${getQueryParams()}`;
+}
+
+function getEndscreenURL() {
+    return `${getBaseURL()}/intfar/jeopardy/endscreen?${getQueryParams()}`;
 }
 
 function getRandomSound(sounds) {
@@ -73,7 +109,7 @@ function afterQuestion() {
     activeAnswer = null;
     window.onkeydown = function(e) {
         if (e.key == "NumLock") {
-            startNextRound();
+            window.location.href = getSelectionURL(activeRound, activeQuestionNum + 1);
         }
     }
 }
@@ -146,45 +182,6 @@ function hideAnswerIndicator() {
         wrongElem.classList.add("d-none");
         wrongElem.style.setProperty("opacity", 0);
     }
-}
-
-function getBaseURL() {
-    return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
-}
-
-function getQueryParams() {
-    // Encode player information and turns into URL query strings
-    let playerNameQueries = new Array();
-    playerNames.forEach((name, index) => {
-        playerNameQueries.push(`p${index+1}=${encodeURIComponent(name)}`);
-    });
-    let namesQueryStr = playerNameQueries.join("&");
-
-    let playerScoreQueries = new Array();
-    playerScores.forEach((score, index) => {
-        playerScoreQueries.push(`s${index+1}=${encodeURIComponent(score)}`);
-    });
-    let scoresQueryStr = playerScoreQueries.join("&");
-
-    let playerColorQueries = new Array();
-    playerColors.forEach((color, index) => {
-        playerColorQueries.push(`c${index+1}=${encodeURIComponent(color)}`);
-    });
-    let colorsQueryStr = playerColorQueries.join("&");
-
-    return `${namesQueryStr}&${scoresQueryStr}&${colorsQueryStr}&turn=${playerTurn}`
-}
-
-function getSelectionURL(round, question) {
-    return `${getBaseURL()}/intfar/jeopardy/${round}/${question}?${getQueryParams()}`
-}
-
-function getQuestionURL(round, category, difficulty) {
-    return `${getBaseURL()}/intfar/jeopardy/${round}/${category}/${difficulty}?${getQueryParams()}`
-}
-
-function startNextRound() {
-    window.location.href = getSelectionURL(activeRound, activeQuestionNum + 1);
 }
 
 function keyIsNumeric(key, min, max) {
@@ -346,6 +343,10 @@ function pauseVideo() {
 }
 
 function playerBuzzedIn(player) {
+    if (!activePlayers[player]) {
+        return; // Player already buzzed in once this question
+    }
+
     // Buzzer has been hit, let the player answer.
     answeringPlayer = player;
     activePlayers[player] = false;
@@ -394,6 +395,13 @@ function questionAsked(countdownDelay) {
         window.onkeydown = function(e) {
             if (keyIsContestant(e.key)) {
                 playerBuzzedIn(CONTESTANT_KEYS.indexOf(e.key));
+            }
+        }
+    }
+    else {
+        window.onkeydown = function(e) {
+            if (e.key == "NumLock") {
+                window.location.href = getFinaleURL(activeQuestionId);
             }
         }
     }
@@ -477,6 +485,9 @@ function showQuestion() {
             afterShowQuestion();
         }
     }
+    else {
+        afterShowQuestion();
+    }
 }
 
 function scaleAnswerChoices() {
@@ -496,7 +507,7 @@ function scaleAnswerChoices() {
     }
 }
 
-function setVariables(round, playerData, turn, questionNum=null, answer=null, value=null) {
+function setVariables(round, playerData, turn, questionNum=null, answer=null, value=null, questionId=null) {
     activeRound = round;
     playerData.forEach((data) => {
         playerNames.push(data["name"]);
@@ -507,27 +518,7 @@ function setVariables(round, playerData, turn, questionNum=null, answer=null, va
     activeQuestionNum = questionNum;
     activeAnswer = answer;
     activeValue = value;
-}
-
-function categorySelection() {
-    let categoryElems = document.getElementsByClassName("quiz-category-entry");
-    window.onkeydown = function(e) {
-        if (keyIsNumeric(e.key, 1, categoryElems.length)) {
-            let num = Number.parseInt(e.key);
-            let elem = categoryElems.item(num-1);
-            if (!elem.classList.contains("quiz-category-inactive")) {
-                let category = elem.dataset.category;
-                let question = getCurrentQuestion();
-
-                elem.classList.add("quiz-category-selected");
-
-                setTimeout(function() {
-                    let url = getBaseURL() + "/intfar/quiz/" + category + "/" + question;
-                    window.location.href = url;
-                }, 1500);
-            }
-        }
-    }
+    activeQuestionId = questionId;
 }
 
 function goToQuestion(div, category, tier) {
@@ -678,6 +669,83 @@ function addPlayerDiv() {
     wrapper.appendChild(div);
 }
 
+function showFinaleCategory(category) {
+    window.onkeydown = function(e) {
+        if (e.key == "NumLock") {
+            let header1 = document.getElementById("selection-finale-header1");
+            header1.style.setProperty("opacity", 1);
+    
+            setTimeout(function() {
+                let header2 = document.getElementById("selection-finale-header2");
+                header2.style.setProperty("opacity", 1);
+    
+                let header3 = document.getElementById("selection-finale-header3");
+                header3.style.setProperty("opacity", 1);
+            }, 2000);
+
+            window.onkeydown = function(e) {
+                if (e.key == "NumLock") {
+                    window.location.href = getQuestionURL(3, category, 1);
+                }
+            }
+        }
+    }
+}
+
+function showFinaleResult() {
+    let wagerDescElems = document.getElementsByClassName("finale-wager-desc");
+    let wagerInputElems = document.getElementsByClassName("finale-wager-amount");
+
+    function showNextResult(player) {
+        let playerElem = ldocument.getElementsByClassName("finale-wager-name").item(player);
+        playerElem.style.color = "#" + playerColors[player];
+        playerElem.classList.remove("d-none");
+        playerElem.style.opacity = 1;
+
+        if (player == playerNames.length - 1) {
+            setTimeout(function() {
+                let teaserElem = document.getElementById("endscreen-teaser");
+                teaserElem.style.opacity = 1;
+                teaserElem.classList.remove("d-none");
+            }, 1000);
+        }
+
+        window.onkeydown = function(e) {
+            let descElem = wagerDescElems.item(player);
+            let amount = parseInt(wagerInputElems.item(player).value);
+
+            if (e.key == 1) {
+                // Current player answered correctly
+                descElem.classList.add("wager-answer-correct");
+                descElem.textContent = `svarede rigtigt og vinder ${amount} GBP!`;
+            }
+            else if (e.key == 2) {
+                // Current player answered incorrectly
+                descElem.classList.add("wager-answer-wrong");
+                descElem.textContent = `svarede forkert og taber ${amount} GBP!`;
+            }
+            else if (e.key == "NumLock") {
+                if (i == playerNames.length) {
+                    window.location.href = getEndscreenURL();
+                }
+                else {
+                    showNextResult(player + 1)
+                }
+            }
+        }
+    }
+
+    window.onkeydown = function(e) {
+        if (e.key == "NumLock") {
+            showNextResult(0);
+        }
+    }
+
+    let answerElem = document.getElementById("finale-answer");
+    answerElem.classList.remove("d-none");
+    answerElem.style.opacity = 1;
+}
+
 function startWinnerParty() {
     window.onkeydown = function(e) {
         if (e.key == "NumLock") {
@@ -689,6 +757,9 @@ function startWinnerParty() {
 
             let colors = ["#1dd8267e", "#1d74d87e", "#c90f0f89", "#deb5117c"];
             let colorIndex = 0;
+
+            let initialDelay = 320;
+            let intervalDelay = 472;
 
             setTimeout(() => {
                 overlay.style.backgroundColor = colors[colorIndex];
@@ -702,8 +773,8 @@ function startWinnerParty() {
                     if (colorIndex == colors.length) {
                         colorIndex = 0;
                     }
-                }, 472);
-            }, 320);
+                }, intervalDelay);
+            }, initialDelay);
         }
     }
 }

@@ -10,6 +10,7 @@
 
             <!-- Categories -->
             {% if round < 3 %}
+            <!-- Jeopardy! and Double Jeopardy! question selection -->
             <div id="selection-categories-wrapper">
                 {% for category in categories %}
                 <div class="selection-category-entry">
@@ -25,19 +26,19 @@
                 </div>
                 {% endfor %}
             </div>
+
             {% else %}
+
+            <!-- Final Jeopardy! question selection -->
             <div id="selection-finale-wrapper">
                 <h1>Final Jeopardy!</h1>
-                <h2>Kategorien er: <span id="selection-finale-category">{{ questions[categories[0]]["name"] }}</span></h2>
-                <h3>Tid til at satse hele baduljen!</h3>
+                <h2 id="selection-finale-header1">Kategorien er...</h2>
+                <h2 id="selection-finale-header2">{{ questions[categories[0]]["name"] }}</h2>
+                <h3 id="selection-finale-header3">Tid til at satse hele baduljen!</h3>
             </div>
 
             <script>
-                window.onkeydown = function() {
-                    if (e.key == "NumLock") {
-                        window.location.href = getQuestionURL(3, '{{ categories[0] }}', 1);
-                    }
-                }
+                showFinaleCategory('{{ categories[0] }}');
             </script>
             {% endif %}
 
