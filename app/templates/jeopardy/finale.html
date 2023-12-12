@@ -9,29 +9,31 @@
             {% include 'jeopardy/logo.html' %}
 
             <!-- Category and question -->
-            <h2>{{ category }}</h2>
-            <h3>{{ question["question"] }}</h3>
+            <h2 id="finale-category-header">{{ category_name }}</h2>
+            <h3 id="finale-question-header">{{ question["question"] }}</h3>
+            <h4>Hvad der satses:</h4>
 
             <div id="finale-wagers-wrapper">
-                <h4>Hvad der satses</h4>
                 {% for data in player_data %}
-                <span class="finale-wager-name">{{ data["name"] }}</span><input class="finale-wager-amount">
+                <div class="finale-wager-entry">
+                    <span class="finale-wager-name" style="color: #{{ data['color'] }};">{{ data["name"] }}</span>: <input class="finale-wager-amount">
+                </div>
                 {% endfor %}
             </div>
 
-            <h2 id="finale-answer" class="d-none">{{ question["answer"] }}</h2>
+            <h3 id="finale-answer">Svaret er: <span class="question-emph">{{ question["answer"] }}</span></h3>
 
             <div id="finale-results-wrapper">
                 <ul>
                     {% for data in player_data %}
-                    <li>
-                        <span class="finale-wager-name d-none">{{ data["name"] }}</span> <span class="finale-wager-desc d-none"></span>
+                    <li class="finale-result-name">
+                        <span>{{ data["name"] }}</span> <span class="finale-result-desc"></span>
                     </li>
                     {% endfor %}
                 </ul>
             </div>
 
-            <p id="endscreen-teaser" class="d-none">Hvilket betyder...</p>
+            <p id="endscreen-teaser">Hvilket betyder...</p>
         </div>
     </body>
 
@@ -43,7 +45,7 @@
             1
         );
 
-        indow.onkeydown = function(e) {
+        window.onkeydown = function(e) {
             if (e.key == "NumLock") {
                 showFinaleResult();
             }

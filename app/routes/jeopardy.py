@@ -56,7 +56,7 @@ def reset_questions():
     for cat in used_questions:
         used_questions[cat] = [
             {"active": True, "used": []}
-            for _ in range(5)
+            for _ in range(6)
         ]
 
     with open(used_questions_file, "w", encoding="utf-8") as fp:
@@ -80,7 +80,10 @@ def get_player_data(request_args):
                 "color": request_args[color_key]
             })
 
-    player_turn = int(request_args["turn"])
+    try:
+        player_turn = int(request_args["turn"])
+    except ValueError:
+        player_turn = -1
 
     return player_data, player_turn
 
@@ -233,7 +236,8 @@ def active_jeopardy(jeopardy_round, question_num):
     if jeopardy_round < 3:
         for category in used_questions:
             for tier, info in enumerate(used_questions[category]):
-                questions[category]["tiers"][tier]["active"] = (not TRACK_UNUSED or info["active"])
+                questions_left = any(index not in info["used"] for index in questions[category]["tiers"][tier]["questions"])
+                questions[category]["tiers"][tier]["active"] = (not TRACK_UNUSED or (info["active"] and questions_left))
 
         ordered_categories = [None] * 6
         for category in questions:
@@ -266,11 +270,12 @@ def final_jeopardy(question_id):
     question = questions[FINALE_CATEGORY]["tiers"][-1]["questions"][question_id]
     category_name = questions[FINALE_CATEGORY]["name"]
 
-    player_data = get_player_data()[0]
+    player_data = get_player_data(flask.request.args)[0]
 
     all_data = {
+        "round": 3,
         "question": question,
-        "category": category_name,
+        "category_name": category_name,
         "player_data": player_data
     }
 
@@ -291,7 +296,7 @@ def jeopardy_endscreen():
         ties += 1
 
     if ties == 0:
-        winner_desc = f"{player_data[0]['name']} wonnered!!! All hail the king!"
+        winner_desc = f'<span style="color: #{player_data[0]["color"]}">{player_data[0]["name"]}</span> wonnered!!! All hail the king!'
 
     elif ties == 1:
         winner_desc = (

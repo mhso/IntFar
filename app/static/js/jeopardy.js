@@ -55,7 +55,7 @@ function getQuestionURL(round, category, difficulty) {
 }
 
 function getFinaleURL(question_id) {
-    return `${getBaseURL()}/intfar/jeopardy/${question_id}?${getQueryParams()}`;
+    return `${getBaseURL()}/intfar/jeopardy/finale/${question_id}?${getQueryParams()}`;
 }
 
 function getEndscreenURL() {
@@ -289,7 +289,7 @@ function setCountdownBar(countdownBar, milis, green, red, maxMilis) {
     countdownBar.style.backgroundColor = "rgb(" + red.toFixed(0) + ", " + green.toFixed(0) + ", 0)";
 }
 
-function startCountdown(duration) {
+function startCountdown(duration, callback=null) {
     let countdownWrapper = document.getElementById("question-countdown-wrapper");
     if (countdownWrapper.classList.contains("d-none")) {
         countdownWrapper.classList.remove("d-none");
@@ -329,7 +329,12 @@ function startCountdown(duration) {
 
         if (secs >= duration) {
             stopCountdown();
-            wrongAnswer("Ikke mere tid");
+            if (callback != null) {
+                callback();
+            }
+            else {
+                wrongAnswer("Ikke mere tid");
+            }
         }
     }, delay);
 }
@@ -386,7 +391,13 @@ function questionAsked(countdownDelay) {
     setTimeout(function() {
         if (answeringPlayer == null) {
             hideAnswerIndicator();
-            startCountdown(TIME_FOR_BUZZING);
+            if (activeRound < 3) {
+                startCountdown(TIME_FOR_BUZZING);
+            }
+            else {
+                // Go to finale screen after countdown is finished if it's round 3
+                startCountdown(TIME_FOR_FINAL_ANSWER, () => window.location.href = getFinaleURL(activeQuestionId));
+            }
         }
     }, countdownDelay);
 
@@ -395,13 +406,6 @@ function questionAsked(countdownDelay) {
         window.onkeydown = function(e) {
             if (keyIsContestant(e.key)) {
                 playerBuzzedIn(CONTESTANT_KEYS.indexOf(e.key));
-            }
-        }
-    }
-    else {
-        window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
-                window.location.href = getFinaleURL(activeQuestionId);
             }
         }
     }
@@ -424,16 +428,15 @@ function showAnswerChoice(index) {
 }
 
 function afterShowQuestion() {
-    if (isQuestionMultipleChoice()) {
-        // If question is multiple-choice, show each choice one by one
-        window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
+    window.onkeydown = function(e) {
+        if (e.key == "NumLock") {
+            if (isQuestionMultipleChoice()) {
                 showAnswerChoice(0);
             }
+            else {
+                questionAsked(500);
+            }
         }
-    }
-    else {
-        questionAsked(500);
     }
 }
 
@@ -629,17 +632,17 @@ function resetUsedQuestions(button) {
 }
 
 function addPlayerDiv() {
-    let wrapper = document.getElementById("jeopardy-menu-contestants");
+    let wrapper = document.getElementById("menu-contestants");
 
     let div = document.createElement("div");
-    div.className = "jeopardy-contestant-entry";
+    div.className = "menu-contestant-entry";
 
     let nameInput = document.createElement("input");
-    nameInput.className = "jeopardy-contestant-name";
+    nameInput.className = "menu-contestant-name";
     nameInput.placeholder = "Navn";
 
     let colorInput = document.createElement("input");
-    colorInput.className = "jeopardy-contestant-color";
+    colorInput.className = "menu-contestant-color";
 
     let randRed = (Math.random() * 255).toString(16).split(".")[0];
     if (randRed == "0") {
@@ -658,7 +661,7 @@ function addPlayerDiv() {
     colorInput.value = `#${randRed}${randGreen}${randBlue}`;
 
     let deleteButton = document.createElement("button");
-    deleteButton.className = "jeopardy-contestant-delete";
+    deleteButton.className = "menu-contestant-delete";
     deleteButton.innerHTML = "&times;";
     deleteButton.onclick = () => wrapper.removeChild(div);
 
@@ -685,7 +688,7 @@ function showFinaleCategory(category) {
 
             window.onkeydown = function(e) {
                 if (e.key == "NumLock") {
-                    window.location.href = getQuestionURL(3, category, 1);
+                    window.location.href = getQuestionURL(3, category, 5);
                 }
             }
         }
@@ -693,43 +696,52 @@ function showFinaleCategory(category) {
 }
 
 function showFinaleResult() {
-    let wagerDescElems = document.getElementsByClassName("finale-wager-desc");
+    let wagerDescElems = document.getElementsByClassName("finale-result-desc");
     let wagerInputElems = document.getElementsByClassName("finale-wager-amount");
 
     function showNextResult(player) {
-        let playerElem = ldocument.getElementsByClassName("finale-wager-name").item(player);
-        playerElem.style.color = "#" + playerColors[player];
-        playerElem.classList.remove("d-none");
-        playerElem.style.opacity = 1;
-
-        if (player == playerNames.length - 1) {
-            setTimeout(function() {
-                let teaserElem = document.getElementById("endscreen-teaser");
-                teaserElem.style.opacity = 1;
-                teaserElem.classList.remove("d-none");
-            }, 1000);
+        if (player == 0) {
+            document.getElementById("finale-results-wrapper").style.opacity = 1;
         }
 
-        window.onkeydown = function(e) {
-            let descElem = wagerDescElems.item(player);
-            let amount = parseInt(wagerInputElems.item(player).value);
+        if (player == playerNames.length) {
+            let teaserElem = document.getElementById("endscreen-teaser");
+            teaserElem.style.opacity = 1;
 
-            if (e.key == 1) {
-                // Current player answered correctly
-                descElem.classList.add("wager-answer-correct");
-                descElem.textContent = `svarede rigtigt og vinder ${amount} GBP!`;
-            }
-            else if (e.key == 2) {
-                // Current player answered incorrectly
-                descElem.classList.add("wager-answer-wrong");
-                descElem.textContent = `svarede forkert og taber ${amount} GBP!`;
-            }
-            else if (e.key == "NumLock") {
-                if (i == playerNames.length) {
-                    window.location.href = getEndscreenURL();
+            setTimeout(function() {
+                window.location.href = getEndscreenURL();
+            }, 2000);
+        }
+        else {
+            let playerElem = document.getElementsByClassName("finale-result-name").item(player);
+            playerElem.style.color = "#" + playerColors[player];
+            playerElem.style.opacity = 1;
+    
+            window.onkeydown = function(e) {
+                let descElem = wagerDescElems.item(player);
+                let amount = parseInt(wagerInputElems.item(player).value);
+    
+                if (e.key == 1) {
+                    // Current player answered correctly
+                    descElem.style.opacity = 1;
+                    descElem.classList.add("wager-answer-correct");
+                    descElem.innerHTML = `svarede rigtigt og <strong>vinder ${amount} GBP</strong>!`;
+                    playerScores[player] += amount;
                 }
-                else {
-                    showNextResult(player + 1)
+                else if (e.key == 2) {
+                    // Current player answered incorrectly
+                    descElem.style.opacity = 1;
+                    descElem.classList.add("wager-answer-wrong");
+                    descElem.innerHTML = `svarede forkert og <strong>taber ${amount} GBP</strong>!`;
+                    playerScores[player] -= amount;
+                }
+                else if (e.key == "NumLock") {
+                    if (player == playerNames.length) {
+                        window.location.href = getEndscreenURL();
+                    }
+                    else {
+                        showNextResult(player + 1)
+                    }
                 }
             }
         }
@@ -742,7 +754,6 @@ function showFinaleResult() {
     }
 
     let answerElem = document.getElementById("finale-answer");
-    answerElem.classList.remove("d-none");
     answerElem.style.opacity = 1;
 }
 
@@ -755,7 +766,7 @@ function startWinnerParty() {
 
             overlay.classList.remove("d-none");
 
-            let colors = ["#1dd8267e", "#1d74d87e", "#c90f0f89", "#deb5117c"];
+            let colors = ["#1dd8265e", "#1d74d85e", "#c90f0f69", "#deb5115c"];
             let colorIndex = 0;
 
             let initialDelay = 320;
@@ -777,4 +788,46 @@ function startWinnerParty() {
             }, initialDelay);
         }
     }
+}
+
+function champOPGG() {
+    let tableRows = document.querySelector(".content > table").getElementsByTagName("tr");
+    let playedDict = {};
+
+    for (let i = 0; i < tableRows.length; i++) {
+        let row = tableRows.item(i);
+        let tdEntries = row.getElementsByTagName("td");
+        if (tdEntries.length == 0) {
+            continue;
+        }
+
+        let champName = tdEntries.item(1).getElementsByClassName("summoner-name").item(0).children[0].textContent;
+
+        let playedEntry = tdEntries.item(2);
+        let winRatioElem = playedEntry.getElementsByClassName("win-ratio");
+        if (winRatioElem.length == 0) {
+            playedDict[champName.replace('"', "").replace('"', "").trim()] = parseInt(playedEntry.textContent.replace("Played", ""));
+        }
+        else {
+            let played = 0;
+            let left = winRatioElem.item(0).getElementsByClassName("winratio-graph__text left");
+            if (left.length != 0) {
+                played += parseInt(left.item(0).textContent.replace("W", ""));
+            }
+            let right = winRatioElem.item(0).getElementsByClassName("winratio-graph__text right");
+            if (right.length != 0) {
+                played += parseInt(right.item(0).textContent.replace("L", ""));
+            }
+
+            playedDict[champName] = played;
+        }
+    }
+
+    return playedDict;
+}
+
+function mergeOPGG(stats) {
+    let playedDict = stuffs();
+    for (var champ in playedDict) { stats[champ] = playedDict[champ] + (stats[champ] || 0); }
+    return stats;
 }

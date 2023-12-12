@@ -80,11 +80,13 @@ h3 {
 
 #menu-wrapper > h2 {
     font-family: Impact;
-    color: #ff7800;
+    color: white;
 }
 
 #menu-wrapper > #logo-wrapper {
     margin-top: 260px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid white;
 }
 
 #menu-buttons {
@@ -92,7 +94,7 @@ h3 {
 }
 
 #menu-buttons > button {
-    background-color: rgb(232, 119, 20);
+    background-color: rgb(0, 88, 255);
     display: block;
     padding: 5px;
     margin: 0 auto;
@@ -262,6 +264,7 @@ h3 {
 }
 
 #selection-finale-header2 {
+    color: gold;
     font-weight: 1000;
     font-style: italic;
 }
@@ -270,18 +273,90 @@ h3 {
     font-size: 24px;
 }
 
-#finale-answer, .finale-wager-name, .finale-wager-desc, #endscreen-teaser {
+/****************##############****************\
+|                    FINALE                    |
+\****************##############****************/
+
+#finale-wrapper > #logo-wrapper {
+    width: 100%;
+}
+
+.wager-answer-correct {
+    color: rgb(31, 187, 31);
+}
+
+.wager-answer-wrong {
+    color: rgb(221, 17, 17);
+
+}
+
+#finale-category-header {
+    color: gold;
+}
+
+#finale-question-header {
+    font-style: italic;
+}
+
+#finale-wrapper > h4 {
+    font-size: 24px;
+    text-decoration: underline;
+    margin-bottom: 20px;
+}
+
+#finale-wagers-wrapper {
+    width: 250px;
+    max-width: 300px;
+    margin: 0 auto;
+    text-align: center;
+    background-color: #000000d6;
+    padding: 10px 20px;
+}
+
+#finale-results-wrapper {
+    width: 300px;
+    max-width: 350px;
+    margin: 0 auto;
+    text-align: left;
+    background-color: #000000d6;
+    border: 1px solid white;
     opacity: 0;
     transition: opacity 2s;
 }
 
-.wager-answer-correct {
-    background-color: rgb(31, 187, 31);
+.finale-wager-entry {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 10px;
+    margin-top: 10px;
 }
 
-.wager-answer-wrong {
-    background-color: rgb(221, 17, 17);
+.finale-wager-entry .finale-wager-name {
+    font-size: 20px;
+}
 
+.finale-wager-entry .finale-wager-amount {
+    width: 100px;
+    float: right;
+    font-size: 18px;
+}
+
+#finale-answer {
+    margin-top: 30px;
+}
+
+#finale-answer, .finale-result-name, .finale-result-desc, #endscreen-teaser {
+    opacity: 0;
+    transition: opacity 2s;
+}
+
+.finale-result-name {
+    padding-left: 30px;
+}
+
+#endscreen-teaser {
+    margin-top: 15px;
+    font-size: 30px;
 }
 
 /****************##############****************\

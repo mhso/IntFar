@@ -2,7 +2,7 @@
     {% if questions %}
     <title>LoL {{ round_name }}</title>
     {% elif question %}
-    <title>LoL {{ round_name }} - {{ question["name"] }} for {{ question_value }} GBP</title>
+    <title>LoL {{ round_name }} - {{ category_name }}{% if round < 3 %} for {{ question_value }} GBP{% endif %}</title>
     {% else %}
     <title>LoL Jeopardy!</title>
     {% endif %}
