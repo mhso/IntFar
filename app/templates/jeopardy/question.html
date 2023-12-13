@@ -10,7 +10,7 @@
             {% include 'jeopardy/logo.html' %}
 
             <!-- Category header -->
-            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if round < 3 %} til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}</h2>
+            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if round < 3 %}<br>til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}</h2>
 
             <!-- Question header -->
             {% if "question" in question %}
@@ -29,14 +29,19 @@
 
             <!-- Question video -->
             {% if "video" in question %}
+            {% if ".mp4" in question["video"] %}
+            {% set video_type = "mp4" %}
+            {% else %}
+            {% set video_type = "webm" %}
+            {% endif %}
             <div id="question-question-image-wrapper">
                 <video id="question-question-video" style="height: {{ question['height'] }}px;">
-                    <source src="{{ url_for('static', filename='img/jeopardy/' + question['video']) }}" type="video/webm">
+                    <source src="{{ url_for('static', filename='img/jeopardy/' + question['video']) }}" type="video/{{ video_type }}">
                 </video>
             </div>
             {% endif %}
 
-            <div id="question-wrapper-inner">
+            <div id="question-choices-wrapper">
                 <!-- Answer choices -->
                 {% if "choices" in question %}
                 {% for option in question["choices"] %}
@@ -57,13 +62,13 @@
 
             <!-- Correct answer -->
             <div id="question-answer-correct" class="d-none">
-                <div id="question-correct-reason">Korrekt! <span class="question-answer-value"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/happy_nono.png') }}"></div>
+                <div id="question-correct-reason">Korrekt!{% if "explanation" in question %} (question["explanation"]){% endif %} <span class="question-answer-value"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/happy_nono.png') }}"></div>
             </div>
 
             <!-- Wrong answer -->
             <div id="question-answer-wrong" class="d-none">
                 <div id="question-wrong-reason"><span id="question-wrong-reason-text"></span> <span class="question-answer-value"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/nat_fine.png') }}"></div>
-                <p id="question-actual-answer" class="d-none">Rigtige svar var '<span class="question-emph">{{ question["answer"] }}</span>'</p>
+                <p id="question-actual-answer" class="d-none">Rigtige svar var '<span class="question-emph">{{ question["answer"] }}{% if "explanation" in question %} (question["explanation"]){% endif %}</span>'</p>
             </div>
         </div>
     

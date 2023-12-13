@@ -7,6 +7,7 @@
         <div id="selection-wrapper">
             <!-- Logo -->
             {% include 'jeopardy/logo.html' %}
+            {% set first_round = round == 1 and player_turn == -1 %}
 
             <!-- Categories -->
             {% if round < 3 %}
@@ -19,7 +20,8 @@
                     </div>
                     {% for category_data in questions[category]["tiers"] %}
                     {% set final_value = category_data["value"] * round %}
-                    <div class="selection-question-box{% if not category_data['active'] %} inactive{% endif %}"{% if category_data['active'] %} onclick="goToQuestion(event.target, '{{ category }}', {{ loop.index }})"{% endif %}>
+                    <div class="selection-question-box{% if not category_data['active'] %} inactive{% endif %}"
+                    {% if category_data['active'] %}onclick="goToQuestion(event.target, '{{ category }}', {{ loop.index }})"{% endif %}>
                         <span>{{ final_value }}</span>
                     </div>
                     {% endfor %}
@@ -40,6 +42,11 @@
             <script>
                 showFinaleCategory('{{ categories[0] }}');
             </script>
+
+            <!-- Jeopardy theme music -->
+            <audio id="selection-jeopardy-theme">
+                <source src="{{ url_for('static', filename='img/jeopardy/jeopardy_theme.mp3') }}" type="audio/mpeg">
+            </audio>
             {% endif %}
 
             <!-- Contestants -->
@@ -48,7 +55,6 @@
     </body>
 
     <script>
-        setContestantTextColors();
         setVariables(
             {{ round }},
             {{ player_data | tojson }},
@@ -57,10 +63,13 @@
         );
 
         {% if round == 1 and player_turn == -1 %}
-        setTimeout(function() {
-            let turn = chooseStartingPlayer();
-            setPlayerTurn(turn, true);
-        }, 1000);
+        window.onkeydown = function(e) {
+            if (e.key == "NumLock") {
+                let turn = chooseStartingPlayer();
+                console.log(turn);
+                setPlayerTurn(turn, true);
+            }
+        };
         {% endif %}
     </script>
 </html>

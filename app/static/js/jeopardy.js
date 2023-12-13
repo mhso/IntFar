@@ -1,4 +1,4 @@
-const TIME_FOR_BUZZING = 5;
+const TIME_FOR_BUZZING = 8;
 const TIME_FOR_ANSWERING = 10;
 const TIME_FOR_WAGERING = 60;
 const TIME_FOR_FINAL_ANSWER = 30;
@@ -114,6 +114,44 @@ function afterQuestion() {
     }
 }
 
+function afterAnswer() {
+    // Reset who is answering
+    answeringPlayer = null;
+    setPlayerTurn(-1, false);
+
+    if (activeAnswer == null) {
+        return;
+    }
+
+    let videoElem = document.getElementById("question-question-video");
+
+    let delay = 4000;
+
+    // Immediately allow other players to buzz in
+    if (videoElem != null && !videoElem.ended) {
+        videoElem.onended = afterShowQuestion;
+
+        // Let players interrupt the video and buzz in early
+        window.onkeydown = function(e) {
+            if (keyIsContestant(e.key)) {
+                playerBuzzedIn(CONTESTANT_KEYS.indexOf(e.key));
+            }
+        }
+
+        setTimeout(function() {
+            // Resume playing video after a delay if no one has buzzed in
+            if (answeringPlayer == null) {
+                hideAnswerIndicator();
+                videoElem.play();
+                videoElem.onended = afterShowQuestion;
+            }
+        }, delay);
+    }
+    else {
+        questionAsked(delay);
+    }
+}
+
 function correctAnswer() {
     let elem = document.getElementById("question-answer-correct");
 
@@ -138,6 +176,7 @@ function correctAnswer() {
 
     // Move on to next question
     afterQuestion();
+    afterAnswer();
 }
 
 function wrongAnswer(reason) {
@@ -168,6 +207,7 @@ function wrongAnswer(reason) {
 
         afterQuestion();
     }
+    afterAnswer();
 }
 
 function hideAnswerIndicator() {
@@ -204,44 +244,6 @@ function isQuestionMultipleChoice() {
     return document.getElementsByClassName("question-answer-entry").length > 0;
 }
 
-function afterAnswer() {
-    // Reset who is answering
-    answeringPlayer = null;
-    setPlayerTurn(-1, false);
-
-    if (activeAnswer == null) {
-        return;
-    }
-
-    let videoElem = document.getElementById("question-question-video");
-
-    let delay = 4000;
-
-    // Immediately allow other players to buzz in
-    if (videoElem != null) {
-        videoElem.onended = afterShowQuestion;
-
-        // Let players interrupt the video and buzz in early
-        window.onkeydown = function(e) {
-            if (keyIsContestant(e.key)) {
-                playerBuzzedIn(CONTESTANT_KEYS.indexOf(e.key));
-            }
-        }
-
-        setTimeout(function() {
-            // Resume playing video after a delay if no one has buzzed in
-            if (answeringPlayer == null) {
-                hideAnswerIndicator();
-                videoElem.play();
-                videoElem.onended = afterShowQuestion;
-            }
-        }, delay);
-    }
-    else {
-        questionAsked(delay);
-    }
-}
-
 function answerQuestion(event) {
     if (keyIsNumeric(event.key, 1, 4)) {
         if (isQuestionMultipleChoice()) {
@@ -262,8 +264,6 @@ function answerQuestion(event) {
                     elem.classList.add("question-answered-wrong");
                     wrongAnswer("Forkert...");
                 }
-
-                afterAnswer();
             }, delay);
         }
         else {
@@ -273,8 +273,6 @@ function answerQuestion(event) {
             else {
                 wrongAnswer("Forkert...");
             }
-
-            afterAnswer();
         }
     }
 }
@@ -371,7 +369,7 @@ function playerBuzzedIn(player) {
 
     // Start new countdown for answering after small delay
     setTimeout(function() {
-        startCountdown(TIME_FOR_ANSWERING);
+        startCountdown(TIME_FOR_ANSWERING, () => wrongAnswer("Ikke mere tid"));
 
         // NumLock has to be pressed before an answer can be given (for safety)
         window.onkeydown = function(e) {
@@ -428,15 +426,15 @@ function showAnswerChoice(index) {
 }
 
 function afterShowQuestion() {
-    window.onkeydown = function(e) {
-        if (e.key == "NumLock") {
-            if (isQuestionMultipleChoice()) {
+    if (isQuestionMultipleChoice()) {
+        window.onkeydown = function(e) {
+            if (e.key == "NumLock") {
                 showAnswerChoice(0);
             }
-            else {
-                questionAsked(500);
-            }
         }
+    }
+    else {
+        questionAsked(500);
     }
 }
 
@@ -484,8 +482,18 @@ function showQuestion() {
             }
         }
         else {
-            imageElem.style.opacity = 1;
-            afterShowQuestion();
+            if (isQuestionMultipleChoice()) {
+                imageElem.style.opacity = 1;
+                afterShowQuestion();
+            }
+            else {
+                window.onkeydown = function(e) {
+                    if (e.key == "NumLock") {
+                        imageElem.style.opacity = 1;
+                        afterShowQuestion();
+                    }
+                }
+            }
         }
     }
     else {
@@ -525,6 +533,11 @@ function setVariables(round, playerData, turn, questionNum=null, answer=null, va
 }
 
 function goToQuestion(div, category, tier) {
+    if (activeRound == 1 && playerTurn == -1) {
+        alert("Choose a starting player first (you idiot)");
+        return;
+    }
+
     if (div.tagName == "SPAN") {
         div = div.parentElement;
     }
@@ -547,7 +560,7 @@ function goToQuestion(div, category, tier) {
 }
 
 function setContestantTextColors() {
-    let contestantEntries = document.getElementsByClassName("jeopardy-contestant-entry");
+    let contestantEntries = document.getElementsByClassName("footer-contestant-entry");
     for (let i = 0; i < contestantEntries.length; i++) {
         let bgColor = contestantEntries.item(i).style.backgroundColor;
         let split = bgColor.replace("rgb(", "").replace(")", "").split(",");
@@ -597,12 +610,17 @@ function chooseStartingPlayer() {
 
     showStartPlayerCandidate(0);
 
+    let questionBoxes = document.getElementsByClassName("selection-question-box");
+    for (let i = 0; i < questionBoxes.length; i++) {
+        questionBoxes.item(i).classList.remove("inactive");
+    }
+
     return player;
 }
 
 function beginJeopardy() {
-    let contestantNameElems = document.getElementsByClassName("jeopardy-contestant-name");
-    let contestantColorElems = document.getElementsByClassName("jeopardy-contestant-color");
+    let contestantNameElems = document.getElementsByClassName("menu-contestant-name");
+    let contestantColorElems = document.getElementsByClassName("menu-contestant-color");
 
     playerNames = [];
     playerColors = [];
@@ -637,9 +655,16 @@ function addPlayerDiv() {
     let div = document.createElement("div");
     div.className = "menu-contestant-entry";
 
+    let player = wrapper.children.length + 1;
+    let keyDesc = "";
+    if (player < CONTESTANT_KEYS.length + 1) {
+        let key = CONTESTANT_KEYS[player - 1].toUpperCase();
+        keyDesc = ` (${key})`;
+    }
+
     let nameInput = document.createElement("input");
     nameInput.className = "menu-contestant-name";
-    nameInput.placeholder = "Navn";
+    nameInput.placeholder = `Deltager ${player}${keyDesc}`;
 
     let colorInput = document.createElement("input");
     colorInput.className = "menu-contestant-color";
@@ -685,6 +710,10 @@ function showFinaleCategory(category) {
                 let header3 = document.getElementById("selection-finale-header3");
                 header3.style.setProperty("opacity", 1);
             }, 2000);
+
+            setTimeout(function() {
+                document.getElementById("selection-jeopardy-theme").play();
+            }, 3000);
 
             window.onkeydown = function(e) {
                 if (e.key == "NumLock") {
@@ -786,6 +815,16 @@ function startWinnerParty() {
                     }
                 }, intervalDelay);
             }, initialDelay);
+        }
+    }
+}
+
+function setVolume() {
+    for (let i = 1; i <= 10; i++) {
+        let className = "volume-" + i;
+        let elems = document.getElementsByClassName(className);
+        for (let i = 0; i < elems.length; i++) {
+            elems.item(i).volume = parseInt("0." + i);
         }
     }
 }

@@ -461,9 +461,10 @@ h3 {
     font-weight: bold;
 }
 
-#question-wrapper-inner {
+#question-choices-wrapper {
     margin: 0 auto;
     width: 650px;
+    margin-top: 20px;
 }
 
 #question-category-header, #question-question-header {
@@ -472,9 +473,9 @@ h3 {
 
 #question-category-header {
     color: white;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: league;
     font-size: 4rem;
-    margin-top: 80px;
+    margin-top: 65px;
     width: 900px;
 }
 
@@ -492,6 +493,7 @@ h3 {
 #question-category-span {
     font-weight: 1000;
     text-decoration: underline;
+    color: rgb(255, 45, 222);
 }
 
 #question-reward-span {

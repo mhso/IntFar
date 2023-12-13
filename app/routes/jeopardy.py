@@ -6,7 +6,7 @@ import flask
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
-TRACK_UNUSED = False
+TRACK_UNUSED = True
 QUESTIONS_PER_ROUND = 30
 ROUND_NAMES = [
     "Jeopardy!",
@@ -56,7 +56,7 @@ def reset_questions():
     for cat in used_questions:
         used_questions[cat] = [
             {"active": True, "used": []}
-            for _ in range(6)
+            for _ in range(5)
         ]
 
     with open(used_questions_file, "w", encoding="utf-8") as fp:
@@ -236,7 +236,7 @@ def active_jeopardy(jeopardy_round, question_num):
     if jeopardy_round < 3:
         for category in used_questions:
             for tier, info in enumerate(used_questions[category]):
-                questions_left = any(index not in info["used"] for index in questions[category]["tiers"][tier]["questions"])
+                questions_left = any(index not in info["used"] for index in range(len(questions[category]["tiers"][tier]["questions"])))
                 questions[category]["tiers"][tier]["active"] = (not TRACK_UNUSED or (info["active"] and questions_left))
 
         ordered_categories = [None] * 6
