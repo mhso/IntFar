@@ -153,13 +153,14 @@ h3 {
     margin-bottom: 15px;
 }
 
-.menu-contestant-name {
+.menu-contestant-id {
     width: 200px;
     text-align: left;
     font-size: 18px;
     color: black;
     padding: 5px;
     border: 2px solid white;
+    border-radius: 10px;
     height: 40px;
     vertical-align: top;
 }
@@ -374,7 +375,7 @@ h3 {
     flex-direction: row;
     justify-content: space-around;
     align-items: end;
-    height: 170px;
+    height: 160px;
     width: 600px;
     margin: 0 auto;
 }
@@ -382,6 +383,7 @@ h3 {
 .footer-contestant-entry {
     width: 200px;
     height: 60%;
+    position: relative;
     border: 2px solid black;
     border-bottom: none;
     margin: 0 5px;
@@ -390,7 +392,24 @@ h3 {
 }
 
 .footer-contestant-entry > p {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;
+}
+
+.footer-contestant-entry-name {
+    margin-top: 1.4rem;
+}
+
+.footer-contestant-entry-score {
+    font-size: 1.25rem;
+}
+
+.footer-contestant-entry-avatar {
+    width: 64px;
+    position: absolute;
+    top: -32px;
+    left: calc(50% - 32px);
+    border-radius: 32px;
+    border: solid 2px black;
 }
 
 
@@ -658,7 +677,35 @@ h3 {
 #endscreen-winner-desc {
     font-size: 30px;
     margin-top: 30px;
-    margin-bottom: 50px;
+    margin-bottom: 100px;
+}
+
+#endscreen-avatars-wrapper {
+    text-align: center;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.endscreen-avatars-entry {
+    display: inline-block;
+    position: relative;
+    margin-left: 20px;
+    margin-right: 20px;
+}
+
+.endscreen-crown {
+    position: absolute;
+    width: 160px;
+    left: calc(50% - 80px);
+    top: -90px;
+    z-index: 10;
+}
+
+.endscreen-avatar {
+    position: relative;
+    width: 120px;
+    border-radius: 60px;
 }
 
 #endscreen-scores-table {

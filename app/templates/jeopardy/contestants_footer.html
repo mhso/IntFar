@@ -4,6 +4,7 @@
         <div class="footer-contestant-entry" style="background-color: #{{ player_dict['color'] }};">
             <p class="footer-contestant-entry-name">{{ player_dict["name"] }}</p>
             <p class="footer-contestant-entry-score">{{ player_dict["score"] }} GBP</p>
+            <img class="footer-contestant-entry-avatar" src="{{ player_dict['avatar'] }}">
         </div>
         {% endfor %}
     </div>

@@ -6,7 +6,7 @@ import flask
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
-TRACK_UNUSED = True
+TRACK_UNUSED = False
 QUESTIONS_PER_ROUND = 30
 ROUND_NAMES = [
     "Jeopardy!",
@@ -14,6 +14,12 @@ ROUND_NAMES = [
     "Final Jeopardy!"
 ]
 FINALE_CATEGORY = "bois"
+PLAYER_NAMES = {
+    115142485579137029: "Dave",
+    172757468814770176: "Murt", 
+    331082926475182081: "Muds",
+    347489125877809155: "Nø"
+}
 
 jeopardy_page = flask.Blueprint("jeopardy", __name__, template_folder="templates")
 
@@ -23,24 +29,13 @@ def home():
     if logged_in_user != ADMIN_DISC_ID:
         return flask.abort(404)
 
-    return app_util.make_template_context("jeopardy/menu.html", 200)
+    player_data = [
+        {"id": str(disc_id), "name": PLAYER_NAMES[disc_id]}
+        for disc_id in PLAYER_NAMES
+    ]
 
-@jeopardy_page.route("/<jeopardy_round>/score")
-def scoreboard_view(jeopardy_round):
-    logged_in_user = app_util.get_user_details()[0]
-    if logged_in_user != ADMIN_DISC_ID:
-        return flask.abort(404)
+    return app_util.make_template_context("jeopardy/menu.html", 200, player_data=player_data)
 
-    contestants = flask.request.cookies.get("jeopardy_contestants", [])
-    scores = int(flask.request.cookies.get("jeopardy_scores", []))
-
-    return app_util.make_template_context(
-        "jeopardy_score.html",
-        200,
-        round=int(jeopardy_round),
-        contestants=contestants,
-        scores=scores
-    )
 
 @jeopardy_page.route("/reset_questions", methods=["POST"])
 def reset_questions():
@@ -67,15 +62,23 @@ def reset_questions():
 def get_player_data(request_args):
     player_data = []
 
-    max_players = 6
-    for index in range(1, max_players + 1):
-        name_key = f"p{index}"
+    for index in range(1, len(PLAYER_NAMES) + 1):
+        id_key = f"i{index}"
         score_key = f"s{index}"
         color_key = f"c{index}"
 
-        if name_key in request_args:
+        if id_key in request_args:
+            disc_id =  int(request_args[id_key])
+            avatar = app_util.discord_request(
+                "func", "get_discord_avatar", (disc_id, 128)
+            )
+            if avatar is not None:
+                avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
+
             player_data.append({
-                "name": request_args[name_key],
+                "id": str(disc_id),
+                "name": PLAYER_NAMES[disc_id],
+                "avatar": avatar,
                 "score": int(request_args[score_key]),
                 "color": request_args[color_key]
             })
@@ -288,8 +291,19 @@ def jeopardy_endscreen():
     # Game over! Go to endscreen
     player_data.sort(key=lambda x: x["score"], reverse=True)
 
+    avatar = app_util.discord_request("func", "get_discord_avatar", data["id"])
+    if avatar is not None:
+        avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
+
+    avatars = [avatar]
     ties = 0
     for index, data in enumerate(player_data[1:], start=1):
+        avatar = app_util.discord_request("func", "get_discord_avatar", data["id"])
+        if avatar is not None:
+            avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
+
+        avatars.append(avatar)
+
         if player_data[index-1]["score"] > data["score"]:
             break
 
@@ -307,16 +321,19 @@ def jeopardy_endscreen():
 
     elif ties > 1:
         players_tied = ", ".join(
-            f'<span style="color: #{data["color"]}">{data["name"]}</span>' for data in player_data[:ties-1]
+            f'<span style="color: #{data["color"]}">{data["name"]}</span>' for data in player_data[:ties]
         ) + f', og <span style="color: #{player_data[ties]["color"]}">{player_data[ties]["name"]}</span>'
 
         winner_desc = (
             f"{players_tied} har alle lige mange point! De har alle sammen vundet!!!"
         )
 
+    app_util.discord_request("announce_jeopardy_winner", (player_data,))
+
     all_data = {
         "player_data": player_data,
-        "winner_desc": winner_desc
+        "winner_desc": winner_desc,
+        "winner_avatars": avatars
     }
 
     return app_util.make_template_context("jeopardy/endscreen.html", **all_data)

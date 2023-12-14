@@ -1431,6 +1431,18 @@ class DiscordClient(discord.Client):
             if game_monitor.should_stop_polling(guild_id):
                 game_monitor.stop_polling(guild_id)
 
+    async def get_role(self, role_name, guild_id):
+        """
+        Find a Discord role in the given guild.
+        """
+        guild = self.get_guild(guild_id)
+
+        for guild_role in guild.roles:
+            if guild_role.name == role_name:
+                return guild_role
+            
+        return None
+
     async def remove_intfar_role(self, intfar_id, role_id):
         """
         Find the Int-Far of the Month Discord role for a user and remove it.
@@ -1486,12 +1498,7 @@ class DiscordClient(discord.Client):
         color = discord.Color.from_rgb(*colors[prev_month-1])
         role_name = f"Int-Far of the Month ({game}) - {month_name}"
 
-        role = None
-        for guild_role in nibs_guild.roles:
-            # Check if role already exists.
-            if guild_role.name == role_name:
-                role = guild_role
-                break
+        role = self.get_role(role_name, nibs_guild)
 
         if role is None:
             role = await nibs_guild.create_role(name=role_name, colour=color)
@@ -1580,6 +1587,55 @@ class DiscordClient(discord.Client):
 
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
         asyncio.create_task(self.polling_loop())
+
+    async def announce_jeopardy_winner(self, player_data):
+        ties = 0
+        for index, data in enumerate(player_data[1:], start=1):
+            if player_data[index-1]["score"] > data["score"]:
+                break
+
+        ties += 1
+
+        if ties == 0:
+            mention = self.get_mention_str(player_data[0]["id"])
+            winner_desc = (
+                f"{mention} is the winner of the *2023 LoL Jeopardy Bonanza* with **{player_data[0]['score']} points**!!! "
+                "All hail the king :crown:\n"
+                "They get a special badge of honor on Discord and wins a **1350 RP** skin!"
+            )
+
+        elif ties == 1:
+            mention_1 = self.get_mention_str(player_data[0]["id"])
+            mention_2 = self.get_mention_str(player_data[1]["id"])
+            winner_desc = (
+                f"{mention_1} and {mention_2} both won the *2023 LoL Jeopardy Bonanza* with "
+                f"**{player_data[0]['score']} points**!!!\n"
+                "They both get a special badge of honor on Discord and win a **975 RP** skin!"
+            )
+
+        elif ties > 1:
+            players_tied = ", ".join(
+                self.get_mention_str(data["id"]) for data in player_data[:ties]
+            ) + self.get_mention_str(player_data[ties]["id"])
+            winner_desc = (
+                f"{players_tied} all got the same score (with **{player_data[0]['score']} points**) "
+                "in the *2023 LoL Jeopardy Bonanza*!!!\n"
+                "They all get a special badge of honor on Discord and all win a **975 RP** skin!"
+            )
+
+        # Hand out a special badge to the winner(s)
+        guild = self.get_guild(api_util.GUILD_MAP["core"])
+        role = self.get_role("Jeopardy Master", api_util.GUILD_MAP["core"])
+        if role is not None:
+            for data in player_data[:ties+1]:
+                member = guild.get_member(data["id"])
+                if member is not None:
+                    await member.add_roles(role)
+
+        channel_id = 512363920044982274 if self.config.env == "dev" else 808796236692848650
+        channel = guild.get_channel(channel_id)
+
+        await channel.send(winner_desc)
 
     async def send_error_msg(self, guild_id):
         """

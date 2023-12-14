@@ -13,9 +13,11 @@ var activeValue;
 var answeringPlayer = null;
 var activePlayers = [];
 var questionAnswered = false;
+let chosenPlayers = [];
+let menuPlayerData;
 
 let playerTurn = 0;
-var playerNames = [];
+var playerIds = [];
 let playerColors = [];
 var playerScores = [];
 
@@ -26,8 +28,8 @@ function getBaseURL() {
 function getQueryParams() {
     // Encode player information and turns into URL query strings
     let playerNameQueries = new Array();
-    playerNames.forEach((name, index) => {
-        playerNameQueries.push(`p${index+1}=${encodeURIComponent(name)}`);
+    playerIds.forEach((name, index) => {
+        playerNameQueries.push(`i${index+1}=${encodeURIComponent(name)}`);
     });
     let namesQueryStr = playerNameQueries.join("&");
 
@@ -439,7 +441,7 @@ function afterShowQuestion() {
 }
 
 function showQuestion() {
-    for (let i = 0; i < playerNames.length; i++) {
+    for (let i = 0; i < playerIds.length; i++) {
         activePlayers.push(true);
     }
 
@@ -521,7 +523,7 @@ function scaleAnswerChoices() {
 function setVariables(round, playerData, turn, questionNum=null, answer=null, value=null, questionId=null) {
     activeRound = round;
     playerData.forEach((data) => {
-        playerNames.push(data["name"]);
+        playerIds.push(data["id"]);
         playerScores.push(data["score"]);
         playerColors.push(data["color"]);
     });
@@ -619,16 +621,16 @@ function chooseStartingPlayer() {
 }
 
 function beginJeopardy() {
-    let contestantNameElems = document.getElementsByClassName("menu-contestant-name");
+    let contestantIdElems = document.getElementsByClassName("menu-contestant-id");
     let contestantColorElems = document.getElementsByClassName("menu-contestant-color");
 
-    playerNames = [];
+    playerIds = [];
     playerColors = [];
     playerScores = [];
     playerTurn = -1;
 
-    for (let i = 0; i < contestantNameElems.length; i++) {
-        playerNames.push(contestantNameElems.item(i).value);
+    for (let i = 0; i < contestantIdElems.length; i++) {
+        playerIds.push(contestantIdElems.item(i).value);
         playerColors.push(contestantColorElems.item(i).value.replace("#", ""));
         playerScores.push(0);
     }
@@ -662,9 +664,32 @@ function addPlayerDiv() {
         keyDesc = ` (${key})`;
     }
 
-    let nameInput = document.createElement("input");
-    nameInput.className = "menu-contestant-name";
-    nameInput.placeholder = `Deltager ${player}${keyDesc}`;
+    let nameSelect = document.createElement("select");
+    nameSelect.className = "menu-contestant-id";
+    for (let i = 0; i < menuPlayerData.length; i++) {
+        if (chosenPlayers.includes(menuPlayerData[i]["id"])) {
+            continue;
+        }
+
+        let idOption = document.createElement("option");
+        idOption.textContent = menuPlayerData[i]["name"];
+        idOption.value = menuPlayerData[i]["id"];
+        idOption.onclick = () => chosenPlayers.push(menuPlayerData[i]["id"]);
+
+        nameSelect.appendChild(idOption);
+    }
+
+    let placeholderOption = document.createElement("option");
+    placeholderOption.textContent = `Deltager ${player}${keyDesc}`;
+    placeholderOption.selected = true;
+    nameSelect.appendChild(placeholderOption);
+
+    nameSelect.onclick = () => {
+        try {
+            nameSelect.removeChild(placeholderOption)
+        }
+        catch {}
+    }
 
     let colorInput = document.createElement("input");
     colorInput.className = "menu-contestant-color";
@@ -688,9 +713,12 @@ function addPlayerDiv() {
     let deleteButton = document.createElement("button");
     deleteButton.className = "menu-contestant-delete";
     deleteButton.innerHTML = "&times;";
-    deleteButton.onclick = () => wrapper.removeChild(div);
+    deleteButton.onclick = () => {
+        wrapper.removeChild(div);
+        chosenPlayers.pop(chosenPlayers.indexOf(nameSelect.value));
+    }
 
-    div.appendChild(nameInput);
+    div.appendChild(nameSelect);
     div.appendChild(colorInput);
     div.appendChild(deleteButton);
 
@@ -733,7 +761,7 @@ function showFinaleResult() {
             document.getElementById("finale-results-wrapper").style.opacity = 1;
         }
 
-        if (player == playerNames.length) {
+        if (player == playerIds.length) {
             let teaserElem = document.getElementById("endscreen-teaser");
             teaserElem.style.opacity = 1;
 
@@ -765,7 +793,7 @@ function showFinaleResult() {
                     playerScores[player] -= amount;
                 }
                 else if (e.key == "NumLock") {
-                    if (player == playerNames.length) {
+                    if (player == playerIds.length) {
                         window.location.href = getEndscreenURL();
                     }
                     else {
@@ -820,11 +848,11 @@ function startWinnerParty() {
 }
 
 function setVolume() {
-    for (let i = 1; i <= 10; i++) {
-        let className = "volume-" + i;
+    for (let volume = 1; volume <= 10; volume++) {
+        let className = "volume-" + volume;
         let elems = document.getElementsByClassName(className);
         for (let i = 0; i < elems.length; i++) {
-            elems.item(i).volume = parseInt("0." + i);
+            elems.item(i).volume = parseFloat("0." + volume);
         }
     }
 }

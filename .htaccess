@@ -1,1 +1,2 @@
 ErrorDocument 404 /intfar/index.php
+AddType video/webm .webm

@@ -16,7 +16,7 @@
                 <button onclick="addPlayerDiv();">Tilføj Deltager</button>
                 <button onclick="resetUsedQuestions(this);">Reset Spørgsmål</button>
             </div>
-            
+
             <img id="menu-naafiri" src="{{ url_for('static', filename='img/naafiri_dance.gif') }}">
             <img id="menu-alistar" src="{{ url_for('static', filename='img/alistar_dance.gif') }}">
             <img id="menu-teemo" src="{{ url_for('static', filename='img/teemo_dance.gif') }}">
@@ -31,5 +31,6 @@
                 beginJeopardy();
             }
         }
+        menuPlayerData = {{ player_data | tojson }};
     </script>
 </html>

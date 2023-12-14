@@ -17,6 +17,14 @@
                 {{ winner_desc }}
                 {% endautoescape %}
             </p>
+            <div id="endscreen-avatars-wrapper">
+                {% for avatar in winner_avatars %}
+                <div class="endscreen-avatars-entry">
+                    <img src="{{ url_for('static', filename='img/jeopardy/crown.png') }}" class="endscreen-crown">
+                    <img src="{{ avatar }}" class="endscreen-avatar">
+                </div>
+                {% endfor %}
+            </div>
 
             <!-- Scores table -->
             <h2>Final Scorez</h2>
@@ -35,8 +43,8 @@
         </div>
 
         <!-- I LOVE LEAGUE OF LEGENDS! -->
-        <audio id="endscreen-sound">
-            <source src="{{ url_for('static', filename='sounds/league.mp3') }}" type="audio/mpeg" class="volume-5">
+        <audio id="endscreen-sound" class="volume-3">
+            <source src="{{ url_for('static', filename='sounds/league.mp3') }}" type="audio/mpeg">
         </audio>
 
         <!-- Shooting Star celebratory music -->

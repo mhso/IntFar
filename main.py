@@ -151,11 +151,7 @@ def main():
             break
 
         except KeyboardInterrupt:
-            proxy_manager.close()
             logger.info("Stopping bot...")
-            if bot_process.is_alive():
-                bot_process.kill()
-            flask_process.kill()
             break
 
 if __name__ == "__main__":

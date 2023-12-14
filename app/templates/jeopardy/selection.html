@@ -70,6 +70,8 @@
                 setPlayerTurn(turn, true);
             }
         };
+        {% else %}
+        setPlayerTurn({{ player_turn }});
         {% endif %}
     </script>
 </html>
