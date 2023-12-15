@@ -1,7 +1,9 @@
 The Gang: Mundo, Jarvan, LeBlanc, Draven, Rakan
+Bilgewater: Gangplank, Graves, Twisted Fate, Miss Fortune, Pyke
 Taunt Team: Shen, Rammus, Galio, Jhin, Senna
 Wombo Combo: Malphite, Sejuani, Yasuo, Fortune, Amumu
 Freljord: Volibear, Sejuani, Lissandra, Ashe, Braum
 Noxus: Urgot, Sion, LeBlanc, Draven, Swain
 Demacia: Garen, Jarvan, Lux, Lucian, Sona
 Ionia: Kennen, Lee, Irelia, Jhin, Karma
+All In: Malphite, Rell, Yone, Ezreal, Rakan
