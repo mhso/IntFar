@@ -6,7 +6,9 @@ import flask
 import app.util as app_util
 import api.util as api_util
 import api.lan as lan_api
+from api.game_data import get_formatted_stat_names, get_formatted_stat_value
 from api.awards import get_doinks_reasons, get_intfar_reasons
+from api.user import User
 
 lan_page = flask.Blueprint("lan", __name__, template_folder="templates")
 
@@ -56,20 +58,18 @@ def get_test_active_data():
 
     active_game = "CLASSIC"
     enemy_champs = [15, 421, 45, 10, 432]
-    users_in_game = [
-        (115142485579137029, 223),
-        (172757468814770176, 35),
-        (267401734513491969, 517),
-        (331082926475182081, 221),
-        (347489125877809155, 888)
-    ]
-    game_prediction = 53
+    users_in_game = {
+        115142485579137029: User(115142485579137029, None, champ_id=223),
+        172757468814770176: User(172757468814770176, None, champ_id=35),
+        267401734513491969: User(267401734513491969, None, champ_id=517),
+        331082926475182081: User(331082926475182081, None, champ_id=221),
+        347489125877809155: User(347489125877809155, None, champ_id=888),
+    }
     blue_side = True
 
     return {
         "users_in_game": users_in_game,
         "enemy_champs": enemy_champs,
-        "chance_to_win": game_prediction,
         "blue_side": blue_side,
         "active_game": active_game
     }
@@ -116,8 +116,8 @@ def get_active_game_data(face_images, lan_info):
     champ_faces = get_champ_faces(game_data["users_in_game"], face_images)
 
     our_champs_imgs = [
-        (flask.url_for("static", filename=riot_api.get_champ_splash_path(user_data[-1]).replace("app/static/", "")),) + face_data
-        for user_data, face_data in zip(game_data["users_in_game"], champ_faces)
+        (flask.url_for("static", filename=riot_api.get_champ_splash_path(game_data["users_in_game"][disc_id]["champ_id"]).replace("app/static/", "")),) + face_data
+        for disc_id, face_data in zip(game_data["users_in_game"], champ_faces)
     ]
     enemy_champs_imgs = [
         (flask.url_for("static", filename=riot_api.get_champ_splash_path(champ_id).replace("app/static/", "")),) + face_data
@@ -251,9 +251,7 @@ def get_data(lan_info):
                 if disc_id not in all_player_stats:
                     all_player_stats[disc_id] = []
 
-                fmt_value = str(int(avg_value)) if stat in ("damage", "gold") else f"{avg_value:.2f}"
-                if stat == "kp":
-                    fmt_value += "%"
+                fmt_value = get_formatted_stat_value(_GAME, stat, avg_value)
 
                 all_player_stats[disc_id].append(fmt_value)
 
@@ -277,8 +275,9 @@ def get_data(lan_info):
         ]
         all_player_stats.sort(key=lambda x: x[0])
         all_player_stats = [x[1:] for x in all_player_stats]
+        formatted_stat_names_dict = get_formatted_stat_names(_GAME)
         stat_names = [
-            stat.upper() if stat in ("kda", "kp", "cs") else " ".join(map(lambda s: s.capitalize(), stat.split("_")))
+            formatted_stat_names_dict[stat]
             for stat in all_avg_stats
         ]
 

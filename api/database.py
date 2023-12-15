@@ -2110,9 +2110,16 @@ class Database(SQLiteDatabase):
         stats_copy = list(stats)
 
         if disc_id is None and "disc_id" not in stats:
-            stats.insert(1, "disc_id")
+            if stats_copy[0] == "game_id":
+                stats.insert(1, "disc_id")
+                stats_copy.insert(1, "disc_id")
+            else:
+                stats.insert(0, "disc_id")
+                stats_copy.insert(0, "disc_id")
 
-        if stats_copy[1] == "disc_id":
+        if stats_copy[0] == "disc_id":
+            stats_copy[0] = "p.disc_id"
+        elif stats_copy[1] == "disc_id":
             stats_copy[1] = "p.disc_id"
 
         try:

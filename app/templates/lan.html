@@ -29,7 +29,7 @@
                 <p id="lan-duration">We have been banging for: <span class="lan-emph">{{ duration_since_start }}</span></p>
                 <p id="lan-games-played">Games played: <span class="lan-emph">{{ games_played }}</span></p>
                 <p id="lan-games-won">Win/Loss: <span class="lan-emph">{{ games_won }} - {{ games_lost }}</span> (<span class="lan-emph">{{ pct_won }}%</span>)</p>
-                <p id="lan-game-results">Track record: {% for win in game_results %}{% if win %}<span class="lan-won lan-emph">W</span>{% else %}<span class="lan-lost lan-emph">L</span>{% endif %}{% endfor %}</p>
+                <p id="lan-game-results">Track record: {% for win in game_results %}{% if win == 1 %}<span class="lan-won lan-emph">W</span>{% else %}<span class="lan-lost lan-emph">L</span>{% endif %}{% endfor %}</p>
                 <p id="lan-longest-game">Longest game: <span class="lan-emph">{{ longest_game }}</span></p>
                 <p id="lan-intfars">Int-Fars awarded: <span class="lan-emph">{{ intfars }}</span></p>
                 <p id="lan-doinks">Doinks awarded: <span class="lan-emph">{{ doinks }}</span></p>
