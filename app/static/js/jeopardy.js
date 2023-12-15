@@ -1,5 +1,5 @@
 const TIME_FOR_BUZZING = 8;
-const TIME_FOR_ANSWERING = 10;
+const TIME_FOR_ANSWERING = 6;
 const TIME_FOR_WAGERING = 60;
 const TIME_FOR_FINAL_ANSWER = 30;
 const CONTESTANT_KEYS = ["z",  "q", "p", "m"]

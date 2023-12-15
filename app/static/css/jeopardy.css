@@ -231,7 +231,7 @@ h3 {
 }
 
 .selection-question-box.inactive {
-    background-color: gray;
+    background-color: #5d5d5d;
     cursor: default;
     color: black;
 }
@@ -344,6 +344,7 @@ h3 {
 
 #finale-answer {
     margin-top: 30px;
+    font-size: 3rem;
 }
 
 #finale-answer, .finale-result-name, .finale-result-desc, #endscreen-teaser {
@@ -456,6 +457,11 @@ h3 {
     height: 1px;
     border-top: 2px solid white;
     margin: 20px auto;
+}
+
+#question-choices-indicator {
+    height: 48px;
+    vertical-align: baseline;
 }
 
 #question-answer-wrong, #question-answer-correct {

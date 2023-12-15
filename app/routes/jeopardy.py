@@ -337,7 +337,7 @@ def jeopardy_endscreen():
             f"{players_tied} har alle lige mange point! De har alle sammen vundet!!!"
         )
 
-    #app_util.discord_request("func", "announce_jeopardy_winner", (player_data,))
+    app_util.discord_request("func", "announce_jeopardy_winner", (player_data,))
 
     all_data = {
         "player_data": player_data,

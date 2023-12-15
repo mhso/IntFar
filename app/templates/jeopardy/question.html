@@ -10,7 +10,7 @@
             {% include 'jeopardy/logo.html' %}
 
             <!-- Category header -->
-            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if round < 3 %}<br>til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}</h2>
+            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if round < 3 %}<br>til <span id="question-reward-span">{{ question_value }} GBP</span>{% if "choices" in question %} <img src="{{ url_for('static', filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
 
             <!-- Question header -->
             {% if "question" in question %}
@@ -35,7 +35,7 @@
             {% set video_type = "webm" %}
             {% endif %}
             <div id="question-question-image-wrapper">
-                <video id="question-question-video" style="height: {{ question['height'] }}px;">
+                <video id="question-question-video" style="height: {{ question['height'] }}px;"{% if 'volume' in question %} class="volume-{{ question['volume'] }}"{% endif %}>
                     <source src="{{ url_for('static', filename='img/jeopardy/' + question['video']) }}" type="video/{{ video_type }}">
                 </video>
             </div>
