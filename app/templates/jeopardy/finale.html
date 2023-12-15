@@ -47,6 +47,7 @@
 
         window.onkeydown = function(e) {
             if (e.key == "NumLock") {
+                document.activeElement.blur();
                 showFinaleResult();
             }
         }

@@ -70,7 +70,7 @@
                 setPlayerTurn(turn, true);
             }
         };
-        {% else %}
+        {% elif round < 3 %}
         setPlayerTurn({{ player_turn }});
         {% endif %}
     </script>

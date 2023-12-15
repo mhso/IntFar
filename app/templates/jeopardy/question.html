@@ -62,13 +62,13 @@
 
             <!-- Correct answer -->
             <div id="question-answer-correct" class="d-none">
-                <div id="question-correct-reason">Korrekt!{% if "explanation" in question %} (question["explanation"]){% endif %} <span class="question-answer-value"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/happy_nono.png') }}"></div>
+                <div id="question-correct-reason">Korrekt!{% if "explanation" in question %} ({{ question["explanation"] }}){% endif %} <img class="question-result-avatar" src="{{ url_for('static', filename='img/happy_nono.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', filename='img/gbp_coin.png') }}"></div>
             </div>
 
             <!-- Wrong answer -->
             <div id="question-answer-wrong" class="d-none">
-                <div id="question-wrong-reason"><span id="question-wrong-reason-text"></span> <span class="question-answer-value"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/nat_fine.png') }}"></div>
-                <p id="question-actual-answer" class="d-none">Rigtige svar var '<span class="question-emph">{{ question["answer"] }}{% if "explanation" in question %} (question["explanation"]){% endif %}</span>'</p>
+                <div id="question-wrong-reason"><span id="question-wrong-reason-text"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/nat_fine.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', filename='img/gbp_coin.png') }}"></div>
+                <p id="question-actual-answer" class="d-none">Rigtige svar var '<span class="question-emph">{{ question["answer"] }}{% if "explanation" in question %} ({{ question["explanation"] }}){% endif %}</span>'</p>
             </div>
         </div>
     
@@ -96,7 +96,7 @@
             {{ round }},
             {{ player_data | tojson }},
             {{ player_turn }},
-            null,
+            {{ question_num }},
             "{{ question['answer'] }}",
             {{ question_value }},
             {{ question['id'] }}

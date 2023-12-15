@@ -1431,7 +1431,7 @@ class DiscordClient(discord.Client):
             if game_monitor.should_stop_polling(guild_id):
                 game_monitor.stop_polling(guild_id)
 
-    async def get_role(self, role_name, guild_id):
+    def get_role(self, role_name, guild_id):
         """
         Find a Discord role in the given guild.
         """
@@ -1594,7 +1594,7 @@ class DiscordClient(discord.Client):
             if player_data[index-1]["score"] > data["score"]:
                 break
 
-        ties += 1
+            ties += 1
 
         if ties == 0:
             mention = self.get_mention_str(player_data[0]["id"])
@@ -1624,8 +1624,9 @@ class DiscordClient(discord.Client):
             )
 
         # Hand out a special badge to the winner(s)
-        guild = self.get_guild(api_util.GUILD_MAP["core"])
-        role = self.get_role("Jeopardy Master", api_util.GUILD_MAP["core"])
+        guild_id = api_util.MY_GUILD_ID if self.config.env == "dev" else api_util.GUILD_MAP["core"]
+        guild = self.get_guild(guild_id)
+        role = self.get_role("Jeopardy Master", guild_id)
         if role is not None:
             for data in player_data[:ties+1]:
                 member = guild.get_member(data["id"])

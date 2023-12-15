@@ -6,7 +6,6 @@ const CONTESTANT_KEYS = ["z",  "q", "p", "m"]
 
 var countdownInterval;
 var activeRound;
-var activeQuestionNum;
 var activeQuestionId;
 var activeAnswer;
 var activeValue;
@@ -17,6 +16,7 @@ let chosenPlayers = [];
 let menuPlayerData;
 
 let playerTurn = 0;
+var questionNum = 0;
 var playerIds = [];
 let playerColors = [];
 var playerScores = [];
@@ -45,11 +45,11 @@ function getQueryParams() {
     });
     let colorsQueryStr = playerColorQueries.join("&");
 
-    return `${namesQueryStr}&${scoresQueryStr}&${colorsQueryStr}&turn=${playerTurn}`
+    return `${namesQueryStr}&${scoresQueryStr}&${colorsQueryStr}&turn=${playerTurn}&question=${questionNum}`
 }
 
-function getSelectionURL(round, question) {
-    return `${getBaseURL()}/intfar/jeopardy/${round}/${question}?${getQueryParams()}`;
+function getSelectionURL(round) {
+    return `${getBaseURL()}/intfar/jeopardy/${round}?${getQueryParams()}`;
 }
 
 function getQuestionURL(round, category, difficulty) {
@@ -111,7 +111,8 @@ function afterQuestion() {
     activeAnswer = null;
     window.onkeydown = function(e) {
         if (e.key == "NumLock") {
-            window.location.href = getSelectionURL(activeRound, activeQuestionNum + 1);
+            questionNum += 1;
+            window.location.href = getSelectionURL(activeRound);
         }
     }
 }
@@ -154,11 +155,22 @@ function afterAnswer() {
     }
 }
 
+function updatePlayerScore(player, delta) {
+    playerScores[player] += delta;
+    let scoreElem = document.getElementsByClassName("footer-contestant-entry-score").item(player);
+    scoreElem.textContent = `${playerScores[player]} GBP`;
+}
+
 function correctAnswer() {
     let elem = document.getElementById("question-answer-correct");
 
     let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
-    valueElem.textContent = "(+" + activeValue + " GBP)";
+    valueElem.textContent = "+" + activeValue;
+
+    let coinElem = elem.getElementsByClassName("question-result-gbp").item(0);
+    if (coinElem.classList.contains("d-none")) {
+        coinElem.classList.remove("d-none");
+    }
 
     revealAnswerImageIfPresent();
 
@@ -169,7 +181,7 @@ function correctAnswer() {
     }, 100);
 
     // Add value to player score
-    playerScores[answeringPlayer] += activeValue;
+    updatePlayerScore(answeringPlayer, activeValue);
 
     if (playerTurn != answeringPlayer) {
         // Set player as having the turn, if they didn't already
@@ -196,8 +208,13 @@ function wrongAnswer(reason) {
     if (answeringPlayer != null) {
         // Deduct points from player if someone buzzed in
         let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
-        valueElem.textContent = "(-" + activeValue + " GBP)";
-        playerScores[answeringPlayer] -= activeValue;
+        valueElem.textContent = "-" + activeValue;
+        updatePlayerScore(answeringPlayer, -activeValue);
+
+        let coinElem = elem.getElementsByClassName("question-result-gbp").item(0);
+        if (coinElem.classList.contains("d-none")) {
+            coinElem.classList.remove("d-none");
+        }
     }
 
     if (activePlayers.every((v) => !v) || (reason == "Ikke mere tid" && answeringPlayer == null)) {
@@ -520,7 +537,7 @@ function scaleAnswerChoices() {
     }
 }
 
-function setVariables(round, playerData, turn, questionNum=null, answer=null, value=null, questionId=null) {
+function setVariables(round, playerData, turn, question, answer=null, value=null, questionId=null) {
     activeRound = round;
     playerData.forEach((data) => {
         playerIds.push(data["id"]);
@@ -528,7 +545,7 @@ function setVariables(round, playerData, turn, questionNum=null, answer=null, va
         playerColors.push(data["color"]);
     });
     playerTurn = turn;
-    activeQuestionNum = questionNum;
+    questionNum = question;
     activeAnswer = answer;
     activeValue = value;
     activeQuestionId = questionId;
@@ -635,7 +652,7 @@ function beginJeopardy() {
         playerScores.push(0);
     }
 
-    window.location.href = getSelectionURL(1, 0);
+    window.location.href = getSelectionURL(1);
 }
 
 function resetUsedQuestions(button) {

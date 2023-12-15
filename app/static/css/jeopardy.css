@@ -223,7 +223,7 @@ h3 {
     font-size: 1.8rem;
     margin: 12px 0;
     height: 100px;
-    line-height: 88px;
+    line-height: 86px;
     font-weight: 800;
     border-radius: 10px;
     cursor: pointer;
@@ -462,8 +462,14 @@ h3 {
     font-size: 2.5rem;
     text-align: center;
     transition: opacity 1.5s;
-    margin-top: 20px;
+    margin-top: 10px;
     opacity: 0;
+}
+
+.question-result-gbp {
+    width: 45px;
+    vertical-align: sub;
+    margin-left: 4px;
 }
 
 #question-wrong-reason {
@@ -526,12 +532,12 @@ h3 {
     text-align: center;
     margin: 0 auto;
     margin-top: 20px;
-    margin-bottom: 30px;
+    margin-bottom: 10px;
 }
 
 #question-question-image, #question-answer-image {
     display: block;
-    height: 100px;
+    height: 120px;
     opacity: 0;
     transition: opacity 1.5s;
     margin: 0 auto;

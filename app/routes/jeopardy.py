@@ -6,7 +6,7 @@ import flask
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
-TRACK_UNUSED = False
+TRACK_UNUSED = True
 QUESTIONS_PER_ROUND = 30
 ROUND_NAMES = [
     "Jeopardy!",
@@ -88,7 +88,12 @@ def get_player_data(request_args):
     except ValueError:
         player_turn = -1
 
-    return player_data, player_turn
+    try:
+        question_num = int(request_args["question"])
+    except ValueError:
+        question_num = 0
+
+    return player_data, player_turn, question_num
 
 @jeopardy_page.route("/<jeopardy_round>/<category>/<tier>")
 def question_view(jeopardy_round, category, tier):
@@ -177,11 +182,12 @@ def question_view(jeopardy_round, category, tier):
     ]
 
     # Get player names and scores from query parameters
-    player_data, player_turn = get_player_data(flask.request.args)
+    player_data, player_turn, question_num = get_player_data(flask.request.args)
 
     all_data = {
         "round": jeopardy_round,
         "round_name": ROUND_NAMES[jeopardy_round-1],
+        "question_num": question_num,
         "category_name": questions[category]["name"],
         "question": question,
         "player_data": player_data,
@@ -192,17 +198,16 @@ def question_view(jeopardy_round, category, tier):
 
     return app_util.make_template_context("jeopardy/question.html", **all_data)
 
-@jeopardy_page.route("/<jeopardy_round>/<question_num>")
-def active_jeopardy(jeopardy_round, question_num):
+@jeopardy_page.route("/<jeopardy_round>")
+def active_jeopardy(jeopardy_round):
     logged_in_user = app_util.get_user_details()[0]
     if logged_in_user != ADMIN_DISC_ID:
         return flask.abort(404)
 
     jeopardy_round = int(jeopardy_round)
-    question_num = int(question_num)
 
     # Get player names and scores from query parameters
-    player_data, player_turn = get_player_data(flask.request.args)
+    player_data, player_turn, question_num = get_player_data(flask.request.args)
 
     if question_num == QUESTIONS_PER_ROUND:
         # Round 1 done, onwards to next one
@@ -230,11 +235,15 @@ def active_jeopardy(jeopardy_round, question_num):
     with open(used_questions_file, encoding="utf-8") as fp:
         used_questions = json.load(fp)
 
-    if jeopardy_round == 1 and question_num == 0:
-        # If it's the first round, set all categories to active
+    if jeopardy_round < 3 and question_num == 0:
+        # If it's the first question of a round, set all categories to active
         for category in used_questions:
             for tier_info in used_questions[category]:
                 tier_info["active"] = True
+
+        if TRACK_UNUSED:
+            with open(used_questions_file, "w", encoding="utf-8") as fp:
+                json.dump(used_questions, fp, indent=4)
 
     if jeopardy_round < 3:
         for category in used_questions:
@@ -291,21 +300,21 @@ def jeopardy_endscreen():
     # Game over! Go to endscreen
     player_data.sort(key=lambda x: x["score"], reverse=True)
 
-    avatar = app_util.discord_request("func", "get_discord_avatar", data["id"])
+    avatar = app_util.discord_request("func", "get_discord_avatar", player_data[0]["id"])
     if avatar is not None:
         avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
     avatars = [avatar]
     ties = 0
     for index, data in enumerate(player_data[1:], start=1):
+        if player_data[index-1]["score"] > data["score"]:
+            break
+
         avatar = app_util.discord_request("func", "get_discord_avatar", data["id"])
         if avatar is not None:
             avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
         avatars.append(avatar)
-
-        if player_data[index-1]["score"] > data["score"]:
-            break
 
         ties += 1
 
@@ -328,7 +337,7 @@ def jeopardy_endscreen():
             f"{players_tied} har alle lige mange point! De har alle sammen vundet!!!"
         )
 
-    app_util.discord_request("announce_jeopardy_winner", (player_data,))
+    #app_util.discord_request("func", "announce_jeopardy_winner", (player_data,))
 
     all_data = {
         "player_data": player_data,
