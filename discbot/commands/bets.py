@@ -34,9 +34,10 @@ def get_bet_params(client, args):
 
     game = args[0]
     if game not in api_util.SUPPORTED_GAMES:
-        raise ValueError("You need to supply a valid game to place the bet on.")
-
-    index = 1
+        game = client.database.DEFAULT_GAME
+        index = 0
+    else:
+        index = 1
 
     while index < len(args):
         event = args[index+1]

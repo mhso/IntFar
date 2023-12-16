@@ -117,10 +117,10 @@ class Command:
 
     async def parse_args(self, client, message, args):
         author_id = message.author.id
-        user_is_registered = client.database.user_exists(None, author_id)
+        user = client.database.all_users.get(author_id)
 
         # If command requires user to be registered, and he is not, send error msg.
-        if not user_is_registered and self.access_level == "all":
+        if user is None and self.access_level == "all":
             await message.channel.send(
                 "You must be registered to Int-Far:tm: to use this command."
             )
@@ -139,7 +139,7 @@ class Command:
                 )
 
                 # If we are targetting ourselves, but are not registered, send an error msg.
-                if not user_is_registered and self.access_level == "self" and value == author_id:
+                if user is None and self.access_level == "self" and value == author_id:
                     await message.channel.send(
                         "You must be registered to Int-Far:tm: " +
                         "to target yourself with this command."
@@ -165,16 +165,22 @@ class Command:
 
             elif isinstance(param, GameParam):
                 if index >= len(args):
-                    parsed_args.append(None)
+                    parsed_args.append(user.default_game)
                     continue
 
                 if args[index] not in SUPPORTED_GAMES:
-                    valid_games = ", ".join(f"`{game}`" for game in SUPPORTED_GAMES)
-                    await message.channel.send(
-                        f"Invalid game '{args[index]}'. This command targets a specific "
-                        f"game which should be one of: {valid_games}."
-                    )
-                    return None
+                    # If no game is supplied, but it was mandatory, show an error
+                    if param in self.mandatory_params:
+                        valid_games = ", ".join(f"`{game}`" for game in SUPPORTED_GAMES)
+                        await message.channel.send(
+                            f"Invalid game '{args[index]}'. This command targets a specific "
+                            f"game which should be one of: {valid_games}."
+                        )
+                        return None
+
+                    # Otherwise, if game is an optional parameter, add the users default game
+                    parsed_args.append(user.default_game)
+                    continue
 
                 parsed_args.append(args[index])
                 index += 1
@@ -348,7 +354,7 @@ def initialize_commands():
     stats_name = "stats"
     stats_desc = "Show a list of available stat keywords to check."
     register_command(
-        stats_name, stats_desc, handle_stats_msg, mandatory_params=[GameParam("game")]
+        stats_name, stats_desc, handle_stats_msg, optional_params=[GameParam("game")]
     )
 
     # intfar command.
@@ -363,8 +369,7 @@ def initialize_commands():
         handle_intfar_msg,
         True, 
         "self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")]
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # intfar relations command.
@@ -375,8 +380,7 @@ def initialize_commands():
         intfar_relations_desc,
         handle_intfar_relations_msg,
         access_level="self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")]
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # intfar criteria command
@@ -389,8 +393,7 @@ def initialize_commands():
         intfar_criteria_name,
         intfar_criteria_desc,
         handle_intfar_criteria_msg,
-        mandatory_params=[GameParam("game")],
-        optional_params=[RegularParam("criteria")]
+        optional_params=[GameParam("game"), RegularParam("criteria")]
     )
 
     # doinks command
@@ -405,8 +408,7 @@ def initialize_commands():
         handle_doinks_msg,
         True,
         "self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")]
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # doinks relations command.
@@ -417,8 +419,7 @@ def initialize_commands():
         doinks_relations_desc,
         handle_doinks_relations_msg,
         access_level="self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")]
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # doinks criteria command
@@ -428,7 +429,7 @@ def initialize_commands():
         doinks_criteria_name,
         doinks_criteria_desc,
         handle_doinks_criteria_msg,
-        mandatory_params=[GameParam("game")],
+        optional_params=[GameParam("game")],
     )
 
     # match history command
@@ -441,8 +442,7 @@ def initialize_commands():
         match_history_desc,
         handle_match_history_msg,
         access_level="self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")],
+        optional_params=[GameParam("game"), TargetParam("person")],
     )
 
     # average command
@@ -461,8 +461,8 @@ def initialize_commands():
         handle_average_msg,
         True,
         "self",
-        mandatory_params=[GameParam("game"), RegularParam("stat")],
-        optional_params=[PlayedParam("champion_or_map"), TargetParam("person")],
+        mandatory_params=[RegularParam("stat")],
+        optional_params=[GameParam("game"), PlayedParam("champion_or_map"), TargetParam("person")],
         aliases=["avg"]
     )
 
@@ -474,8 +474,8 @@ def initialize_commands():
         "Fx. `!best lol kda` shows how many times you had the best KDA in a LoL game. " +
         "`!best [game] [stat] all` shows what the best ever was for that stat, and who got it."
     )
-    async def stats_best_wrapper(client, message, game, stat, target_id):
-        await handle_stat_msg(client, message, game, True, stat, target_id)
+    async def stats_best_wrapper(client, message, stat, game, target_id):
+        await handle_stat_msg(client, message, True, game, stat, target_id)
 
     register_command(
         best_name,
@@ -483,8 +483,8 @@ def initialize_commands():
         stats_best_wrapper,
         True,
         "self",
-        mandatory_params=[GameParam("game"), RegularParam("stat")],
-        optional_params=[TargetParam("person")],
+        mandatory_params=[RegularParam("stat")],
+        optional_params=[GameParam("game"), TargetParam("person")],
         aliases=["most", "highest"]
     )
 
@@ -497,8 +497,8 @@ def initialize_commands():
         "`!worst [game] [stat] all` shows what the worst ever was for that stat, and who got it."
     )
 
-    async def stats_worst_wrapper(client, message, game, stat, target_id):
-        await handle_stat_msg(client, message, game, False, stat, target_id)
+    async def stats_worst_wrapper(client, message, stat, game, target_id):
+        await handle_stat_msg(client, message, False, game, stat, target_id)
 
     register_command(
         worst_name,
@@ -506,8 +506,8 @@ def initialize_commands():
         stats_worst_wrapper,
         True,
         "self",
-        mandatory_params=[GameParam("game"), RegularParam("stat")],
-        optional_params=[TargetParam("person")],
+        mandatory_params=[RegularParam("stat")],
+        optional_params=[GameParam("game"), TargetParam("person")],
         aliases=["least", "lowest", "fewest"]
     )
 
@@ -523,7 +523,7 @@ def initialize_commands():
         status_name,
         status_desc,
         handle_status_msg,
-        mandatory_params=[GameParam("game")]
+        optional_params=[GameParam("game")]
     )
 
     # game command
@@ -533,7 +533,8 @@ def initialize_commands():
         game_name,
         game_desc,
         handle_game_msg,
-        mandatory_params=[GameParam("game"), TargetParam("person")]
+        mandatory_params=[TargetParam("person")],
+        optional_params=[GameParam("game")]
     )
 
     # betting command
@@ -568,8 +569,8 @@ def initialize_commands():
         cancel_bet_desc,
         handle_cancel_bet_msg,
         access_level="all",
-        mandatory_params=[GameParam("game"), RegularParam("event/ticket")],
-        optional_params=[TargetParam("person", None)]
+        mandatory_params=[RegularParam("event/ticket")],
+        optional_params=[GameParam("game"), TargetParam("person", None)]
     )
 
     # give command
@@ -1047,6 +1048,16 @@ def initialize_commands():
         "all",
         optional_params=[TargetParam("person")],
         guilds=[GUILD_MAP["core"]]
+    )
+
+    default_game_name = "default_game"
+    default_game_desc = "Set your prefered default game for use with commands."
+    register_command(
+        default_game_name,
+        default_game_desc,
+        handle_default_game_msg,
+        access_level="all",
+        mandatory_params=[GameParam("game")]
     )
 
     # ===== CUTE COMMANDS =====

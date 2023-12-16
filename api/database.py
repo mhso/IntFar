@@ -11,6 +11,8 @@ from api.game_data import get_stat_quantity_descriptions
 from api.user import User
 from api.util import TimeZone, generate_user_secret, SUPPORTED_GAMES
 
+DEFAULT_GAME = "lol"
+
 class DBException(OperationalError, ProgrammingError):
     def __init__(self, *args):
         super().__init__(args)
@@ -56,14 +58,22 @@ class Database(SQLiteDatabase):
 
     def user_exists(self, game, discord_id):
         if game is None:
-            return any(discord_id in self.users_by_game[game] for game in self.users_by_game.keys())
+            return discord_id in self.all_users
 
         return discord_id in self.users_by_game[game]
 
     def get_base_users(self):
-        query = "SELECT disc_id, secret FROM users"
+        query = """
+            SELECT
+                u.disc_id,
+                u.secret,
+                dg.default_game
+            FROM users AS u
+            INNER JOIN default_game AS dg
+            ON dg.disc_id = u.disc_id
+        """
         with self:
-            return {x[0]: User(x[0], x[1]) for x in self.execute_query(query).fetchall()}
+            return {x[0]: User(x[0], x[1], default_game=x[2] or DEFAULT_GAME) for x in self.execute_query(query).fetchall()}
 
     def get_all_registered_users(self, game, *extra_params):
         users_table = self._get_users_table(game)
@@ -196,6 +206,14 @@ class Database(SQLiteDatabase):
             self.execute_query(query, disc_id)
 
         del self.users_by_game[game][disc_id]
+
+    def set_default_game(self, disc_id, game):
+        with self:
+            self.all_users[disc_id]["default_game"] = game
+            self.all_users[disc_id].default_game = game
+
+            query = "REPLACE INTO default_game VALUES (?, ?)"
+            self.execute_query(query, disc_id, game)
 
     def discord_id_from_ingame_info(self, game, exact_match=True, **search_params):
         matches = []

@@ -1,7 +1,7 @@
 from datetime import datetime
 from api.game_data import get_stat_quantity_descriptions
 
-TESTING = True
+TESTING = False
 
 class LANInfo:
     def __init__(self, start_time, end_time, participants, guild_id):
@@ -39,18 +39,6 @@ if not TESTING:
         "september_23": LANInfo(
             datetime(2023, 9, 9, 14, 0, 0).timestamp(),
             datetime(2023, 9, 10, 18, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "december_23": LANInfo(
-            datetime(2023, 12, 16, 10, 0, 0).timestamp(),
-            datetime(2023, 12, 17, 6, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",

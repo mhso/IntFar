@@ -1,12 +1,15 @@
 ADMIN_DISC_ID = 267401734513491969
 
-COMMANDS = {} # Defined in commands/__init__.py
+COMMANDS = {} # Instantiated in commands/__init__.py
 
-CUTE_COMMANDS = {} # Also defined in commands/__init__.py
+CUTE_COMMANDS = {} # Also instantiated in commands/__init__.py
 
-ADMIN_COMMANDS = {} # You guessed it, defined in commands/__init__.py
+ADMIN_COMMANDS = {} # You guessed it, instantiated in commands/__init__.py
 
 def valid_command(message, cmd, args):
+    """
+    Check if a command, with the given arguments, appear valid.
+    """
     if cmd in ADMIN_COMMANDS:
         return message.author.id == ADMIN_DISC_ID, False
 

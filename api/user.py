@@ -1,10 +1,11 @@
 class User(dict):
-    def __init__(self, disc_id: int, secret: str, ingame_name: list[str]=None, ingame_id: list[str]=None, **extra_params):
+    def __init__(self, disc_id: int, secret: str, ingame_name: list[str]=None, ingame_id: list[str]=None, default_game=None, **extra_params):
         all_params = {
             "disc_id": disc_id,
             "secret": secret,
             "ingame_name": ingame_name,
-            "ingame_id": ingame_id
+            "ingame_id": ingame_id,
+            "default_game": default_game
         }
         all_params.update(extra_params)
 

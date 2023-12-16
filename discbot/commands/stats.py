@@ -126,7 +126,7 @@ async def handle_average_msg_cs2(client, message, stat, map_id=None, disc_id=Non
 
     await message.channel.send(client.insert_emotes(response))
 
-async def handle_average_msg(client, message, game, stat, champ_or_map=None, disc_id=None):
+async def handle_average_msg(client, message, stat, game, champ_or_map=None, disc_id=None):
     quantity_descs = get_stat_quantity_descriptions(game)
     if stat not in quantity_descs: # Check if the requested stat is a valid stat.
         emote = "{emote_carole_fucking_baskin}"
@@ -154,7 +154,7 @@ def get_game_summary(client, game, game_id, target_id, guild_id):
     )[0]
     return game_stats.get_finished_game_summary(target_id)
 
-async def handle_stat_msg(client, message, game, best, stat, target_id):
+async def handle_stat_msg(client, message, best, game, stat, target_id):
     """
     Get the highest or lowest value of the requested stat for the given player
     and write it to Discord. If target_id is None, instead gets the highest/lowest

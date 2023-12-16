@@ -221,3 +221,7 @@ CREATE TABLE [command_queue] (
     [arguments] NVARCHAR(128) NOT NULL,
     [result] NVARCHAR(128) NULL
 );
+CREATE TABLE [default_game] (
+    [disc_id] INTEGER NOT NULL,
+    [game] NVARCHAR(64) NULL
+);
