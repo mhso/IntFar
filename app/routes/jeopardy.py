@@ -346,3 +346,21 @@ def jeopardy_endscreen():
     }
 
     return app_util.make_template_context("jeopardy/endscreen.html", **all_data)
+
+@jeopardy_page.route("/cheatsheet")
+def answers():
+    if (
+        flask.request.authorization is None
+        or (password := flask.request.authorization.parameters.get("password")) is None
+        or password != flask.current_app.config["APP_CONFIG"].jeopardy_cheetsheet_pass
+    ):
+        response = app_util.make_text_response("Wrong password", 401)
+        response.headers.add("WWW-Authenticate", "Basic")
+        return response
+
+    questions_file = "app/static/jeopardy_questions.json"
+
+    with open(questions_file, encoding="utf-8") as fp:
+        questions = json.load(fp)
+
+    return app_util.make_template_context("jeopardy/cheat_sheet.html", questions=questions)

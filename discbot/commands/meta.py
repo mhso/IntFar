@@ -281,10 +281,16 @@ async def handle_verify_msg(client, message):
         await message.channel.send(
             "Error: DM Message could not be sent for some reason ;( Try again!"
         )
-async def handle_default_game_msg(client, message, game):
-    client.database.set_default_game(message.author.id, game)
-    game_name = api_util.SUPPORTED_GAMES[game]
 
-    response = f"Your default game is now set to *{game_name}*"
+async def handle_default_game_msg(client, message, game=None):
+    if game is None:
+        game = client.database.all_users[message.author.id].default_game
+        game_name = api_util.SUPPORTED_GAMES[game]
+        response = f"Your default game is *{game_name}*"
 
-    await message.channel.send(client.insert_emotes(response))
+    else:
+        client.database.set_default_game(message.author.id, game)
+        game_name = api_util.SUPPORTED_GAMES[game]
+        response = f"Your default game is now set to *{game_name}*"
+
+    await message.channel.send(response)

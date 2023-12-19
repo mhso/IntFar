@@ -82,6 +82,7 @@
     </audio>
 
     <!-- Correct/wrong answers sounds -->
+    {% if round < 3 %}
     {% for sound_list in sounds %}
     {% set correct_sound = loop.first %}
     {% for sound_file in sound_list %}
@@ -90,6 +91,11 @@
     </audio>
     {% endfor %}
     {% endfor %}
+    {% else %}
+    <audio id="question-finale-suspense">
+        <source src="{{ url_for('static', filename='img/jeopardy/supsense.mp3 ') }}" type="audio/mpeg">
+    </audio>
+    {% endif %}
 
     <script>
         setVariables(

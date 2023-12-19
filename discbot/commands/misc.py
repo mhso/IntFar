@@ -5,7 +5,6 @@ import requests
 from mhooge_flask.logging import logger
 
 from api import util as api_util
-from api import game_stats
 from api.game_data import get_stat_parser
 from discbot.commands import util as commands_util
 
@@ -14,7 +13,7 @@ FLIRT_MESSAGES = {
     "spanish": api_util.load_flavor_texts("flirt_spanish")
 }
 
-async def handle_game_msg(client, message, game, target_id):
+async def handle_game_msg(client, message, target_id, game):
     ingame_ids = None
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
@@ -278,7 +277,7 @@ async def handle_performance_msg(client, message, game, target_id=None):
 
     await message.channel.send(response)
 
-async def handle_winrate_msg(client, message, game, champ_or_map, target_id):
+async def handle_winrate_msg(client, message, champ_or_map, game, target_id):
     winrate = None
     games = None
     qualified_name = None

@@ -12,6 +12,7 @@ class Config:
         self.discord_token = auth["discordToken"]
         self.riot_key = auth["riotDevKey"] if self.use_dev_token else auth["riotAPIKey"]
         self.youtube_key = auth["youtubeAPIKey"]
+        self.jeopardy_cheetsheet_pass = auth["jeopardyCheatsheetPassword"]
         self.steam_2fa_code = None
         self.steam_key = auth["steamAPIKey"]
         self.steam_secrets = auth["steamSecrets"]

@@ -86,8 +86,9 @@ class PlayedParam:
         return self.name
 
 class GameParam:
-    def __init__(self, name):
+    def __init__(self, name, allow_default=True):
         self.name = name
+        self.allow_default = allow_default
 
     def __str__(self):
         return self.name
@@ -165,7 +166,8 @@ class Command:
 
             elif isinstance(param, GameParam):
                 if index >= len(args):
-                    parsed_args.append(user.default_game)
+                    game_value = user.default_game if param.allow_default else None
+                    parsed_args.append(game_value)
                     continue
 
                 if args[index] not in SUPPORTED_GAMES:
@@ -178,8 +180,8 @@ class Command:
                         )
                         return None
 
-                    # Otherwise, if game is an optional parameter, add the users default game
-                    parsed_args.append(user.default_game)
+                    game_value = user.default_game if param.allow_default else None
+                    parsed_args.append(game_value)
                     continue
 
                 parsed_args.append(args[index])
@@ -327,7 +329,7 @@ def initialize_commands():
         users_name,
         users_desc,
         handle_users_msg,
-        optional_params=[GameParam("game")]
+        optional_params=[GameParam("game", allow_default=False)]
     )
 
     # help command
@@ -593,7 +595,7 @@ def initialize_commands():
         handle_active_bets_msg,
         True,
         "self",
-        optional_params=[GameParam("game"), TargetParam("person")]
+        optional_params=[GameParam("game", allow_default=False), TargetParam("person")]
     )
 
     # bets command
@@ -604,8 +606,7 @@ def initialize_commands():
         bets_desc,
         handle_all_bets_msg,
         access_level="self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")]
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # betting tokens command
@@ -632,8 +633,8 @@ def initialize_commands():
         bet_return_disc,
         handle_bet_return_msg,
         access_level="self",
-        mandatory_params=[GameParam("game"), RegularParam("event")],
-        optional_params=[TargetParam("person", None)]
+        mandatory_params=[RegularParam("event")],
+        optional_params=[GameParam("game"), TargetParam("person", None)]
     )
 
     # website command
@@ -652,8 +653,7 @@ def initialize_commands():
         website_profile_desc,
         handle_profile_msg,
         access_level="self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")]
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # website verify command
@@ -703,8 +703,7 @@ def initialize_commands():
         doinks_sound_desc,
         doinks_sound_wrapper,
         access_level="all",
-        mandatory_params=[GameParam("game")],
-        optional_params=[RegularParam("sound")]
+        optional_params=[GameParam("game"), RegularParam("sound")]
     )
 
     # intfar sound command
@@ -718,8 +717,7 @@ def initialize_commands():
         intfar_sound_desc,
         intfar_sound_wrapper,
         access_level="all",
-        mandatory_params=[GameParam("game")],
-        optional_params=[RegularParam("sound")]
+        optional_params=[GameParam("game"), RegularParam("sound")]
     )
 
     # play command
@@ -968,8 +966,7 @@ def initialize_commands():
         summary_desc,
         handle_summary_msg,
         access_level="self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")]
+        optional_params=[GameParam("game"), TargetParam("person")]
     )
 
     # performance command
@@ -983,8 +980,7 @@ def initialize_commands():
         handle_performance_msg,
         True,
         "self",
-        mandatory_params=[GameParam("game")],
-        optional_params=[TargetParam("person")],
+        optional_params=[GameParam("game"), TargetParam("person")],
         aliases=["penis"]
     )
 
@@ -1000,8 +996,8 @@ def initialize_commands():
         wr_desc,
         handle_winrate_msg,
         access_level="self",
-        mandatory_params=[GameParam("game"), RegularParam("champion_or_map")],
-        optional_params=[TargetParam("person")],
+        mandatory_params=[RegularParam("champion_or_map")],
+        optional_params=[GameParam("game"), TargetParam("person")],
         aliases=["winrate"]
     )
 
@@ -1057,7 +1053,7 @@ def initialize_commands():
         default_game_desc,
         handle_default_game_msg,
         access_level="all",
-        mandatory_params=[GameParam("game")]
+        optional_params=[GameParam("game", allow_default=False)]
     )
 
     # ===== CUTE COMMANDS =====

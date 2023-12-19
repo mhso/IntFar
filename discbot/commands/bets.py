@@ -105,7 +105,7 @@ async def handle_make_bet_msg(client, message, game, amounts, events, targets):
 
     await message.channel.send(response)
 
-async def handle_cancel_bet_msg(client, message, game, betting_event, target_id=None):
+async def handle_cancel_bet_msg(client, message, betting_event, game, target_id=None):
     target_name = (
         None if target_id is None
         else client.get_discord_nick(target_id, message.guild.id)
@@ -300,7 +300,7 @@ async def handle_token_balance_msg(client, message, target_id):
 
     await message.channel.send(response)
 
-async def handle_bet_return_msg(client, message, game, betting_event, target_id=None):
+async def handle_bet_return_msg(client, message, betting_event, game, target_id=None):
     target_name = (
         None if target_id is None
         else client.get_discord_nick(target_id, message.guild.id)

@@ -401,6 +401,9 @@ class LoLAwardQualifiers(AwardQualifiers):
                         victim_list.append(person_with_quadra)
                         stolen_penta_victims[disc_id] = victim_list
 
+            # Check whether we invaded at the start of the game
+            
+
         if biggest_gold_deficit > self.config.timeline_min_deficit and game_win: # Epic comeback!
             timeline_events.append((0, biggest_gold_deficit, None))
         elif biggest_gold_lead > self.config.timeline_min_lead and not game_win: # Huge throw...

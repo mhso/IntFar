@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+</head>
+<body>
+    {% for category in questions %}
+    <div class="accordion">
+        <button onclick="toggleAccordion(event);">{{ questions[category]["name"] }}</button>
+        <div>
+            {% for tier in questions[category]["tiers"] %}
+            <div class="accordion">
+                <button onclick="toggleAccordion(event);">{{ tier["value"] }}</button>
+                <div>
+                    <ol>
+                        {% for question in tier["questions"] %}
+                        <li><span class="question">{{ question["question"] }}</span>: <span class="answer">{{ question["answer"] }}</span></li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</body>
+<script>
+    function toggleAccordion(e) {
+        let parent = e.target.parentElement;
+        parent.classList.add("active");
+        let div = parent.children[1];
+        div.style.display = div.style.display == "block" ? "none" : "block";
+    }
+</script>
+<style>
+    .accordion {
+        width: 100vw;
+        max-width: 350px;
+        padding: 20px;
+        margin: 5px;
+    }
+
+    .accordion > div {
+        display: none;
+    }
+
+    .answer {
+        font-weight: 800;
+    }
+
+    li {
+        margin-bottom: 8px;
+    }
+</style>
+</html>

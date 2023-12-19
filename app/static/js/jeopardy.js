@@ -413,6 +413,7 @@ function questionAsked(countdownDelay) {
             }
             else {
                 // Go to finale screen after countdown is finished if it's round 3
+                document.getElementById("question-finale-suspense").play();
                 startCountdown(TIME_FOR_FINAL_ANSWER, () => window.location.href = getFinaleURL(activeQuestionId));
             }
         }

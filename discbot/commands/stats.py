@@ -213,7 +213,7 @@ async def handle_stat_msg(client, message, best, game, stat, target_id):
             if stat == "first_blood":
                 quant = "most" if best else "least"
                 response = f"The person who has gotten first blood the {quant} "
-                response += f"is {recepient} with **{min_or_max_value}** games out of **{game_count}** games played "
+                response += f"is {recepient} with **{min_or_max_value}** games"
                 response += client.insert_emotes(emote_to_use)
             else:
                 response = f"The {readable_stat} ever in a game was **{min_or_max_value}** "
@@ -250,7 +250,7 @@ async def handle_stat_msg(client, message, best, game, stat, target_id):
     else:
         emote = "{emote_carole_fucking_baskin}"
         response = f"Not a valid stat: '{stat}' {emote}. See `!stats` for a list of valid stats."
-        await message.channel.send(response)
+        await message.channel.send(client.insert_emotes(response))
         return
 
 async def handle_match_history_msg(client, message, game, target_id=None):

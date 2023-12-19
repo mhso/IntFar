@@ -67,9 +67,9 @@ class Database(SQLiteDatabase):
             SELECT
                 u.disc_id,
                 u.secret,
-                dg.default_game
+                dg.game
             FROM users AS u
-            INNER JOIN default_game AS dg
+            LEFT JOIN default_game AS dg
             ON dg.disc_id = u.disc_id
         """
         with self:
@@ -350,13 +350,25 @@ class Database(SQLiteDatabase):
                 SELECT
                     {player_select}
                     Count(DISTINCT g.game_id) AS c,
+                    games.c AS games,
                     NULL AS extreme,
                     NULL AS game_id
                 FROM {games_table} AS g
-                JOIN {stats_table} AS p
+                INNER JOIN {stats_table} AS p
                 ON p.game_id = g.game_id
+                AND p.disc_id = g.first_blood
                 INNER JOIN {users_table} AS u
                 ON u.disc_id = p.disc_id
+                INNER JOIN (
+                    SELECT
+                        COUNT(*) AS c,
+                        p.disc_id
+                    FROM {games_table} AS g
+                    INNER JOIN {stats_table} AS p
+                    ON p.game_id = g.game_id
+                    GROUP BY p.disc_id
+                ) AS games
+                ON games.disc_id = u.disc_id
                 WHERE
                     u.active = 1
                     {player_condition}
@@ -1290,7 +1302,7 @@ class Database(SQLiteDatabase):
             result = self.execute_query(query, *params).fetchall()
 
             if return_top_n == 1:
-                result = result[0]
+                result = None if result == [] else result[0]
 
             if result is None and min_games == 10:
                 # If no champs are found with min 10 games, try again with 5.

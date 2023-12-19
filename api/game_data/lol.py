@@ -49,7 +49,9 @@ class LoLPlayerStats(PlayerStats):
             vision_wards=("most", "fewest"),
             vision_score=("highest", "lowest"),
             steals=("most", "least"),
+            first_blood=("most", "fewest")
         )
+
         return stat_quantities
 
     @classmethod
