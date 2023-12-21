@@ -107,13 +107,13 @@ h3 {
     transition: background-color 1s;
 }
 
-#menu-teemo, #menu-ivern, #menu-alistar, #menu-naafiri {
+#menu-wrapper > img {
     position: absolute;
     pointer-events: none;
 }
 
 #menu-quinn {
-    position: fixed;
+    position: fixed !important;
     top: -35px;
     width: 350px;
     left: calc(50% - 175px);
@@ -137,10 +137,21 @@ h3 {
     right: 100px
 }
 
+#menu-brand {
+    top: 0px;
+    right: -600px;
+}
+
 #menu-naafiri {
-    top: 200px;
+    left: -600px;
+    top: 100px;
     width: 1000px;
-    left: -320px
+}
+
+#menu-nidalee {
+    top: 350px;
+    left: 20px;
+    width: 50%;
 }
 
 #menu-contestants {
@@ -240,6 +251,7 @@ h3 {
     background-color: rgb(15, 12, 118);
     width: 10vw;
     text-align: center;
+    padding: 0 5px;
 }
 
 .selection-category-header > span, .selection-question-box > span {
@@ -452,6 +464,13 @@ h3 {
     right: 30px;
 }
 
+#question-wager-input {
+    font-size: 20px;
+    border: 2px solid black;
+    border-radius: 5px;
+    margin-top: 5px;
+}
+
 .question-divider {
     width: 400px;
     height: 1px;
@@ -575,7 +594,7 @@ h3 {
 .question-answer-entry {
     width: 47.5%;
     display: inline-block;
-    margin: 1%;
+    margin: 1% 0.5%;
     height: 60px;
     background-color: #2e28f2;
     border-radius: 10px;

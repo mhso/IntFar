@@ -14,10 +14,10 @@
             <div id="sounds-sort-wrapper">
                 <img id="sounds-sort-ascending" class="sounds-sort-order-button" src="{{ url_for('static', filename='img/arrow_down_2.png') }}">
                 <img id="sounds-sort-descending" class="sounds-sort-order-button" src="{{ url_for('static', filename='img/arrow_up_2.png') }}">
-                <button class="sounds-sort-button sounds-highlighted-sort-btn" onclick="sortSounds('alphabetical', this)">
+                <button class="sounds-sort-button" onclick="sortSounds('alphabetical', this)">
                     <img src="{{ url_for('static', filename='img/alphabetical.png') }}">
                 </button>
-                <button class="sounds-sort-button" onclick="sortSounds('chronological', this)">
+                <button class="sounds-sort-button sounds-highlighted-sort-btn" onclick="sortSounds('chronological', this)">
                     <img src="{{ url_for('static', filename='img/chronological.png') }}">
                 </button>
             </div>

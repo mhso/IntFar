@@ -20,6 +20,59 @@ PLAYER_NAMES = {
     331082926475182081: "Muds",
     347489125877809155: "Nø"
 }
+# Sounds for answering questions correctly/wrong.
+ANSWER_SOUNDS = [
+    [
+        "easy_money",
+        "how_lovely",
+        "outta_my_face",
+        "yeah",
+        "heyheyhey",
+        "peanut",
+        "never_surrender",
+        "exactly",
+        "hell_yeah",
+        "ult",
+        "wheeze",
+        "demon",
+        "myoo",
+        "rimelig_stor",
+        "worst_laugh",
+        "nyong",
+        "climax",
+        "cackle",
+        "kabim",
+        "kvinder",
+        "uhu",
+        "porn",
+        "package_boy"
+    ],
+    [
+        "mmnonono",
+        "what",
+        "whatemagonodo",
+        "yoda",
+        "daisy",
+        "bass",
+        "despair",
+        "ahhh",
+        "spil",
+        "fedtmand",
+        "no_way",
+        "hehehe",
+        "braindead",
+        "big_nej",
+        "junge",
+        "sad_animal",
+        "hold_da_op",
+        "dåser",
+        "oh_no",
+        "i_dont_know_dude",
+        "disappoint",
+        "nej",
+        "augh"
+    ]
+]
 
 jeopardy_page = flask.Blueprint("jeopardy", __name__, template_folder="templates")
 
@@ -50,7 +103,7 @@ def reset_questions():
 
     for cat in used_questions:
         used_questions[cat] = [
-            {"active": True, "used": []}
+            {"active": True, "used": [], "double": False}
             for _ in range(5)
         ]
 
@@ -125,61 +178,11 @@ def question_view(jeopardy_round, category, tier):
         with open(used_questions_file, "w", encoding="utf-8") as fp:
             json.dump(used_questions, fp, indent=4)
 
+    is_daily_double = used_questions[category][tier]["double"]
+
     # If question is multiple-choice, randomize order of choices
     if "choices" in question:
         random.shuffle(question["choices"])
-
-    # Sounds for answering questions correctly/wrong.
-    sounds = [
-        [
-            "easy_money",
-            "how_lovely",
-            "outta_my_face",
-            "yeah",
-            "peanut",
-            "never_surrender",
-            "exactly",
-            "hell_yeah",
-            "ult",
-            "wheeze",
-            "demon",
-            "myoo",
-            "rimelig_stor",
-            "worst_laugh",
-            "nyong",
-            "climax",
-            "cackle",
-            "kabim",
-            "kvinder",
-            "uhu",
-            "porn",
-            "package_boy"
-        ],
-        [
-            "mmnonono",
-            "what",
-            "whatemagonodo",
-            "yoda",
-            "daisy",
-            "bass",
-            "despair",
-            "ahhh",
-            "spil",
-            "fedtmand",
-            "no_way",
-            "hehehe",
-            "braindead",
-            "big_nej",
-            "junge",
-            "sad_animal",
-            "hold_da_op",
-            "dåser",
-            "oh_no",
-            "i_dont_know_dude",
-            "disappoint",
-            "nej"
-        ]
-    ]
 
     # Get player names and scores from query parameters
     player_data, player_turn, question_num = get_player_data(flask.request.args)
@@ -193,7 +196,8 @@ def question_view(jeopardy_round, category, tier):
         "player_data": player_data,
         "player_turn": player_turn,
         "question_value": questions[category]["tiers"][tier]["value"] * jeopardy_round,
-        "sounds": sounds
+        "daily_double": is_daily_double,
+        "sounds": ANSWER_SOUNDS
     }
 
     return app_util.make_template_context("jeopardy/question.html", **all_data)
@@ -207,7 +211,7 @@ def active_jeopardy(jeopardy_round):
     jeopardy_round = int(jeopardy_round)
 
     # Get player names and scores from query parameters
-    player_data, player_turn, question_num = get_player_data(flask.request.args)
+    player_data, player_turn, question_num = get_player_data(flask.request.args)        
 
     if question_num == QUESTIONS_PER_ROUND:
         # Round 1 done, onwards to next one
@@ -235,28 +239,45 @@ def active_jeopardy(jeopardy_round):
     with open(used_questions_file, encoding="utf-8") as fp:
         used_questions = json.load(fp)
 
-    if jeopardy_round < 3 and question_num == 0:
-        # If it's the first question of a round, set all categories to active
-        for category in used_questions:
-            for tier_info in used_questions[category]:
-                tier_info["active"] = True
-
-        if TRACK_UNUSED:
-            with open(used_questions_file, "w", encoding="utf-8") as fp:
-                json.dump(used_questions, fp, indent=4)
-
-    if jeopardy_round < 3:
-        for category in used_questions:
-            for tier, info in enumerate(used_questions[category]):
-                questions_left = any(index not in info["used"] for index in range(len(questions[category]["tiers"][tier]["questions"])))
-                questions[category]["tiers"][tier]["active"] = (not TRACK_UNUSED or (info["active"] and questions_left))
-
+    if jeopardy_round == 3:
+        ordered_categories = ["bois"]
+    else:
         ordered_categories = [None] * 6
         for category in questions:
             if questions[category]["order"] < 6:
                 ordered_categories[questions[category]["order"]] = category
-    else:
-        ordered_categories = ["bois"]
+
+        if question_num == 0:
+            # If it's the first question of a round, set all categories to active and reset daily doubles
+            for category in used_questions:
+                for tier_info in used_questions[category]:
+                    tier_info["active"] = True
+                    tier_info["double"] = False
+
+            # Choose 1 or 2 random category/tier combination to be daily double
+            double_questions = jeopardy_round
+            previous_double = None
+            for _ in range(double_questions):
+                category = ordered_categories[random.randint(0, 5)]
+                tier = random.randint(0, 4)
+
+                while (category, tier) == previous_double:
+                    category = ordered_categories[random.randint(0, 5)]
+                    tier = random.randint(0, 4)
+
+                previous_double = (category, tier)
+
+                used_questions[category][tier]["double"] = True
+
+            if TRACK_UNUSED:
+                with open(used_questions_file, "w", encoding="utf-8") as fp:
+                    json.dump(used_questions, fp, indent=4)
+
+        for category in used_questions:
+            for tier, info in enumerate(used_questions[category]):
+                questions_left = any(index not in info["used"] for index in range(len(questions[category]["tiers"][tier]["questions"])))
+                questions[category]["tiers"][tier]["active"] = (not TRACK_UNUSED or (info["active"] and questions_left))
+                questions[category]["tiers"][tier]["double"] = info["double"]
 
     all_data = {
         "round": jeopardy_round,
@@ -362,5 +383,11 @@ def answers():
 
     with open(questions_file, encoding="utf-8") as fp:
         questions = json.load(fp)
+
+    for category in questions:
+        for tier_info in category[category]["tiers"]:
+            for question in tier_info["questions"]:
+                if "choices" in question:
+                    question["choice_index"] = question["choices"].index(question["answer"])
 
     return app_util.make_template_context("jeopardy/cheat_sheet.html", questions=questions)

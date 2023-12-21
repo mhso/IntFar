@@ -1,5 +1,6 @@
 const TIME_FOR_BUZZING = 8;
 const TIME_FOR_ANSWERING = 6;
+const TIME_FOR_DOUBLE_ANSWER = 10;
 const TIME_FOR_WAGERING = 60;
 const TIME_FOR_FINAL_ANSWER = 30;
 const CONTESTANT_KEYS = ["z",  "q", "p", "m"]
@@ -12,6 +13,7 @@ var activeValue;
 var answeringPlayer = null;
 var activePlayers = [];
 var questionAnswered = false;
+var isDailyDouble = false;
 let chosenPlayers = [];
 let menuPlayerData;
 
@@ -20,6 +22,10 @@ var questionNum = 0;
 var playerIds = [];
 let playerColors = [];
 var playerScores = [];
+
+function canPlayersBuzzIn() {
+    return activeRound < 3 && !isDailyDouble;
+}
 
 function getBaseURL() {
     return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
@@ -364,6 +370,25 @@ function pauseVideo() {
     }
 }
 
+function startAnswerCountdown(duration) {
+    startCountdown(duration, () => wrongAnswer("Ikke mere tid"));
+
+    // NumLock has to be pressed before an answer can be given (for safety)
+    window.onkeydown = function(e) {
+        if (e.key == "NumLock") {
+            // Pause video if one is playing
+            pauseVideo();
+
+            // Clear countdown
+            stopCountdown();
+
+            window.onkeydown = function(e) {
+                answerQuestion(e);
+            }
+        }
+    }
+}
+
 function playerBuzzedIn(player) {
     if (!activePlayers[player]) {
         return; // Player already buzzed in once this question
@@ -388,44 +413,37 @@ function playerBuzzedIn(player) {
 
     // Start new countdown for answering after small delay
     setTimeout(function() {
-        startCountdown(TIME_FOR_ANSWERING, () => wrongAnswer("Ikke mere tid"));
-
-        // NumLock has to be pressed before an answer can be given (for safety)
-        window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
-                // Clear countdown
-                stopCountdown();
-
-                window.onkeydown = function(e) {
-                    answerQuestion(e);
-                }
-            }
-        }
+        startAnswerCountdown(TIME_FOR_ANSWERING);
     }, 500);
 }
 
 function questionAsked(countdownDelay) {
     setTimeout(function() {
-        if (answeringPlayer == null) {
+        if (answeringPlayer == null && canPlayersBuzzIn()) {
             hideAnswerIndicator();
-            if (activeRound < 3) {
-                startCountdown(TIME_FOR_BUZZING);
-            }
-            else {
-                // Go to finale screen after countdown is finished if it's round 3
-                document.getElementById("question-finale-suspense").play();
-                startCountdown(TIME_FOR_FINAL_ANSWER, () => window.location.href = getFinaleURL(activeQuestionId));
-            }
+            startCountdown(TIME_FOR_BUZZING);
+        }
+        else if (isDailyDouble) {
+            startAnswerCountdown(TIME_FOR_DOUBLE_ANSWER);
+        }
+        else {
+            // Go to finale screen after countdown is finished if it's round 3
+            document.getElementById("question-finale-suspense").play();
+            startCountdown(TIME_FOR_FINAL_ANSWER, () => window.location.href = getFinaleURL(activeQuestionId));
         }
     }, countdownDelay);
 
-    if (activeRound < 3) {
+    if (canPlayersBuzzIn()) {
         // Enable participants to buzz in if we are in round 1 or 2
         window.onkeydown = function(e) {
             if (keyIsContestant(e.key)) {
                 playerBuzzedIn(CONTESTANT_KEYS.indexOf(e.key));
             }
         }
+    }
+    else if (isDailyDouble) {
+        answeringPlayer = playerTurn;
+        setPlayerTurn(answeringPlayer, false);
     }
 }
 
@@ -460,7 +478,7 @@ function afterShowQuestion() {
 
 function showQuestion() {
     for (let i = 0; i < playerIds.length; i++) {
-        activePlayers.push(true);
+        activePlayers.push(isDailyDouble ? false : true);
     }
 
     // Show the question, if it exists
@@ -489,7 +507,7 @@ function showQuestion() {
                         videoElem.play();
                         videoElem.onended = afterShowQuestion;
 
-                        if (activeRound < 3) {
+                        if (canPlayersBuzzIn()) {
                             // Let players interrupt the video and buzz in early
                             window.onkeydown = function(e) {
                                 if (keyIsContestant(e.key)) {
@@ -521,6 +539,13 @@ function showQuestion() {
     }
 }
 
+function afterDailyDoubleWager() {
+    activeValue = parseInt(document.getElementById("question-wager-input").value);
+    document.activeElement.blur();
+    document.getElementById("question-wager-wrapper").classList.add("d-none");
+    showQuestion();
+}
+
 function scaleAnswerChoices() {
     let choiceElems = document.getElementsByClassName("quiz-answer-entry");
     for (let i = 0; i < choiceElems.length; i++) {
@@ -538,7 +563,7 @@ function scaleAnswerChoices() {
     }
 }
 
-function setVariables(round, playerData, turn, question, answer=null, value=null, questionId=null) {
+function setVariables(round, playerData, turn, question, answer=null, value=null, questionId=null, dailyDouble=false) {
     activeRound = round;
     playerData.forEach((data) => {
         playerIds.push(data["id"]);
@@ -550,9 +575,10 @@ function setVariables(round, playerData, turn, question, answer=null, value=null
     activeAnswer = answer;
     activeValue = value;
     activeQuestionId = questionId;
+    isDailyDouble = dailyDouble;
 }
 
-function goToQuestion(div, category, tier) {
+function goToQuestion(div, category, tier, isDouble) {
     if (activeRound == 1 && playerTurn == -1) {
         alert("Choose a starting player first (you idiot)");
         return;
@@ -566,6 +592,10 @@ function goToQuestion(div, category, tier) {
     }
 
     div.style.zIndex = 999;
+
+    if (isDouble) {
+        div.getElementsByTagName("span").item(0).textContent = "Daily Double!";
+    }
 
     let bbox = div.getBoundingClientRect();
     let distX = (window.innerWidth / 2) - (bbox.x + bbox.width / 2);
