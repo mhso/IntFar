@@ -6,8 +6,9 @@ queries.sql
 __pycache__
 *.db
 *.pt
-api/champions*.json
-api/maps.json
+resources/champions*.json
+resources/items*.json
+resources/maps.json
 app/static/*
 app/static/*/bootstrap/
 !app/static/js/

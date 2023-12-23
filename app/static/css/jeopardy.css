@@ -66,6 +66,7 @@ h3 {
 #jeopardy-logo {
     width: 460px;
     margin-top: -10px;
+    filter: drop-shadow(0 5px 5px black);
 }
 
 /****************##############****************\
@@ -81,6 +82,7 @@ h3 {
 #menu-wrapper > h2 {
     font-family: Impact;
     color: white;
+    filter: drop-shadow(5px 5px 5px black);
 }
 
 #menu-wrapper > #logo-wrapper {

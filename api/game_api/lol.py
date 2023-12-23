@@ -22,10 +22,24 @@ class RiotAPIClient(GameAPIClient):
         self.champ_ids = {}
         self.champ_portraits_path = "app/static/img/champions/portraits"
         self.champ_splash_path = "app/static/img/champions/splashes"
+        self.champ_abilities_path = "app/static/img/champions/abilities"
+        self.item_icons_path = "app/static/img/items"
         self.champ_data_path = "app/static/champ_data"
         self.latest_patch = None
 
         self.get_latest_data()
+
+    @property
+    def champions_file(self):
+        return f"resources/champions-{self.latest_patch}.json"
+
+    @property
+    def items_file(self):
+        return f"resources/items-{self.latest_patch}.json"
+
+    @property
+    def maps_file(self):
+        return "resources/maps.json"
 
     def get_latest_data(self):
         """
@@ -34,16 +48,20 @@ class RiotAPIClient(GameAPIClient):
         then downloads champion metadata, splashes, and portraits.
         """
         self.latest_patch = self.get_latest_patch()
-        if not exists(self.get_champions_file()):
+        if not exists(self.champions_file):
             self.get_latest_champions_file()
+
+        if not exists(self.items_file):
+            self.get_latest_items_file()
 
         self.champ_splash_path = "app/static/img/champions/splashes"
         self.initialize_champ_dicts()
         self.get_champion_portraits()
         self.get_champion_splashes()
+        self.get_champion_data()
 
     def initialize_champ_dicts(self):
-        champions_file = self.get_champions_file()
+        champions_file = self.champions_file
         if champions_file is None:
             return
 
@@ -56,9 +74,6 @@ class RiotAPIClient(GameAPIClient):
         name_order_champs = sorted(list(self.champ_names.items()), key=lambda x: x[1])
         self.champ_ids = {kv[0]: index for index, kv in enumerate(name_order_champs)}
 
-    def get_champions_file(self):
-        return f"api/champions-{self.latest_patch}.json"
-
     def get_latest_patch(self):
         url = "https://ddragon.leagueoflegends.com/api/versions.json"
         try:
@@ -70,56 +85,114 @@ class RiotAPIClient(GameAPIClient):
 
     def get_latest_champions_file(self):
         url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/champion.json"
-        logger.info(f"Downloading latest champions file: '{self.get_champions_file()}'")
+        logger.info(f"Downloading latest champions file: '{self.champions_file}'")
 
-        old_file = glob("api/champions-*.json")[0]
+        old_files = glob("resources/champions-*.json")
 
         try:
             response_json = requests.get(url).json()
-            f_out = open(self.get_champions_file(), "w", encoding="utf-8")
+            f_out = open(self.champions_file, "w", encoding="utf-8")
             json.dump(response_json, f_out)
-            remove(old_file)
+            if old_files != []:
+                remove(old_files)
         except requests.exceptions.RequestException:
-            logger.exception("Exception when getting newest champions.json file from Riot API.")
+            logger.exception("Exception when getting newest champion.json file from Riot API.")
+
+    def get_latest_items_file(self):
+        url = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/item.json"
+        logger.info(f"Downloading latest item file: '{self.items_file}'")
+
+        old_files = glob("api/items-*.json")
+
+        try:
+            response_json = requests.get(url).json()
+            f_out = open(self.items_file, "w", encoding="utf-8")
+            json.dump(response_json, f_out)
+            if old_files != []:
+                remove(old_files)
+        except requests.exceptions.RequestException:
+            logger.exception("Exception when getting newest item.json file from Riot API.")
 
     def get_champion_portraits(self):
         base_url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/img/champion"
 
-        with open(self.get_champions_file(), encoding="utf-8") as fp:
+        with open(self.champions_file, encoding="utf-8") as fp:
             champion_data = json.load(fp)
-            for champ_name in champion_data["data"]:
-                champ_id = int(champion_data["data"][champ_name]["key"])
-                filename = self.get_champ_portrait_path(champ_id)
-                if exists(filename):
-                    continue
 
-                url = f"{base_url}/{champ_name}.png"
-                logger.info(f"Downloading champion portrait for '{champ_name}'")
+        for champ_name in champion_data["data"]:
+            champ_id = int(champion_data["data"][champ_name]["key"])
+            filename = self.get_champ_portrait_path(champ_id)
+            if exists(filename):
+                continue
 
-                try:
-                    data = requests.get(url, stream=True)
-                    with open(filename, "wb") as fp:
-                        for chunk in data.iter_content(chunk_size=128):
-                            fp.write(chunk)
+            url = f"{base_url}/{champ_name}.png"
+            logger.info(f"Downloading champion portrait for '{champ_name}'")
 
-                except requests.exceptions.RequestException:
-                    logger.exception(f"Exception when getting champion portrait for {champ_name} from Riot API.")
+            try:
+                data = requests.get(url, stream=True)
+                with open(filename, "wb") as fp_out:
+                    for chunk in data.iter_content(chunk_size=128):
+                        fp_out.write(chunk)
 
-                sleep(0.5)
+            except requests.exceptions.RequestException:
+                logger.exception(f"Exception when getting champion portrait for {champ_name} from Riot API.")
+
+            sleep(0.5)
 
     def get_champion_splashes(self):
         base_url = f"http://ddragon.leagueoflegends.com/cdn/img/champion/loading"
 
-        with open(self.get_champions_file(), encoding="utf-8") as fp:
+        with open(self.champions_file, encoding="utf-8") as fp:
             champion_data = json.load(fp)
-            for champ_name in champion_data["data"]:
-                champ_id = int(champion_data["data"][champ_name]["key"])
-                filename = self.get_champ_splash_path(champ_id)
+
+        for champ_name in champion_data["data"]:
+            champ_id = int(champion_data["data"][champ_name]["key"])
+            filename = self.get_champ_splash_path(champ_id)
+            if exists(filename):
+                continue
+
+            url = f"{base_url}/{champ_name}_0.jpg"
+            logger.info(f"Downloading champion splash for '{champ_name}'")
+
+            try:
+                data = requests.get(url, stream=True)
+                with open(filename, "wb") as fp_out:
+                    for chunk in data.iter_content(chunk_size=128):
+                        fp_out.write(chunk)
+
+            except requests.exceptions.RequestException:
+                logger.exception(f"Exception when getting champion splash for {champ_name} from Riot API.")
+
+            sleep(0.5)
+
+    def get_champion_abilities(self):
+        base_url_passives = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/img/passive"
+        base_url_actives = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/img/spell"
+
+        with open(self.champions_file, encoding="utf-8") as fp:
+            champion_data = json.load(fp)
+
+        for champ_name in champion_data["data"]:
+            champ_id = int(champion_data["data"][champ_name]["key"])
+            champ_data_file = self.get_champ_data_path(champ_id)
+
+            with open(champ_data_file, "r", encoding="utf-8") as fp:
+                champ_data = json.load(fp)
+
+            logger.info(f"Downloading ability icons for '{champ_name}'")
+
+            abilities = [champ_data["data"][champ_name]["passive"]] + champ_data["data"][champ_name]["spells"]
+
+            for index, ability in enumerate(abilities):
+                base_url = base_url_passives if index == 0 else base_url_actives
+                ability_id = ability["id"] if "id" in ability else "passive"
+
+                filename = self.get_champ_abilities_path(champ_id, ability_id)
                 if exists(filename):
                     continue
 
-                url = f"{base_url}/{champ_name}_0.jpg"
-                logger.info(f"Downloading champion splash for '{champ_name}'")
+                image_name = ability["image"]["full"]
+                url = f"{base_url}/{image_name}"
 
                 try:
                     data = requests.get(url, stream=True)
@@ -128,35 +201,61 @@ class RiotAPIClient(GameAPIClient):
                             fp.write(chunk)
 
                 except requests.exceptions.RequestException:
-                    logger.exception(f"Exception when getting champion splash for {champ_name} from Riot API.")
+                    logger.exception(f"Exception when getting ability icon for {ability['name']} for {champ_name} from Riot API.")
 
                 sleep(0.5)
 
     def get_champion_data(self):
         base_url = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/champion"
 
-        with open(self.get_champions_file(), encoding="utf-8") as fp:
+        with open(self.champions_file, encoding="utf-8") as fp:
             champion_data = json.load(fp)
-            for champ_name in champion_data["data"]:
-                champ_id = int(champion_data["data"][champ_name]["key"])
 
-                filename = self.get_champ_data_path(champ_id)
-                if exists(filename):
-                    continue
+        for champ_name in champion_data["data"]:
+            champ_id = int(champion_data["data"][champ_name]["key"])
 
-                url = f"{base_url}/{champ_name}.json"
-                logger.info(f"Downloading champion data for '{champ_name}'")
+            filename = self.get_champ_data_path(champ_id)
+            if exists(filename):
+                continue
 
-                try:
-                    data = requests.get(url, stream=True)
-                    with open(filename, "wb") as fp:
-                        for chunk in data.iter_content(chunk_size=128):
-                            fp.write(chunk)
+            url = f"{base_url}/{champ_name}.json"
+            logger.info(f"Downloading champion data for '{champ_name}'")
 
-                except requests.exceptions.RequestException:
-                    logger.exception(f"Exception when getting champion data for {champ_name} from Riot API.")
+            try:
+                data = requests.get(url, stream=True)
+                with open(filename, "wb") as fp_out:
+                    for chunk in data.iter_content(chunk_size=128):
+                        fp_out.write(chunk)
 
-                sleep(0.5)
+            except requests.exceptions.RequestException:
+                logger.exception(f"Exception when getting champion data for {champ_name} from Riot API.")
+
+            sleep(0.5)
+
+    def get_item_icons(self):
+        base_url = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/img/item"
+
+        with open(self.items_file, encoding="utf-8") as fp:
+            item_data = json.load(fp)
+
+        for item_id in item_data["data"]:
+            filename = f"{self.item_icons_path}/{item_id}.png"
+            if exists(filename):
+                continue
+
+            url = f"{base_url}/{item_id}.png"
+            logger.info(f"Downloading item icon for '{item_data['data'][item_id]['name']}'")
+
+            try:
+                data = requests.get(url, stream=True)
+                with open(filename, "wb") as fp_out:
+                    for chunk in data.iter_content(chunk_size=128):
+                        fp_out.write(chunk)
+
+            except requests.exceptions.RequestException:
+                logger.exception(f"Exception when getting item icon for {item_id} from Riot API.")
+
+            sleep(0.5)
 
     def make_request(self, endpoint, api_route, *params, ignore_errors=[]):
         req_string = endpoint
@@ -259,6 +358,9 @@ class RiotAPIClient(GameAPIClient):
     def get_champ_splash_path(self, champ_id):
         return f"{self.champ_splash_path}/{champ_id}.png"
 
+    def get_champ_abilities_path(self, champ_id, ability):
+        return f"{self.champ_abilities_path}/{champ_id}_{ability}.png"
+
     def get_champ_data_path(self, champ_id):
         return f"{self.champ_data_path}/{champ_id}.json"
 
@@ -298,7 +400,7 @@ class RiotAPIClient(GameAPIClient):
         """
         Get name of League of Legends map with id `map_id`.
         """
-        with open("api/maps.json", encoding="utf-8") as fp:
+        with open(self.maps_file, encoding="utf-8") as fp:
             map_data = json.load(fp)
             for map_info in map_data:
                 if map_info["mapId"] == map_id:
@@ -307,7 +409,7 @@ class RiotAPIClient(GameAPIClient):
         return None
 
     def map_is_sr(self, map_id):
-        with open("api/maps.json", encoding="utf-8") as fp:
+        with open(self.maps_file, encoding="utf-8") as fp:
             map_data = json.load(fp)
             for map_info in map_data:
                 if map_info["mapId"] == map_id:

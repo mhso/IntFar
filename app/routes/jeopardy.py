@@ -70,7 +70,7 @@ ANSWER_SOUNDS = [
         "i_dont_know_dude",
         "disappoint",
         "nej",
-        "augh"
+        "wilhelm"
     ]
 ]
 
@@ -192,6 +192,7 @@ def question_view(jeopardy_round, category, tier):
         "round_name": ROUND_NAMES[jeopardy_round-1],
         "question_num": question_num,
         "category_name": questions[category]["name"],
+        "bg_image": questions[category]["background"],
         "question": question,
         "player_data": player_data,
         "player_turn": player_turn,

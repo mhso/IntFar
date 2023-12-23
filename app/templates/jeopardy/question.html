@@ -3,7 +3,7 @@
     {% include 'jeopardy/head.html' %}
     
     <body>
-        <div id="bg-image"></div>
+        <div id="bg-image" style="background-image: url({{ url_for('static', filename='img/jeopardy/' + bg_image) }});"></div>
 
         <div id="question-wrapper">
             <!-- Logo -->
