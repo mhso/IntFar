@@ -14,7 +14,7 @@
                 <div>
                     <ol>
                         {% for question in tier["questions"] %}
-                        <li>{% if "image" in question %}<img src="{{ url_for('static', filename='img/jeopardy/' + question['image'] ) }}" height="150px"><br>{% endif %}<span class="question">{{ question["question"] }}</span>: <span class="answer">{{ question["answer"] }}{% if "choice_index" in question %}({{ question["choice_index"] }}){% endif %}</span></li>
+                        <li>{% if "image" in question %}<img src="{{ url_for('static', filename='img/jeopardy/' + question['image'] ) }}" height="150px"><br>{% endif %}<span class="question">{{ question["question"] }}</span>: <span class="answer">{{ question["answer"] }}</span></li>
                         {% endfor %}
                     </ol>
                 </div>

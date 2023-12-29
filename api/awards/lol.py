@@ -136,6 +136,12 @@ class LoLAwardQualifiers(AwardQualifiers):
             "timeline_throw",
             "timeline_goldkeeper",
             "timeline_pentasteal",
+            "timeline_invade_won",
+            "timeline_invade_lost",
+            "timeline_invade_tied",
+            "timeline_anti_invade_won",
+            "timeline_anti_invade_lost",
+            "timeline_anti_invade_tied",
         ]
 
     @classmethod
@@ -299,6 +305,37 @@ class LoLAwardQualifiers(AwardQualifiers):
 
         return cool_stats
 
+    def _is_event_on_our_side(self, x, y):
+        if x < y: # Top side
+            redside_p1 = (2420, 13000)
+            redside_p2 = (9026, 8101)
+            blueside_p1 = (1273, 12141)
+            blueside_p2 = (7861, 7398)
+        else: # Bottom side
+            redside_p1 = (9026, 8101)
+            redside_p2 = (15865, 3546)
+            blueside_p1 = (7861, 7398)
+            blueside_p2 = (15077, 1922)
+
+        blue_side = self.parsed_game_stats.team_id == 100
+
+        if blue_side: # Blue side
+            p_1 = blueside_p1
+            p_2 = blueside_p2
+        else: # Red side
+            p_1 = redside_p1
+            p_2 = redside_p2
+
+        slope = (p_2[1] - p_1[1]) / (p_2[0] - p_1[0])
+        intercept = (slope * p_1[0] - p_1[1]) * -1
+
+        coef = slope * x + intercept - y
+        
+        if blue_side:
+            return coef > 0
+
+        return coef < 0
+
     def get_cool_timeline_events(self):
         """
         Returns a list of cool/embarrasing events that happened during the course of the game.
@@ -329,6 +366,10 @@ class LoLAwardQualifiers(AwardQualifiers):
         curr_multikill = {}
         stolen_penta_victims = {}
         stolen_penta_scrubs = {}
+        invade_kills = 0
+        anti_invade_kills = 0
+        invade_victims = 0
+        anti_invade_victims = 0
 
         # Calculate stats from timeline frames.
         for frame_data in timeline_data["frames"]:
@@ -367,42 +408,59 @@ class LoLAwardQualifiers(AwardQualifiers):
             else: # Record max gold lead during the game.
                 biggest_gold_lead = max(gold_diff, biggest_gold_lead)
 
-            if not any_quadrakills:
-                continue
-
-            for disc_id in curr_multikill:
-                if frame_data["timestamp"] - curr_multikill[disc_id]["timestamp"] > 10_000: # 10 secs
-                    curr_multikill[disc_id]["streak"] = 0
-
-            # Keep track of multikills for each player
-            for event in frame_data.get("events", []):
-                if event["type"] != "CHAMPION_KILL":
-                    continue
-
-                disc_id = participant_dict.get(int(event["killerId"]))
-                if disc_id is None:
-                    continue
-
-                if disc_id not in curr_multikill:
-                    curr_multikill[disc_id] = {"streak": 0, "timestamp": 0}
-
-                curr_multikill[disc_id]["streak"] += 1
-                curr_multikill[disc_id]["timestamp"] = event["timestamp"]
-
-            # Check if someone stole a penta from someone else
-            people_with_quadras = list(filter(lambda x: x[1]["streak"] == 4, curr_multikill.items()))
-
-            if people_with_quadras != []:
-                person_with_quadra, streak_dict = people_with_quadras[0]
+            if any_quadrakills:
                 for disc_id in curr_multikill:
-                    if disc_id != person_with_quadra and curr_multikill[disc_id]["timestamp"] > streak_dict["timestamp"]:
-                        stolen_penta_scrubs[disc_id] = stolen_penta_scrubs.get(disc_id, 0) + 1
-                        victim_list = stolen_penta_victims.get(disc_id, [])
-                        victim_list.append(person_with_quadra)
-                        stolen_penta_victims[disc_id] = victim_list
+                    if frame_data["timestamp"] - curr_multikill[disc_id]["timestamp"] > 10_000: # 10 secs
+                        curr_multikill[disc_id]["streak"] = 0
 
-            # Check whether we invaded at the start of the game
-            
+                # Keep track of multikills for each player
+                for event in frame_data.get("events", []):
+                    if event["type"] != "CHAMPION_KILL":
+                        continue
+
+                    disc_id = participant_dict.get(int(event["killerId"]))
+                    if disc_id is None:
+                        continue
+
+                    if disc_id not in curr_multikill:
+                        curr_multikill[disc_id] = {"streak": 0, "timestamp": 0}
+
+                    curr_multikill[disc_id]["streak"] += 1
+                    curr_multikill[disc_id]["timestamp"] = event["timestamp"]
+
+                # Check if someone stole a penta from someone else
+                people_with_quadras = list(filter(lambda x: x[1]["streak"] == 4, curr_multikill.items()))
+
+                if people_with_quadras != []:
+                    person_with_quadra, streak_dict = people_with_quadras[0]
+                    for disc_id in curr_multikill:
+                        if disc_id != person_with_quadra and curr_multikill[disc_id]["timestamp"] > streak_dict["timestamp"]:
+                            stolen_penta_scrubs[disc_id] = stolen_penta_scrubs.get(disc_id, 0) + 1
+                            victim_list = stolen_penta_victims.get(disc_id, [])
+                            victim_list.append(person_with_quadra)
+                            stolen_penta_victims[disc_id] = victim_list
+
+            if frame_data["timestamp"] < 130_000:
+                # Check whether we invaded at the start of the game
+                # and either got kills or got killed
+                for event in frame_data.get("events", []):
+                    if event["type"] != "CHAMPION_KILL":
+                        continue
+
+                    our_kill = (int(event["victimId"]) < 5) ^ timeline_data["ourTeamLower"]
+                    x = event["position"]["x"]
+                    y = event["position"]["y"]
+
+                    if self._is_event_on_our_side(x, y):
+                        if our_kill:
+                            anti_invade_kills += 1
+                        else:
+                            anti_invade_victims += 1
+                    else:
+                        if our_kill:
+                            invade_kills += 1
+                        else:
+                            invade_victims += 1
 
         if biggest_gold_deficit > self.config.timeline_min_deficit and game_win: # Epic comeback!
             timeline_events.append((0, biggest_gold_deficit, None))
@@ -425,6 +483,22 @@ class LoLAwardQualifiers(AwardQualifiers):
             desc = f"{stolen_penta_scrubs[disc_id]} {pentakills} from {victims}"
     
             timeline_events.append((3, desc, disc_id))
+
+        if invade_kills > 0 or invade_victims > 0:
+            if invade_kills > invade_victims: # We won an invade
+                timeline_events.append((4, invade_kills, None))
+            elif invade_kills < invade_victims: # We lost an invade
+                timeline_events.append((5, invade_victims, None))
+            else: # We got an equal amount of kills in an invade
+                timeline_events.append((6, invade_kills, None))
+
+        elif anti_invade_kills > 0 or anti_invade_victims > 0:
+            if anti_invade_kills > anti_invade_victims: # We won an anti-invade
+                timeline_events.append((7, anti_invade_kills, None))
+            elif anti_invade_kills < anti_invade_victims: # We lost an anti-invade
+                timeline_events.append((8, anti_invade_victims, None))
+            else: # We got an equal amount of kills when being invaded
+                timeline_events.append((9, anti_invade_kills, None))
 
         return timeline_events
 

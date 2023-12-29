@@ -370,7 +370,7 @@ def jeopardy_endscreen():
     return app_util.make_template_context("jeopardy/endscreen.html", **all_data)
 
 @jeopardy_page.route("/cheatsheet")
-def answers():
+def cheatsheet():
     if (
         flask.request.authorization is None
         or (password := flask.request.authorization.parameters.get("password")) is None
@@ -384,11 +384,5 @@ def answers():
 
     with open(questions_file, encoding="utf-8") as fp:
         questions = json.load(fp)
-
-    for category in questions:
-        for tier_info in category[category]["tiers"]:
-            for question in tier_info["questions"]:
-                if "choices" in question:
-                    question["choice_index"] = question["choices"].index(question["answer"])
 
     return app_util.make_template_context("jeopardy/cheat_sheet.html", questions=questions)
