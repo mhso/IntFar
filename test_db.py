@@ -36,16 +36,26 @@ try:
             query = input(">")
             if query in ("q", "quit", "exit"):
                 break
+
             time_start = time()
-            result = conn.cursor().execute(query).fetchall()
+            result = conn.cursor().execute(query)
+
+            column_names = result.description
+            print(", ".join(tup[0] for tup in column_names))
+
+            print("-" * 100)
+
+            rows_returned = 0
             for row in result:
-                print(row)
+                print(", ".join(str(v) for v in row))
+                rows_returned += 1
+
             conn.commit()
             time_end = time()
             time_taken = f"{time_end - time_start:.3f} seconds."
 
-            if result != []:
-                print(f"Rows returned: {len(result)} in {time_taken}")
+            if rows_returned != 0:
+                print(f"Rows returned: {rows_returned} in {time_taken}")
             else:
                 rows_affected = conn.cursor().execute("SELECT changes()").fetchone()[0]
                 print(f"Rows affected: {rows_affected} in {time_taken}")

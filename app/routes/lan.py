@@ -224,6 +224,7 @@ def get_data(lan_info):
                         if any_doinks:
                             doinks_reason += " and "
                         doinks_reason += reason
+                        any_doinks = True
 
                 latest_doinks.append((doinks_name, doinks_reason))
 

@@ -4,12 +4,12 @@ from glob import glob
 from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
-from api.lan import get_average_stats, LAN_PARTIES
+from api.lan import LAN_PARTIES
 
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, database, util
 from api.awards import get_awards_handler
-from api.game_data import get_stat_parser, get_formatted_stat_names, get_formatted_stat_value
+from api.game_data import get_stat_parser, get_formatted_stat_names, get_stat_quantity_descriptions
 from api.game_api.lol import RiotAPIClient
 from api.game_api.cs2 import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
@@ -94,11 +94,23 @@ class TestFuncs:
         print(intfar_data)
 
     def test_lan_rework(self):
-        lan_info = LAN_PARTIES["april_22"]
-        all_avg_stats, all_ranks_list = get_average_stats(self.database, lan_info)
+        lan_info = LAN_PARTIES["december_23"]
+        game = "lol"
+        stat_quantity_desc = get_stat_quantity_descriptions(game)
+        stats_to_get = list(stat_quantity_desc)
 
-        print(all_avg_stats)
-        print(all_ranks_list)
+        all_stats = self.database.get_player_stats(
+            game,
+            stats_to_get,
+            time_after=lan_info.start_time,
+            time_before=lan_info.end_time,
+            guild_id=lan_info.guild_id
+        )
+
+        stats_to_get.remove("disc_id")
+
+        print(stats_to_get)
+        print(all_stats)
 
     def test_duration(self):
         dt_2 = datetime.now()
@@ -161,41 +173,10 @@ class TestFuncs:
         print(max(list(counts.items()), key=lambda x: x[1]))
 
     def test_ifotm(self):
-        conf = config.Config()
-        monthly_monitor = MonthlyIntfar(conf.hour_of_ifotm_announce)
-        db_client = database.Database(conf)
-        month = monthly_monitor.time_at_announcement.month
-        prev_month = month - 1 if month != 1 else 12
-        month_name = MONTH_NAMES[prev_month-1]
+        client = DiscordClient(CONFIG, DATABASE, None, {"lol": RIOT_API, "cs2": None})
 
-        details = db_client.get_intfars_of_the_month("lol")
-
-        print(details)
-
-        # if details == []:
-        #     # No one has played enough games to quality for IFOTM this month
-        #     response = (
-        #         f"No one has played a minimum of {self.config.ifotm_min_games} games "
-        #         "this month, or those who do have no Int-Fars, so no Int-Far of the Month "
-        #         f"will be crowned for {month_name}. Dead game, I guess :("
-        #     )
-        #     print(response)
-        #     return
-
-        # intfar_details = [
-        #     ("Disc ID: " + str(disc_id), games, intfars, ratio)
-        #     for (disc_id, games, intfars, ratio) in details
-        # ]
-
-        # intro_desc = f"THE RESULTS ARE IN!!! Int-Far of the month for {month_name} is...\n\n"
-        # intro_desc += "*DRUM ROLL*\n\n"
-        # desc, num_winners = monthly_monitor.get_description_and_winners(intfar_details)
-        # winners = [tupl[0] for tupl in details[:num_winners]]
-        # desc += ":clap: :clap: :clap: :clap: :clap: \n"
-        # desc += "{emote_uwu} {emote_sadbuttrue} {emote_smol_dave} "
-        # desc += "{emote_extra_creme} {emote_happy_nono} {emote_hairy_retard}"
-        # print(intro_desc + desc)
-        # print(winners)
+        client.add_event_listener("ready", client.assign_monthly_intfar_role, "lol", 1, [267401734513491969])
+        client.run(CONFIG.discord_token)
 
     def test_lifetime_stats(self):
         id_dave = 115142485579137029

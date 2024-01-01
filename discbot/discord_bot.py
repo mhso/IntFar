@@ -1431,16 +1431,14 @@ class DiscordClient(discord.Client):
             if game_monitor.should_stop_polling(guild_id):
                 game_monitor.stop_polling(guild_id)
 
-    def get_role(self, role_name, guild_id):
+    def get_role(self, role_name, guild):
         """
-        Find a Discord role in the given guild.
+        Find a Discord role with the given name in the given guild.
         """
-        guild = self.get_guild(guild_id)
-
         for guild_role in guild.roles:
             if guild_role.name == role_name:
                 return guild_role
-            
+
         return None
 
     async def remove_intfar_role(self, intfar_id, role_id):
@@ -1464,10 +1462,11 @@ class DiscordClient(discord.Client):
         """
         for month in range(12):
             month_name = api_util.MONTH_NAMES[month]
+            old_role_name = f"Int-Far of the Month - {month_name}"
             role_name = f"Int-Far of the Month ({game}) - {month_name}"
 
             for role in guild.roles:
-                if role.name == role_name:
+                if role.name == role_name or role_name == old_role_name:
                     for member in role.members:
                         logger.info(f"Removing {role.name} from {member.name}.")
                         await member.remove_roles(role)
@@ -1626,7 +1625,7 @@ class DiscordClient(discord.Client):
         # Hand out a special badge to the winner(s)
         guild_id = api_util.MY_GUILD_ID if self.config.env == "dev" else api_util.GUILD_MAP["core"]
         guild = self.get_guild(guild_id)
-        role = self.get_role("Jeopardy Master", guild_id)
+        role = self.get_role("Jeopardy Master", guild)
         if role is not None:
             for data in player_data[:ties+1]:
                 member = guild.get_member(data["id"])

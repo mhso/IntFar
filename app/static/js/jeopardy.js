@@ -390,7 +390,7 @@ function startAnswerCountdown(duration) {
 }
 
 function playerBuzzedIn(player) {
-    if (!activePlayers[player]) {
+    if (!activePlayers[player] || answeringPlayer != null) {
         return; // Player already buzzed in once this question
     }
 
