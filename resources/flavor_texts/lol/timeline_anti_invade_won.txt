@@ -1,1 +1,1 @@
-got invaded, but showed the puny invaders no mercy, getting {value} kills! {emote_poggers}
+got invaded, but showed the puny invaders no mercy, getting {value} kill{quantifier}! {emote_poggers}

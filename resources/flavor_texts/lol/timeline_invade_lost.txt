@@ -1,1 +1,1 @@
-tried to invade, but failed miserably and gave away {value} kills {emote_nat_really_fine}
+tried to invade, but failed miserably and gave away {value} kill{quantifier} {emote_nat_really_fine}

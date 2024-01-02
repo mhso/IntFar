@@ -136,6 +136,7 @@ class LoLAwardQualifiers(AwardQualifiers):
             "timeline_throw",
             "timeline_goldkeeper",
             "timeline_pentasteal",
+            "timeline_no_items",
             "timeline_invade_won",
             "timeline_invade_lost",
             "timeline_invade_tied",
@@ -366,6 +367,7 @@ class LoLAwardQualifiers(AwardQualifiers):
         curr_multikill = {}
         stolen_penta_victims = {}
         stolen_penta_scrubs = {}
+        people_forgetting_items = []
         invade_kills = 0
         anti_invade_kills = 0
         invade_victims = 0
@@ -440,6 +442,18 @@ class LoLAwardQualifiers(AwardQualifiers):
                             victim_list.append(person_with_quadra)
                             stolen_penta_victims[disc_id] = victim_list
 
+            if 10_000 < frame_data["timestamp"] < 70_000:
+                # Check whether someone left the fountain without buying items
+                people_buying_items = set()
+                for event in frame_data.get("events", []):
+                    if event["type"] == "ITEM_PURCHASED":
+                        people_buying_items.add(event["participantId"])
+
+                people_with_no_items = set(int(participant_id) for participant_id in frame_data["participantFrames"]) - people_buying_items
+                for participant_id in people_with_no_items:
+                    if (disc_id := participant_dict.get(participant_id)) is not None:
+                        people_forgetting_items.append(disc_id)
+
             if frame_data["timestamp"] < 130_000:
                 # Check whether we invaded at the start of the game
                 # and either got kills or got killed
@@ -447,7 +461,7 @@ class LoLAwardQualifiers(AwardQualifiers):
                     if event["type"] != "CHAMPION_KILL":
                         continue
 
-                    our_kill = (int(event["victimId"]) < 5) ^ timeline_data["ourTeamLower"]
+                    our_kill = (int(event["victimId"]) <= 5) ^ timeline_data["ourTeamLower"]
                     x = event["position"]["x"]
                     y = event["position"]["y"]
 
@@ -484,21 +498,24 @@ class LoLAwardQualifiers(AwardQualifiers):
     
             timeline_events.append((3, desc, disc_id))
 
+        for disc_id in people_forgetting_items:
+            timeline_events.append((4, None, disc_id))
+
         if invade_kills > 0 or invade_victims > 0:
             if invade_kills > invade_victims: # We won an invade
-                timeline_events.append((4, invade_kills, None))
+                timeline_events.append((5, invade_kills, None))
             elif invade_kills < invade_victims: # We lost an invade
-                timeline_events.append((5, invade_victims, None))
+                timeline_events.append((6, invade_victims, None))
             else: # We got an equal amount of kills in an invade
-                timeline_events.append((6, invade_kills, None))
+                timeline_events.append((7, invade_kills, None))
 
         elif anti_invade_kills > 0 or anti_invade_victims > 0:
             if anti_invade_kills > anti_invade_victims: # We won an anti-invade
-                timeline_events.append((7, anti_invade_kills, None))
+                timeline_events.append((8, anti_invade_kills, None))
             elif anti_invade_kills < anti_invade_victims: # We lost an anti-invade
-                timeline_events.append((8, anti_invade_victims, None))
+                timeline_events.append((9, anti_invade_victims, None))
             else: # We got an equal amount of kills when being invaded
-                timeline_events.append((9, anti_invade_kills, None))
+                timeline_events.append((10, anti_invade_kills, None))
 
         return timeline_events
 

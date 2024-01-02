@@ -141,7 +141,7 @@ class TestFuncs:
         print(response)
 
     def test_timeline(self):
-        game_id = 6723127347
+        game_id = 6748316771
         game = "lol"
         game_data = self.riot_api.get_game_details(game_id)
         parser = get_stat_parser(game, game_data, self.riot_api, self.database.users_by_game["lol"], 803987403932172359)
@@ -150,7 +150,7 @@ class TestFuncs:
 
         timeline_stats = awards_handler.get_cool_timeline_events()
         print(timeline_stats)
-        print(awards_handler.get_flavor_text("timeline", 4, "random", value=3))
+        print(awards_handler.get_flavor_text("timeline", 4, "random"))
 
     def test_normalize_sound(self):
         files = glob("app/static/sounds/*.mp3")

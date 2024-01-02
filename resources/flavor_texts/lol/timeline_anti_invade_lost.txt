@@ -1,1 +1,1 @@
-got invaded and gave away {value} kills like complete scrubs {emote_nat_really_fine}
+got invaded and gave away {value} kill{quantifier} like complete scrubs {emote_nat_really_fine}

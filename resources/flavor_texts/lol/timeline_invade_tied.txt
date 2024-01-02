@@ -1,1 +1,1 @@
-tried invading but it went pretty meh, since we both got *and* gave away {value} kills
+tried invading but it went pretty meh, since we both got *and* gave away {value} kill{quantifier}

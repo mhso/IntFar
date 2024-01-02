@@ -1,1 +1,1 @@
-invaded like absolute chads and got {value} kills! {emote_poggers}
+invaded like absolute chads and got {value} kill{quantifier}! {emote_poggers}
