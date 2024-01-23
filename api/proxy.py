@@ -77,49 +77,52 @@ class ProxyManager(object):
         time_to_sleep = 0.5
 
         while not self._stop_event.is_set():
-            for proxy in wait(self.proxies, timeout=0.01):
-                try:
-                    command, *args = proxy.recv()
-                except (OSError, BrokenPipeError) as exc:
-                    self.close()
-                    break
-
-                if command == "close":
-                    proxy.send("exiting...")
-                    break
-
-                result = None
-                self.database.enqueue_command(command_id, self.target_name, command, *args)
-                wait_time = 0
-                while wait_time < timeout:
-                    result = self.database.get_command_result(command_id, self.target_name)
-
-                    if result is not None:
+            try:
+                for proxy in wait(self.proxies, timeout=0.01):
+                    try:
+                        command, *args = proxy.recv()
+                    except (OSError, BrokenPipeError):
+                        self.kill()
                         break
 
-                    wait_time += time_to_sleep
-                    sleep(time_to_sleep)
+                    if command == "close":
+                        proxy.send("exiting...")
+                        break
 
-                if result is None:
-                    result = "null:None"
+                    result = None
+                    self.database.enqueue_command(command_id, self.target_name, command, *args)
+                    wait_time = 0
+                    while wait_time < timeout:
+                        result = self.database.get_command_result(command_id, self.target_name)
 
-                dtype, *values = result.split(":")
-                if dtype == "null":
-                    proxy.send(None)
-                else:
-                    value_str = ":".join(values)
-                    if dtype == "json":
-                        value_str = json.loads(value_str)
-                    elif dtype == "int":
-                        value_str = int(value_str)
-                    elif dtype == "bool":
-                        value_str = bool(value_str)
+                        if result is not None:
+                            break
+
+                        wait_time += time_to_sleep
+                        sleep(time_to_sleep)
+
+                    if result is None:
+                        result = "null:None"
+
+                    dtype, *values = result.split(":")
+                    if dtype == "null":
+                        proxy.send(None)
                     else:
-                        value_str = str(value_str)
+                        value_str = ":".join(values)
+                        if dtype == "json":
+                            value_str = json.loads(value_str)
+                        elif dtype == "int":
+                            value_str = int(value_str)
+                        elif dtype == "bool":
+                            value_str = bool(value_str)
+                        else:
+                            value_str = str(value_str)
 
-                    proxy.send(value_str)
+                        proxy.send(value_str)
 
-                command_id += 1
+                    command_id += 1
+            except OSError:
+                break
 
     def create_proxy(self):
         conn_1, conn_2 = Pipe(True)
@@ -129,13 +132,16 @@ class ProxyManager(object):
 
         return proxy
 
-    def close(self):
-        self._stop_event.set()
-        if self.proxies:
-            self.proxies[0].close()
+    def is_alive(self):
+        return not self._stop_event.is_set()
 
-        if self.steam_process.returncode is None:
+    def kill(self):
+        self._stop_event.set()
+        for proxy in self.proxies:
+            proxy.close()
+
+        if self.steam_process.poll() is None:
             self.database.enqueue_command(-1, self.target_name, "close")
 
-            while self.steam_process.returncode is None:
+            while self.steam_process.poll() is None:
                 sleep(0.1)

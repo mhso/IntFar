@@ -46,6 +46,14 @@ def start_flask_process(*args):
 
     return flask_process, bot_end_flask
 
+def kill_all_processes(processes):
+    for process in processes:
+        process.kill()
+
+    while any(p.is_alive() for p in processes):
+        sleep(0.1)
+
+
 # def start_ai_process(config):
 #     ai_end, bot_end_ai = Pipe()
 #     ai_process = Process(
@@ -110,6 +118,8 @@ def main():
     discord_args = [conf, database_client, betting_handlers, api_clients, None, bot_end_flask]
     bot_process, _ = start_discord_process(*discord_args)
 
+    processes = [flask_process, bot_process, proxy_manager]
+
     while True:
         try:
             if flask_process.exitcode == 3:
@@ -126,17 +136,10 @@ def main():
             if flask_process.exitcode == 2 or bot_process.exitcode == 2:
                 # We have issued a restart command on Discord or the website to restart the program.
                 #ai_process.kill()
-                flask_process.kill()
-                bot_process.kill()
-                proxy_manager.close()
                 sync_manager.shutdown()
 
                 # Wait for all subprocesses to exit.
-                processes = [flask_process, bot_process]
-                while all(p.is_alive() for p in processes):
-                    sleep(0.5)
-
-                logger.info(f"++++++ Restarting {__file__} ++++++")
+                kill_all_processes(processes)
 
                 exit(2)
 
@@ -151,7 +154,8 @@ def main():
             break
 
         except KeyboardInterrupt:
-            logger.info("Stopping bot...")
+            logger.info("Stopping Int-Far...")
+            kill_all_processes(processes)
             break
 
 if __name__ == "__main__":

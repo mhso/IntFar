@@ -9,6 +9,7 @@ from api.game_data import (
     get_formatted_stat_value
 )
 from api.game_data.cs2 import RANKS
+from discbot.commands.misc import get_winrate
 
 async def handle_stats_msg(client, message, game):
     valid_stats = ", ".join(f"'{cmd}'" for cmd in get_stat_quantity_descriptions(game))
@@ -162,11 +163,6 @@ async def handle_stat_msg(client, message, best, game, stat, target_id):
     """
     stat_descs = get_stat_quantity_descriptions(game)
     if stat in stat_descs: # Check if the requested stat is a valid stat.
-        if best:
-            best = stat != "deaths"
-        else:
-            best = stat == "deaths"
-
         quantity_type = 0 if best else 1
 
         # Check whether to find the max or min of some value, when returning
@@ -224,13 +220,13 @@ async def handle_stat_msg(client, message, best, game, stat, target_id):
             game_specific_desc = ""
             if game == "lol":
                 champ_id, champ_count = client.database.get_league_champ_count_for_stat(
-                    stat, best, target_id
+                    stat, maximize, target_id
                 )
                 champ_name = client.api_clients[game].get_champ_name(champ_id)
                 game_specific_desc = f"The champion he most often gets {readable_stat} with is **{champ_name}** (**{champ_count}** games).\n"
             elif game == "cs2":
                 map_id, map_count = client.database.get_cs2_map_count_for_stat(
-                    stat, best, target_id
+                    stat, maximize, target_id
                 )
                 map_name = client.api_clients[game].get_map_name(map_id)
                 game_specific_desc = f"The map he most often gets {readable_stat} on is **{map_name}** (**{map_count}** games)\n"
@@ -343,3 +339,49 @@ async def handle_match_history_msg(client, message, game, target_id=None):
     header = f"--- Match history for **{api_util.SUPPORTED_GAMES[game]}** ---"
 
     await client.paginate(message.channel, formatted_entries, 0, 1, header)
+
+async def handle_champion_msg(client, message, champ_id, game, target_id):
+    if champ_id is None:
+        await message.channel.send(f"Champion is not valid.")
+        return
+
+    champ_name, winrate, games = get_winrate(client, champ_id, game, target_id)
+
+    if winrate is None or games == 0:
+        response = f"{user_name} has not played any games on {champ_name}."
+        await message.channel.send(response)
+        return
+
+    user_name = client.get_discord_nick(target_id, message.guild.id)
+    response = f"Stats for {user_name} on *{champ_name}*:\n"
+    response += f"Winrate: **{winrate:.2f}%** in **{int(games)}** games.\n"
+
+    stats_to_get = [
+        "kills",
+        "deaths",
+        "assists",
+        "kda",
+        "cs",
+        "cs_per_min",
+        "damage",
+        "gold",
+        "vision_score",
+        "vision_wards"
+    ]
+
+    stats = {
+        stat: get_formatted_stat_value(
+            game,
+            stat,
+            client.database.get_average_stat_league(stat, target_id, champ_id, 1)[0][1]
+        )
+        for stat in stats_to_get
+    }
+
+    response += f"KDA: **{stats['kills']}**/**{stats['deaths']}**/**{stats['assists']}** (**{stats['kda']}**)\n"
+    response += f"CS: **{stats['cs']}** (**{stats['cs_per_min']}** per min)\n"
+    response += f"Damage: **{stats['damage']}**\n"
+    response += f"Gold: **{stats['gold']}**\n"
+    response += f"Vision: **{stats['vision_score']}** (**{stats['vision_wards']}** pink wards)\n"
+
+    await message.channel.send(response)

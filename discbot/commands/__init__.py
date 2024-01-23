@@ -10,7 +10,7 @@ from discbot.commands.shop import *
 from discbot.commands.stats import *
 from discbot.commands.sounds import *
 from discbot.commands import util as commands_util
-from api.database import DBException
+from api.database import DBException, DEFAULT_GAME
 from api.util import GUILD_IDS, GUILD_MAP, MY_GUILD_ID, SUPPORTED_GAMES
 
 from mhooge_flask.logging import logger
@@ -152,7 +152,7 @@ class Command:
 
             elif isinstance(param, PlayedParam):
                 # Try to find game from previously parsed args
-                game = None
+                game = user.default_game if user is not None else DEFAULT_GAME
                 for arg in parsed_args:
                     if arg in SUPPORTED_GAMES:
                         game = arg
@@ -999,6 +999,19 @@ def initialize_commands():
         mandatory_params=[RegularParam("champion_or_map")],
         optional_params=[GameParam("game"), TargetParam("person")],
         aliases=["winrate"]
+    )
+
+    # champion command
+    champion_name = "champion"
+    champion_desc = "Show your or someone else's stats on a specific champion."
+    register_command(
+        champion_name,
+        champion_desc,
+        handle_champion_msg,
+        access_level="self",
+        mandatory_params=[PlayedParam("champion")],
+        optional_params=[GameParam("game"), TargetParam("person")],
+        aliases=["champ"]
     )
 
     lan_name = "lan"

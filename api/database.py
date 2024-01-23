@@ -343,13 +343,13 @@ class Database(SQLiteDatabase):
                 player_condition = "AND g.first_blood = ?"
                 params = [disc_id]
             else:
-                player_select = "g.first_blood,"
+                player_select = "g.first_blood AS disc_id,"
                 player_condition = "GROUP BY g.first_blood"
 
             query = f"""
                 SELECT
                     {player_select}
-                    Count(DISTINCT g.game_id) AS c,
+                    Count(DISTINCT g.game_id) AS best,
                     games.c AS games,
                     NULL AS extreme,
                     NULL AS game_id
@@ -412,7 +412,7 @@ class Database(SQLiteDatabase):
                 ) best
                 INNER JOIN (
                     SELECT
-                        COUNT(*) AS c,
+                        COUNT(DISTINCT game_id) AS c,
                         p.game_id,
                         p.disc_id
                     FROM {stats_table} AS p
@@ -443,7 +443,10 @@ class Database(SQLiteDatabase):
         aggregator = "MAX" if maximize else "MIN"
 
         query = f"""
-            SELECT sub2.champ_id, {aggregator}(c) FROM (
+            SELECT
+                sub2.champ_id,
+                MAX(c)
+            FROM (
                 SELECT
                     sub.champ_id,
                     COUNT(*) AS c
@@ -453,9 +456,9 @@ class Database(SQLiteDatabase):
                         p.champ_id,
                         p.disc_id
                     FROM {stats_table} AS p
-                    JOIN {games_table} AS g
+                    INNER JOIN {games_table} AS g
                     ON g.game_id = p.game_id
-                    JOIN {users_table} AS u
+                    INNER JOIN {users_table} AS u
                     ON u.disc_id = p.disc_id
                     WHERE u.active = 1
                     GROUP BY p.game_id
@@ -609,7 +612,7 @@ class Database(SQLiteDatabase):
                 INNER JOIN {users_table} AS u
                     ON u.disc_id = played.disc_id
                 WHERE u.active = 1
-                    AND played.c > {min_games}
+                    AND played.c >= {min_games}
                     {player_condition}
                 GROUP BY played.disc_id
                 ORDER BY avg_val DESC
@@ -621,8 +624,7 @@ class Database(SQLiteDatabase):
                     played.disc_id,
                     stat_values.s / played.c AS avg_val,
                     CAST(played.c AS int)
-                FROM
-                (
+                FROM (
                     SELECT
                         disc_id,
                         SUM({stat}) AS s
@@ -630,8 +632,7 @@ class Database(SQLiteDatabase):
                     {champ_condition}
                     GROUP BY p.disc_id
                 ) stat_values
-                INNER JOIN
-                (
+                INNER JOIN (
                     SELECT
                         disc_id,
                         CAST(COUNT(DISTINCT g.game_id) as real) AS c
@@ -641,11 +642,11 @@ class Database(SQLiteDatabase):
                     {champ_condition}
                     GROUP BY p.disc_id
                 ) played
-                    ON played.disc_id = stat_values.disc_id
+                ON played.disc_id = stat_values.disc_id
                 INNER JOIN {users_table} AS u
-                    ON u.disc_id = played.disc_id
+                ON u.disc_id = played.disc_id
                 WHERE u.active = 1
-                    AND played.c > {min_games}
+                    AND played.c >= {min_games}
                 {player_condition}
                 GROUP BY played.disc_id
                 ORDER BY avg_val DESC
@@ -1879,6 +1880,22 @@ class Database(SQLiteDatabase):
 
             return games_with_person, doinks_with_person
 
+    def get_max_games_count(self, game):
+        stats_table = self._get_participants_table(game)
+        query = f"""
+            SELECT MAX(counts.c)
+            FROM (
+                SELECT COUNT(games.disc_id) AS c
+                FROM (
+                    SELECT disc_id
+                    FROM {stats_table}
+                ) games
+                GROUP BY disc_id
+            ) counts
+        """
+        with self:
+            return self.execute_query(query).fetchone()[0]
+
     def get_performance_score(self, game, disc_id=None):
         games_table = self._get_games_table(game)
         stats_table = self._get_participants_table(game)
@@ -1906,18 +1923,23 @@ class Database(SQLiteDatabase):
 
         stat_equations_str = " + ".join(stat_equations)
 
-        total = intfar_weight + doinks_weight + winrate_weight + (len(stat_keys) * stats_weight)
+        most_games = self.get_max_games_count(game)
+        games_weight = 0.25
+
+        total = (intfar_weight + doinks_weight + winrate_weight + games_weight + (len(stat_keys) * stats_weight)) / 2
         performance_range = 10
 
         equation = (
             f"(((1 - COALESCE(intfars.c / played.c, 0)) * {intfar_weight} + " +
             f"COALESCE(doinks.c / played.c, 0) * {doinks_weight} + " +
-            f"COALESCE(wins.c / played.c, 0) * {winrate_weight} + {stat_equations_str}) / {total}) * {performance_range}"
+            f"COALESCE(wins.c / played.c, 0) * {winrate_weight} + " +
+            f"(played.c / {most_games}) * {games_weight} + "
+            f"{stat_equations_str}) / {total}) * {performance_range}"
         )
         min_games = self.config.performance_mimimum_games
 
         query = f"""
-            SELECT sub.user, sub.score FROM (
+            SELECT sub.user, MIN(sub.score, {performance_range}) FROM (
                 SELECT
                     played.disc_id AS user,
                     {equation} AS score

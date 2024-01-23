@@ -13,7 +13,6 @@ from api.game_data import get_stat_parser, get_formatted_stat_names, get_stat_qu
 from api.game_api.lol import RiotAPIClient
 from api.game_api.cs2 import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
-from discbot.montly_intfar import MonthlyIntfar, MONTH_NAMES
 from discbot.discord_bot import DiscordClient
 
 class TestFuncs:
@@ -23,23 +22,8 @@ class TestFuncs:
         self.riot_api = riot_api
 
     def test_performance_score(self):
-        id_dave = 115142485579137029
-        id_murt = 172757468814770176
-        id_thomas = 219497453374668815
-        id_tobber = 235831136733888512
-        id_myggen = 248126657028685824
-        id_me = 267401734513491969
-        id_anton = 347489125877809155
-
-        game = "cs2"
-
-        print("Myggen:", self.database.get_performance_score(game, id_myggen))
-        print("Murt:", self.database.get_performance_score(game, id_murt))
-        print("Mikkel:", self.database.get_performance_score(game, id_me))
-        print("Anton:", self.database.get_performance_score(game, id_anton))
-        print("Thommy:", self.database.get_performance_score(game, id_thomas))
-        print("Dave:", self.database.get_performance_score(game, id_dave))
-        print("Tobber:", self.database.get_performance_score(game, id_tobber))
+        for stuff in self.database.get_performance_score("lol"):
+            print(stuff)
 
     def test_cool_stats(self):
         game_ids = self.database.get_game_ids()
@@ -270,6 +254,13 @@ class TestFuncs:
 
         timeline_events = awards_handler.get_cool_timeline_events()
         print(timeline_events)
+
+    def test_average_stats(self):
+        stats = self.database.get_average_stat_league("kda", 267401734513491969, min_games=1)
+        for row in stats:
+            print(row)
+
+        print(len(stats), "rows")
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

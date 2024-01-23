@@ -94,7 +94,7 @@ class RiotAPIClient(GameAPIClient):
             f_out = open(self.champions_file, "w", encoding="utf-8")
             json.dump(response_json, f_out)
             if old_files != []:
-                remove(old_files)
+                remove(old_files[0])
         except requests.exceptions.RequestException:
             logger.exception("Exception when getting newest champion.json file from Riot API.")
 
@@ -372,10 +372,9 @@ class RiotAPIClient(GameAPIClient):
         of their name. If only one candidate is found it is returned,
         if more are found, None is returned.
 
-        :param search_term: The search term to try and match champions against
-                            Should use _ in place of spaces and should not include
-                            . or ' (fx. Kai'sa should be Kaisa,
-                            Dr. Mundo should be Dr_Mundo)
+        :param search_term: The search term to try and match champions against.
+        Should use _ in place of spaces and should not include
+        . or ' (fx. Kai'sa should be Kaisa, Dr. Mundo should be Dr_Mundo)
         """
         search_name = search_term.strip().lower().replace("_", " ")
         candidates = []
@@ -388,7 +387,7 @@ class RiotAPIClient(GameAPIClient):
 
             if search_name in lowered:
                 candidates.append(champ_id)
-                break
+                continue
 
             # Remove apostrophe and period from name.
             if search_name in lowered.replace("'", "").replace(".", ""):

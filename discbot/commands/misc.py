@@ -271,35 +271,40 @@ async def handle_performance_msg(client, message, game, target_id=None):
     score_fmt += "These scores are" if target_id is None else "This score is"
     response += (
         f"\n{score_fmt} calculated using the ratio of " +
-        "games being Int-Far, getting doinks, or winning. " +
+        "games being Int-Far, getting doinks, winning, being best in a stat, and total games played. " +
         f"You must have a minimum of {min_games} games to get a score."
     )
 
     await message.channel.send(response)
 
-async def handle_winrate_msg(client, message, champ_or_map, game, target_id):
+def get_winrate(client, champ_or_map, game, target_id):
     winrate = None
     games = None
     qualified_name = None
 
-    played_id = client.api_clients[game].try_find_played(champ_or_map)
-    if played_id is None:
-        played_name = "champion" if game == "lol" else "map"
-        response = f"Not a valid {played_name}: `{champ_or_map}`."
+    if game == "lol":
+        winrate, games = client.database.get_league_champ_winrate(target_id, champ_or_map)
+        qualified_name = client.api_clients[game].get_champ_name(champ_or_map)
     else:
-        if game == "lol":
-            winrate, games = client.database.get_league_champ_winrate(target_id, played_id)
-            qualified_name = client.api_clients[game].get_champ_name(played_id)
-        else:
-            winrate, games = client.database.get_cs2_map_winrate(target_id, played_id)
-            qualified_name = client.api_clients[game].get_map_name(played_id)
+        winrate, games = client.database.get_cs2_map_winrate(target_id, champ_or_map)
+        qualified_name = client.api_clients[game].get_map_name(champ_or_map)
 
+    return qualified_name, winrate, games
+
+async def handle_winrate_msg(client, message, champ_or_map, game, target_id):
+    if champ_or_map is None:
+        played_name = "Champion" if game == "lol" else "Map"
+        await message.channel.send(f"{played_name} is not valid.")
+        return
+
+    qualified_name, winrate, games = get_winrate(client, champ_or_map, game, target_id)
+
+    user_name = client.get_discord_nick(target_id, message.guild.id)
     if winrate is not None:
-        user_name = client.get_discord_nick(target_id, message.guild.id)
         if games == 0:
             response = f"{user_name} has not played any games on {qualified_name}."
         else:
-            response = f"{user_name} has a **{winrate:.2f}%** winrate on {qualified_name} in **{int(games)}** games.\n"
+            response = f"{user_name} has a **{winrate:.2f}%** winrate on {qualified_name} in **{int(games)}** games."
     else:
         response = f"{user_name} has not played any games on {qualified_name}."
 
