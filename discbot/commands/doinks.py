@@ -2,23 +2,22 @@ from api.util import SUPPORTED_GAMES
 from api.awards import get_doinks_reasons, organize_doinks_stats
 
 async def handle_doinks_msg(client, message, game, target_id):
+    database = client.game_databases[game]
     doinks_reasons = get_doinks_reasons(game)
 
     def get_doinks_stats(disc_id, expanded=True):
         person_to_check = client.get_discord_nick(disc_id, message.guild.id)
-        doinks_reason_ids = client.database.get_doinks_stats(game, disc_id)
-        total_doinks = client.database.get_doinks_count(game, disc_id)[1]
+        doinks_reason_ids = database.get_doinks_stats(disc_id)
+        total_doinks = database.get_doinks_count(disc_id)[1]
         doinks_counts = organize_doinks_stats(game, doinks_reason_ids)
 
-        if game == "lol":
-            champ_id, champ_count = client.database.get_league_champ_with_most_doinks(disc_id)
-            champ_name = client.api_clients["lol"].get_champ_name(champ_id)
+        champ_id, champ_count = database.get_played_with_most_doinks(disc_id)
+        champ_name = client.api_clients[game].get_champ_name(champ_id)
 
         msg = f"{person_to_check} has earned {total_doinks} " + "{emote_Doinks}"
         if expanded and total_doinks > 0:
-            if game == "lol":
-                msg += "\nHe has earned the most {emote_Doinks} " 
-                msg += f"when playing **{champ_name}** (**{champ_count}** times)"
+            msg += "\nHe has earned the most {emote_Doinks} " 
+            msg += f"when playing **{champ_name}** (**{champ_count}** times)"
 
             reason_desc = "\n" + "Big doinks awarded so far:"
             for reason_id, reason in enumerate(doinks_reasons):
@@ -31,7 +30,7 @@ async def handle_doinks_msg(client, message, game, target_id):
     response = ""
     if target_id is None: # Check doinks for everyone.
         messages = []
-        for disc_id in client.database.users_by_game[game].keys():
+        for disc_id in database.game_users.keys():
             resp_str, doinks = get_doinks_stats(disc_id, expanded=False)
             messages.append((resp_str, doinks))
 
@@ -45,9 +44,10 @@ async def handle_doinks_msg(client, message, game, target_id):
     await message.channel.send(response)
 
 def get_doinks_relation_stats(client, game, target_id):
+    database = client.game_databases[game]
     data = []
-    games_relations, doinks_relations = client.database.get_doinks_relations(game, target_id)
-    doinks_games = client.database.get_doinks_count(game, target_id)[0]
+    games_relations, doinks_relations = database.get_doinks_relations(target_id)
+    doinks_games = database.get_doinks_count(target_id)[0]
     for disc_id, total_games in games_relations.items():
         doinks = doinks_relations.get(disc_id, 0)
         data.append(

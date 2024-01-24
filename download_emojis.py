@@ -1,20 +1,19 @@
-import threading
 import os
 from time import sleep
 
 import requests
 
-from api.database import Database
+from api.meta_database import MetaDatabase
 from api.config import Config
 from discbot.discord_bot import DiscordClient
 
 conf = Config()
 
-database_client = Database(conf)
+database_client = MetaDatabase(conf)
 
 client = DiscordClient(conf, database_client, None, None, None, None)
 
-def download_emojis(disc_client):
+def download_emojis(disc_client: DiscordClient):
     emoji_data = disc_client.get_all_emojis()
 
     folder = "misc/emojis"

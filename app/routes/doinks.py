@@ -21,9 +21,9 @@ def get_doinks_awards(game, database):
         "func", "get_discord_nick", None
     )
 
-    for disc_id in database.users_by_game[game].keys():
-        doinks_reasons = database.get_doinks_stats(game, disc_id)
-        total_doinks = database.get_doinks_count(game, disc_id)[1]
+    for disc_id in database.game_users.keys():
+        doinks_reasons = database.get_doinks_stats(disc_id)
+        total_doinks = database.get_doinks_count(disc_id)[1]
         unique_doinks = set()
         for doinks_str in doinks_reasons:
             doinks_indices = list(
@@ -53,8 +53,8 @@ def get_doinks_awards(game, database):
 @doinks_page.route('/')
 def home():
     game = flask.current_app.config["CURRENT_GAME"]
+    database = flask.current_app.config["GAME_DATABASES"][game]
 
-    database = flask.current_app.config["DATABASE"]
     doinks_data, doinks_counts, doinks_for_person = get_doinks_awards(game, database)
     return make_template_context(
         "doinks.html",

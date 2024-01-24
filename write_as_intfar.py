@@ -4,7 +4,7 @@ import io
 
 from api.betting import BettingHandler
 from api.config import Config
-from api.database import Database
+from api.meta_database import Database
 from api.bets import get_betting_handler
 from discbot.discord_bot import DiscordClient
 from api.util import GUILD_MAP, SUPPORTED_GAMES

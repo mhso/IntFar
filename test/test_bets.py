@@ -2,7 +2,7 @@ from time import time
 from test.runner import TestRunner, test
 from api.bets import get_betting_handler
 from api.betting import BettingHandler, MAX_BETTING_THRESHOLD
-from api.database import Database
+from api.meta_database import Database
 from api.config import Config
 from api.util import format_tokens_amount, SUPPORTED_GAMES
 from api.game_data.lol import LoLGameStats, LoLPlayerStats

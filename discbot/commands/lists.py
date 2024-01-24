@@ -7,7 +7,7 @@ async def handle_random_champ_msg(client, message, list_name=None):
     if list_name is None:
         champ_list = list(client.api_clients["lol"].champ_names.values())
     else:
-        champ_list = client.database.get_list_by_name(list_name)[1]
+        champ_list = client.game_databases["lol"].get_list_by_name(list_name)[1]
         if champ_list is not None:
             champ_list = [client.api_clients["lol"].champ_names[tup[1]] for tup in champ_list]
 
@@ -24,7 +24,7 @@ async def handle_random_champ_msg(client, message, list_name=None):
 
 async def handle_random_unplayed_msg(client, message, target_id):
     all_champs = set(client.api_clients["lol"].champ_names.keys())
-    played_champs = set(x[0] for x in client.database.get_played_league_champs(target_id))
+    played_champs = set(x[0] for x in client.game_databases["lol"].get_played_ids(target_id))
 
     unplayed_champs = [client.api_clients["lol"].get_champ_name(champ) for champ in (all_champs - played_champs)]
     if len(unplayed_champs) == 0: # All champs have been played.
@@ -38,7 +38,7 @@ async def handle_random_unplayed_msg(client, message, target_id):
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_champ_lists_msg(client, message, target_id=None):
-    lists = client.database.get_lists(target_id)
+    lists = client.game_databases["lol"].get_lists(target_id)
 
     if lists == []:
         response = (
@@ -67,11 +67,11 @@ async def handle_champ_lists_msg(client, message, target_id=None):
     await message.channel.send(response)
 
 async def handle_champs_msg(client, message, list_name):
-    list_id, champ_list = client.database.get_list_by_name(list_name)
+    list_id, champ_list = client.game_databases["lol"].get_list_by_name(list_name)
     if champ_list is None:
         response = f"No champion list found with the name `{list_name}` " + "{emote_sadge}"
     else:
-        name, owner_id = client.database.get_list_data(list_id)
+        name, owner_id = client.game_databases["lol"].get_list_data(list_id)
         owner_name = client.get_discord_nick(owner_id, message.guild.id)
         list_desc = f"The list `{name}` by {owner_name} "
 
@@ -95,7 +95,7 @@ async def handle_champs_msg(client, message, list_name):
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_create_list_msg(client, message, list_name):
-    success, response = lists.create_list(message.author.id, list_name, client.database)
+    success, response = lists.create_list(message.author.id, list_name, client.game_databases["lol"])
 
     if success:
         response = f"Champion list `{list_name}` has been created " + "{emote_poggers}"
@@ -109,7 +109,7 @@ async def handle_create_list_msg(client, message, list_name):
 def parse_champs_params(client, args):
     list_name = args[0]
 
-    list_id = client.database.get_list_by_name(list_name)[0]
+    list_id = client.game_databases["lol"].get_list_by_name(list_name)[0]
     if list_id is None:
         raise ValueError(f"No champion list found with the name `{list_name}` " + "{emote_sadge}")
 
@@ -128,10 +128,10 @@ def parse_champs_params(client, args):
 
 async def handle_add_champs(client, message, list_id, champ_ids):
     success, response = lists.add_champ_to_list(
-        message.author.id, list_id, champ_ids, client.api_clients["lol"], client.database
+        message.author.id, list_id, champ_ids, client.api_clients["lol"], client.game_databases["lol"]
     )
     if success:
-        list_name = client.database.get_list_data(list_id)[0]
+        list_name = client.game_databases["lol"].get_list_data(list_id)[0]
         response = f"{response} to `{list_name}`."
     else:
         response = f"Could not add champ to list: {response}."
@@ -139,11 +139,11 @@ async def handle_add_champs(client, message, list_id, champ_ids):
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_delete_list(client, message, list_name):
-    list_id = client.database.get_list_by_name(list_name)[0]
+    list_id = client.game_databases["lol"].get_list_by_name(list_name)[0]
     if list_id is None:
         response = f"No champion list found with the name `{list_name}` " + "{emote_sadge}"
     else:
-        success, response = lists.delete_list(message.author.id, list_id, client.database)
+        success, response = lists.delete_list(message.author.id, list_id, client.game_databases["lol"])
         if success:
             response = f"The list `{list_name}` has been deleted."
         else:
@@ -153,10 +153,10 @@ async def handle_delete_list(client, message, list_name):
 
 async def handle_remove_champ(client, message, list_id, champ_ids):
     success, response = lists.delete_by_champ_ids(
-        message.author.id, list_id, champ_ids, client.database
+        message.author.id, list_id, champ_ids, client.game_databases["lol"]
     )
     if success:
-        list_name = client.database.get_list_data(list_id)[0]
+        list_name = client.game_databases["lol"].get_list_data(list_id)[0]
         response = f"{response} from `{list_name}`."
     else:
         response = f"Could not remove champ from list: {response}."
@@ -202,7 +202,7 @@ async def handle_best_nochest(client, message, target_id=None):
         response = "You have already earned a chest on every champ {emote_woahpikachu}"
     else:
         # Get highest winrate of all the champs with no chest gained.
-        result = client.database.get_min_or_max_league_winrate_champ(
+        result = client.game_databases["lol"].get_min_or_max_winrate_played(
             target_id, True, no_chest_champs, return_top_n=5, min_games=3
         )
 

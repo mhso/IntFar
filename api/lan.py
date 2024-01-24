@@ -140,7 +140,6 @@ def get_average_stats(database, lan_info):
     stats_to_get = list(stat_quantity_desc)
 
     all_stats = database.get_player_stats(
-        game,
         stats_to_get,
         time_after=lan_info.start_time,
         time_before=lan_info.end_time,

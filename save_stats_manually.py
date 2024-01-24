@@ -5,8 +5,9 @@ from mhooge_flask.logging import logger
 
 from api.bets import get_betting_handler
 from api.game_apis import get_api_client
+from api.game_databases import get_database_client
 from api.config import Config
-from api.meta_database import Database
+from api.meta_database import MetaDatabase
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from discbot.discord_bot import DiscordClient
 
@@ -21,8 +22,8 @@ class MockChannel:
         await asyncio.sleep(0.1)
 
 class TestMock(DiscordClient):
-    def __init__(self, args, config, database, betting_handlers, api_clients, **kwargs):
-        super().__init__(config, database, betting_handlers, api_clients, **kwargs)
+    def __init__(self, args, config, database, game_databases, betting_handlers, api_clients, **kwargs):
+        super().__init__(config, database, game_databases, betting_handlers, api_clients, **kwargs)
         self.missing = args.missing
         self.game = args.game
         self.game_id = args.game_id
@@ -39,7 +40,7 @@ class TestMock(DiscordClient):
 
     def get_users_in_cs2_game(self, game_info):
         users_in_game = {}
-        all_users = self.meta_database.users_by_game[self.game]
+        all_users = self.game_databases["cs2"].game_users
         round_stats = game_info["matches"][0]["roundstatsall"]
 
         max_player_round = 0
@@ -61,7 +62,7 @@ class TestMock(DiscordClient):
 
     def get_users_in_lol_game(self, game_info):
         users_in_game = {}
-        all_users = self.meta_database.users_by_game[self.game]
+        all_users = self.game_databases["lol"].game_users
 
         for participant in game_info["participants"]:
             for disc_id in all_users.keys():
@@ -75,7 +76,7 @@ class TestMock(DiscordClient):
         await super(TestMock, self).on_ready()
 
         if self.missing:
-            ids_to_save = self.meta_database.get_missed_games(self.game)
+            ids_to_save = self.game_databases[self.game].get_missed_games()
         else:
             ids_to_save = [(self.game_id, self.guild_to_use)]
 
@@ -104,7 +105,7 @@ class TestMock(DiscordClient):
 
             await self.on_game_over(self.game, game_info, guild_id, status)
 
-            self.database.remove_missed_game(self.game, game_id)
+            self.game_databases[self.game].remove_missed_game(game_id)
 
     async def user_joined_voice(self, member, guild, poll=False):
         pass
@@ -138,13 +139,14 @@ conf.steam_2fa_code = args.steam_2fa_code
 
 logger.info("Initializing database...")
 
-database_client = Database(conf)
+meta_database = MetaDatabase(conf)
 
 logger.info("Starting Discord Client...")
 
-betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
+game_databases = {game: get_database_client(game, conf) for game in SUPPORTED_GAMES}
+betting_handlers = {game: get_betting_handler(game, conf, meta_database, game_databases[game]) for game in SUPPORTED_GAMES}
 api_clients = {game: get_api_client(game, conf) for game in SUPPORTED_GAMES}
 
-client = TestMock(args, conf, database_client, betting_handlers, api_clients)
+client = TestMock(args, conf, meta_database, game_databases, betting_handlers, api_clients)
 
 client.run(conf.discord_token)

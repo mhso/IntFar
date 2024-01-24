@@ -1,5 +1,5 @@
 from test.runner import TestRunner, test
-from api.database import Database
+from api.meta_database import Database
 from api.config import Config
 from api.shop import ShopHandler
 

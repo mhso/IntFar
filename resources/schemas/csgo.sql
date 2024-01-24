@@ -59,3 +59,15 @@ CREATE TABLE [participants] (
     [rank] INTEGER,
     PRIMARY KEY (game_id, disc_id)
 );
+CREATE TABLE [missed_games] (
+    [game_id] NVARCHAR(64) NOT NULL,
+    [guild_id] INTEGER NOT NULL,
+    [timestamp] INTEGER,
+    PRIMARY KEY (game_id, game)
+);
+CREATE TABLE [event_sounds] (
+    [disc_id] INTEGER NOT NULL,
+    [sound] NVARCHAR(24) NOT NULL,
+    [event] NVARCHAR(6) NOT NULL,
+    PRIMARY KEY (disc_id, game, event)
+);

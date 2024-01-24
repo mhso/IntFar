@@ -7,38 +7,39 @@ api_page = flask.Blueprint("api", __name__, template_folder="templates")
 
 @api_page.route("/statistics", methods=["GET"])
 def get_statistics():
-    database = flask.current_app.config["DATABASE"]
     game = flask.current_app.config["CURRENT_GAME"]
+    meta_database = flask.current_app.config["DATABASE"]
+    game_database = flask.current_app.config["GAME_DATABASES"][game]
 
     # Get authorization values from URL parameters and user_id header.
     disc_id = int(flask.request.args.get("disc_id"))
     user_id = flask.request.headers.get("User-Id")
 
-    if disc_id is None or app_util.get_logged_in_user(database, user_id) != disc_id:
+    if disc_id is None or app_util.get_logged_in_user(meta_database, user_id) != disc_id:
         return app_util.make_json_response(
             {"error": "You are not authorized to access this API."},
             http_code=403
         )
 
     try:
-        with database:
+        with game_database:
             # Get active games, if any are ongoing.
             active_games = app_util.get_game_info(game)
 
             # Get total games played and won.
-            games_played, _, games_won, _ = database.get_games_count(game)
+            games_played, _, games_won, _ = game_database.get_games_count()
             won_pct = float(f"{(games_won / games_played) * 100:.1f}")
 
             # Get total count of Int-Fars awarded.
-            intfars_total = database.get_intfar_count(game)
+            intfars_total = game_database.get_intfar_count()
             intfars_pct = float(f"{(intfars_total / games_played) * 100:.1f}")
 
             # Games where doinks were earned and total doinks earned.
-            doinks_games, doinks_total = database.get_doinks_count(game)
+            doinks_games, doinks_total = game_database.get_doinks_count()
             doinks_pct = float(f"{(doinks_games / games_played) * 100:.1f}")
 
             # Get Int-Far of the month leads.
-            monthly_intfars = database.get_intfars_of_the_month(game)
+            monthly_intfars = game_database.get_intfars_of_the_month()
 
         if monthly_intfars != []:
             tied_intfars = [monthly_intfars[0]]

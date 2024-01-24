@@ -3,7 +3,7 @@ import random
 
 from api.game_stats import GameStats
 from api.config import Config
-from api.database import Database
+from api.game_database import GameDatabase
 from api.util import load_flavor_texts, SUPPORTED_GAMES
 
 class AwardQualifiers(ABC):
@@ -145,7 +145,7 @@ class AwardQualifiers(ABC):
 
         return flavor_text_dict
 
-    def get_lifetime_stats(self, database: Database):
+    def get_lifetime_stats(self, database: GameDatabase):
         """
         Returns a list of lifetime awards for each player.
         These events include:
@@ -159,11 +159,11 @@ class AwardQualifiers(ABC):
         for stats in self.parsed_game_stats.filtered_player_stats:
             lifetime_mentions[stats.disc_id] = []
 
-            game_data = database.get_games_count(self.game, stats.disc_id)
+            game_data = database.get_games_count(stats.disc_id)
             total_games = game_data[0]
             total_wins = game_data[2]
-            total_intfars = database.get_intfar_count(self.game, stats.disc_id)
-            total_doinks = database.get_doinks_count(self.game, stats.disc_id)[1]
+            total_intfars = database.get_intfar_count(stats.disc_id)
+            total_doinks = database.get_doinks_count(stats.disc_id)[1]
 
             values = [total_games, total_wins, total_intfars, total_doinks]
             moduli = [1000, 1000, 100, 100]

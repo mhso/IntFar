@@ -7,8 +7,9 @@ lists_page = flask.Blueprint("lists", __name__, template_folder="templates")
 
 @lists_page.route('/')
 def home(error_msg=None, status=200):
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
     lists = database.get_lists()
+
     list_data = []
     for list_id, owner_id, list_name, list_count in lists:
         user_data = discord_request("func", ["get_discord_nick", "get_discord_avatar"],  owner_id)
@@ -20,7 +21,7 @@ def home(error_msg=None, status=200):
 
 @lists_page.route("/create", methods=["POST"])
 def create():
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
     data = flask.request.form
 
     logged_in_user = get_user_details()[0]
@@ -40,7 +41,7 @@ def order_list_items(items): # Sort items alphabetically.
 
 @lists_page.route("/<list_id>")
 def list_view(list_id, error_msg=None, status=200):
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
     riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
     list_id = int(list_id)
@@ -82,7 +83,7 @@ def list_view(list_id, error_msg=None, status=200):
 
 @lists_page.route("/<list_id>/rename", methods=["POST"])
 def rename(list_id):
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
     data = flask.request.form
 
     list_id = int(list_id)
@@ -101,7 +102,7 @@ def rename(list_id):
 
 @lists_page.route("/<list_id>/delete_list", methods=["POST"])
 def delete_list(list_id):
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
 
     list_id = int(list_id)
 
@@ -119,7 +120,7 @@ def delete_list(list_id):
 
 @lists_page.route("/<list_id>/add", methods=["POST"])
 def add_item(list_id):
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
     riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
     data = flask.request.form
 
@@ -141,7 +142,7 @@ def add_item(list_id):
 
 @lists_page.route("/<item_id>/delete_item", methods=["POST"])
 def delete_item(item_id):
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
 
     item_id = int(item_id)
 

@@ -110,7 +110,7 @@ class GameStats(ABC):
         ]
 
     @classmethod
-    def get_stats_from_db(cls, game: str, database, player_stats_cls: PlayerStats, game_id: int = None) -> tuple[list[dict], list[dict]]:
+    def get_stats_from_db(cls, database, player_stats_cls: PlayerStats, game_id: int = None) -> tuple[list[dict], list[dict]]:
         """
         Load stats from the database for all games or a single game
         as well as stats for players in the game(s).
@@ -118,8 +118,8 @@ class GameStats(ABC):
         game_stats_to_save = cls.stats_to_save()
         player_stats_to_save = player_stats_cls.stats_to_save()
 
-        game_stats = database.get_game_stats(game, game_stats_to_save, game_id)
-        player_stats = database.get_player_stats(game, player_stats_to_save, game_id)
+        game_stats = database.get_game_stats(game_stats_to_save, game_id)
+        player_stats = database.get_player_stats(player_stats_to_save, game_id)
 
         game_stats_dicts = [dict(zip(game_stats_to_save, stats)) for stats in game_stats]
 

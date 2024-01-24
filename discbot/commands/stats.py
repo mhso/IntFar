@@ -27,7 +27,7 @@ async def handle_average_msg_lol(client, message, stat, champ_id=None, disc_id=N
         champ_name = client.api_clients["lol"].get_champ_name(champ_id)
 
     minimum_games = 10 if champ_id is None else 5
-    values = client.database.get_average_stat_league(stat, disc_id, champ_id, minimum_games)
+    values = client.game_databases["lol"].get_average_stat(stat, disc_id, champ_id, minimum_games)
 
     for_all = disc_id is None
     readable_stat = stat.replace("_", " ")
@@ -80,7 +80,7 @@ async def handle_average_msg_cs2(client, message, stat, map_id=None, disc_id=Non
         map_name = client.api_clients["cs2"].get_map_name(map_id)
 
     minimum_games = 10 if map_id is None else 5
-    values = client.database.get_average_stat_cs2(stat, disc_id, map_id, minimum_games)
+    values = client.game_databases["cs2"].get_average_stat(stat, disc_id, map_id, minimum_games)
 
     for_all = disc_id is None
     readable_stat = stat.replace("_", " ")
@@ -147,9 +147,8 @@ def get_game_summary(client, game, game_id, target_id, guild_id):
     """
     game_stats = stats_from_database(
         game,
-        client.database,
+        client.game_databases[game],
         client.api_clients[game],
-        client.database.users_by_game[game],
         guild_id,
         game_id,
     )[0]
@@ -187,14 +186,14 @@ async def handle_stat_msg(client, message, best, game, stat, target_id):
                 target_id, # <- Who got the highest/lowest stat ever
                 min_or_max_value, # <- The highest/lowest value of the stat
                 game_id # <- The game where it happened
-            ) = client.database.get_most_extreme_stat(game, stat, maximize)
+            ) = client.game_databases[game].get_most_extreme_stat(stat, maximize)
         else:
             (
                 stat_count, # <- How many times the stat has occured
                 game_count, # <- How many games were the stat was relevant
                 min_or_max_value, # <- Highest/lowest occurance of the stat value
                 game_id
-            ) = client.database.get_best_or_worst_stat(game, stat, target_id, maximize)
+            ) = client.game_databases[game].get_best_or_worst_stat(stat, target_id, maximize)
 
         recepient = client.get_discord_nick(target_id, message.guild.id)
 
@@ -217,19 +216,18 @@ async def handle_stat_msg(client, message, best, game, stat, target_id):
                 if game_summary is not None:
                     response += f"\nHe got this when playing {game_summary}"
         else:
-            game_specific_desc = ""
+            played_id, played_count = client.game_databases[game].get_played_count_for_stat(
+                stat, maximize, target_id
+            )
+
             if game == "lol":
-                champ_id, champ_count = client.database.get_league_champ_count_for_stat(
-                    stat, maximize, target_id
-                )
-                champ_name = client.api_clients[game].get_champ_name(champ_id)
-                game_specific_desc = f"The champion he most often gets {readable_stat} with is **{champ_name}** (**{champ_count}** games).\n"
+                played_name = client.api_clients[game].get_champ_name(played_id)
+                played_type = "champion"
             elif game == "cs2":
-                map_id, map_count = client.database.get_cs2_map_count_for_stat(
-                    stat, maximize, target_id
-                )
-                map_name = client.api_clients[game].get_map_name(map_id)
-                game_specific_desc = f"The map he most often gets {readable_stat} on is **{map_name}** (**{map_count}** games)\n"
+                played_name = client.api_clients[game].get_map_name(played_id)
+                played_type = "map"
+
+            game_specific_desc = f"The {played_type} he most often gets {readable_stat} on is **{played_name}** (**{played_count}** games)\n"
 
             response = (
                 f"{recepient} has gotten {readable_stat} in a game " +
@@ -254,9 +252,8 @@ async def handle_match_history_msg(client, message, game, target_id=None):
 
     all_game_stats = stats_from_database(
         game,
-        client.database,
+        client.game_databases[game],
         client.api_clients[game],
-        client.database.users_by_game[game],
         message.guild.id,
     )
 
@@ -373,7 +370,7 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
         stat: get_formatted_stat_value(
             game,
             stat,
-            client.database.get_average_stat_league(stat, target_id, champ_id, 1)[0][1]
+            client.game_databases["lol"].get_average_stat(stat, target_id, champ_id, 1)[0][1]
         )
         for stat in stats_to_get
     }

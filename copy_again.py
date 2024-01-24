@@ -1,5 +1,5 @@
 import os
-from api.database import Database
+from api.meta_database import Database
 from api.config import Config
 
 conf_1 = Config()

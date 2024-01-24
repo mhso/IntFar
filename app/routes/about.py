@@ -7,14 +7,14 @@ about_page = flask.Blueprint("about", __name__, template_folder="templates")
 
 @about_page.route('/')
 def home():
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
 
     (
         games, earliest_game, games_won, unique_game_guilds,
         longest_game_duration, longest_game_time, users,
         doinks_games, total_doinks, intfars, games_ratios,
         intfar_ratios, intfar_multi_ratios
-    ) = database.get_meta_stats("lol")
+    ) = database.get_meta_stats()
 
     logged_in_user = app_util.get_user_details()[0]
 

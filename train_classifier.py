@@ -6,7 +6,7 @@ from ai import data, train, validate_classifier
 from ai.model import Model
 from api.config import Config
 from api.riot_api import RiotAPIClient
-from api.database import Database
+from api.meta_database import Database
 
 SEED = 2132412
 

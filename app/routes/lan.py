@@ -165,10 +165,12 @@ def get_data(lan_info):
         games_lost = games_played - games_won
         pct_won = (games_won / games_played) * 100
 
-        champs_played = database.get_league_champs_played(
-            time_after=lan_info.start_time,
-            time_before=lan_info.end_time,
-            guild_id=lan_info.guild_id
+        champs_played = len(
+            database.get_played_ids(
+                time_after=lan_info.start_time,
+                time_before=lan_info.end_time,
+                guild_id=lan_info.guild_id
+            )
         )
 
         dt_start = datetime.fromtimestamp(first_game_timestamp)
@@ -278,12 +280,13 @@ def get_data(lan_info):
         ]
 
         # TILT VALUE!!
-        recent_games = database.get_recent_game_results(
+        recent_games = database.get_games_results(
+            False,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
         )
-        tilt_value, tilt_color = lan_api.get_tilt_value(recent_games)
+        tilt_value, tilt_color = lan_api.get_tilt_value([x[0] for x in recent_games])
 
         # Team Comp ideas
         with open("resources/team_comps.txt") as fp:

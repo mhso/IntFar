@@ -2,10 +2,10 @@ from multiprocessing import Pipe, Process
 from multiprocessing.connection import wait
 from time import sleep
 
-from api.game_api.cs2 import SteamAPIClient
+from api.game_apis.cs2 import SteamAPIClient
 from test.runner import TestRunner, test
 from api.config import Config
-from api.database import Database
+from api.meta_database import MetaDatabase
 from api.proxy import ProxyManager
 
 def send_from_proc(proxy, conn):
@@ -22,7 +22,7 @@ class TestWrapper(TestRunner):
     def __init__(self):
         super().__init__()
         conf = Config()
-        db = Database(conf)
+        db = MetaDatabase(conf)
         db.clear_command_queue()
         self.steam_process = None
         self.proxy_manager = None

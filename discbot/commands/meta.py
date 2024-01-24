@@ -147,7 +147,7 @@ async def handle_status_msg(client, message, game):
         longest_game_time, users, doinks_games,
         total_doinks, intfars, games_ratios,
         intfar_ratios, intfar_multi_ratios
-    ) = client.database.get_meta_stats(game)
+    ) = client.game_databases[game].get_meta_stats()
 
     pct_games_won = (games_won / games) * 100
 
@@ -163,7 +163,7 @@ async def handle_status_msg(client, message, game):
     pct_doinks = int((doinks_games / games) * 100)
     earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
     doinks_emote = client.insert_emotes("{emote_Doinks}")
-    all_bets = client.database.get_bets(game, False)
+    all_bets = client.meta_database.get_bets(game, False)
 
     tokens_name = client.config.betting_tokens
     bets_won = 0

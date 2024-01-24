@@ -866,7 +866,7 @@ class CS2GameStatsParser(GameStatsParser):
         Get data for a given game, or all games if `game_id` is None, from the database
         and return a list of GameStats objects with the game data.
         """
-        all_game_stats, all_player_stats = CS2GameStats.get_stats_from_db(self.game, database, CS2PlayerStats, game_id)
+        all_game_stats, all_player_stats = CS2GameStats.get_stats_from_db(database, CS2PlayerStats, game_id)
 
         all_stats = []
         for game_stats, player_stats in zip(all_game_stats, all_player_stats):

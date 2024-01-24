@@ -1,5 +1,5 @@
 from datetime import datetime
-from api import config, database
+from api import config, meta_database
 from api.util import TimeZone, MONTH_NAMES
 
 class MonthlyIntfar:
@@ -127,7 +127,7 @@ class MonthlyIntfar:
 if __name__ == "__main__":
     conf = config.Config()
     monthly_monitor = MonthlyIntfar(conf.hour_of_ifotm_announce)
-    db_client = database.Database(conf)
+    db_client = meta_database.Database(conf)
     details = db_client.get_intfars_of_the_month()
     # details = [
     #     (1, 40, 12, 30),

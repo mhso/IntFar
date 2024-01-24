@@ -7,26 +7,29 @@ from dateutil.relativedelta import relativedelta
 from api.lan import LAN_PARTIES
 
 from app.routes.soundboard import normalize_sound_volume
-from api import award_qualifiers, config, database, util
+from api import award_qualifiers, config, util
+from api.meta_database import MetaDatabase
+from api.game_database import GameDatabase
 from api.awards import get_awards_handler
 from api.game_data import get_stat_parser, get_formatted_stat_names, get_stat_quantity_descriptions
-from api.game_api.lol import RiotAPIClient
-from api.game_api.cs2 import SteamAPIClient
+from api.game_apis.lol import RiotAPIClient
+from api.game_apis.cs2 import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
 from discbot.discord_bot import DiscordClient
 
 class TestFuncs:
-    def __init__(self, config, database: database.Database, riot_api):
+    def __init__(self, config, meta_database: MetaDatabase, game_databases: dict[str, GameDatabase], riot_api):
         self.config = config
-        self.database = database
+        self.meta_database = meta_database
+        self.game_databases = game_databases
         self.riot_api = riot_api
 
     def test_performance_score(self):
-        for stuff in self.database.get_performance_score("lol"):
+        for stuff in self.game_databases["lol"].get_performance_score():
             print(stuff)
 
     def test_cool_stats(self):
-        game_ids = self.database.get_game_ids()
+        game_ids = self.game_databases["lol"].get_game_ids()
 
         max_count = 20
         threshold = 7
@@ -61,7 +64,7 @@ class TestFuncs:
 
     def test_unplayed_champs(self):
         all_champs = set(self.riot_api.champ_names.keys())
-        played_champs = set(x[0] for x in self.database.get_played_champs(ADMIN_DISC_ID))
+        played_champs = set(x[0] for x in self.game_databases["lol"].get_played_champs(ADMIN_DISC_ID))
 
         unplayed_champs = [self.riot_api.get_champ_name(champ) for champ in (all_champs - played_champs)]
         for champ in unplayed_champs:
@@ -71,7 +74,7 @@ class TestFuncs:
         game_id = 6678873918
         guild_id = 803987403932172359
         game_data = self.riot_api.get_game_details(game_id)
-        parser = get_stat_parser("lol", game_data, self.riot_api, self.database.users_by_game["lol"], guild_id)
+        parser = get_stat_parser("lol", game_data, self.riot_api, self.game_databases["lol"].game_users, guild_id)
         parsed_stats = parser.parse_data()
 
         intfar_data = get_awards_handler("lol", self.config, parsed_stats).get_intfar()
@@ -83,8 +86,7 @@ class TestFuncs:
         stat_quantity_desc = get_stat_quantity_descriptions(game)
         stats_to_get = list(stat_quantity_desc)
 
-        all_stats = self.database.get_player_stats(
-            game,
+        all_stats = self.game_databases["lol"].get_player_stats(
             stats_to_get,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
@@ -128,7 +130,7 @@ class TestFuncs:
         game_id = 6748316771
         game = "lol"
         game_data = self.riot_api.get_game_details(game_id)
-        parser = get_stat_parser(game, game_data, self.riot_api, self.database.users_by_game["lol"], 803987403932172359)
+        parser = get_stat_parser(game, game_data, self.riot_api, self.game_databases["lol"].game_users, 803987403932172359)
         parsed_game_stats = parser.parse_data()
         awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
 
@@ -140,21 +142,6 @@ class TestFuncs:
         files = glob("app/static/sounds/*.mp3")
         for filename in files:
             normalize_sound_volume(filename)
-
-    def test_stuffs(self):
-        count_me = 0
-        counts = {}
-        with open("stsfas.txt") as fp:
-            for line in fp:
-                split = line[1:-2].split(",")
-                if split[2].strip() == "267401734513491969":
-                    count_me += 1
-
-                    champ_id = split[1].strip()
-                    new_count = counts.get(champ_id, 0) + 1
-                    counts[champ_id] = new_count
-
-        print(max(list(counts.items()), key=lambda x: x[1]))
 
     def test_ifotm(self):
         client = DiscordClient(CONFIG, DATABASE, None, {"lol": RIOT_API, "cs2": None})
@@ -179,8 +166,9 @@ class TestFuncs:
         print(lifetime_stats)
 
     def test_games_count(self):
-        games_count_me = self.database.get_games_count(115142485579137029)
-        games_count_all = self.database.get_games_count()
+        database = self.game_databases["lol"]
+        games_count_me = database.get_games_count(115142485579137029)
+        games_count_all = database.get_games_count()
         print(games_count_me)
         print(games_count_all)
 
@@ -195,13 +183,13 @@ class TestFuncs:
         client.run(CONFIG.discord_token)
 
     def test_monthly_intfar(self):
-        stats = self.database.get_intfar_stats("lol", 267401734513491969, True)
+        stats = self.game_databases["lol"].get_intfar_stats(267401734513491969, True)
         print(stats)
 
     def test_steam_api(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
 
-        api_client = steam_api.SteamAPIClient(self.config)
+        api_client = SteamAPIClient(self.config)
         match_token = "CSGO-6Pntd-wC8iV-ELKBc-bUcdG-pJGrL"
 
         game_data = api_client.get_game_details(match_token)
@@ -221,7 +209,7 @@ class TestFuncs:
 
     def test_cs_sharecode(self):
         api_client = SteamAPIClient("cs2", self.config)
-        user = self.database.users_by_game["cs2"][267401734513491969]
+        user = self.game_databases["cs2"].game_users[267401734513491969]
         print(user.latest_match_token[0])
         next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], "CSGO-DARih-4Y65Q-AHxyw-e9ZBZ-FFzQN")
         print(next_code)
@@ -235,7 +223,7 @@ class TestFuncs:
         with open(f"data_{sharecode}.json", "w", encoding="utf-8") as fp:
             json.dump(game_stats, fp)
 
-        parser = get_stat_parser("cs2", game_stats, api_client, self.database.users_by_game["cs2"], 619073595561213953)
+        parser = get_stat_parser("cs2", game_stats, api_client, self.game_databases["cs2"].game_users, 619073595561213953)
         data = parser.parse_data()
 
     def test_format_stats(self):
@@ -248,7 +236,7 @@ class TestFuncs:
         game = "lol"
 
         game_stats = self.riot_api.get_game_details(game_id)
-        parser = get_stat_parser(game, game_stats, self.riot_api, self.database.users_by_game[game], 512363920044982272)
+        parser = get_stat_parser(game, game_stats, self.riot_api, self.game_databases[game].game_users, 512363920044982272)
         parsed_game_stats = parser.parse_data()
         awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
 
@@ -256,7 +244,7 @@ class TestFuncs:
         print(timeline_events)
 
     def test_average_stats(self):
-        stats = self.database.get_average_stat_league("kda", 267401734513491969, min_games=1)
+        stats = self.game_databases["lol"].get_average_stat("kda", 267401734513491969, min_games=1)
         for row in stats:
             print(row)
 
@@ -266,10 +254,11 @@ if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
 
     CONFIG = config.Config()
-    DATABASE = database.Database(CONFIG)
+    META_DATABASE = MetaDatabase(CONFIG)
+    GAME_DATABASES = {game: GameDatabase(game, CONFIG) for game in util.SUPPORTED_GAMES}
     RIOT_API = RiotAPIClient("lol", CONFIG)
 
-    TEST_RUNNER = TestFuncs(CONFIG, DATABASE, RIOT_API)
+    TEST_RUNNER = TestFuncs(CONFIG, META_DATABASE, GAME_DATABASES, RIOT_API)
     FUNCS = [
         func.replace("test_", "")
         for func in TEST_RUNNER.__dir__() if func.startswith("test_")

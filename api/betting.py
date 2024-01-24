@@ -6,7 +6,9 @@ from abc import ABC, abstractmethod
 
 from mhooge_flask.logging import logger
 
-from api.database import DBException, Database
+from mhooge_flask.database import DBException
+from api.meta_database import MetaDatabase
+from api.game_database import GameDatabase
 from api.config import Config
 from api.util import format_duration, round_digits, format_tokens_amount, parse_amount_str, SUPPORTED_GAMES
 from api.game_stats import GameStats
@@ -108,10 +110,11 @@ class BetResolver(ABC):
         raise ValueError("Could not match bet with the proper resolver!")
 
 class BettingHandler(ABC):
-    def __init__(self, game: str, config: Config, database: Database):
+    def __init__(self, game: str, config: Config, meta_database: MetaDatabase, game_database: GameDatabase):
         self.game = game
         self.config = config
-        self.database = database
+        self.meta_database = meta_database
+        self.game_database = game_database
 
         self.betting_tokens_for_win = config.betting_tokens_for_win
         self.betting_tokens_for_loss = config.betting_tokens_for_loss
@@ -138,23 +141,23 @@ class BettingHandler(ABC):
     def get_intfar_return(self, bet: Bet, target_id: int):
         is_intfar = bet.event_id == "intfar"
         if target_id is None or not is_intfar:
-            games_total = self.database.get_games_count(self.game)[0]
-            intfars_total = self.database.get_intfar_count(self.game)
+            games_total = self.game_database.get_games_count()[0]
+            intfars_total = self.game_database.get_intfar_count()
             intfar_count = intfars_total if is_intfar else games_total - intfars_total
             return intfar_count, games_total
 
-        games_played, intfar_reason_ids = self.database.get_intfar_stats(self.game, target_id)
+        games_played, intfar_reason_ids = self.game_database.get_intfar_stats(target_id)
         return len(intfar_reason_ids), games_played
 
     def get_intfar_reason_return(self, intfar_index: int, target_id: int):
         reason_count = 0
         num_games = 0
         if target_id is None:
-            intfar_reason_ids = self.database.get_intfar_reason_counts(self.game)[0]
-            num_games = self.database.get_games_count(self.game)[0]
+            intfar_reason_ids = self.game_database.get_intfar_reason_counts()[0]
+            num_games = self.game_database.get_games_count()[0]
             reason_count = intfar_reason_ids[intfar_index]
         else:
-            num_games, intfar_reason_ids = self.database.get_intfar_stats(self.game, target_id)
+            num_games, intfar_reason_ids = self.game_database.get_intfar_stats(target_id)
             for reason_id in intfar_reason_ids:
                 if reason_id[0][intfar_index] == "1":
                     reason_count += 1
@@ -163,24 +166,24 @@ class BettingHandler(ABC):
 
     def get_doinks_return(self, target_id: int):
         if target_id is None:
-            games_total = self.database.get_games_count(self.game)[0]
-            doinks_count = self.database.get_doinks_count(self.game)[0]
+            games_total = self.game_database.get_games_count()[0]
+            doinks_count = self.game_database.get_doinks_count()[0]
             return doinks_count, games_total
 
-        games_played = self.database.get_games_count(self.game, target_id)[0]
-        doinks_count = self.database.get_doinks_count(self.game, target_id)[0]
+        games_played = self.game_database.get_games_count(target_id)[0]
+        doinks_count = self.game_database.get_doinks_count(target_id)[0]
         return doinks_count, games_played
 
     def get_doinks_reason_return(self, doinks_index: int, target_id: int):
         reason_count = 0
         num_games = 0
         if target_id is None:
-            doinks_reason_ids = self.database.get_doinks_reason_counts(self.game)
-            num_games = self.database.get_games_count(self.game)[0]
+            doinks_reason_ids = self.game_database.get_doinks_reason_counts()
+            num_games = self.game_database.get_games_count()[0]
             reason_count = doinks_reason_ids[doinks_index]
         else:
-            num_games = self.database.get_games_count(self.game, target_id)[0]
-            doinks_reason_ids = self.database.get_doinks_stats(self.game, target_id)
+            num_games = self.game_database.get_games_count(target_id)[0]
+            doinks_reason_ids = self.game_database.get_doinks_stats(target_id)
             for reason_id in doinks_reason_ids:
                 if reason_id[0][doinks_index] == "1":
                     reason_count += 1
@@ -188,14 +191,14 @@ class BettingHandler(ABC):
         return reason_count, num_games
 
     def get_stats_return(self, stat, target_id):
-        result = self.database.get_best_or_worst_stat(self.game, stat, target_id)
+        result = self.game_database.get_best_or_worst_stat(stat, target_id)
         if result is None:
             return 0, 0
 
         return result[0], result[1]
 
     def award_tokens_for_playing(self, disc_id, tokens_gained):
-        self.database.update_token_balance(disc_id, tokens_gained, True)
+        self.meta_database.update_token_balance(disc_id, tokens_gained, True)
 
     def get_dynamic_bet_desc(self, event: str, target_person: str=None):
         bet_desc = self.get_bet(event).description
@@ -342,7 +345,7 @@ class BettingHandler(ABC):
 
         for bet_id in bet_ids:
             try:
-                self.database.mark_bet_as_resolved(
+                self.meta_database.mark_bet_as_resolved(
                     bet_id, game_stats.game_id, timestamp, all_success, total_value
                 )
             except DBException:
@@ -350,7 +353,7 @@ class BettingHandler(ABC):
                 return
 
         if all_success: # Only award points if all bets were won
-            self.database.update_token_balance(disc_id, total_value, True)
+            self.meta_database.update_token_balance(disc_id, total_value, True)
 
         return all_success, total_value
 
@@ -486,7 +489,7 @@ class BettingHandler(ABC):
 
             return (False, err_msg)
 
-        if self.database.get_bet_id(self.game, disc_id, guild_id, event_id, bet_target, ticket) is not None:
+        if self.meta_database.get_bet_id(self.game, disc_id, guild_id, event_id, bet_target, ticket) is not None:
             err_msg = self._get_bet_error_msg(bet_desc, "Such a bet has already been made!")
             return (False, err_msg)
 
@@ -528,7 +531,7 @@ class BettingHandler(ABC):
         IDs of the bet, which are necessary if the bet should be cancelled.
         """
         tokens_name = self.config.betting_tokens
-        ticket = None if len(amounts) == 1 else self.database.generate_ticket_id(disc_id)
+        ticket = None if len(amounts) == 1 else self.meta_database.generate_ticket_id(disc_id)
         bet_data = []
         reward_equation = ""
         game_duration = 0
@@ -540,7 +543,7 @@ class BettingHandler(ABC):
         used_events = set()
 
         try:
-            balance = self.database.get_token_balance(disc_id)
+            balance = self.meta_database.get_token_balance(disc_id)
             running_cost = 0 # Total cost of the bet
 
             # Run through betting amounts, events, target discord IDs, and target names
@@ -577,7 +580,7 @@ class BettingHandler(ABC):
             # Run through the parsed bet data and generate a string describing
             # the bet and the potential reward it could give
             for amount, event_id, bet_target, base_return, bet_desc in bet_data:
-                bet_id = self.database.make_bet(
+                bet_id = self.meta_database.make_bet(
                     self.game,
                     disc_id,
                     guild_id,
@@ -683,15 +686,15 @@ class BettingHandler(ABC):
         if game_timestamp is not None: # Game has already started.
             return (False, "Bet was not cancelled: Game is underway!")
 
-        if ticket is None and self.database.get_better_id(bet_id) != disc_id:
+        if ticket is None and self.meta_database.get_better_id(bet_id) != disc_id:
             return (False, "Bet was not cancelled: Bet does not exist, or you don't own the bet!")
 
         if ticket is None:
-            amount_refunded = self.database.cancel_bet(bet_id, disc_id)
+            amount_refunded = self.meta_database.cancel_bet(bet_id, disc_id)
         else:
-            amount_refunded = self.database.cancel_multi_bet(ticket, disc_id)
+            amount_refunded = self.meta_database.cancel_multi_bet(ticket, disc_id)
 
-        new_balance = self.database.get_token_balance(disc_id)
+        new_balance = self.meta_database.get_token_balance(disc_id)
 
         return (True, (new_balance, amount_refunded))
 
@@ -734,7 +737,7 @@ class BettingHandler(ABC):
                 return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
 
         try:
-            bet_id = self.database.get_bet_id(self.game, disc_id, guild_id, event_id, target_id, ticket)
+            bet_id = self.meta_database.get_bet_id(self.game, disc_id, guild_id, event_id, target_id, ticket)
             if bet_id is None:
                 return (
                     False,
@@ -789,7 +792,7 @@ class BettingHandler(ABC):
         balance = 0
         tokens_name = self.config.betting_tokens
         try:
-            balance = self.database.get_token_balance(disc_id)
+            balance = self.meta_database.get_token_balance(disc_id)
         except DBException:
             print_exc()
             err_msg = self._get_gift_err_msg("Database error occured :(")
@@ -808,13 +811,13 @@ class BettingHandler(ABC):
             return (False, err_msg)
 
         try:
-            self.database.give_tokens(disc_id, amount, receiver_id)
+            self.meta_database.give_tokens(disc_id, amount, receiver_id)
         except DBException:
             print_exc()
             err_msg = self._get_gift_err_msg("Database error occured :(")
             return (False, err_msg)
 
-        receiver_balance = self.database.get_token_balance(receiver_id)
+        receiver_balance = self.meta_database.get_token_balance(receiver_id)
 
         response = f"Transfer of **{format_tokens_amount(amount)}** {tokens_name} to {receiver_name} succesfully made.\n"
         response += f"You now have **{format_tokens_amount(balance - amount)}** {tokens_name}.\n"

@@ -5,13 +5,6 @@ CREATE TABLE [users] (
     [secret] NVARCHAR(32) NOT NULL,
     [reports] INTEGER DEFAULT(0)
 );
-CREATE TABLE [missed_games] (
-    [game_id] NVARCHAR(64) NOT NULL,
-    [game] NVARCHAR(64) NOT NULL,
-    [guild_id] INTEGER NOT NULL,
-    [timestamp] INTEGER,
-    PRIMARY KEY (game_id, game)
-);
 CREATE TABLE [betting_balance] (
     [disc_id] INTEGER PRIMARY KEY,
     [tokens] INTEGER
@@ -30,13 +23,6 @@ CREATE TABLE [bets] (
     [ticket] INTEGER,
     [result] INTEGER(2),
     [payout] INTEGER
-);
-CREATE TABLE [event_sounds] (
-    [disc_id] INTEGER NOT NULL,
-    [game] NVARCHAR(64) NOT NULL,
-    [sound] NVARCHAR(24) NOT NULL,
-    [event] NVARCHAR(6) NOT NULL,
-    PRIMARY KEY (disc_id, game, event)
 );
 CREATE TABLE [shop_items] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -105,24 +105,25 @@ async def handle_flirtation_msg(client, message, language):
 
 async def handle_lol_summary_msg(client, message, target_id):
     game = "lol"
+    database = client.game_databases[game]
 
     # Shows information about various stats a person has accrued.
     nickname = client.get_discord_nick(target_id, message.guild.id)
-    games_played = client.database.get_intfar_stats(game, target_id)[0]
-    champs_played = client.database.get_league_champs_played(target_id)
+    games_played = database.get_intfar_stats(target_id)[0]
+    champs_played = len(database.get_played_ids(target_id))
 
-    total_winrate = client.database.get_total_winrate(game, target_id)
+    total_winrate = database.get_total_winrate(target_id)
     total_champs = len(client.api_clients[game].champ_ids)
 
-    longest_win_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 1)
-    longest_loss_streak = client.database.get_longest_win_or_loss_streak(game, target_id, -1)
+    longest_win_streak = database.get_longest_win_or_loss_streak(target_id, 1)
+    longest_loss_streak = database.get_longest_win_or_loss_streak(target_id, -1)
 
-    best_champ_wr, best_champ_games, best_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, True)
-    worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_league_winrate_champ(target_id, False)
+    best_champ_wr, best_champ_games, best_champ_id = database.get_min_or_max_winrate_played(target_id, True)
+    worst_champ_wr, worst_champ_games, worst_champ_id = database.get_min_or_max_winrate_played(target_id, False)
 
     if best_champ_id == worst_champ_id:
         # Person has not played 10 games with any champ. Try to get stats with 5 minimum games.
-        worst_champ_wr, worst_champ_games, worst_champ_id = client.database.get_min_or_max_league_winrate_champ(
+        worst_champ_wr, worst_champ_games, worst_champ_id = database.get_min_or_max_winrate_played(
             target_id, False, min_games=5
         )
 
@@ -146,11 +147,11 @@ async def handle_lol_summary_msg(client, message, target_id):
             f"**{worst_champ_wr:.1f}%** of **{worst_champ_games}** games).\n"
         )
 
-    best_person_id, best_person_games, best_person_wr = client.database.get_winrate_relation(game, target_id, True)
-    worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(game, target_id, False)
+    best_person_id, best_person_games, best_person_wr = database.get_winrate_relation(target_id, True)
+    worst_person_id, worst_person_games, worst_person_wr = database.get_winrate_relation(target_id, False)
 
     if best_person_id == worst_person_id:
-        worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(game, target_id, False, min_games=5)
+        worst_person_id, worst_person_games, worst_person_wr = database.get_winrate_relation(target_id, False, min_games=5)
 
     # If person has not played a minimum of 5 games with any person, skip person winrate stats.
     if best_person_wr is not None and worst_person_wr is not None and best_person_id != worst_person_id:
@@ -164,7 +165,7 @@ async def handle_lol_summary_msg(client, message, target_id):
         )
 
     # Get performance score for person.
-    score, rank, num_scores = client.database.get_performance_score(game, target_id)
+    score, rank, num_scores = database.get_performance_score(target_id)
 
     response += (
         f"The *Personally Evaluated Normalized Int-Far Score* for {nickname} is " +
@@ -175,24 +176,25 @@ async def handle_lol_summary_msg(client, message, target_id):
 
 async def handle_cs2_summary_msg(client, message, target_id):
     game = "cs2"
+    database = client.game_databases[game]
 
     # Shows information about various stats a person has accrued.
     nickname = client.get_discord_nick(target_id, message.guild.id)
-    games_played = client.database.get_intfar_stats(game, target_id)[0]
-    maps_played = client.database.get_cs2_maps_played(target_id)
+    games_played = database.get_intfar_stats(target_id)[0]
+    maps_played = len(database.get_played_ids(target_id))
 
-    total_winrate = client.database.get_total_winrate(game, target_id)
+    total_winrate = database.get_total_winrate(target_id)
     total_maps = len(client.api_clients[game].map_names)
 
-    longest_win_streak = client.database.get_longest_win_or_loss_streak(game, target_id, 1)
-    longest_loss_streak = client.database.get_longest_win_or_loss_streak(game, target_id, -1)
+    longest_win_streak = database.get_longest_win_or_loss_streak(target_id, 1)
+    longest_loss_streak = database.get_longest_win_or_loss_streak(target_id, -1)
 
-    best_map_wr, best_map_games, best_map_id = client.database.get_min_or_max_cs2_winrate_map(target_id, True)
-    worst_map_wr, worst_map_games, worst_map_id = client.database.get_min_or_max_cs2_winrate_map(target_id, False)
+    best_map_wr, best_map_games, best_map_id = database.get_min_or_max_winrate_played(target_id, True)
+    worst_map_wr, worst_map_games, worst_map_id = database.get_min_or_max_winrate_played(target_id, False)
 
     if best_map_id == worst_map_id:
         # Person has not played 10 games with any champ. Try to get stats with 5 minimum games.
-        worst_map_wr, worst_map_games, worst_map_id = client.database.get_min_or_max_cs2_winrate_map(
+        worst_map_wr, worst_map_games, worst_map_id = database.get_min_or_max_winrate_played(
             target_id, False, min_games=5
         )
 
@@ -216,11 +218,11 @@ async def handle_cs2_summary_msg(client, message, target_id):
             f"**{worst_map_wr:.1f}%** of **{worst_map_games}** games).\n"
         )
 
-    best_person_id, best_person_games, best_person_wr = client.database.get_winrate_relation(game, target_id, True)
-    worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(game, target_id, False)
+    best_person_id, best_person_games, best_person_wr = database.get_winrate_relation(target_id, True)
+    worst_person_id, worst_person_games, worst_person_wr = database.get_winrate_relation(target_id, False)
 
     if best_person_id == worst_person_id:
-        worst_person_id, worst_person_games, worst_person_wr = client.database.get_winrate_relation(game, target_id, False, min_games=5)
+        worst_person_id, worst_person_games, worst_person_wr = database.get_winrate_relation(target_id, False, min_games=5)
 
     # If person has not played a minimum of 5 games with any person, skip person winrate stats.
     if best_person_wr is not None and worst_person_wr is not None and best_person_id != worst_person_id:
@@ -234,7 +236,7 @@ async def handle_cs2_summary_msg(client, message, target_id):
         )
 
     # Get performance score for person.
-    score, rank, num_scores = client.database.get_performance_score(game, target_id)
+    score, rank, num_scores = database.get_performance_score(target_id)
 
     response += (
         f"The *Personally Evaluated Normalized Int-Far Score* for {nickname} is " +
@@ -250,7 +252,7 @@ async def handle_summary_msg(client, message, game, target_id):
         return await handle_cs2_summary_msg(client, message, target_id)
 
 async def handle_performance_msg(client, message, game, target_id=None):
-    performance_data = client.database.get_performance_score(game, target_id)
+    performance_data = client.game_databases[game].get_performance_score(target_id)
     game_name = api_util.SUPPORTED_GAMES[game]
     if target_id is None:
         response = f"*Personally Evaluated Normalized Int-Far Scores* for {game_name} for all users:"
@@ -282,11 +284,10 @@ def get_winrate(client, champ_or_map, game, target_id):
     games = None
     qualified_name = None
 
+    winrate, games = client.database.get_played_winrate(target_id, champ_or_map)
     if game == "lol":
-        winrate, games = client.database.get_league_champ_winrate(target_id, champ_or_map)
         qualified_name = client.api_clients[game].get_champ_name(champ_or_map)
     else:
-        winrate, games = client.database.get_cs2_map_winrate(target_id, champ_or_map)
         qualified_name = client.api_clients[game].get_map_name(champ_or_map)
 
     return qualified_name, winrate, games

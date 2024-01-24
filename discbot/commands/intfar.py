@@ -2,12 +2,13 @@ import api.util as api_util
 from api.awards import get_intfar_reasons, get_intfar_criterias_desc, organize_intfar_stats
 
 async def handle_intfar_msg(client, message, game, target_id):
+    database = client.game_databases[game]
     current_month = api_util.current_month()
     intfar_reasons = get_intfar_reasons(game)
 
     def format_for_all(disc_id, monthly=False):
         person_to_check = client.get_discord_nick(disc_id, message.guild.id)
-        games_played, intfar_reason_ids = client.database.get_intfar_stats(game, disc_id, monthly)
+        games_played, intfar_reason_ids = database.get_intfar_stats(disc_id, monthly)
         games_played, intfars, _, pct_intfar = organize_intfar_stats(game, games_played, intfar_reason_ids)
         msg = f"{person_to_check}: Int-Far **{intfars}** times "
         msg += f"**({pct_intfar:.2f}%** of {games_played} games) "
@@ -16,25 +17,24 @@ async def handle_intfar_msg(client, message, game, target_id):
 
     def format_for_single(disc_id):
         person_to_check = client.get_discord_nick(disc_id, message.guild.id)
-        games_played, intfar_reason_ids = client.database.get_intfar_stats(game, disc_id, False)
+        games_played, intfar_reason_ids = database.get_intfar_stats(disc_id, False)
         games_played, intfars, intfar_counts, pct_intfar = organize_intfar_stats(game, games_played, intfar_reason_ids)
-        intfars_of_the_month = client.database.get_intfars_of_the_month(game)
+        intfars_of_the_month = database.get_intfars_of_the_month()
         user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
 
+        played_id, played_count = database.get_played_with_most_intfars(disc_id)
         if game == "lol":
-            champ_id, champ_count = client.database.get_champ_with_most_intfars(disc_id)
-            champ_name = client.api_clients["lol"].get_champ_name(champ_id)
+            played_name = client.api_clients["lol"].get_champ_name(played_id)
+        elif game == "cs2":
+            played_name = client.api_clients["cs2"].get_map_name(played_id)
 
         msg = f"{person_to_check} has been Int-Far **{intfars}** times "
         msg += "{emote_unlimited_chins}"
         if intfars > 0:
-            monthly_games, monthly_infar_ids = client.database.get_intfar_stats(game, disc_id, True)
+            monthly_games, monthly_infar_ids = database.get_intfar_stats(disc_id, True)
             monthly_games, monthly_intfars, _, pct_monthly = organize_intfar_stats(game, monthly_games, monthly_infar_ids)
 
-            if game == "lol":
-                ratio_desc = f"\nHe has inted the most when playing **{champ_name}** (**{champ_count}** times)"
-            else:
-                ratio_desc = ""
+            ratio_desc = f"\nHe has inted the most when playing **{played_name}** (**{played_count}** times)"
             ratio_desc += f"\nIn total, he was Int-Far in **{pct_intfar:.2f}%** of his "
             ratio_desc += f"{games_played} games played.\n"
             ratio_desc += f"In {current_month}, he was Int-Far in **{monthly_intfars}** "
@@ -44,13 +44,13 @@ async def handle_intfar_msg(client, message, game, target_id):
             for reason_id, reason in enumerate(intfar_reasons):
                 reason_desc += f"- {reason}: **{intfar_counts[reason_id]}**\n"
 
-            longest_streak, date_ended = client.database.get_longest_intfar_streak(game, disc_id)
+            longest_streak, date_ended = database.get_longest_intfar_streak(disc_id)
             streak_desc = f"His longest Int-Far streak was **{longest_streak}** games in a row "
             if date_ended is not None:
                 streak_desc += f"(ended **{date_ended}**) "
             streak_desc += "{emote_suk_a_hotdok}\n"
 
-            longest_non_streak, date_ended = client.database.get_longest_no_intfar_streak(game, disc_id)
+            longest_non_streak, date_ended = database.get_longest_no_intfar_streak(disc_id)
             no_streak_desc = f"His longest streak of *not* being Int-Far was **{longest_non_streak}** games in a row "
             if date_ended is not None:
                 no_streak_desc += f"(ended **{date_ended})** "
@@ -74,7 +74,7 @@ async def handle_intfar_msg(client, message, game, target_id):
     if target_id is None: # Check intfar stats for everyone.
         messages_all_time = []
         messages_monthly = []
-        for disc_id in client.database.users_by_game[game].keys():
+        for disc_id in database.game_users.keys():
             resp_str_all_time, intfars, pct_all_time, _ = format_for_all(disc_id)
             resp_str_month, intfars_month, pct_month, games_played = format_for_all(disc_id, monthly=True)
 
@@ -105,9 +105,10 @@ async def handle_intfar_msg(client, message, game, target_id):
     await message.channel.send(response)
 
 def get_intfar_relation_stats(client, game, target_id):
+    database = client.game_databases[game]
     data = []
-    games_relations, intfars_relations = client.database.get_intfar_relations(game, target_id)
-    total_intfars = len(client.database.get_intfar_stats(game, target_id)[1])
+    games_relations, intfars_relations = database.get_intfar_relations(target_id)
+    total_intfars = len(database.get_intfar_stats(target_id)[1])
     for disc_id, total_games in games_relations.items():
         intfars = intfars_relations.get(disc_id, 0)
         data.append(

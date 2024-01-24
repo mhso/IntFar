@@ -1,5 +1,12 @@
+from abc import abstractmethod
+from datetime import datetime
+
 from mhooge_flask.database import SQLiteDatabase, DBException
-from api.util import SUPPORTED_GAMES
+from mhooge_flask.logging import logger
+
+from api.util import SUPPORTED_GAMES, TimeZone
+from api.game_data import get_stat_quantity_descriptions
+from api.game_stats import GameStats, get_outlier_stat
 from api.config import Config
 from api.user import User
 
@@ -245,3 +252,1360 @@ class GameDatabase(SQLiteDatabase):
             """
 
             return self.execute_query(query).fetchone()
+
+    def get_best_or_worst_query(self, stat, disc_id=None, maximize=True):
+        aggregator = "MAX" if maximize else "MIN"
+
+        min_condition = f"AND {stat} <> 0" if stat != "deaths" else ""
+        player_select = ""
+        params = []
+
+        if stat == "first_blood":
+            if disc_id is not None:
+                player_condition = "AND g.first_blood = ?"
+                params = [disc_id]
+            else:
+                player_select = "g.first_blood AS disc_id,"
+                player_condition = "GROUP BY g.first_blood"
+
+            query = f"""
+                SELECT
+                    {player_select}
+                    Count(DISTINCT g.game_id) AS best,
+                    games.c AS games,
+                    NULL AS extreme,
+                    NULL AS game_id
+                FROM games AS g
+                INNER JOIN participants AS p
+                ON p.game_id = g.game_id
+                AND p.disc_id = g.first_blood
+                INNER JOIN users AS u
+                ON u.disc_id = p.disc_id
+                INNER JOIN (
+                    SELECT
+                        COUNT(*) AS c,
+                        p.disc_id
+                    FROM games AS g
+                    INNER JOIN participants AS p
+                    ON p.game_id = g.game_id
+                    GROUP BY p.disc_id
+                ) AS games
+                ON games.disc_id = u.disc_id
+                WHERE
+                    u.active = 1
+                    {player_condition}
+            """
+        else:
+            if disc_id is not None:
+                player_condition = "WHERE best.disc_id = ?"
+                params = [disc_id]
+            else:
+                player_select = "best.disc_id,"
+                player_condition = "GROUP BY best.disc_id"
+
+            query = f"""
+                SELECT
+                    {player_select}
+                    best.c AS best,
+                    games.c AS games,
+                    best.extreme,
+                    best.game_id
+                FROM (
+                    SELECT
+                        sub.disc_id,
+                        COUNT(*) AS c,
+                        {aggregator}(sub.c) AS extreme,
+                        sub.game_id
+                    FROM (
+                        SELECT
+                            {aggregator}({stat}) AS c,
+                            p.game_id,
+                            p.disc_id
+                        FROM participants AS p
+                        JOIN users AS u
+                        ON u.disc_id = p.disc_id
+                        WHERE
+                            u.active = 1
+                            AND {stat} IS NOT NULL
+                            {min_condition}
+                        GROUP BY game_id
+                    ) sub
+                    GROUP BY sub.disc_id
+                ) best
+                INNER JOIN (
+                    SELECT
+                        COUNT(DISTINCT game_id) AS c,
+                        p.game_id,
+                        p.disc_id
+                    FROM participants AS p
+                    JOIN users AS u
+                    ON u.disc_id = p.disc_id
+                    WHERE
+                        u.active = 1
+                        AND {stat} IS NOT NULL
+                    GROUP BY p.disc_id
+                ) AS games
+                ON games.disc_id = best.disc_id
+                {player_condition}
+            """
+
+        return query, params
+
+    def get_best_or_worst_stat(self, stat, disc_id=None, maximize=True):
+        with self:
+            query, params = self.get_best_or_worst_query(stat, disc_id, maximize)
+            result = self.execute_query(query, *params)
+            return result.fetchall() if disc_id is None else result.fetchone()
+
+    @abstractmethod
+    def get_played_count_for_stat(self, stat, maximize, disc_id):
+        ...
+
+    @abstractmethod
+    def get_average_stat(self, stat, disc_id=None, played_id=None, min_games=10):
+        ...
+
+    @abstractmethod
+    def get_played_with_most_doinks(self, disc_id):
+        ...
+
+    @abstractmethod
+    def get_played_with_most_intfars(self, disc_id):
+        ...
+
+    @abstractmethod
+    def get_played_ids(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        ...
+
+    @abstractmethod
+    def get_played_winrate(self, disc_id, champ_id):
+        ...
+
+    @abstractmethod
+    def get_min_or_max_winrate_played(self, disc_id, best, included_ids=None, return_top_n=1, min_games=10):
+        ...
+
+    def get_game_ids(self):
+        query = f"SELECT game_id FROM games"
+        with self:
+            return self.execute_query(query).fetchall()
+
+    def get_doinks_count(
+        self,
+        disc_id: int=  None,
+        time_after: int = None,
+        time_before: int = None,
+        guild_id: int = None
+    ) -> tuple[int, int]:
+        """
+        Query the database for the total games where doinks were earned
+        as well doinks earned in total over all games.
+
+        ### Parameters
+
+        `:param game:`          Supported game to look for doinks for (fx. 'lol' for League of Legends)
+
+        `:param disc_id:`       Optional Discord ID to only include counts for a single person
+
+        `:param time_after:`    Optional UNIX timestamp to only include results after this point
+
+        `:param time_before:`   Optional UNIX timestamp to only include results before this point
+
+        `:param guild_id:`      Optional Discord guild ID to only include results of games played in that server
+
+        ### Returns
+        `tuple[int, int]`: Amount of games where doinks was played and amount of doinks earned in total
+        """
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
+
+        query_doinks = f"""
+            SELECT SUM(sub.doinks_games), SUM(sub.doinks_total) FROM (
+                SELECT COUNT(*) AS doinks_games, SUM(LENGTH(REPLACE(sub_2.doinks, '0', ''))) AS doinks_total FROM (
+                    SELECT DISTINCT
+                        p.game_id,
+                        p.disc_id,
+                        doinks,
+                        timestamp
+                    FROM participants AS p
+                    LEFT JOIN users AS u
+                    ON u.disc_id = p.disc_id
+                    LEFT JOIN games AS g
+                    ON g.game_id = p.game_id
+                    WHERE
+                        doinks IS NOT NULL
+                        AND u.active=1{delim_str}
+                ) sub_2
+                GROUP BY sub_2.disc_id
+            ) sub
+        """
+
+        with self:
+            doinks_games, doinks_total = self.execute_query(query_doinks, *params).fetchone()
+            return doinks_games or 0, doinks_total or 0
+
+    def get_max_doinks_details(self):
+        with self:
+            query = """
+                SELECT 
+                    MAX(counts.c),
+                    counts.disc_id
+                FROM (
+                    SELECT
+                        p.disc_id,
+                        COUNT(*) AS c
+                    FROM
+                        participants AS p, 
+                        users AS u
+                    WHERE
+                        doinks IS NOT NULL
+                        AND u.disc_id = p.disc_id
+                        AND u.active = 1
+                    GROUP BY p.disc_id
+                ) counts
+            """
+            return self.execute_query(query).fetchone()
+
+    def get_doinks_reason_counts(self):
+        with self:
+            query_doinks_multis = """
+                SELECT doinks
+                FROM
+                    participants AS p,
+                    users AS u
+                WHERE
+                    doinks IS NOT NULL
+                    AND u.disc_id = p.disc_id
+                    AND u.active = 1
+            """
+            doinks_reasons_data = self.execute_query(query_doinks_multis).fetchall()
+            if doinks_reasons_data == []:
+                return None
+
+            doinks_counts = [0 for _ in range(len(doinks_reasons_data[0][0]))]
+            for reason in doinks_reasons_data:
+                for index, c in enumerate(reason[0]):
+                    if c == "1":
+                        doinks_counts[index] += 1
+
+            return doinks_counts
+
+    def get_recent_intfars_and_doinks(self):
+        with self:
+            query = """
+                SELECT
+                    g.game_id,
+                    timestamp,
+                    p.disc_id,
+                    doinks,
+                    intfar_id,
+                    intfar_reason
+                FROM participants AS p
+                LEFT JOIN games AS g
+                    ON p.game_id = g.game_id
+                LEFT JOIN users AS u
+                    ON p.disc_id = u.disc_id
+                WHERE u.active = 1
+                GROUP BY p.game_id, p.disc_id
+                ORDER BY timestamp ASC
+            """
+            return self.execute_query(query).fetchall()
+
+    def get_games_results(self, ascending=True, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
+
+        sort_order = "ASC" if ascending else "DESC"
+
+        query = f"""
+            SELECT
+                win,
+                timestamp
+            FROM games
+            {delim_str}
+            ORDER BY timestamp {sort_order}
+        """
+
+        with self:
+            return self.execute_query(query, *params).fetchall()
+
+    def get_games_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id, prefix="AND")
+        delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, prefix="AND")
+
+        query = f"""
+            WITH game_cte AS (
+                SELECT
+                    p.game_id,
+                    p.disc_id,
+                    g.guild_id,
+                    g.win,
+                    g.timestamp
+                FROM games AS g
+                INNER JOIN participants AS p
+                ON p.game_id = g.game_id
+                INNER JOIN users AS u
+                ON u.disc_id = p.disc_id
+                WHERE
+                    u.active = 1
+                    {delim_str_1}
+                    {delim_str_2}
+            )
+            SELECT
+                games.c,
+                games.t,
+                wins.c,
+                guilds.c
+            FROM (
+                SELECT
+                    COUNT(DISTINCT game_id) AS c,
+                    MIN(timestamp) AS t
+                FROM game_cte
+            ) games,
+            (
+                SELECT COUNT(DISTINCT game_id) AS c
+                FROM game_cte
+                WHERE win = 1
+            ) wins,
+            (
+                SELECT COUNT(DISTINCT guild_id) AS c
+                FROM game_cte
+            ) guilds
+        """
+
+        params = params_2 if params_1 is None else params_1 + params_2
+
+        with self:
+            return self.execute_query(query, *params).fetchone()
+
+    def get_longest_game(self, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
+
+        query = f"""
+            SELECT
+                MAX(duration),
+                timestamp
+            FROM games
+            {delim_str}
+        """
+
+        with self:
+            return self.execute_query(query, *params).fetchone()
+
+    def get_intfar_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id, "AND")
+
+        query_intfars = f"""
+            SELECT SUM(sub.intfars)
+            FROM (
+                SELECT COUNT(*) AS intfars
+                FROM (
+                    SELECT DISTINCT
+                        g.game_id,
+                        intfar_id
+                    FROM games AS g
+                    LEFT JOIN users AS u
+                    ON u.disc_id=intfar_id
+                  WHERE
+                    intfar_id IS NOT NULL
+                    AND u.active = 1{delim_str}
+                ) sub_2
+                GROUP BY sub_2.intfar_id
+            ) sub
+        """
+
+        with self:
+            intfars = self.execute_query(query_intfars, *params).fetchone()
+            return (intfars[0] if intfars is not None else 0) or 0
+
+    def get_intfar_reason_counts(self):
+        query_intfar_multis = """
+            SELECT intfar_reason
+            FROM games AS g
+            LEFT JOIN users AS u
+                ON u.disc_id = g.intfar_id
+            WHERE
+                g.intfar_id IS NOT NULL
+                AND u.active=1
+            GROUP BY game_id
+        """
+
+        with self:
+            intfar_multis_data = self.execute_query(query_intfar_multis).fetchall()
+            if intfar_multis_data == []:
+                return [], []
+
+            amount_intfars = len(intfar_multis_data[0][0])
+
+            intfar_counts = [0] * amount_intfars
+            intfar_multi_counts = {
+                i: 0 for i in range(1, amount_intfars + 1)
+            }
+            for reason in intfar_multis_data:
+                amount = 0
+                for index, c in enumerate(reason[0]):
+                    if c == "1":
+                        intfar_counts[index] += 1
+                        amount += 1
+                if amount > 0:
+                    intfar_multi_counts[amount] += 1
+
+            intfar_multis = [intfar_multi_counts[x] for x in intfar_multi_counts]
+
+            return intfar_counts, intfar_multis
+
+    def get_total_winrate(self, disc_id):
+        query = f"""
+            SELECT (wins.c / played.c) * 100 FROM (
+                SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                FROM games AS g
+                LEFT JOIN participants AS p
+                    ON g.game_id = p.game_id
+                WHERE
+                    disc_id = ?
+                    AND win = 1
+            ) wins,
+            (
+                SELECT CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                FROM games AS g
+                LEFT JOIN participants AS p
+                    ON g.game_id = p.game_id
+                WHERE disc_id = ?
+            ) played
+        """
+    
+        with self:
+            return self.execute_query(query, disc_id, disc_id).fetchone()[0]
+
+    def get_winrate_relation(self, disc_id, best, min_games=10):
+        query_games = f"""
+            SELECT
+                p2.disc_id,
+                Count(*) as c
+            FROM
+                participants p1,
+                participants p2
+            WHERE
+                p1.disc_id != p2.disc_id
+                AND p1.game_id = p2.game_id
+                AND p1.disc_id = ?
+            GROUP BY
+                p1.disc_id,
+                p2.disc_id
+            ORDER BY c DESC
+        """
+        query_wins = f"""
+            SELECT
+                p2.disc_id,
+                Count(*) as c
+            FROM
+                games AS g,
+                participants p1,
+                participants p2
+            WHERE
+                p1.disc_id != p2.disc_id
+                AND g.game_id = p1.game_id
+                AND g.game_id = p2.game_id
+                AND p1.game_id = p2.game_id
+                AND p1.disc_id = ?
+                AND win = 1
+            GROUP BY
+                p1.disc_id,
+                p2.disc_id
+            ORDER BY c DESC
+        """
+
+        with self:
+            games_with_person = {}
+            wins_with_person = {}
+            for part_id, wins in self.execute_query(query_wins, disc_id):
+                if disc_id == part_id or not self.user_exists(part_id):
+                    continue
+
+                wins_with_person[part_id] = wins
+
+            for part_id, games in self.execute_query(query_games, disc_id):
+                if self.user_exists(part_id):
+                    games_with_person[part_id] = games
+
+            winrate_with_person = [
+                (x, games_with_person[x], (wins_with_person[x] / games_with_person[x]) * 100)
+                for x in games_with_person if games_with_person[x] > min_games
+            ]
+
+            if winrate_with_person == []:
+                if min_games == 10:
+                    return self.get_winrate_relation(disc_id, best, min_games=5)
+
+                return None, None, None
+
+            func = max if best else min
+
+            return func(winrate_with_person, key=lambda x: x[2])
+
+    def get_meta_stats(self):
+        query_persons = f"SELECT Count(*) FROM participants AS p GROUP BY game_id"
+
+        users = (len(self.game_users),)
+        with self:
+            game_data = self.get_games_count()
+            longest_game = self.get_longest_game()
+            intfar_data = self.get_intfar_count()
+            doinks_data = self.get_doinks_count()
+            persons_counts = self.execute_query(query_persons)
+            persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
+            for persons in persons_counts:
+                persons_count[persons[0]] += 1
+            twos_ratio = int((persons_count[2] / game_data[0]) * 100)
+            threes_ratio = int((persons_count[3] / game_data[0]) * 100)
+            fours_ratio = int((persons_count[4] / game_data[0]) * 100)
+            fives_ratio = int((persons_count[5] / game_data[0]) * 100)
+            games_ratios = [twos_ratio, threes_ratio, fours_ratio, fives_ratio]
+
+            intfar_counts, intfar_multis_counts = self.get_intfar_reason_counts()
+            intfar_ratios = [(count / intfar_data) * 100 for count in intfar_counts]
+            intfar_multis_ratios = [(count / intfar_data) * 100 for count in intfar_multis_counts]
+
+            return (
+                game_data + longest_game + users + doinks_data +
+                (intfar_data, games_ratios, intfar_ratios, intfar_multis_ratios)
+            )
+
+    def get_monthly_delimiter(self):
+        tz_cph = TimeZone()
+        curr_time = datetime.now(tz_cph)
+        current_month = curr_time.month
+        if curr_time.day > 1 or curr_time.hour > self.config.hour_of_ifotm_announce:
+            # Get Int-Far stats for current month.
+            start_of_month = curr_time.replace(day=1, hour=0, minute=0, second=0)
+            min_timestamp = int(start_of_month.timestamp())
+        else:
+            # Get Int-Far stats for previous month.
+            prev_month = 12 if current_month == 1 else current_month - 1
+            prev_year = curr_time.year if prev_month != 12 else curr_time.year - 1
+            prev_time = curr_time.replace(
+                prev_year,
+                prev_month,
+                1,
+                0,
+                0,
+                0,
+                0,
+                tz_cph
+            )
+            min_timestamp = int(prev_time.timestamp())
+
+        max_timestamp = int(curr_time.timestamp())
+        return f"timestamp > {min_timestamp} AND timestamp < {max_timestamp}"
+
+    def get_intfars_of_the_month(self):
+        delim_str = self.get_monthly_delimiter()
+
+        query_intfars = f"""
+            SELECT intfar_id
+            FROM games AS g
+            LEFT JOIN users AS u
+                ON u.disc_id = intfar_id
+            WHERE
+                intfar_id IS NOT NULL
+                AND {delim_str}
+                AND u.active = 1
+            GROUP BY g.game_id
+        """
+        query_games = f"""
+            SELECT p.disc_id
+            FROM
+                games AS g
+            LEFT JOIN participants AS p
+                ON g.game_id = p.game_id
+            LEFT JOIN users AS u
+                ON u.disc_id=p.disc_id
+            WHERE
+                {delim_str}
+                AND u.active = 1
+            GROUP BY
+                g.game_id,
+                p.disc_id
+        """
+
+        with self:
+            games_per_person = self.execute_query(query_games).fetchall()
+            intfars_per_person = self.execute_query(query_intfars).fetchall()
+            pct_intfars = []
+            intfar_dict = {}
+            games_dict = {}
+            for intfar_id in intfars_per_person:
+                intfars = intfar_dict.get(intfar_id[0], 0)
+                intfar_dict[intfar_id[0]] = intfars + 1
+
+            for disc_id in games_per_person:
+                games = games_dict.get(disc_id[0], 0)
+                games_dict[disc_id[0]] = games + 1
+
+            for disc_id in games_dict:
+                total_games = games_dict[disc_id]
+
+                if total_games < self.config.ifotm_min_games:
+                    # Disqualify people with less than 10 games played this month.
+                    continue
+
+                intfars = intfar_dict.get(disc_id, 0)
+
+                if intfars == 0:
+                    # Disqualify people with no intfars this month.
+                    continue
+
+                pct_intfars.append(
+                    (disc_id, total_games, intfars, (intfars / total_games) * 100)
+                )
+
+            return sorted(pct_intfars, key=lambda x: (x[3], x[2]), reverse=True)
+
+    def get_longest_intfar_streak(self, disc_id):
+        query = """
+            SELECT
+                intfar_id,
+                timestamp
+            FROM games
+            GROUP BY game_id
+            ORDER BY game_id
+        """
+
+        with self:
+            int_fars = self.execute_query(query).fetchall()
+            max_count = 0
+            timestamp_ended = None
+            count = 0
+            for int_far, timestamp in int_fars:
+                if int_far is None or disc_id != int_far:
+                    count = 0
+                else:
+                    count += 1
+
+                if count > max_count:
+                    max_count = count
+                    timestamp_ended = timestamp
+
+            if timestamp_ended is not None:
+                timestamp_ended = datetime.fromtimestamp(timestamp_ended).strftime("%Y-%m-%d")
+
+            return max_count, timestamp_ended
+
+    def get_longest_no_intfar_streak(self, disc_id):
+        if not self.user_exists(disc_id):
+            return 0
+
+        query = """
+            SELECT
+                intfar_id,
+                timestamp
+            FROM participants AS p
+            LEFT JOIN games AS g
+                ON g.game_id = p.game_id
+            WHERE p.disc_id = ?
+            ORDER BY g.game_id ASC
+        """
+
+        with self:
+            int_fars = self.execute_query(query, disc_id).fetchall()
+            max_count = 0
+            timestamp_ended = None
+            count = 0
+            for int_far, timestamp in int_fars:
+                if disc_id == int_far:
+                    count = 0
+                else:
+                    count += 1
+
+                if count > max_count:
+                    max_count = count
+                    timestamp_ended = timestamp
+
+            if timestamp_ended is not None:
+                if timestamp_ended == timestamp:
+                    # Streak is ongoing
+                    timestamp_ended = None
+                else:
+                    timestamp_ended = datetime.fromtimestamp(timestamp_ended).strftime("%Y-%m-%d")
+
+            return max_count, timestamp_ended
+
+    def get_current_intfar_streak(self):
+        query = f"""
+            SELECT g.intfar_id
+            FROM games AS g
+            LEFT JOIN users AS u
+                ON g.intfar_id = u.disc_id
+            WHERE u.active = 1
+            GROUP BY game_id
+            ORDER BY game_id DESC
+        """
+
+        with self:
+            int_fars = self.execute_query(query).fetchall()
+            if int_fars == []:
+                return 0, None
+
+            prev_intfar = int_fars[0][0]
+            for count, int_far in enumerate(int_fars[1:], start=1):
+                if int_far[0] is None or prev_intfar != int_far[0]:
+                    return count, prev_intfar
+
+            return len(int_fars), prev_intfar # All the Int-Fars is the current int-far!
+
+    def get_longest_win_or_loss_streak(self, disc_id: int, win: int):
+        query = f"""
+            SELECT g.win
+            FROM games AS g
+            INNER JOIN participants AS p
+                ON p.game_id = g.game_id
+            INNER JOIN users AS u
+                ON p.disc_id = u.disc_id
+            WHERE
+                p.disc_id = ?
+                AND u.active
+            GROUP BY g.game_id
+            ORDER BY g.game_id DESC
+        """
+
+        with self:
+            games = self.execute_query(query, disc_id).fetchall()
+
+            max_count = 0
+            count = 0
+            for row in games:
+                if win != row[0]:
+                    count = 0
+                else:
+                    count += 1
+
+                if count > max_count:
+                    max_count = count
+
+            return max_count
+
+    def get_current_win_or_loss_streak(self, disc_id: int, win: int, offset=0):
+        query = f"""
+            SELECT g.win
+            FROM games AS g
+            INNER JOIN participants AS p
+                ON p.game_id = g.game_id
+            INNER JOIN users AS u
+                ON p.disc_id = u.disc_id
+            WHERE
+                p.disc_id = ?
+                AND u.active = 1
+            GROUP BY g.game_id
+            ORDER BY timestamp DESC
+        """
+
+        with self:
+            games = self.execute_query(query, disc_id).fetchall()
+
+            count_offset = 1 if offset == 0 else 0
+
+            for count, row in enumerate(games[offset:], start=count_offset):
+                if row[0] != win:
+                    return count
+
+            total_offset = -offset if offset > 0 else 1
+
+            return len(games) + total_offset
+
+    def get_max_intfar_details(self):
+        query = f"""
+            SELECT
+                MAX(pcts.pct),
+                pcts.intboi
+            FROM (
+                SELECT
+                    (intfar_counts.c / games_counts.c) * 100 AS pct,
+                    intfar_counts.intfar_id AS intboi
+                FROM (
+                    SELECT
+                        intfar_id,
+                        CAST(Count(*) as real) as c
+                    FROM games
+                    WHERE intfar_id IS NOT NULL
+                    GROUP BY intfar_id
+                ) AS intfar_counts,
+                (
+                    SELECT
+                        disc_id,
+                        CAST(Count(*) as real) as c
+                    FROM participants
+                    GROUP BY disc_id
+                ) AS games_counts
+                WHERE
+                    intfar_id = disc_id
+                    AND games_counts.c > 10
+            ) AS pcts
+            INNER JOIN users AS u
+                ON u.disc_id = pcts.intboi
+            WHERE u.active = 1
+        """
+
+        with self:
+            return self.execute_query(query).fetchone()
+
+    def get_intfar_stats(self, disc_id, monthly=False, time_after=None, time_before=None, guild_id=None):
+        params_1 = []
+        params_2 = []
+
+        if monthly:
+            monthly_delim = self.get_monthly_delimiter()
+            if disc_id is not None:
+                delim_str_1 = f" WHERE disc_id = ? AND {monthly_delim}"
+                delim_str_2 = f" WHERE intfar_id = ? AND {monthly_delim}"
+                params_1 = [disc_id]
+                params_2 = [disc_id]
+            else:
+                delim_str_1 = f" WHERE {monthly_delim}"
+                delim_str_2 = f" WHERE {monthly_delim}"
+        else:
+            delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
+            delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "intfar_id", disc_id)
+
+        query_total = f"""
+            SELECT Count(*)
+            FROM games AS g
+            JOIN participants AS p
+                ON g.game_id = p.game_id
+            {delim_str_1}
+        """
+        query_intfar = f"""
+            SELECT intfar_reason
+            FROM games AS g
+            JOIN participants AS p 
+                ON g.game_id = p.game_id
+            {delim_str_2}
+            GROUP BY g.game_id
+        """
+
+        with self:
+            total_games = self.execute_query(query_total, *params_1).fetchone()[0]
+            intfar_games = self.execute_query(query_intfar, *params_2).fetchall()
+            return total_games, intfar_games
+
+    def get_intfar_relations(self, disc_id):
+        query_games = f"""
+            SELECT
+                p2.disc_id,
+                COUNT(*) AS c
+            FROM
+                participants AS p1,
+                participants AS p2
+            WHERE
+                p1.disc_id != p2.disc_id
+                AND p1.game_id = p2.game_id
+                AND p1.disc_id = ?
+            GROUP BY
+                p1.disc_id,
+                p2.disc_id
+            ORDER BY c DESC
+        """
+        query_intfars = f"""
+            SELECT
+                disc_id,
+                COUNT(*) AS c
+            FROM
+                games AS g,
+                participants AS p
+            WHERE
+                intfar_id IS NOT NULL
+                AND g.game_id = p.game_id
+                AND intfar_id = ?
+            GROUP BY disc_id
+            ORDER BY c DESC
+        """
+
+        with self:
+            games_with_person = {}
+            intfars_with_person = {}
+
+            for part_id, intfars in self.execute_query(query_intfars, disc_id):
+                if disc_id == part_id or not self.user_exists(part_id):
+                    continue
+                intfars_with_person[part_id] = intfars
+
+            for part_id, games in self.execute_query(query_games, disc_id):
+                if self.user_exists(part_id):
+                    games_with_person[part_id] = games
+
+            return games_with_person, intfars_with_person
+
+    def get_doinks_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
+
+        query = f"""
+            SELECT doinks
+            FROM participants AS p
+            LEFT JOIN users AS u
+                ON u.disc_id = p.disc_id
+            LEFT JOIN games AS g
+                ON p.game_id = g.game_id
+            WHERE
+                doinks IS NOT NULL
+                AND u.active = 1
+                {delim_str}
+            GROUP BY g.game_id
+        """
+
+        with self:
+            return self.execute_query(query, *params).fetchall()
+
+    def get_doinks_relations(self, disc_id):
+        query_games = f"""
+            SELECT
+                p2.disc_id,
+                Count(*) as c
+            FROM
+                participants p1,
+                participants p2
+            WHERE
+                p1.disc_id != p2.disc_id
+                AND p1.game_id = p2.game_id
+                AND p1.disc_id = ?
+            GROUP BY
+                p1.disc_id,
+                p2.disc_id
+            ORDER BY c DESC
+        """
+        query_doinks = f"""
+            SELECT
+                p2.disc_id,
+                Count(*) as c
+            FROM
+                participants p1,
+                participants p2
+            WHERE
+                p1.disc_id != p2.disc_id
+                AND p1.game_id = p2.game_id
+                AND p1.doinks IS NOT NULL
+                AND p1.disc_id = ?
+            GROUP BY
+                p1.disc_id,
+                p2.disc_id
+            ORDER BY c DESC
+        """
+
+        with self:
+            games_with_person = {}
+            doinks_with_person = {}
+
+            for part_id, doinks in self.execute_query(query_doinks, disc_id):
+                if disc_id == part_id or not self.user_exists(part_id):
+                    continue
+                doinks_with_person[part_id] = doinks
+
+            for part_id, games in self.execute_query(query_games, disc_id):
+                if self.user_exists(part_id):
+                    games_with_person[part_id] = games
+
+            return games_with_person, doinks_with_person
+
+    def get_max_games_count(self):
+        query = f"""
+            SELECT MAX(counts.c)
+            FROM (
+                SELECT COUNT(games.disc_id) AS c
+                FROM (
+                    SELECT disc_id
+                    FROM participants
+                ) games
+                GROUP BY disc_id
+            ) counts
+        """
+        with self:
+            return self.execute_query(query).fetchone()[0]
+
+    def get_performance_score(self, disc_id=None):
+        intfar_weight = 1
+        doinks_weight = 1
+        winrate_weight = 2
+        stats_weight = 0.25
+
+        stat_keys = get_stat_quantity_descriptions(self.game)
+        stat_joins = []
+
+        prev_join = "doinks.disc_id"
+        for stat in stat_keys:
+            query_best = self.get_best_or_worst_query(stat, maximize=stat != "deaths")[0]
+
+            stat_joins.append(f"LEFT JOIN ({query_best}) {stat}_best\nON {stat}_best.disc_id = {prev_join}")
+            prev_join = f"{stat}_best.disc_id"
+
+        stat_join_queries = "\n".join(stat_joins)
+
+        stat_equations = [
+            f"COALESCE({stat}_best.best / {stat}_best.games, 0) * {stats_weight}" for stat in stat_keys
+        ]
+
+        stat_equations_str = " + ".join(stat_equations)
+
+        most_games = self.get_max_games_count()
+        games_weight = 0.25
+
+        total = (intfar_weight + doinks_weight + winrate_weight + games_weight + (len(stat_keys) * stats_weight)) / 2
+        performance_range = 10
+
+        equation = (
+            f"(((1 - COALESCE(intfars.c / played.c, 0)) * {intfar_weight} + " +
+            f"COALESCE(doinks.c / played.c, 0) * {doinks_weight} + " +
+            f"COALESCE(wins.c / played.c, 0) * {winrate_weight} + " +
+            f"(played.c / {most_games}) * {games_weight} + "
+            f"{stat_equations_str}) / {total}) * {performance_range}"
+        )
+        min_games = self.config.performance_mimimum_games
+
+        query = f"""
+            SELECT sub.user, MIN(sub.score, {performance_range}) FROM (
+                SELECT
+                    played.disc_id AS user,
+                    {equation} AS score
+                FROM
+                (
+                    SELECT
+                        CAST(COUNT(DISTINCT g.game_id) AS real) AS c,
+                        disc_id
+                    FROM games AS g
+                    JOIN participants AS p
+                        ON g.game_id = p.game_id
+                    GROUP BY disc_id
+                ) played
+                LEFT JOIN (
+                    SELECT
+                        CAST(COUNT(DISTINCT g.game_id) AS real) AS c,
+                        disc_id
+                    FROM games AS g
+                    JOIN participants AS p
+                        ON g.game_id = p.game_id
+                    WHERE win = 1
+                    GROUP BY disc_id
+                ) wins
+                ON wins.disc_id = played.disc_id
+                LEFT JOIN (
+                    SELECT COALESCE(c, 0.0) AS c, p.disc_id AS intfar_id FROM 
+                    participants AS p
+                    LEFT JOIN participants AS g
+                    ON g.game_id = p.game_id
+                    LEFT JOIN (
+                        SELECT
+                            CAST(COUNT(*) AS real) AS c,
+                            intfar_id
+                        FROM games AS g
+                        WHERE intfar_id IS NOT NULL
+                        GROUP BY intfar_id
+                    ) sub
+                    ON p.disc_id = sub.intfar_id
+                    GROUP BY p.disc_id
+                ) intfars
+                ON intfars.intfar_id = wins.disc_id
+                LEFT JOIN (
+                    SELECT
+                        CAST(SUM(LENGTH(REPLACE(COALESCE(doinks_sub.doinks, ''), '0', ''))) AS real) AS c,
+                        doinks_sub.disc_id
+                    FROM (
+                        SELECT
+                            DISTINCT game_id,
+                            doinks,
+                            disc_id
+                        FROM participants
+                        WHERE doinks IS NOT NULL
+                    ) doinks_sub
+                    GROUP BY doinks_sub.disc_id
+                ) doinks
+                ON doinks.disc_id = intfars.intfar_id
+                {stat_join_queries}
+                WHERE played.c > {min_games}
+            ) sub
+            LEFT JOIN users AS u
+                ON sub.user = u.disc_id
+            WHERE u.active = 1
+            GROUP BY sub.user
+            ORDER BY sub.score DESC
+        """
+
+        with self:
+            performance_scores = self.execute_query(query).fetchall()
+            if disc_id is None:
+                return performance_scores
+
+            rank = len(self.game_users) - 1
+            score = 0
+            for index, (score_id, score_value) in enumerate(performance_scores):
+                if score_id == disc_id:
+                    rank = index
+                    score = score_value
+                    break
+
+            return score, rank + 1, len(performance_scores)
+
+    def get_stat_data(self, parsed_game_stats: GameStats, stat: str, reverse_order=False):
+        (
+            min_stat_id, min_stat,
+            max_stat_id, max_stat
+        ) = get_outlier_stat(
+            parsed_game_stats.filtered_player_stats,
+            stat,
+            reverse_order=reverse_order
+        )
+
+        (
+            best_ever_id,
+            best_ever,
+            _
+        ) = self.get_most_extreme_stat(stat, stat != "deaths")
+
+        (
+            worst_ever_id,
+            worst_ever,
+            _
+        ) = self.get_most_extreme_stat(stat, stat == "deaths")
+
+        return min_stat_id, min_stat, max_stat_id, max_stat, best_ever, best_ever_id, worst_ever, worst_ever_id
+
+    def record_stats(self, parsed_game_stats: GameStats) -> tuple[list[tuple], list[tuple]]:
+        """
+        Save all the stats in the given GameStats object to the database.
+        Also determines whether any stat "records" have been beaten (i.e. whether
+        someone has gotten a new lowest or highest value for a stat) and returns
+        those stats along with who beat set the new record.
+        """
+        beaten_records_best = []
+        beaten_records_worst = []
+
+        for stat in parsed_game_stats.filtered_player_stats[0].stat_quantity_desc():
+            reverse_order = stat == "deaths"
+            (
+                min_id, min_value, max_id, max_value,
+                prev_best, prev_best_id, prev_worst, prev_worst_id
+            ) = self.get_stat_data(parsed_game_stats, stat, reverse_order)
+
+            if reverse_order: # Stat is 'deaths'.
+                if None not in (prev_best, min_value) and min_value < prev_best: # Fewest deaths ever has been reached.
+                    beaten_records_best.append((stat, min_value, min_id, prev_best, prev_best_id))
+                elif None not in(prev_worst, max_value) and max_value > prev_worst: # Most deaths ever has been reached.
+                    beaten_records_worst.append((stat, max_value, max_id, prev_worst, prev_worst_id))
+            else: # Stat is any other stat.
+                if None not in (prev_best, max_value) and max_value > prev_best: # A new best has been set for a stat.
+                    beaten_records_best.append((stat, max_value, max_id, prev_best, prev_best_id))
+                elif None not in (prev_worst, min_value) and min_value < prev_worst: # A new worst has been set for a stat.
+                    beaten_records_worst.append((stat, min_value, min_id, prev_worst, prev_worst_id))
+
+        game_insert_str = ",\n".join(parsed_game_stats.stats_to_save())
+        game_insert_qms = ",".join(["?"] * len(parsed_game_stats.stats_to_save()))
+
+        stats_insert_str = ",\n".join(parsed_game_stats.filtered_player_stats[0].stats_to_save())
+        stats_insert_qms = ",".join(["?"] * len(parsed_game_stats.filtered_player_stats[0].stats_to_save()))
+
+        game_insert_values = [getattr(parsed_game_stats, stat) for stat in parsed_game_stats.stats_to_save()]
+
+        with self:
+            query_game = f"""
+                INSERT INTO games(
+                    {game_insert_str}
+                )
+                VALUES ({game_insert_qms})
+            """
+
+            self.execute_query(
+                query_game, *game_insert_values
+            )
+
+            query = f"""
+                INSERT INTO participants(
+                    {stats_insert_str}
+                )
+                VALUES ({stats_insert_qms})
+            """
+
+            for player_stats in parsed_game_stats.filtered_player_stats:
+                stat_insert_values = [getattr(player_stats, stat) for stat in player_stats.stats_to_save()]
+                logger.debug(f"Saving participant data:\n", stat_insert_values)
+
+                self.execute_query(query, *stat_insert_values)
+
+        return beaten_records_best, beaten_records_worst
+
+    def save_missed_game(self, game_id, guild_id, timestamp):
+        query = "INSERT INTO missed_games VALUES (?, ?, ?)"
+        with self:
+            self.execute_query(query, game_id, guild_id, timestamp)
+
+    def get_missed_games(self):
+        query = "SELECT game_id, guild_id FROM missed_games"
+        with self:
+            return self.execute_query(query).fetchall()
+
+    def remove_missed_game(self, game_id):
+        query = "DELETE FROM missed_games WHERE game_id=?"
+        with self:
+            self.execute_query(query, game_id)
+
+    def get_game_stats(self, stats, game_id=None, time_after=None, time_before=None, guild_id=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "g.game_id", game_id)
+
+        stats_to_select = ", ".join(stats)
+
+        query = f"""
+            SELECT
+                {stats_to_select}
+            FROM games AS g
+            {delim_str}
+            ORDER BY timestamp DESC
+        """
+
+        with self:
+            return self.execute_query(query, *params).fetchall()
+
+    def get_player_stats(self, stats, game_id=None, disc_id=None, time_after=None, time_before=None, guild_id=None):
+        prefix = "AND"
+        game_id_delimeter = ""
+        params = []
+        if game_id is not None:
+            game_id_delimeter = "AND g.game_id=?"
+            params = [game_id]
+ 
+        delim_str, delim_params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, prefix)
+        params = params + delim_params
+
+        stats_copy = list(stats)
+
+        if disc_id is None and "disc_id" not in stats:
+            if stats_copy[0] == "game_id":
+                stats.insert(1, "disc_id")
+                stats_copy.insert(1, "disc_id")
+            else:
+                stats.insert(0, "disc_id")
+                stats_copy.insert(0, "disc_id")
+
+        if stats_copy[0] == "disc_id":
+            stats_copy[0] = "p.disc_id"
+        elif stats_copy[1] == "disc_id":
+            stats_copy[1] = "p.disc_id"
+
+        try:
+            # game_id will be ambigious, so we need to specify table alias
+            index = stats_copy.index("game_id")
+            stats_copy[index] = "g.game_id"
+        except ValueError:
+            pass
+
+        stats_to_select = ", ".join(stats_copy)
+
+        query = f"""
+            SELECT
+                {stats_to_select}
+            FROM participants AS p
+            INNER JOIN games AS g
+            ON g.game_id = p.game_id
+            INNER JOIN users AS u
+            ON u.disc_id = p.disc_id
+            WHERE u.active = 1
+            {game_id_delimeter}
+            {delim_str}
+            ORDER BY timestamp DESC
+        """
+
+        with self:
+            return self.execute_query(query, *params).fetchall()
+
+    def get_event_sound(self, disc_id, event):
+        query = "SELECT sound FROM event_sounds WHERE disc_id=? AND event=?"
+
+        with self:
+            result = self.execute_query(query, disc_id, event).fetchone()
+
+            return result[0] if result is not None else None
+
+    def set_event_sound(self, disc_id, sound, event):
+        query = "REPLACE INTO event_sounds(disc_id, sound, event) VALUES (?, ?, ?)"
+
+        with self:
+            self.execute_query(query, disc_id, sound, event)
+
+    def remove_event_sound(self, disc_id, event):
+        query = "DELETE FROM event_sounds WHERE disc_id=? AND event=?"
+
+        with self:
+            self.execute_query( query, disc_id, event)
+
+    def get_lifetime_activity(self):
+        query = """
+            SELECT SUBSTR(
+                DATE(
+                    DATETIME(g.timestamp, 'unixepoch', 'localtime')
+                ),
+            1, 7) AS month, COUNT(g.game_id), COUNT(w.game_id)
+            FROM (
+                SELECT game_id, timestamp
+                FROM games
+            ) g
+            LEFT JOIN
+            (
+                SELECT game_id
+                FROM games
+                WHERE win = 1
+            ) w
+            ON g.game_id = w.game_id
+            GROUP BY month
+        """
+
+        with self:
+            return self.execute_query(query).fetchall()
+
+    def get_weekday_activity(self):
+        query = """
+            SELECT STRFTIME(
+                "%w",
+                DATE(DATETIME(g.timestamp, 'unixepoch', 'localtime'))
+            ) AS day, COUNT(g.game_id), COUNT(w.game_id)
+            FROM (
+                SELECT game_id, timestamp
+                FROM games
+            ) g
+            LEFT JOIN
+            (
+                SELECT game_id
+                FROM games
+                WHERE win = 1
+            ) w
+            ON g.game_id = w.game_id
+            GROUP BY day
+        """
+
+        with self:
+            return self.execute_query(query).fetchall()
+
+    def get_hourly_activity(self):
+        query = """
+            SELECT STRFTIME(
+                "%H",
+                DATETIME(timestamp, 'unixepoch', 'localtime')
+            ) AS hour, COUNT(g.game_id), COUNT(w.game_id)
+            FROM (
+                SELECT game_id, timestamp
+                FROM games
+            ) g
+            LEFT JOIN
+            (
+                SELECT game_id
+                FROM games
+                WHERE win = 1
+            ) w
+            ON g.game_id = w.game_id
+            GROUP BY hour
+        """
+
+        with self:
+            return self.execute_query(query).fetchall()
+
+    def clear_tables(self):
+        with self:
+            query_tables = "SELECT name FROM sqlite_master WHERE type='table'"
+            tables = self.execute_query(query_tables).fetchall()
+
+            for table in tables:
+                query = f"DELETE FROM {table[0]}"
+                self.execute_query(query, commit=False)
+
+            self.connection.commit()

@@ -104,7 +104,10 @@ def main():
         "cs2": proxy_manager.create_proxy()
     }
 
-    betting_handlers = {game: get_betting_handler(game, conf, meta_database) for game in SUPPORTED_GAMES}
+    betting_handlers = {
+        game: get_betting_handler(game, conf, meta_database, game_database[game])
+        for game in SUPPORTED_GAMES
+    }
 
     # Start process with machine learning model
     # that trains in the background after each game.

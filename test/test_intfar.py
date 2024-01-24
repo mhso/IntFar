@@ -4,7 +4,7 @@ from datetime import datetime
 
 from test.runner import TestRunner, test
 from api.config import Config
-from api.database import Database
+from api.meta_database import Database
 from api import award_qualifiers, game_stats
 from discbot.discord_bot import get_cool_stat_flavor_text, get_doinks_flavor_text, get_intfar_flavor_text, get_reason_flavor_text
 
