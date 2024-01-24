@@ -102,7 +102,7 @@ class RiotAPIClient(GameAPIClient):
         url = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/item.json"
         logger.info(f"Downloading latest item file: '{self.items_file}'")
 
-        old_files = glob("api/items-*.json")
+        old_files = glob("resources/items-*.json")
 
         try:
             response_json = requests.get(url).json()

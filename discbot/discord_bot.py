@@ -20,10 +20,11 @@ from api.award_qualifiers import AwardQualifiers
 from api.awards import get_awards_handler
 from api.game_data import get_stat_parser, get_empty_game_data
 from api.game_stats import GameStats
-from api.game_monitoring import get_game_monitor
-from api.game_monitoring.lol import LoLGameMonitor
-from api.game_monitoring.cs2 import CS2GameMonitor
-from api.database import DBException, Database
+from api.game_monitors import get_game_monitor
+from api.game_monitors.lol import LoLGameMonitor
+from api.game_monitors.cs2 import CS2GameMonitor
+from api.meta_database import DBException, MetaDatabase
+from api.game_database import GameDatabase
 from api.betting import BettingHandler
 from api.audio_handler import AudioHandler
 from api.shop import ShopHandler
@@ -49,7 +50,8 @@ class DiscordClient(discord.Client):
     def __init__(
         self,
         config: Config,
-        database: Database,
+        meta_database: MetaDatabase,
+        game_databases: dict[str, GameDatabase],
         betting_handlers: dict[str, BettingHandler],
         api_clients: dict[str, GameAPIClient],
         **kwargs
@@ -59,8 +61,9 @@ class DiscordClient(discord.Client):
 
         :param config:              Config instance that holds all the configuration
                                     options for Int-Far
-        :param database:            SQLiteDatabase instance that handles the logic
+        :param meta_database:       SQLiteMetaDatabase instance that handles the logic
                                     of interacting with the sqlite database
+        :param game_databases:      Game databases 
         :param betting_handlers:    BettingHandler instance that handles the logic
                                     of creating, resolving, and listing bets
         :param audio_handler:       AudioHandler instance that handles the logic of
@@ -81,7 +84,8 @@ class DiscordClient(discord.Client):
             )
         )
         self.config = config
-        self.database = database
+        self.meta_database = meta_database
+        self.game_databases = game_databases
         self.betting_handlers = betting_handlers
         self.api_clients = api_clients
 
@@ -91,14 +95,14 @@ class DiscordClient(discord.Client):
            streamscape = None
 
         self.audio_handler = AudioHandler(self.config, streamscape)
-        self.shop_handler = ShopHandler(self.config, self.database)
+        self.shop_handler = ShopHandler(self.config, self.meta_database)
 
         self.ai_conn = kwargs.get("ai_pipe")
         self.main_conn = kwargs.get("main_pipe")
         self.flask_conn = kwargs.get("flask_pipe")
 
         self.game_monitors = {
-            game: get_game_monitor(game, self.config, self.database, self.on_game_over, self.api_clients[game])
+            game: get_game_monitor(game, self.config, self.meta_database, self.on_game_over, self.api_clients[game])
             for game in api_util.SUPPORTED_GAMES
         }
 
@@ -136,7 +140,7 @@ class DiscordClient(discord.Client):
             await self.send_error_msg(guild_id)
 
         elif status_code == game_monitor.POSTGAME_STATUS_MISSING:
-            self.database.save_missed_game(game, game_info["gameId"], guild_id, int(time()))
+            self.meta_database.save_missed_game(game, game_info["gameId"], guild_id, int(time()))
 
             # Send message pinging me about the error.
             mention_me = self.get_mention_str(commands_util.ADMIN_DISC_ID, guild_id)
@@ -212,7 +216,7 @@ class DiscordClient(discord.Client):
         """        
         for disc_id in game_monitor.users_in_game[guild_id]:
             steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
-            self.database.set_new_cs2_sharecode(disc_id, steam_id, game_info["matchID"])
+            self.game_databases["cs2]"].set_new_cs2_sharecode(disc_id, steam_id, game_info["matchID"])
 
         if status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
             # Game was too short, most likely an early surrender
@@ -261,7 +265,7 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         """
         try: # Get formatted stats that are relevant for the players in the game.
-            stat_parser = get_stat_parser(game, game_info, self.api_clients[game], self.database.users_by_game[game], guild_id)
+            stat_parser = get_stat_parser(game, game_info, self.api_clients[game], self.meta_database.users_by_game[game], guild_id)
             parsed_game_stats = stat_parser.parse_data()
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito/Volvo pls).
@@ -399,7 +403,7 @@ class DiscordClient(discord.Client):
             return None if member is None else member.display_name
 
         nicknames = {}
-        for disc_id in self.database.all_users.keys():
+        for disc_id in self.meta_database.all_users.keys():
             member = self.get_member_safe(disc_id, guild_id)
             name = "Unnamed" if member is None else member.display_name
             nicknames[disc_id] = name
@@ -409,7 +413,7 @@ class DiscordClient(discord.Client):
     async def get_discord_avatar(self, discord_id=None, size=64):
         default_avatar = "app/static/img/questionmark.png"
         users_to_search = (
-            [disc_id for disc_id in self.database.all_users.keys()]
+            [disc_id for disc_id in self.meta_database.all_users.keys()]
             if discord_id is None
             else [discord_id]
         )
@@ -531,7 +535,7 @@ class DiscordClient(discord.Client):
                 for member in members_in_voice:
                     for game in api_util.SUPPORTED_GAMES:
                         member_id = int(member.id)
-                        user_info = self.database.game_user_data_from_discord_id(game, member_id)
+                        user_info = self.game_databases[game].game_user_data_from_discord_id(member_id)
                         if user_info is not None:
                             users_in_voice[guild.id][game][member_id] = user_info
 
@@ -561,7 +565,7 @@ class DiscordClient(discord.Client):
 
         disc_id_candidates = set()
         for game in api_util.SUPPORTED_GAMES:
-            discord_id = self.database.discord_id_from_ingame_info(game, exact_match=False, ingame_name=name)
+            discord_id = self.game_databases[game].discord_id_from_ingame_info(exact_match=False, ingame_name=name)
             if discord_id is not None:
                 disc_id_candidates.add(discord_id)
 
@@ -671,11 +675,11 @@ class DiscordClient(discord.Client):
             f"\n{game_desc} {tokens_gained_desc}."
         )
         response_bets = "**\n--- Results of bets made that game ---**\n"
-        max_tokens_holder = self.database.get_max_tokens_details()[1]
+        max_tokens_holder = self.meta_database.get_max_tokens_details()[1]
         betting_handler = self.betting_handlers[game_stats.game]
 
         any_bets = False # Bool to indicate whether any bets were made.
-        for disc_id in self.database.users_by_game[game_stats.game].keys():
+        for disc_id in self.meta_database.users_by_game[game_stats.game].keys():
             # See if the user corresponding to 'disc_id' was in-game.
             player_stats = game_stats.find_player_stats(disc_id, game_stats.filtered_player_stats)
 
@@ -689,8 +693,8 @@ class DiscordClient(discord.Client):
                 betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
             # Get list of active bets for the current user.
-            bets_made = self.database.get_bets(game_stats.game, True, disc_id, guild_id)
-            balance_before = self.database.get_token_balance(disc_id)
+            bets_made = self.meta_database.get_bets(game_stats.game, True, disc_id, guild_id)
+            balance_before = self.meta_database.get_token_balance(disc_id)
             tokens_earned = gain_for_user # Variable for tracking tokens gained for the user.
             tokens_lost = -1 # Variable for tracking tokens lost for the user.
             disc_name = self.get_discord_nick(disc_id, guild_id)
@@ -753,7 +757,7 @@ class DiscordClient(discord.Client):
                     quant_desc = "" if tokens_earned == balance_before else "more than"
                     response_bets += f"{disc_name} {quant_desc} doubled his amount of {tokens_name} that game!\n"
 
-        new_max_tokens_holder = self.database.get_max_tokens_details()[1]
+        new_max_tokens_holder = self.meta_database.get_max_tokens_details()[1]
         if new_max_tokens_holder != max_tokens_holder: # See if user now has most tokens after winning.
             max_tokens_name = self.get_discord_nick(new_max_tokens_holder, guild_id)
 
@@ -798,13 +802,13 @@ class DiscordClient(discord.Client):
             sounds_to_play = []
 
             # Add Int-Far sound to queue (if it exists)
-            intfar_sound = self.database.get_event_sound(game, intfar, "intfar")
+            intfar_sound = self.meta_database.get_event_sound(game, intfar, "intfar")
             if intfar_sound is not None:
                 sounds_to_play.append(intfar_sound)
 
             # Add each doinks sound to queue (if any exist)
             for disc_id in doinks:
-                doinks_sound = self.database.get_event_sound(game, disc_id, "doinks")
+                doinks_sound = self.meta_database.get_event_sound(game, disc_id, "doinks")
                 if doinks_sound is not None:
                     sounds_to_play.append(doinks_sound)
 
@@ -1079,8 +1083,8 @@ class DiscordClient(discord.Client):
         """
         mention_str = self.get_mention_str(intfar_id, awards_handler.guild_id)
         message = f"{mention_str} has now taken the lead for Int-Far of the Month " + "{emote_nazi}"
-        intfar_details = self.database.get_intfars_of_the_month(awards_handler.game)
-        monthly_games, monthly_intfars = self.database.get_intfar_stats(awards_handler.game, intfar_id, monthly=True)
+        intfar_details = self.meta_database.get_intfars_of_the_month(awards_handler.game)
+        monthly_games, monthly_intfars = self.meta_database.get_intfar_stats(awards_handler.game, intfar_id, monthly=True)
 
         if intfar_details == []: # No one was Int-Far yet this month.
             if monthly_games == self.config.ifotm_min_games - 1:
@@ -1173,7 +1177,7 @@ class DiscordClient(discord.Client):
 
         final_intfar, final_intfar_data, ties, ties_msg = awards_handler.get_intfar()
 
-        intfar_streak, prev_intfar = self.database.get_current_intfar_streak(awards_handler.game)
+        intfar_streak, prev_intfar = self.meta_database.get_current_intfar_streak(awards_handler.game)
 
         if final_intfar is not None: # Send int-far message.
             reason = ""
@@ -1261,7 +1265,7 @@ class DiscordClient(discord.Client):
         return cool_events_msg
 
     def get_lifetime_stats_data(self, awards_handler: AwardQualifiers):
-        lifetime_mentions = awards_handler.get_lifetime_stats(self.database)
+        lifetime_mentions = awards_handler.get_lifetime_stats(self.meta_database)
         lifetime_msg = self.get_lifetime_stats_msg(awards_handler, lifetime_mentions)
 
         return lifetime_msg
@@ -1283,8 +1287,8 @@ class DiscordClient(discord.Client):
         for stats in awards_handler.parsed_game_stats.filtered_player_stats:
             disc_id = stats.disc_id
 
-            current_streak = self.database.get_current_win_or_loss_streak(awards_handler.game, disc_id, game_result)
-            prev_streak = self.database.get_current_win_or_loss_streak(awards_handler.game, disc_id, opposite) - 1
+            current_streak = self.meta_database.get_current_win_or_loss_streak(awards_handler.game, disc_id, game_result)
+            prev_streak = self.meta_database.get_current_win_or_loss_streak(awards_handler.game, disc_id, opposite) - 1
 
             if current_streak >= self.config.stats_min_win_loss_streak:
                 # We are currently on a win/loss streak
@@ -1360,10 +1364,10 @@ class DiscordClient(discord.Client):
         """
         try:
             # Save stats to database.
-            best_records, worst_records = self.database.record_stats(parsed_game_stats)
+            best_records, worst_records = self.meta_database.record_stats(parsed_game_stats)
 
             # Create backup of database
-            self.database.create_backup()
+            self.meta_database.create_backup()
             logger.info("Game over! Stats were saved succesfully.")
 
             return best_records, worst_records
@@ -1397,7 +1401,7 @@ class DiscordClient(discord.Client):
 
         users_in_voice = self.get_users_in_voice()[guild_id]
         for game in users_in_voice:
-            user_game_info = self.database.game_user_data_from_discord_id(game, disc_id)
+            user_game_info = self.game_databases[game].game_user_data_from_discord_id(disc_id)
             if user_game_info is not None:
                 game_monitor = self.game_monitors[game]
                 game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
@@ -1518,7 +1522,7 @@ class DiscordClient(discord.Client):
         prev_month = month - 1 if month != 1 else 12
         month_name = api_util.MONTH_NAMES[prev_month-1]
 
-        intfar_data = self.database.get_intfars_of_the_month(game)
+        intfar_data = self.meta_database.get_intfars_of_the_month(game)
 
         if intfar_data == [] or game in monthly_monitor.disabled_games:
             # No one has played enough games to quality for IFOTM this month
@@ -1931,10 +1935,11 @@ class DiscordClient(discord.Client):
 
         self.api_clients["cs2"].close()
 
-def run_client(config, database, betting_handlers, api_clients, ai_pipe, flask_pipe, main_pipe):
+def run_client(config, meta_database, game_databases, betting_handlers, api_clients, ai_pipe, flask_pipe, main_pipe):
     client = DiscordClient(
         config,
-        database,
+        meta_database,
+        game_databases,
         betting_handlers,
         api_clients,
         ai_pipe=ai_pipe,

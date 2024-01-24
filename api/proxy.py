@@ -6,6 +6,9 @@ from multiprocessing import Pipe
 from multiprocessing.connection import wait
 from threading import Thread, Event
 
+from api.config import Config
+from api.meta_database import MetaDatabase
+
 class Proxy(object):
     def __init__(self, conn, target_cls):
         self.conn = conn
@@ -50,9 +53,9 @@ class Proxy(object):
         return self.conn.recv()
 
 class ProxyManager(object):
-    def __init__(self, target_cls, game, database, config):
+    def __init__(self, target_cls, game: str, meta_database: MetaDatabase, config: Config):
         self.proxies = []
-        self.database = database
+        self.database = meta_database
 
         self.target_cls = target_cls
         self.target_name = self.target_cls.__name__

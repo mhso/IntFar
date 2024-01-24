@@ -6,9 +6,11 @@ from api.game_data import get_stat_quantity_descriptions
 
 stats_page = flask.Blueprint("stats", __name__, template_folder="templates")
 
-def get_stats(game, database):
+def get_stats(game):
     all_stats = []
     stat_descs = get_stat_quantity_descriptions(game)
+    database = flask.current_app.config["GAME_DATABASES"][game]
+
     for best in (True, False):
         stat_data = []
         for stat in stat_descs:
@@ -18,7 +20,7 @@ def get_stats(game, database):
                 best_or_worst_ever_id,
                 best_or_worst_ever,
                 _
-            ) = database.get_most_extreme_stat(game, stat, maximize)
+            ) = database.get_most_extreme_stat(stat, maximize)
 
             user_data = discord_request(
                 "func", ["get_discord_nick", "get_discord_avatar"],
@@ -49,7 +51,6 @@ def get_stats(game, database):
 @stats_page.route('/')
 def home():
     game = flask.current_app.config["CURRENT_GAME"]
+    stats_data = get_stats(game)
 
-    database = flask.current_app.config["DATABASE"]
-    stats_data = get_stats(game, database)
     return make_template_context("stats.html", stats_data=stats_data)

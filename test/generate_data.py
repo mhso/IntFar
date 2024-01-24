@@ -1,5 +1,5 @@
 import json
-from api.database import Database
+from api.meta_database import Database
 from api.config import Config
 from discbot.discord_bot import DiscordClient
 
@@ -51,7 +51,7 @@ class TestMock(DiscordClient):
         await super().on_ready()
         summoners = ["prince jarvan lv", "senile felines", "kazpariuz"]
         self.users_in_game = [
-            self.database.discord_id_from_summoner(name) for name in summoners
+            self.meta_database.discord_id_from_summoner(name) for name in summoners
         ]
         print(self.get_ifotm_lead_msg(115142485579137029))
 

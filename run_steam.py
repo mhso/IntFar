@@ -4,8 +4,8 @@ monkey.patch_all()
 import json
 
 from api.config import Config
-from api.database import Database
-from api.game_api.cs2 import SteamAPIClient
+from api.meta_database import MetaDatabase
+from api.game_apis.cs2 import SteamAPIClient
 from argparse import ArgumentParser
 
 if __name__ == "__main__":
@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     config = Config()
     config.steam_2fa_code = args.steam_2fa_code
-    database = Database(config)
+    database = MetaDatabase(config)
 
     try:
         client = SteamAPIClient(args.game, config)

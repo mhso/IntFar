@@ -10,12 +10,13 @@ from mhooge_flask.logging import logger
 from mhooge_flask.restartable import restartable
 
 from api.config import Config
-from api.database import Database
+from api.meta_database import MetaDatabase
+from api.game_databases import get_database_client
 from api.util import SUPPORTED_GAMES
 from api.proxy import ProxyManager
 
-from api.game_api.lol import RiotAPIClient
-from api.game_api.cs2 import SteamAPIClient
+from api.game_apis.lol import RiotAPIClient
+from api.game_apis.cs2 import SteamAPIClient
 from api.bets import get_betting_handler
 #from ai import model
 
@@ -84,38 +85,37 @@ def main():
 
     logger.info("Initializing database...")
     sync_manager = Manager()
-    database_client = Database(conf)
-    database_client.clear_command_queue()
+
+    game_databases = {game: get_database_client(game, conf) for game in SUPPORTED_GAMES}
+
+    meta_database = MetaDatabase(conf)
+    meta_database.clear_command_queue()
 
     # Convert database user dicts to synchronized proxies so they're synced across processes
-    database_client.all_users = sync_manager.dict(database_client.all_users)
-    database_client.users_by_game = sync_manager.dict(
-        {
-            game: sync_manager.dict(database_client.users_by_game[game])
-            for game in SUPPORTED_GAMES
-        }
-    )
+    meta_database.all_users = sync_manager.dict(meta_database.all_users)
+    for game_database in game_databases.values():
+        game_database.game_users = sync_manager.dict(game_database.game_users)
 
     logger.info("Initializing game API clients...")
-    proxy_manager = ProxyManager(SteamAPIClient, "cs2", database_client, conf)
+    proxy_manager = ProxyManager(SteamAPIClient, "cs2", meta_database, conf)
 
     api_clients = {
         "lol": RiotAPIClient("lol", conf),
         "cs2": proxy_manager.create_proxy()
     }
 
-    betting_handlers = {game: get_betting_handler(game, conf, database_client) for game in SUPPORTED_GAMES}
+    betting_handlers = {game: get_betting_handler(game, conf, meta_database) for game in SUPPORTED_GAMES}
 
     # Start process with machine learning model
     # that trains in the background after each game.
     #ai_process, our_end_ai = start_ai_process(conf)
 
     logger.info("Starting Flask web app...")
-    flask_args = [database_client, betting_handlers, api_clients, conf]
+    flask_args = [conf, meta_database, game_databases, betting_handlers, api_clients]
     flask_process, bot_end_flask = start_flask_process(*flask_args)
 
     logger.info("Starting Discord Client...")
-    discord_args = [conf, database_client, betting_handlers, api_clients, None, bot_end_flask]
+    discord_args = [conf, meta_database, game_databases, betting_handlers, api_clients, None, bot_end_flask]
     bot_process, _ = start_discord_process(*discord_args)
 
     processes = [flask_process, bot_process, proxy_manager]

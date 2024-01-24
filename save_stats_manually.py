@@ -4,9 +4,9 @@ import argparse
 from mhooge_flask.logging import logger
 
 from api.bets import get_betting_handler
-from api.game_api import get_api_client
+from api.game_apis import get_api_client
 from api.config import Config
-from api.database import Database
+from api.meta_database import Database
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from discbot.discord_bot import DiscordClient
 
@@ -39,7 +39,7 @@ class TestMock(DiscordClient):
 
     def get_users_in_cs2_game(self, game_info):
         users_in_game = {}
-        all_users = self.database.users_by_game[self.game]
+        all_users = self.meta_database.users_by_game[self.game]
         round_stats = game_info["matches"][0]["roundstatsall"]
 
         max_player_round = 0
@@ -61,7 +61,7 @@ class TestMock(DiscordClient):
 
     def get_users_in_lol_game(self, game_info):
         users_in_game = {}
-        all_users = self.database.users_by_game[self.game]
+        all_users = self.meta_database.users_by_game[self.game]
 
         for participant in game_info["participants"]:
             for disc_id in all_users.keys():
@@ -75,7 +75,7 @@ class TestMock(DiscordClient):
         await super(TestMock, self).on_ready()
 
         if self.missing:
-            ids_to_save = self.database.get_missed_games(self.game)
+            ids_to_save = self.meta_database.get_missed_games(self.game)
         else:
             ids_to_save = [(self.game_id, self.guild_to_use)]
 
@@ -87,7 +87,7 @@ class TestMock(DiscordClient):
                 self.channels_to_write[guild_id] = MockChannel()
 
             if self.forget_sharecode:
-                self.database.set_new_cs2_sharecode = self.set_sharecode_mock
+                self.game_databases["cs2"].set_new_cs2_sharecode = self.set_sharecode_mock
 
             try:
                 game_info = self.api_clients[self.game].get_game_details(self.game_id)

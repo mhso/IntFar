@@ -3,7 +3,7 @@ from os import remove
 from time import time
 from test.runner import TestRunner, test
 from api.config import Config
-from api.database import Database
+from api.meta_database import MetaDatabase
 from api.util import MAIN_GUILD_ID
 
 MY_DISC_ID = 267401734513491969
@@ -16,12 +16,12 @@ class TestWrapper(TestRunner):
         remove("resources/test.db")
         copy("resources/database.db", "resources/test.db")
         conf.database = "resources/test.db"
-        database_client = Database(conf)
+        database_client = MetaDatabase(conf)
         self.before_all(database=database_client)
 
     @test
     def test_user_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
 
         users_before = len(database.users_by_game[GAME])
         self.assert_no_exception(database.add_user, "Add New User.", GAME, 123, ingame_name="name", ingame_id="id")
@@ -62,7 +62,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_game_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
     
         test_game_id = 5163331322
 
@@ -84,7 +84,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_stat_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
     
         self.assert_no_exception(database.get_most_extreme_stat, "Get most extreme stat.", GAME, "kills", True)
         self.assert_no_exception(database.get_most_extreme_stat, "Get most extreme stat.", GAME, "first_blood", True)
@@ -136,7 +136,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_doinks_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
 
         self.assert_no_exception(database.get_doinks_count, "Get doinks counts.", GAME)
         self.assert_no_exception(database.get_doinks_count, "Get doinks counts filtered.", GAME, MY_DISC_ID)
@@ -156,7 +156,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_intfar_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
 
         self.assert_no_exception(database.get_intfar_count, "Get intfar counts.", GAME)
         self.assert_no_exception(database.get_intfar_count, "Get intfar counts filtered.", GAME, MY_DISC_ID)
@@ -179,7 +179,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_betting_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
 
         self.assert_no_exception(database.generate_ticket_id, "Generate ticket.", MY_DISC_ID)
 
@@ -215,7 +215,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_shop_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
 
         def add_items_to_shop_func():
             items = [
@@ -259,7 +259,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_sound_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
 
         self.assert_no_exception(database.get_event_sound, "Get event sound.", GAME, MY_DISC_ID, "intfar")
         self.assert_no_exception(database.get_event_sound, "Get event sound.", GAME, MY_DISC_ID, "doinks")
@@ -272,7 +272,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_list_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
 
         def create_list_func():
             database.create_list(MY_DISC_ID, "test_list1")
@@ -328,7 +328,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_misc_queries(self):
-        database: Database = self.database
+        database: MetaDatabase = self.database
         self.assert_no_exception(database.get_meta_stats, "Get meta stats.", GAME)
 
         self.assert_no_exception(database.get_performance_score, "Get performance score", GAME)

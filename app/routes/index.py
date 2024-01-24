@@ -135,7 +135,7 @@ def get_bet_desc(game, bet_data):
     return response_list, format_duration_approx(timestamp)
 
 def get_feed_data(game, database, feed_length=10):
-    bets = database.get_bets(game, False)
+    bets = database.get_bets(False)
 
     all_bets = []
     for disc_id in bets:
@@ -144,7 +144,7 @@ def get_feed_data(game, database, feed_length=10):
 
     all_bets.sort(key=lambda x: x[3])
 
-    all_game_data = database.get_recent_intfars_and_doinks(game)
+    all_game_data = database.get_recent_intfars_and_doinks()
     best_stats_ever = []
     worst_stats_ever = []
 
@@ -153,7 +153,7 @@ def get_feed_data(game, database, feed_length=10):
     for best in (True, False):
         for stat in stats:
             maximize = not ((stat != "deaths") ^ best)
-            stat_id, stat_value, game_id = database.get_most_extreme_stat(game, stat, maximize)
+            stat_id, stat_value, game_id = database.get_most_extreme_stat(stat, maximize)
             if best:
                 best_stats_ever.append((stat, stat_id, stat_value, game_id))
             else:
@@ -196,16 +196,16 @@ def get_feed_data(game, database, feed_length=10):
 def index():
     game = flask.current_app.config["CURRENT_GAME"]
 
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"][game]
     curr_month = api_util.current_month()
 
     feed_descs = get_feed_data(game, database, feed_length=25)
 
     intfar_all_data = {}
     intfar_month_data = {}
-    for disc_id in database.users_by_game[game].keys():
-        games_played, intfar_reason_ids = database.get_intfar_stats(game, disc_id)
-        games_played_monthly, intfar_reason_ids_monthly = database.get_intfar_stats(game, disc_id, True)
+    for disc_id in database.game_users.keys():
+        games_played, intfar_reason_ids = database.get_intfar_stats(disc_id)
+        games_played_monthly, intfar_reason_ids_monthly = database.get_intfar_stats(disc_id, True)
         pct_intfar = (
             0 if games_played == 0
             else len(intfar_reason_ids) / games_played * 100

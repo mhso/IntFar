@@ -164,7 +164,7 @@ async def handle_remove_champ(client, message, list_id, champ_ids):
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_random_nochest(client, message, target_id=None):
-    summ_data = client.database.game_user_data_from_discord_id("lol", target_id)
+    summ_data = client.game_databases["lol"].game_user_data_from_discord_id(target_id)
     champion_mastery_data = client.api_clients["lol"].get_champion_mastery(summ_data.ingame_id[0])
 
     # Filter champs with no chest granted.
@@ -189,7 +189,7 @@ async def handle_best_nochest(client, message, target_id=None):
     Handler for 'best_nochest' command. Finds the champion with the highest winrate
     for the given player where no chest has yet been obtained.
     """
-    summ_data = client.database.game_user_data_from_discord_id("lol", target_id)
+    summ_data = client.game_databases["lol"].game_user_data_from_discord_id(target_id)
     champion_mastery_data = client.api_clients["lol"].get_champion_mastery(summ_data.ingame_id[0])
 
     # Filter champs with no chest granted.

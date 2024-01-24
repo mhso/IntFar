@@ -7,7 +7,13 @@ import discbot.commands.util as commands_util
 
 async def handle_register_msg(client, message, game, username, *extra_args):
     disc_id = message.author.id
-    status_code, status_msg = register_for_game(client.database, client.api_clients[game], disc_id, username, *extra_args)
+    status_code, status_msg = register_for_game(
+        client.meta_database,
+        client.game_databases[game],
+        client.api_clients[game],
+        disc_id, username,
+        *extra_args
+    )
 
     if status_code > 0:
         users_in_voice = client.get_users_in_voice()
@@ -35,7 +41,7 @@ async def handle_unregister_msg(client, message, game):
             "(that would be cheating {emote_im_nat_kda_player_yo})"
         )
     else:
-        client.database.remove_user(game, message.author.id)
+        client.game_databases[game].remove_user(message.author.id)
         game_name = api_util.SUPPORTED_GAMES[game]
         response = (
             f"You are no longer registered to the Int-Far™ Tracker™ for {game_name} " + "{emote_sadge} " +
@@ -258,7 +264,7 @@ async def handle_verify_msg(client, message):
     verifies a user and allows them to interact with the Int-Far website. This URL is
     then sent via. a Discord DM to the invoker of the command.
     """
-    client_secret = client.database.get_client_secret(message.author.id)
+    client_secret = client.meta_database.get_client_secret(message.author.id)
     url = f"{api_util.get_website_link()}/verify/{client_secret}"
     response_dm = "Go to this link to verify yourself (totally not a virus):\n"
     response_dm += url + "\n"

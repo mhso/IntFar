@@ -7,7 +7,8 @@ from datetime import datetime
 
 from mhooge_flask.logging import logger
 
-from api.database import Database, User
+from api.user import User
+from api.game_database import GameDatabase
 from api.config import Config
 from api.game_api_client import GameAPIClient
 
@@ -21,7 +22,7 @@ class GameMonitor(ABC):
     POSTGAME_STATUS_DUPLICATE = 2
     POSTGAME_STATUS_MISSING = 3
 
-    def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, api_client: GameAPIClient):
+    def __init__(self, game: str, config: Config, database: GameDatabase, game_over_callback: Coroutine, api_client: GameAPIClient):
         """
         Initialize the game monitor. This class handles the logic of polling for
         games to see if any users registered to Int-Far are playing a game or is done with one.

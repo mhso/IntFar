@@ -1,4 +1,3 @@
-from datetime import datetime
 import json
 
 class Config:
@@ -19,7 +18,8 @@ class Config:
         self.steam_username = auth["steamUsername"]
         self.steam_password = auth["steamPassword"]
         self.env = auth["env"]
-        self.database = "resources/database.db"
+        self.database_folder = "resources/databases"
+        self.schema_folder = "resources/schemas"
         self.generate_predictions_img = False
         self.performance_mimimum_games = 10
 

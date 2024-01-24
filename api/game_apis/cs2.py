@@ -291,13 +291,13 @@ class SteamAPIClient(GameAPIClient):
 
         # Try to find candidates that have the search_term in ther name.
         for map_id in self.map_names:
-            if search_name == map_id:
+            lowered = self.map_names[map_id].lower()
+            if search_name == lowered:
                 return map_id
 
-            lowered = self.map_names[map_id].lower()
             if search_name in lowered:
                 candidates.append(map_id)
-                break
+                continue
 
             # Remove apostrophe and period from name.
             if search_name in lowered.replace("'", "").replace(".", ""):

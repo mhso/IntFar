@@ -4,11 +4,11 @@ venv
 queries.sql
 .vscode
 __pycache__
-*.db
 *.pt
 resources/champions*.json
 resources/items*.json
 resources/maps.json
+resources/databases
 app/static/*
 app/static/*/bootstrap/
 !app/static/js/

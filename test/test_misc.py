@@ -6,10 +6,10 @@ import shutil
 from api import game_stats, util
 from test.runner import TestRunner, test
 from api.config import Config
-from api.database import Database
+from api.meta_database import Database
 from discbot.discord_bot import DiscordClient
-from api.database import Database
-from api.game_api.lol import RiotAPIClient
+from api.meta_database import Database
+from api.game_apis.lol import RiotAPIClient
 from api.betting import BettingHandler
 
 class TestWrapper(TestRunner):

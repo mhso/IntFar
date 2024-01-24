@@ -11,15 +11,17 @@ from app.util import before_request
 from app.routes import errors as route_errors
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from api.game_api_client import GameAPIClient
-from api.database import Database
+from api.meta_database import MetaDatabase
+from api.game_database import GameDatabase
 from api.betting import BettingHandler
 from api.config import Config
 
 def run_app(
-    database: Database,
+    config: Config,
+    meta_database: MetaDatabase,
+    game_databases: dict[str, GameDatabase],
     bet_handlers: dict[str, BettingHandler],
     api_clients: dict[str, GameAPIClient],
-    config: Config,
     bot_pipe: Connection
 ):
 
@@ -55,7 +57,8 @@ def run_app(
         app_name,
         "/intfar/",
         static_routes + game_routes,
-        database,
+        meta_database,
+        game_databases=game_databases,
         propagate_exceptions=False,
         app_config=config,
         bet_handlers=bet_handlers,

@@ -5,10 +5,10 @@ from time import time
 from mhooge_flask.logging import logger
 
 from api.config import Config
-from api.database import Database
+from api.game_database import GameDatabase
 from api.user import User
 from api.game_monitor import GameMonitor
-from api.game_api.cs2 import SteamAPIClient
+from api.game_apis.cs2 import SteamAPIClient
 
 class CS2GameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 4
@@ -16,7 +16,7 @@ class CS2GameMonitor(GameMonitor):
     POSTGAME_STATUS_SHORT_MATCH = 6
     POSTGAME_STATUS_SURRENDER = 7
 
-    def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, steam_api: SteamAPIClient):
+    def __init__(self, game: str, config: Config, database: GameDatabase, game_over_callback: Coroutine, steam_api: SteamAPIClient):
         super().__init__(game, config, database, game_over_callback, steam_api)
 
     @property
@@ -90,7 +90,7 @@ class CS2GameMonitor(GameMonitor):
             else:
                 steam_name = user_dict[disc_id].ingame_name[0]
 
-            user = User.clone(self.database.users_by_game[self.game][disc_id])
+            user = User.clone(self.database.game_users[disc_id])
             user.ingame_id = [steam_id]
             user.ingame_name = [steam_name]
             users_in_current_game[disc_id] = user
@@ -124,7 +124,7 @@ class CS2GameMonitor(GameMonitor):
         last_round = game_info["matches"][0]["roundstatsall"][-1]
         max_rounds = max(last_round["teamScores"])
 
-        if self.database.game_exists(self.game, game_info["matchID"]):
+        if self.database.game_exists(game_info["matchID"]):
             logger.warning(
                 "We triggered end of game stuff again... Strange!"
             )
@@ -148,7 +148,7 @@ class CS2GameMonitor(GameMonitor):
         users_missing = {
             disc_id: self.users_in_game[guild_id][disc_id]
             for disc_id in self.users_in_game[guild_id]
-            if self.users_in_game[guild_id][disc_id].latest_match_token[0] == self.database.users_by_game[self.game][disc_id].latest_match_token[0]
+            if self.users_in_game[guild_id][disc_id].latest_match_token[0] == self.database.game_users[disc_id].latest_match_token[0]
         }
 
         # Get new CS sharecode, if we didn't already get it when searching for active games

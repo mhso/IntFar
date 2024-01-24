@@ -4,9 +4,9 @@ import asyncio
 from mhooge_flask.logging import logger
 
 from api.game_monitor import GameMonitor
-from api.database import  Database
+from api.game_database import GameDatabase
 from api.user import User
-from api.game_api.lol import RiotAPIClient
+from api.game_apis.lol import RiotAPIClient
 from api.config import Config
 from api.game_data.lol import get_player_stats
 
@@ -16,7 +16,7 @@ class LoLGameMonitor(GameMonitor):
     POSTGAME_STATUS_NOT_SR = 6
     POSTGAME_STATUS_REMAKE = 7
 
-    def __init__(self, game: str, config: Config, database: Database, game_over_callback: Coroutine, api_client: RiotAPIClient):
+    def __init__(self, game: str, config: Config, database: GameDatabase, game_over_callback: Coroutine, api_client: RiotAPIClient):
         super().__init__(game, config, database, game_over_callback, api_client)
 
     async def get_active_game_info(self, guild_id):
@@ -93,7 +93,7 @@ class LoLGameMonitor(GameMonitor):
         )
 
     async def get_finished_game_status(self, game_info: dict, guild_id: int):
-        if self.database.game_exists(self.game, game_info["gameId"]):
+        if self.database.game_exists(game_info["gameId"]):
             logger.warning(
                 "We triggered end of game stuff again... Strange!"
             )

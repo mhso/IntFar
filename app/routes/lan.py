@@ -133,11 +133,10 @@ def get_active_game_data(face_images, lan_info):
     return game_data
 
 def get_data(lan_info):
-    database = flask.current_app.config["DATABASE"]
+    database = flask.current_app.config["GAME_DATABASES"]["lol"]
     riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
     games_stats = database.get_games_results(
-        _GAME,
         time_after=lan_info.start_time,
         time_before=lan_info.end_time,
         guild_id=lan_info.guild_id
@@ -182,7 +181,6 @@ def get_data(lan_info):
         duration_since_start = api_util.format_duration(dt_start, dt_now)
 
         longest_game_duration, longest_game_time = database.get_longest_game(
-            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
@@ -193,7 +191,6 @@ def get_data(lan_info):
 
         # Latest game.
         latest_game_data, latest_doinks_data = database.get_latest_game(
-            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
@@ -230,13 +227,11 @@ def get_data(lan_info):
 
         # Int-Far and Doinks in total.
         intfars = database.get_intfar_count(
-            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
         )
         doinks = database.get_doinks_count(
-            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
@@ -284,7 +279,6 @@ def get_data(lan_info):
 
         # TILT VALUE!!
         recent_games = database.get_recent_game_results(
-            _GAME,
             time_after=lan_info.start_time,
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
