@@ -1,15 +1,21 @@
+import os
 from time import time
 from argparse import ArgumentParser
 import sqlite3
 
 parser = ArgumentParser()
 
-parser.add_argument("--database", default="database", type=str)
+parser.add_argument("-db", "--database", default="meta", type=str)
 parser.add_argument("--query", default=None, type=str)
 
 args = parser.parse_args()
 
-conn = sqlite3.connect("resources/" + args.database + ".db")
+database_path = f"resources/databases/{args.database}.db"
+if not os.path.exists(database_path):
+    print("Database does not seem to exists. Exiting...")
+    exit(0)
+
+conn = sqlite3.connect(database_path)
 
 if args.query is not None:
     filename = f"misc/queries/{args.query}"
@@ -20,9 +26,12 @@ if args.query is not None:
         for row in result:
             print(row)
             rows_returned += 1
+
         conn.commit()
+
         time_end = time()
         time_taken = f"{time_end - time_start:.3f} seconds."
+
         rows_affected = conn.cursor().execute("SELECT changes()").fetchone()[0]
         if rows_affected > 0:
             print(f"Rows affected: {rows_affected} in {time_taken}")

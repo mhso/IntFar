@@ -266,7 +266,7 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         """
         try: # Get formatted stats that are relevant for the players in the game.
-            stat_parser = get_stat_parser(game, game_info, self.api_clients[game], self.meta_database.users_by_game[game], guild_id)
+            stat_parser = get_stat_parser(game, game_info, self.api_clients[game], self.game_databases[game].game_users, guild_id)
             parsed_game_stats = stat_parser.parse_data()
         except ValueError as exc:
             # Game data was not formatted correctly for some reason (Rito/Volvo pls).
@@ -680,7 +680,7 @@ class DiscordClient(discord.Client):
         betting_handler = self.betting_handlers[game_stats.game]
 
         any_bets = False # Bool to indicate whether any bets were made.
-        for disc_id in self.meta_database.users_by_game[game_stats.game].keys():
+        for disc_id in self.game_databases[game_stats.game].game_users.keys():
             # See if the user corresponding to 'disc_id' was in-game.
             player_stats = game_stats.find_player_stats(disc_id, game_stats.filtered_player_stats)
 

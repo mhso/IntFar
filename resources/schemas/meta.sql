@@ -43,6 +43,6 @@ CREATE TABLE [command_queue] (
     [result] NVARCHAR(128) NULL
 );
 CREATE TABLE [default_game] (
-    [disc_id] INTEGER NOT NULL,
+    [disc_id] INTEGER PRIMARY KEY,
     [game] NVARCHAR(64) NULL
 );

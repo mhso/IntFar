@@ -26,14 +26,12 @@ class GameDatabase(SQLiteDatabase):
 
     def get_all_registered_users(self):
         with self:
-            query = "SELECT disc_id, secret FROM users"
-            values = self.execute_query(query).fetchall()
-            games_user_info = {x[0]: {"disc_id": x[0], "secret": x[1]} for x in values}
-
             all_params = ["disc_id", "ingame_name", "ingame_id"] + list(self.game_user_params) + ["main", "active"]
             params_str = ", ".join(all_params)
             query = f"SELECT {params_str} FROM users ORDER BY main DESC"
             values = self.execute_query(query).fetchall()
+
+            games_user_info = {}
 
             for row in values:
                 disc_id = row[0]
@@ -41,7 +39,10 @@ class GameDatabase(SQLiteDatabase):
                 if not active:
                     continue
 
-                for index, param_name in enumerate(all_params[1:], start=1):
+                if disc_id not in games_user_info:
+                    games_user_info[disc_id] = {}
+
+                for index, param_name in enumerate(all_params):
                     if param_name not in games_user_info[disc_id]:
                         games_user_info[disc_id][param_name] = []
 

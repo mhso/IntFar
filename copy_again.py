@@ -1,103 +1,78 @@
 import os
-from api.meta_database import Database
+from api.meta_database import MetaDatabase
+from api.game_databases import get_database_client
 from api.config import Config
+from api.util import SUPPORTED_GAMES
 
 conf_1 = Config()
-
-database_client_1 = Database(conf_1)
+meta_database_1 = MetaDatabase(conf_1)
 
 conf_2 = Config()
-conf_2.database = "resources/copy.db"
+conf_2.database_folder = "resources"
 
-if os.path.exists(conf_2.database):
-    os.remove(conf_2.database)
+if os.path.exists(f"{conf_2.database_folder}/meta.db"):
+    os.remove(f"{conf_2.database_folder}/meta.db")
 
-database_client_2 = Database(conf_2)
+meta_database_2 = MetaDatabase(conf_2)
 
-with database_client_1.get_connection() as db_1:
-    data_games_lol = db_1.cursor().execute("SELECT * FROM games_lol").fetchall()
-    data_games_csgo = db_1.cursor().execute("SELECT * FROM games_csgo").fetchall()
-    participants_lol = db_1.cursor().execute("SELECT * FROM participants_lol").fetchall()
-    participants_csgo = db_1.cursor().execute("SELECT * FROM participants_csgo").fetchall()
-    users = db_1.cursor().execute("SELECT * FROM users").fetchall()
-    users_lol = db_1.cursor().execute("SELECT * FROM users_lol").fetchall()
-    users_csgo = db_1.cursor().execute("SELECT * FROM users_csgo").fetchall()
-    balances = db_1.cursor().execute("SELECT * FROM betting_balance").fetchall()
-    bets = db_1.cursor().execute("SELECT * FROM bets").fetchall()
-    shop_items = db_1.cursor().execute("SELECT * FROM shop_items").fetchall()
-    owned_items = db_1.cursor().execute("SELECT * FROM owned_items").fetchall()
-    event_sounds = db_1.cursor().execute("SELECT * FROM event_sounds").fetchall()
-    champ_lists = db_1.cursor().execute("SELECT * FROM champ_lists").fetchall()
-    list_items = db_1.cursor().execute("SELECT * FROM list_items").fetchall()
-    missed_games = db_1.cursor().execute("SELECT * FROM missed_games").fetchall()
+def get_questionmark_str(values):
+    return ", ".join("?" for _ in values[0])
 
-    with database_client_2.get_connection() as db_2:
-        for user in users:
-            db_2.cursor().execute("INSERT OR IGNORE INTO users VALUES (?, ?, ?)", user)
+with meta_database_1.get_connection() as meta_db_1:
+    with meta_database_2.get_connection() as meta_db_2:
+        users = meta_db_1.cursor().execute("SELECT * FROM users").fetchall()
+        query = f"INSERT OR IGNORE INTO users VALUES ({get_questionmark_str(users)})"
+        meta_db_2.cursor().executemany(query, users)
 
-        for user in users_lol:
-            db_2.cursor().execute("INSERT OR IGNORE INTO users_lol VALUES (?, ?, ?, ?, ?)", user)
-
-        for user in users_csgo:
-            db_2.cursor().execute("INSERT OR IGNORE INTO users_csgo VALUES (?, ?, ?, ?, ?, ?, ?)", user)
-            db_2.cursor().execute("INSERT OR IGNORE INTO users_cs2 VALUES (?, ?, ?, ?, ?, ?, ?)", user)
-
-        query = "INSERT INTO games_lol VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        for data in data_games_lol:
-            db_2.cursor().execute(query, data)
-
-        query = "INSERT INTO games_csgo VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        for data in data_games_csgo:
-            db_2.cursor().execute(query, data)
-
-        query = (
-            """
-            INSERT INTO participants_lol VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
-        )
-        for data in participants_lol:
-            db_2.cursor().execute(query, data)
-
-        query = (
-            """
-            INSERT INTO participants_csgo VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
-        )
-        for data in participants_csgo:
-            db_2.cursor().execute(query, data)
-
+        balances = meta_db_1.cursor().execute("SELECT * FROM betting_balance").fetchall()
         query = "INSERT OR IGNORE INTO betting_balance(disc_id, tokens) VALUES (?, ?)"
-        for data in balances:
-            db_2.cursor().execute(query, data)
+        meta_db_2.cursor().executemany(query, balances)
 
-        query = (
-            "INSERT OR IGNORE INTO bets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        )
-        for data in bets:
-            db_2.cursor().execute(query, data)
+        bets = meta_db_1.cursor().execute("SELECT * FROM bets").fetchall()
+        query = "INSERT OR IGNORE INTO bets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        meta_db_2.cursor().executemany(query, bets)
 
+        shop_items = meta_db_1.cursor().execute("SELECT * FROM shop_items").fetchall()
         query = "INSERT INTO shop_items VALUES (?, ?, ?, ?)"
-        for data in shop_items:
-            db_2.cursor().execute(query, data)
+        meta_db_2.cursor().executemany(query, shop_items)
 
+        owned_items = meta_db_1.cursor().execute("SELECT * FROM owned_items").fetchall()
         query = "INSERT INTO owned_items VALUES (?, ?, ?)"
-        for data in owned_items:
-            db_2.cursor().execute(query, data)
+        meta_db_2.cursor().executemany(query, owned_items)
 
-        query = "INSERT INTO event_sounds(disc_id, game, sound, event) VALUES (?, ?, ?, ?)"
-        for data in event_sounds:
-            db_2.cursor().execute(query, data)
+        meta_db_2.commit()
 
-        query = "INSERT INTO champ_lists(id, name, owner_id) VALUES (?, ?, ?)"
-        for data in champ_lists:
-            db_2.cursor().execute(query, data)
+    for game in SUPPORTED_GAMES:
+        if os.path.exists(f"{conf_1.database_folder}/{game}.db"):
+            os.remove(f"{conf_1.database_folder}/{game}.db")
 
-        query = "INSERT INTO list_items(id, champ_id, list_id) VALUES (?, ?, ?)"
-        for data in list_items:
-            db_2.cursor().execute(query, data)
+        game_database = get_database_client(game, conf_1)
 
-        query = "INSERT INTO missed_games(game_id, game, guild_id, timestamp) VALUES (?, ?, ?, ?)"
-        for data in missed_games:
-            db_2.cursor().execute(query, data)
+        with game_database.get_connection() as game_db:
+            game_users = meta_db_1.cursor().execute(f"SELECT * FROM users_{game}").fetchall()
+            query = f"INSERT OR IGNORE INTO users VALUES ({get_questionmark_str(game_users)})"
+            game_db.cursor().executemany(query, game_users)
 
-        db_2.commit()
+            games = meta_db_1.cursor().execute(f"SELECT * FROM games_{game}").fetchall()
+            query = f"INSERT OR IGNORE INTO games VALUES ({get_questionmark_str(games)})"
+            game_db.cursor().executemany(query, games)
+
+            participants = meta_db_1.cursor().execute(f"SELECT * FROM participants_{game}").fetchall()
+            query = f"INSERT OR IGNORE INTO participants VALUES ({get_questionmark_str(participants)})"
+            game_db.cursor().executemany(query, participants)
+
+            event_sounds = meta_db_1.cursor().execute("SELECT disc_id, sound, event FROM event_sounds WHERE game=?", (game,)).fetchall()
+            game_db.cursor().executemany("INSERT INTO event_sounds(disc_id, sound, event) VALUES (?, ?, ?)", event_sounds)
+
+            missed_games = meta_db_1.cursor().execute("SELECT game_id, guild_id, timestamp FROM missed_games").fetchall()
+            query = "INSERT INTO missed_games(game_id, guild_id, timestamp) VALUES (?, ?, ?)"
+            game_db.cursor().executemany(query, missed_games)
+
+            if game == "lol":
+                champ_lists = meta_db_1.cursor().execute("SELECT * FROM champ_lists").fetchall()
+                game_db.cursor().executemany("INSERT OR IGNORE INTO champ_lists(id, name, owner_id) VALUES(?, ?, ?)", champ_lists)
+
+                list_items = meta_db_1.cursor().execute("SELECT * FROM list_items").fetchall()
+                game_db.cursor().executemany("INSERT OR IGNORE INTO list_items(id, champ_id, list_id) VALUES (?, ?, ?)", list_items)
+
+        game_db.commit()

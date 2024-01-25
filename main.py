@@ -1,5 +1,5 @@
-import run_flask
-from discbot import discord_bot
+from run_flask import run_app as run_flask_app
+from discbot.discord_bot import run_client as run_discord_client
 
 from time import sleep
 from multiprocessing import Process, Pipe, Manager
@@ -27,7 +27,7 @@ def start_discord_process(*args):
     our_end, bot_end_us = Pipe()
     bot_process = Process(
         name="Discord Bot",
-        target=discord_bot.run_client,
+        target=run_discord_client,
         args=args + (bot_end_us,)
     )
     bot_process.start()
@@ -38,7 +38,7 @@ def start_flask_process(*args):
     flask_end, bot_end_flask = Pipe()
     flask_process = Process(
         name="Flask Web App",
-        target=run_flask.run_app,
+        target=run_flask_app,
         args=(
             args + (flask_end,)
         )

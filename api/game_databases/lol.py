@@ -1,9 +1,10 @@
 from api.game_database import GameDatabase
+from api.config import Config
 from sqlite3 import IntegrityError
 
-class LoLDatabase(GameDatabase):
-    def __init__(self, config):
-        super().__init__(config)
+class LoLGameDatabase(GameDatabase):
+    def __init__(self, game: str, config: Config):
+        super().__init__(game, config)
 
     def get_played_count_for_stat(self, stat, maximize, disc_id):
         aggregator = "MAX" if maximize else "MIN"

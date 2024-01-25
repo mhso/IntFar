@@ -1,6 +1,10 @@
 from api.game_database import GameDatabase
+from api.config import Config
 
 class CS2GameDatabase(GameDatabase):
+    def __init__(self, game: str, config: Config):
+        super().__init__(game, config)
+
     @property
     def game_user_params(self):
         return ["match_auth_code", "latest_match_token"]
@@ -47,10 +51,6 @@ class CS2GameDatabase(GameDatabase):
             return self.execute_query(query, disc_id).fetchone()
 
     def get_average_stat(self, stat, disc_id=None, map_id=None, min_games=10):
-        game = "cs2"
-        games_table = self._get_games_table(game)
-        stats_table = self._get_participants_table(game)
-        users_table = self._get_users_table(game)
         params = []
         player_condition = ""
         map_condition = ""
@@ -70,8 +70,8 @@ class CS2GameDatabase(GameDatabase):
                 SELECT
                     disc_id,
                     SUM({stat}) AS s
-                FROM {stats_table} AS p
-                INNER JOIN {games_table} AS g
+                FROM participants AS p
+                INNER JOIN games AS g
                     ON g.game_id = p.game_id
                 WHERE {stat} IS NOT NULL
                 {map_condition}
@@ -82,15 +82,15 @@ class CS2GameDatabase(GameDatabase):
                 SELECT
                     disc_id,
                     CAST(COUNT(DISTINCT g.game_id) as real) AS c
-                FROM {games_table} AS g
-                LEFT JOIN {stats_table} AS p
+                FROM games AS g
+                LEFT JOIN participants AS p
                     ON g.game_id = p.game_id
                 WHERE {stat} IS NOT NULL
                 {map_condition}
                 GROUP BY p.disc_id
             ) played
                 ON played.disc_id = stat_values.disc_id
-            INNER JOIN {users_table} AS u
+            INNER JOIN users AS u
                 ON u.disc_id = played.disc_id
             WHERE u.active = 1
                 AND played.c > {min_games}

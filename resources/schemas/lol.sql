@@ -5,7 +5,8 @@ CREATE TABLE [users] (
     [ingame_name] NVARCHAR(64) NOT NULL,
     [ingame_id] NVARCHAR(64) NOT NULL,
     [main] INTEGER(1),
-    [active] INTEGER DEFAULT(1)
+    [active] INTEGER DEFAULT(1),
+    PRIMARY KEY (disc_id, ingame_id)
 );
 CREATE TABLE [games] (
     [game_id] NVARCHAR(64) PRIMARY KEY,
@@ -47,15 +48,14 @@ CREATE TABLE [list_items] (
     [list_id] INTEGER NOT NULL,
     UNIQUE(champ_id, list_id)
 );
-CREATE TABLE [missed_games] (
-    [game_id] NVARCHAR(64) NOT NULL,
-    [guild_id] INTEGER NOT NULL,
-    [timestamp] INTEGER,
-    PRIMARY KEY (game_id, game)
-);
 CREATE TABLE [event_sounds] (
     [disc_id] INTEGER NOT NULL,
     [sound] NVARCHAR(24) NOT NULL,
     [event] NVARCHAR(6) NOT NULL,
-    PRIMARY KEY (disc_id, game, event)
+    PRIMARY KEY (disc_id, event)
+);
+CREATE TABLE [missed_games] (
+    [game_id] NVARCHAR(64) PRIMARY KEY,
+    [guild_id] INTEGER NOT NULL,
+    [timestamp] INTEGER
 );

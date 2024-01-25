@@ -1,5 +1,14 @@
 class User(dict):
-    def __init__(self, disc_id: int, secret: str, ingame_name: list[str]=None, ingame_id: list[str]=None, main=True, default_game=None, **extra_params):
+    def __init__(
+        self,
+        disc_id: int,
+        secret: str = None,
+        ingame_name: list[str] = None,
+        ingame_id: list[str] = None,
+        main = True,
+        default_game = None,
+        **extra_params
+    ):
         all_params = {
             "disc_id": disc_id,
             "secret": secret,
