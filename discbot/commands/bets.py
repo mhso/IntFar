@@ -34,7 +34,7 @@ def get_bet_params(client, args):
 
     game = args[0]
     if game not in api_util.SUPPORTED_GAMES:
-        game = client.database.DEFAULT_GAME
+        game = client.meta_database.DEFAULT_GAME
         index = 0
     else:
         index = 1
@@ -92,7 +92,7 @@ async def handle_make_bet_msg(client, message, game, amounts, events, targets):
         target_ids.append(target_id)
         target_names.append(discord_name)
 
-    with client.database:
+    with client.meta_database:
         response = client.betting_handlers[game].place_bet(
             message.author.id,
             message.guild.id,
@@ -125,13 +125,13 @@ async def handle_cancel_bet_msg(client, message, betting_event, game, target_id=
 async def handle_give_tokens_msg(client, message, amount, target_id):
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    max_tokens_before, max_tokens_holder = client.database.get_max_tokens_details()
+    max_tokens_before, max_tokens_holder = client.meta_database.get_max_tokens_details()
 
     response = client.betting_handlers["lol"].give_tokens(
         message.author.id, amount, target_id, target_name
     )[1]
 
-    balance_after = client.database.get_token_balance(target_id)
+    balance_after = client.meta_database.get_token_balance(target_id)
 
     if balance_after > max_tokens_before and target_id != max_tokens_holder:
         # This person now has the most tokens of all users!
@@ -143,7 +143,7 @@ async def handle_give_tokens_msg(client, message, amount, target_id):
 
 async def handle_active_bets_msg(client, message, game, target_id):
     def get_bet_description(game, disc_id, single_person=True):
-        active_bets = client.database.get_bets(game, True, disc_id)
+        active_bets = client.meta_database.get_bets(game, True, disc_id)
         recepient = client.get_discord_nick(disc_id, message.guild.id)
 
         response = ""
@@ -196,7 +196,7 @@ async def handle_active_bets_msg(client, message, game, target_id):
         if target_id is None:
             # Check active bets for everyone
             any_bet = False
-            for disc_id in client.database.users_by_game[game].keys():
+            for disc_id in client.game_databases[game].game_users.keys():
                 bets_for_person = get_bet_description(game, disc_id, False)
                 if bets_for_person is not None:
                     if any_bet:
@@ -225,7 +225,7 @@ async def handle_active_bets_msg(client, message, game, target_id):
 
 async def handle_all_bets_msg(client, message, game, target_id):
     game_name = api_util.SUPPORTED_GAMES[game]
-    all_bets = client.database.get_bets(game, False, target_id)
+    all_bets = client.meta_database.get_bets(game, False, target_id)
     tokens_name = client.config.betting_tokens
     bets_won = 0
     had_target = 0
@@ -278,7 +278,7 @@ async def handle_all_bets_msg(client, message, game, target_id):
 async def handle_token_balance_msg(client, message, target_id):
     def get_token_balance(disc_id):
         name = client.get_discord_nick(disc_id, message.guild.id)
-        balance = client.database.get_token_balance(disc_id)
+        balance = client.meta_database.get_token_balance(disc_id)
         return balance, name
 
     tokens_name = client.config.betting_tokens
@@ -286,7 +286,7 @@ async def handle_token_balance_msg(client, message, target_id):
     response = ""
     if target_id is None: # Get betting balance for all.
         balances = []
-        for disc_id, _, _ in client.database.summoners:
+        for disc_id in client.meta_database.all_users:
             balance, name = get_token_balance(disc_id)
             balances.append((balance, name))
 

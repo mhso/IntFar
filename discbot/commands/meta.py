@@ -55,10 +55,11 @@ async def handle_users_msg(client, message, game=None):
     response = ""
     games = api_util.SUPPORTED_GAMES if game is None else [game]
     for game in games:
+        database = client.game_databases[game]
         game_response = ""
         game_name = api_util.SUPPORTED_GAMES[game]
-        for disc_id in client.database.users_by_game[game].keys():
-            formatted_names = ", ".join(client.database.users_by_game[game][disc_id].ingame_name)
+        for disc_id in database.game_users.keys():
+            formatted_names = ", ".join(database.game_users[disc_id].ingame_name)
             nickname = client.get_discord_nick(disc_id, message.guild.id)
             game_response += f"\n- {nickname} ({formatted_names})"
 
@@ -290,12 +291,12 @@ async def handle_verify_msg(client, message):
 
 async def handle_default_game_msg(client, message, game=None):
     if game is None:
-        game = client.database.all_users[message.author.id].default_game
+        game = client.meta_database.all_users[message.author.id].default_game
         game_name = api_util.SUPPORTED_GAMES[game]
         response = f"Your default game is *{game_name}*"
 
     else:
-        client.database.set_default_game(message.author.id, game)
+        client.meta_database.set_default_game(message.author.id, game)
         game_name = api_util.SUPPORTED_GAMES[game]
         response = f"Your default game is now set to *{game_name}*"
 

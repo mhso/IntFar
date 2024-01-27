@@ -1,14 +1,17 @@
 import os
 from api.meta_database import MetaDatabase
+from api.util import SUPPORTED_GAMES
+SUPPORTED_GAMES["csgo"] = "Counter Strike: Global Offensive"
 from api.game_databases import get_database_client
 from api.config import Config
-from api.util import SUPPORTED_GAMES
+
 
 conf_1 = Config()
+conf_1.database_folder = "resources"
+
 meta_database_1 = MetaDatabase(conf_1)
 
 conf_2 = Config()
-conf_2.database_folder = "resources"
 
 if os.path.exists(f"{conf_2.database_folder}/meta.db"):
     os.remove(f"{conf_2.database_folder}/meta.db")
@@ -43,10 +46,10 @@ with meta_database_1.get_connection() as meta_db_1:
         meta_db_2.commit()
 
     for game in SUPPORTED_GAMES:
-        if os.path.exists(f"{conf_1.database_folder}/{game}.db"):
-            os.remove(f"{conf_1.database_folder}/{game}.db")
+        if os.path.exists(f"{conf_2.database_folder}/{game}.db"):
+            os.remove(f"{conf_2.database_folder}/{game}.db")
 
-        game_database = get_database_client(game, conf_1)
+        game_database = get_database_client(game, conf_2)
 
         with game_database.get_connection() as game_db:
             game_users = meta_db_1.cursor().execute(f"SELECT * FROM users_{game}").fetchall()
@@ -58,6 +61,17 @@ with meta_database_1.get_connection() as meta_db_1:
             game_db.cursor().executemany(query, games)
 
             participants = meta_db_1.cursor().execute(f"SELECT * FROM participants_{game}").fetchall()
+            if game in ("cs2", "lol"):
+                participants_swapped = []
+                for row in participants:
+                    list_row = list(row)
+                    temp = list_row[2]
+                    for index in range(3, 6):
+                        list_row[index-1] = list_row[index]
+                    list_row[5] = temp
+                    participants_swapped.append(tuple(list_row))
+                participants = participants_swapped
+        
             query = f"INSERT OR IGNORE INTO participants VALUES ({get_questionmark_str(participants)})"
             game_db.cursor().executemany(query, participants)
 

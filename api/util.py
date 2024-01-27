@@ -14,8 +14,7 @@ MY_GUILD_ID  = 512363920044982272
 
 SUPPORTED_GAMES = {
     "lol": "League of Legends",
-    "cs2": "Counter Strike 2",
-    "csgo": "Counter Strike: Global Offensive"
+    "cs2": "Counter Strike 2"
 }
 
 GUILD_IDS = [ # List of ids of guilds that Int-Far is active in.

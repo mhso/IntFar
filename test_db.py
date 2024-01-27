@@ -50,9 +50,9 @@ try:
             result = conn.cursor().execute(query)
 
             column_names = result.description
-            print(", ".join(tup[0] for tup in column_names))
-
-            print("-" * 100)
+            if column_names is not None:
+                print(", ".join(tup[0] for tup in column_names))
+                print("-" * 100)
 
             rows_returned = 0
             for row in result:

@@ -17,9 +17,6 @@ class MetaDatabase(SQLiteDatabase):
 
         self.all_users = self.get_base_users()
 
-    def user_exists(self, discord_id):
-        return discord_id in self.all_users
-
     def get_base_users(self):
         query = """
             SELECT
@@ -33,6 +30,23 @@ class MetaDatabase(SQLiteDatabase):
         with self:
             return {x[0]: User(x[0], x[1], default_game=x[2] or DEFAULT_GAME) for x in self.execute_query(query).fetchall()}
 
+    def user_exists(self, discord_id):
+        return discord_id in self.all_users
+
+    def add_user(self, discord_id):
+        if self.user_exists(discord_id):
+            return
+
+        with self:
+            query = "INSERT INTO users(disc_id, secret, reports) VALUES (?, ?, ?)"
+            secret = generate_user_secret()
+            self.execute_query(query, discord_id, secret, 0)
+
+            query = "INSERT INTO betting_balance VALUES (?, ?)"
+            self.execute_query(query, discord_id, 100)
+
+            self.all_users[discord_id] = User(discord_id, secret)
+
     def get_client_secret(self, disc_id):
         query = "SELECT secret FROM users WHERE disc_id=?"
 
@@ -44,13 +58,6 @@ class MetaDatabase(SQLiteDatabase):
 
         with self:
             return self.execute_query(query, secret).fetchone()[0]
-
-    def add_user(self, discord_id):
-        query = "INSERT INTO users(disc_id, secret, reports) VALUES (?, ?, ?)"
-        secret = generate_user_secret()
-        self.execute_query(query, discord_id, secret, 0)
-
-        self.all_users[discord_id] = User(discord_id, secret)
 
     def set_default_game(self, disc_id, game):
         with self:

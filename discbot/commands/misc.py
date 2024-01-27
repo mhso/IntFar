@@ -14,12 +14,13 @@ FLIRT_MESSAGES = {
 }
 
 async def handle_game_msg(client, message, target_id, game):
+    database = client.game_databases[game]
     ingame_ids = None
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    for disc_id in client.database.users_by_game[game].keys():
+    for disc_id in database.game_users.keys():
         if disc_id == target_id:
-            ingame_ids = client.database.users_by_game[game][disc_id].ingame_id
+            ingame_ids = database.game_users[disc_id].ingame_id
             break
 
     response = ""
@@ -36,7 +37,7 @@ async def handle_game_msg(client, message, target_id, game):
         await asyncio.sleep(1)
 
     if game_data is not None:
-        stat_parser = get_stat_parser(game, game_data, client.api_clients[game], client.database.users_by_game[game], message.guild.id)
+        stat_parser = get_stat_parser(game, game_data, client.api_clients[game], database.game_users[game], message.guild.id)
         response = f"{target_name} is "
         summary = stat_parser.get_active_game_summary(active_id)
         response += summary
@@ -78,7 +79,7 @@ async def handle_report_msg(client, message, target_id):
     target_name = client.get_discord_nick(target_id, message.guild.id)
     mention = client.get_mention_str(target_id, message.guild.id)
 
-    reports = client.database.report_user(target_id)
+    reports = client.meta_database.report_user(target_id)
 
     response = f"{message.author.name} reported {mention} " + "{emote_woahpikachu}\n"
     response += f"{target_name} has been reported {reports} time"
@@ -89,7 +90,7 @@ async def handle_report_msg(client, message, target_id):
     await message.channel.send(client.insert_emotes(response))
 
 async def handle_see_reports_msg(client, message, target_id):
-    report_data = client.database.get_reports(target_id)
+    report_data = client.meta_database.get_reports(target_id)
     response = ""
     for disc_id, reports in report_data:
         name = client.get_discord_nick(disc_id, message.guild.id)
@@ -284,7 +285,7 @@ def get_winrate(client, champ_or_map, game, target_id):
     games = None
     qualified_name = None
 
-    winrate, games = client.database.get_played_winrate(target_id, champ_or_map)
+    winrate, games = client.meta_database.get_played_winrate(target_id, champ_or_map)
     if game == "lol":
         qualified_name = client.api_clients[game].get_champ_name(champ_or_map)
     else:

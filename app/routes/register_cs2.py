@@ -8,7 +8,8 @@ register_cs2_page = flask.Blueprint("register_cs2_page", __name__, template_fold
 @register_cs2_page.route('/', methods=["GET", "POST"])
 def home():
     disc_id = get_user_details()[0]
-    database = flask.current_app.config["DATABASE"]
+    game_database = flask.current_app.config["GAME_DATABASES"]["cs2"]
+    meta_database = flask.current_app.config["GAME_DATABASES"]["cs2"]
 
     if disc_id is None: # Not logged in
         err_msg = "You must be verified with Int-Far to register for CS2."
@@ -23,7 +24,7 @@ def home():
             error=err_msg
         )
 
-    existing_accounts_dict = database.users_by_game["cs2"].get(disc_id, {})
+    existing_accounts_dict = game_database.game_users.get(disc_id, {})
     existing_accounts_list = list(
         zip(
             existing_accounts_dict.get("steam_ids", []),
@@ -46,7 +47,15 @@ def home():
         match_token = data["match_token"]
         match_auth_code = data["match_auth_code"]
 
-        status_code, status_msg = register_for_game(database, api_client, disc_id, steam_id, match_auth_code, match_token)
+        status_code, status_msg = register_for_game(
+            meta_database,
+            game_database,
+            api_client,
+            disc_id,
+            steam_id,
+            match_auth_code,
+            match_token
+        )
 
         return make_template_context(
             "register_cs2.html",

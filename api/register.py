@@ -22,17 +22,15 @@ def register_for_lol(
     elif (summ_id := api_client.get_summoner_id(summ_name.replace(" ", "%20"))) is None:
         return 0, "Invalid summoner name."
 
+    # Add user to Int-Far base users if they are new
+    meta_database.add_user(disc_id)
+
     # Add user to game database
     status_code, status = game_database.add_user(
-        api_client.game,
         disc_id,
         ingame_name=summ_name,
         ingame_id=summ_id
     )
-
-    # If user is new to Int-Far, also add user to meta database
-    if status_code == 1:
-        meta_database.add_user(disc_id)
 
     return status_code, status
 
@@ -42,8 +40,8 @@ def register_for_cs2(
     api_client: SteamAPIClient,
     disc_id: int,
     steam_id: int,
-    match_auth_code: str=None,
-    match_token: str=None
+    match_auth_code: str = None,
+    match_token: str = None
 ):
     if steam_id is None:
         return 0, "You must supply a Steam ID."
@@ -61,8 +59,10 @@ def register_for_cs2(
     if steam_name is None:
         return 0, "Invalid Steam ID."
 
-    status_code, status_msg = meta_database.add_user(
-        api_client.game,
+    # Add user to Int-Far base users if they are new
+    meta_database.add_user(disc_id)
+
+    status_code, status_msg = game_database.add_user(
         disc_id,
         ingame_name=steam_name,
         ingame_id=steam_id,
@@ -70,9 +70,7 @@ def register_for_cs2(
         latest_match_token=match_token
     )
 
-    if status_code == 1: # New user
-        meta_database.add_user(disc_id)
-
+    if status_code in (1, 2):
         # Send friend request on Steam from Int-Far to the newly registered player
         friend_status = api_client.send_friend_request(steam_id)
         logger.info(f"Sent Steam friend request with status {friend_status}")

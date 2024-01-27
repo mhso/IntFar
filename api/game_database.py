@@ -53,9 +53,11 @@ class GameDatabase(SQLiteDatabase):
     def user_exists(self, discord_id):
         return discord_id in self.game_users
 
-    def add_user(self, game, discord_id, **game_params):
+    def add_user(self, discord_id, **game_params):
         status = ""
         status_code = 0
+        game_name = SUPPORTED_GAMES[self.game]
+
         try:
             with self:
                 query = f"SELECT * FROM users WHERE disc_id=? AND active=0"
@@ -65,20 +67,15 @@ class GameDatabase(SQLiteDatabase):
                     # Check if user has been registered before, and is now re-registering.
                     query = f"UPDATE users SET active=1 WHERE disc_id=?"
                     self.execute_query(query, discord_id)
-                    status = "Welcome back to the Int-Far:tm: Tracker:tm:, my lost son :hearts:"
+                    status = f"Welcome back to the Int-Far:tm: Tracker:tm: for {game_name}:tm:, my lost son :hearts:"
 
-                    reduced_params = dict(game_params)
-                    del reduced_params["ingame_name"]
-                    del reduced_params["ingame_id"]
-
-                    self.game_users[game][discord_id] = self.get_all_registered_users(game, **reduced_params)
+                    self.game_users[discord_id] = self.get_all_registered_users()[discord_id]
                     status_code = 3 # User reactivated
 
                 else:
-                    new_user = not any(self.user_exists(game_name, discord_id) for game_name in self.game_users.keys())
                     main = 1
 
-                    user_info = self.game_users[game].get(discord_id)
+                    user_info = self.game_users.get(discord_id)
 
                     game_user_name = game_params["ingame_name"]
                     game_user_id = game_params["ingame_id"]
@@ -104,25 +101,17 @@ class GameDatabase(SQLiteDatabase):
 
                         main = 0
 
-                        status = f"Added smurf '{game_user_name}' with ID '{game_user_id}' for {SUPPORTED_GAMES[game]}."
+                        status = f"Added smurf '{game_user_name}' with ID '{game_user_id}' for {game_name}."
+                        status_code = 2 # Smurf added
                     else:
                         user_params = {param_name: [game_params[param_name]] for param_name in game_params}
                         user_params["disc_id"] = discord_id
-                        self.game_users[game][discord_id] = User(**user_params)
-                        status = f"User '{game_user_name}' with ID '{game_user_id}' succesfully added for {SUPPORTED_GAMES[game]}!"
+                        self.game_users[discord_id] = User(**user_params)
+                        status = f"User '{game_user_name}' with ID '{game_user_id}' succesfully added for {game_name}!"
+                        status_code = 1 # New user added
 
                     values_list = [discord_id] + list(game_params.values()) + [main]
                     self.execute_query(query, *values_list)
-
-                    if new_user:
-                        # Only create betting balance table if user is new.
-                        query = "INSERT INTO betting_balance VALUES (?, ?)"
-
-                        self.execute_query(query, discord_id, 100)
-
-                        status_code = 1 # New user added
-                    else:
-                        status_code = 2 # Smurf added
 
         except DBException:
             return (0, "A user with that summoner name is already registered!")
@@ -455,11 +444,11 @@ class GameDatabase(SQLiteDatabase):
                         p.disc_id,
                         COUNT(*) AS c
                     FROM
-                        participants AS p, 
-                        users AS u
+                        participants AS p
+                    INNER JOIN users AS u
+                    ON u.disc_id = p.disc_id
                     WHERE
                         doinks IS NOT NULL
-                        AND u.disc_id = p.disc_id
                         AND u.active = 1
                     GROUP BY p.disc_id
                 ) counts
@@ -467,17 +456,17 @@ class GameDatabase(SQLiteDatabase):
             return self.execute_query(query).fetchone()
 
     def get_doinks_reason_counts(self):
+        query_doinks_multis = """
+            SELECT doinks
+            FROM participants AS p
+            INNER JOIN users AS u
+            ON u.disc_id = p.disc_id
+            WHERE
+                doinks IS NOT NULL
+                AND u.active = 1
+        """
+
         with self:
-            query_doinks_multis = """
-                SELECT doinks
-                FROM
-                    participants AS p,
-                    users AS u
-                WHERE
-                    doinks IS NOT NULL
-                    AND u.disc_id = p.disc_id
-                    AND u.active = 1
-            """
             doinks_reasons_data = self.execute_query(query_doinks_multis).fetchall()
             if doinks_reasons_data == []:
                 return None
@@ -491,24 +480,25 @@ class GameDatabase(SQLiteDatabase):
             return doinks_counts
 
     def get_recent_intfars_and_doinks(self):
+        query = """
+            SELECT
+                g.game_id,
+                timestamp,
+                p.disc_id,
+                doinks,
+                intfar_id,
+                intfar_reason
+            FROM participants AS p
+            LEFT JOIN games AS g
+                ON p.game_id = g.game_id
+            LEFT JOIN users AS u
+                ON p.disc_id = u.disc_id
+            WHERE u.active = 1
+            GROUP BY p.game_id, p.disc_id
+            ORDER BY timestamp ASC
+        """
+
         with self:
-            query = """
-                SELECT
-                    g.game_id,
-                    timestamp,
-                    p.disc_id,
-                    doinks,
-                    intfar_id,
-                    intfar_reason
-                FROM participants AS p
-                LEFT JOIN games AS g
-                    ON p.game_id = g.game_id
-                LEFT JOIN users AS u
-                    ON p.disc_id = u.disc_id
-                WHERE u.active = 1
-                GROUP BY p.game_id, p.disc_id
-                ORDER BY timestamp ASC
-            """
             return self.execute_query(query).fetchall()
 
     def get_games_results(self, ascending=True, time_after=None, time_before=None, guild_id=None):

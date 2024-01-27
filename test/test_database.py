@@ -4,7 +4,9 @@ from time import time
 from test.runner import TestRunner, test
 from api.config import Config
 from api.meta_database import MetaDatabase
-from api.util import MAIN_GUILD_ID
+from api.game_database import GameDatabase
+from api.game_databases import get_database_client
+from api.util import MAIN_GUILD_ID, SUPPORTED_GAMES
 
 MY_DISC_ID = 267401734513491969
 GAME = "lol"
@@ -13,173 +15,199 @@ class TestWrapper(TestRunner):
     def __init__(self):
         super().__init__()
         conf = Config()
-        remove("resources/test.db")
-        copy("resources/database.db", "resources/test.db")
-        conf.database = "resources/test.db"
-        database_client = MetaDatabase(conf)
-        self.before_all(database=database_client)
+        remove(f"{conf.database_folder}/test/meta.db")
+        copy(f"{conf.database_folder}/meta.db", f"{conf.database_folder}/test/meta.db")
+        for game in SUPPORTED_GAMES:
+            remove(f"{conf.database_folder}/test/{game}.db")
+            copy(f"{conf.database_folder}/{game}.db", f"{conf.database_folder}/test/{game}.db")
+
+        conf.database_folder = f"{conf.database_folder}/test"
+        meta_database = MetaDatabase(conf)
+        game_databases = {game: get_database_client(game, conf) for game in SUPPORTED_GAMES}
+
+        self.before_all(meta_database=meta_database, game_databases=game_databases)
 
     @test
     def test_user_queries(self):
-        database: MetaDatabase = self.database
+        meta_database: MetaDatabase = self.meta_database
 
-        users_before = len(database.users_by_game[GAME])
-        self.assert_no_exception(database.add_user, "Add New User.", GAME, 123, ingame_name="name", ingame_id="id")
-        users_after = len(database.users_by_game[GAME])
+        for game in SUPPORTED_GAMES:
+            game_database: GameDatabase = self.game_databases[game]
+            game_users_before = len(game_database.game_users)
+            all_users_before = len(meta_database.all_users)
+            def add_user():
+                status, _ = game_database.add_user(123, ingame_name="name", ingame_id="id")
+                if status == 1:
+                    meta_database.add_user(123)
+                    all_users_after = len(meta_database.all_users)
+                    self.assert_equals(all_users_after, all_users_before + 1, "User was added.")
 
-        self.assert_equals(users_after, users_before + 1, "User was added.")
+            self.assert_no_exception(add_user, f"Add user {game}")
 
-        self.assert_no_exception(database.discord_id_from_ingame_info, "User from ingame info", GAME, ingame_name="name")
+            game_users_after = len(game_database.game_users)
+            self.assert_equals(game_users_after, game_users_before + 1, "Game user was added.")
 
-        users_before = len(database.users_by_game[GAME])
-        self.assert_no_exception(database.add_user, "Add Smurf.", GAME, 123, ingame_name="name", ingame_id="id2")
-        users_after = len(database.users_by_game[GAME])
+            self.assert_no_exception(game_database.discord_id_from_ingame_info, "User from ingame info", ingame_name="name")
 
-        self.assert_equals(users_after, users_before, "Smurf was added.")
+            game_users_before = len(game_database.game_users)
+            self.assert_no_exception(game_database.add_user, "Add Smurf.", 123, ingame_name="name", ingame_id="id2")
+            game_users_after = len(game_database.game_users)
 
-        self.assert_no_exception(database.remove_user, "Remove User.", GAME, 123)
-        users_after = len(database.users_by_game[GAME])
+            self.assert_equals(game_users_after, game_users_before, "Smurf was added.")
 
-        self.assert_equals(users_after, users_before - 1, "User was removed.")
+            self.assert_no_exception(game_database.remove_user, "Remove User.", 123)
+            game_users_after = len(game_database.game_users)
 
-        users_before = len(database.users_by_game[GAME])
-        self.assert_no_exception(database.add_user, "Re-add User.", GAME, 123, ingame_name="name", ingame_id="id")
-        users_after = len(database.users_by_game[GAME])
+            self.assert_equals(game_users_after, game_users_before - 1, "User was removed.")
 
-        self.assert_equals(users_after, users_before + 1, "User was re-added.")
+            game_users_before = len(game_database.game_users)
+            self.assert_no_exception(game_database.add_user, "Re-add User.", 123, ingame_name="name", ingame_id="id")
+            game_users_after = len(game_database.game_users)
 
-        self.assert_no_exception(database.get_reports, "Get reports.", MY_DISC_ID)
-        self.assert_no_exception(database.get_max_reports_details, "Get max reports.")
-        self.assert_no_exception(database.report_user, "Report user.", MY_DISC_ID)
+            self.assert_equals(game_users_after, game_users_before + 1, "User was re-added.")
 
-        self.assert_no_exception(database.get_client_secret, "Get client secret.", MY_DISC_ID)
+        self.assert_no_exception(meta_database.get_reports, "Get reports.", MY_DISC_ID)
+        self.assert_no_exception(meta_database.get_max_reports_details, "Get max reports.")
+        self.assert_no_exception(meta_database.report_user, "Report user.", MY_DISC_ID)
+        self.assert_no_exception(meta_database.get_client_secret, "Get client secret.", MY_DISC_ID)
 
         def get_user_from_secret_func():
-            secret = database.get_client_secret(MY_DISC_ID)
-            database.get_user_from_secret(secret)
+            secret = meta_database.get_client_secret(MY_DISC_ID)
+            meta_database.get_user_from_secret(secret)
 
         self.assert_no_exception(get_user_from_secret_func, "Get client from secret.")
 
     @test
     def test_game_queries(self):
-        database: MetaDatabase = self.database
-    
-        test_game_id = 5163331322
+        test_game_ids = {
+            "lol": 5163331322,
+            "cs2": "CSGO-8VPTQ-vMjZq-K5ZAB-bVPPQ-PRqmJ"
+        }
 
-        self.assert_no_exception(database.game_exists, "Game exists.", GAME, test_game_id)
+        for game in SUPPORTED_GAMES:
+            database: GameDatabase = self.game_databases[game]
+            test_game_id = test_game_ids[game]
 
-        self.assert_no_exception(database.delete_game, "Delete game.", GAME, test_game_id)
+            self.assert_no_exception(database.game_exists, "Game exists.", test_game_id)
+            self.assert_true(database.game_exists(test_game_id), "Game exists before delete.")
 
-        self.assert_false(database.game_exists(GAME, test_game_id), "Game doesn't exist after delete.")
+            self.assert_no_exception(database.delete_game, "Delete game.", test_game_id)
+            self.assert_false(database.game_exists(test_game_id), "Game doesn't exist after delete.")
 
-        self.assert_no_exception(database.get_latest_game, "Get latest game.", GAME)
+            self.assert_no_exception(database.get_latest_game, "Get latest game.")
 
-        self.assert_no_exception(database.get_game_ids, "Get game ids.", GAME)
+            self.assert_no_exception(database.get_game_ids, "Get game ids.")
 
-        self.assert_no_exception(database.get_games_count, "Get games counts.", GAME)
-        self.assert_no_exception(database.get_longest_game, "Get longest game", GAME)
+            self.assert_no_exception(database.get_games_count, "Get games counts.")
+            self.assert_no_exception(database.get_longest_game, "Get longest game")
 
-        self.assert_no_exception(database.get_recent_game_results, "Get recent game results", GAME)
-        self.assert_no_exception(database.get_games_results, "Get games results", GAME)
+            self.assert_no_exception(database.get_games_results, "Get games results")
+
+            self.assert_no_exception(database.get_missed_games, "Get missed games")
 
     @test
     def test_stat_queries(self):
-        database: MetaDatabase = self.database
-    
-        self.assert_no_exception(database.get_most_extreme_stat, "Get most extreme stat.", GAME, "kills", True)
-        self.assert_no_exception(database.get_most_extreme_stat, "Get most extreme stat.", GAME, "first_blood", True)
+        test_game_ids = {
+            "lol": 5163331322,
+            "cs2": "CSGO-8VPTQ-vMjZq-K5ZAB-bVPPQ-PRqmJ"
+        }
 
-        self.assert_no_exception(database.get_best_or_worst_stat, "Get stat.", GAME, "kills", MY_DISC_ID, True)
-        self.assert_no_exception(database.get_best_or_worst_stat, "Get stat.", GAME, "first_blood", MY_DISC_ID, True)
+        for game in SUPPORTED_GAMES:
+            database: GameDatabase = self.game_databases[game]
 
-        self.assert_no_exception(database.get_total_winrate, "Get total winrate.", GAME, MY_DISC_ID)
+            self.assert_no_exception(database.get_most_extreme_stat, "Get most extreme stat.", "kills", True)
+            if game == "lol":
+                self.assert_no_exception(database.get_most_extreme_stat, "Get most extreme stat.", "first_blood", True)
 
-        self.assert_no_exception(database.get_league_champ_winrate, "Get champ winrate.", MY_DISC_ID, 4)
-        self.assert_no_exception(database.get_league_champ_count_for_stat, "Get champ count for stat", "kda", True, MY_DISC_ID)
-        self.assert_no_exception(database.get_league_champ_count_for_stat, "Get champ count for stat", "kda", False, MY_DISC_ID)
+            self.assert_no_exception(database.get_best_or_worst_stat, "Get stat.", "kills", MY_DISC_ID, True)
+            if game == "lol":
+                self.assert_no_exception(database.get_best_or_worst_stat, "Get stat.", "first_blood", MY_DISC_ID, True)
 
-        self.assert_no_exception(database.get_average_stat_league, "Get average stat", "kills")
-        self.assert_no_exception(database.get_average_stat_league, "Get average stat", "kills", MY_DISC_ID)
-        self.assert_no_exception(database.get_average_stat_league, "Get average stat", "kills", 4)
-        self.assert_no_exception(database.get_average_stat_league, "Get average stat", "kills", MY_DISC_ID, 4)
+            self.assert_no_exception(database.get_total_winrate, "Get total winrate.", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_min_or_max_league_winrate_champ, "Get min or max winrate champ best.", MY_DISC_ID, True)
-        self.assert_no_exception(database.get_min_or_max_league_winrate_champ, "Get min or max winrate champ worst.", MY_DISC_ID, False)
+            self.assert_no_exception(database.get_played_winrate, "Get played winrate.", MY_DISC_ID, 4)
+            self.assert_no_exception(database.get_played_count_for_stat, "Get played count for stat", "kda", True, MY_DISC_ID)
+            self.assert_no_exception(database.get_played_count_for_stat, "Get played count for stat", "kda", False, MY_DISC_ID)
 
-        self.assert_no_exception(database.get_min_or_max_cs2_winrate_map, "Get min or max winrate map best.", MY_DISC_ID, True)
-        self.assert_no_exception(database.get_min_or_max_cs2_winrate_map, "Get min or max winrate map worst.", MY_DISC_ID, False)
+            self.assert_no_exception(database.get_average_stat, "Get average stat", "kills")
+            self.assert_no_exception(database.get_average_stat, "Get average stat", "kills", MY_DISC_ID)
+            self.assert_no_exception(database.get_average_stat, "Get average stat", "kills", 4)
+            self.assert_no_exception(database.get_average_stat, "Get average stat", "kills", MY_DISC_ID, 4)
 
-        self.assert_no_exception(database.get_league_champs_played, "Get champs played")
-        self.assert_no_exception(database.get_league_champs_played, "Get champs played", MY_DISC_ID)
+            self.assert_no_exception(database.get_min_or_max_winrate_played, "Get min or max winrate played best.", MY_DISC_ID, True)
+            self.assert_no_exception(database.get_min_or_max_winrate_played, "Get min or max winrate played worst.", MY_DISC_ID, False)
 
-        self.assert_no_exception(database.get_played_league_champs, "Get played league champs", MY_DISC_ID)
+            self.assert_no_exception(database.get_played_ids, "Get champs played")
+            self.assert_no_exception(database.get_played_ids, "Get champs played", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_winrate_relation, "Get winrate relation", GAME, MY_DISC_ID, True)
-        self.assert_no_exception(database.get_winrate_relation, "Get winrate relation", GAME, MY_DISC_ID, False)
+            self.assert_no_exception(database.get_winrate_relation, "Get winrate relation", MY_DISC_ID, True)
+            self.assert_no_exception(database.get_winrate_relation, "Get winrate relation", MY_DISC_ID, False)
 
-        self.assert_no_exception(database.get_longest_win_or_loss_streak, "Get longest win or loss streak", GAME, MY_DISC_ID, 1)
-        self.assert_no_exception(database.get_longest_win_or_loss_streak, "Get longest win or loss streak", GAME, MY_DISC_ID, 0)
+            self.assert_no_exception(database.get_longest_win_or_loss_streak, "Get longest win or loss streak", MY_DISC_ID, 1)
+            self.assert_no_exception(database.get_longest_win_or_loss_streak, "Get longest win or loss streak", MY_DISC_ID, 0)
 
-        self.assert_no_exception(database.get_current_win_or_loss_streak, "Get current win or loss streak", GAME, MY_DISC_ID, 1)
-        self.assert_no_exception(database.get_current_win_or_loss_streak, "Get current win or loss streak", GAME, MY_DISC_ID, 0)
+            self.assert_no_exception(database.get_current_win_or_loss_streak, "Get current win or loss streak", MY_DISC_ID, 1)
+            self.assert_no_exception(database.get_current_win_or_loss_streak, "Get current win or loss streak", MY_DISC_ID, 0)
 
-        test_game_id = 5163331322
-        game_stats_to_save = ["timestamp", "duration", "game_id"]
-        self.assert_no_exception(database.get_game_stats, "Get game stats", GAME, game_stats_to_save)
-        self.assert_no_exception(database.get_game_stats, "Get game stats", GAME, game_stats_to_save, test_game_id)
+            test_game_id = test_game_ids[game]
+            game_stats_to_get = ["timestamp", "duration", "game_id"]
+            self.assert_no_exception(database.get_game_stats, "Get game stats", game_stats_to_get)
+            self.assert_no_exception(database.get_game_stats, "Get game stats", game_stats_to_get, test_game_id)
 
-        player_stats_to_save = ["kills", "deaths", "game_id"]
-        self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save)
-        self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, test_game_id)
-        self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, None, MY_DISC_ID)
-        self.assert_no_exception(database.get_player_stats, "Get player stats", GAME, player_stats_to_save, test_game_id, MY_DISC_ID)
+            player_stats_to_get = ["kills", "deaths", "game_id"]
+            self.assert_no_exception(database.get_player_stats, "Get player stats", player_stats_to_get)
+            self.assert_no_exception(database.get_player_stats, "Get player stats", player_stats_to_get, test_game_id)
+            self.assert_no_exception(database.get_player_stats, "Get player stats", player_stats_to_get, None, MY_DISC_ID)
+            self.assert_no_exception(database.get_player_stats, "Get player stats", player_stats_to_get, test_game_id, MY_DISC_ID)
 
     @test
     def test_doinks_queries(self):
-        database: MetaDatabase = self.database
+        for game in SUPPORTED_GAMES:
+            database: GameDatabase = self.game_databases[game]
 
-        self.assert_no_exception(database.get_doinks_count, "Get doinks counts.", GAME)
-        self.assert_no_exception(database.get_doinks_count, "Get doinks counts filtered.", GAME, MY_DISC_ID)
+            self.assert_no_exception(database.get_doinks_count, "Get doinks counts.")
+            self.assert_no_exception(database.get_doinks_count, "Get doinks counts filtered.", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_league_champ_with_most_doinks, "Get champ with most doinks", MY_DISC_ID)
+            self.assert_no_exception(database.get_max_doinks_details, "Get max doinks details.")
 
-        self.assert_no_exception(database.get_max_doinks_details, "Get max doinks details.", GAME)
+            self.assert_no_exception(database.get_doinks_reason_counts, "Get doinks reason counts.")
 
-        self.assert_no_exception(database.get_doinks_reason_counts, "Get doinks reason counts.", GAME)
+            self.assert_no_exception(database.get_recent_intfars_and_doinks, "Get recent intfars and doinks.")
 
-        self.assert_no_exception(database.get_recent_intfars_and_doinks, "Get recent intfars and doinks.", GAME)
+            self.assert_no_exception(database.get_doinks_stats, "Get doinks stats.")
+            self.assert_no_exception(database.get_doinks_stats, "Get doinks stats filtered.", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_doinks_stats, "Get doinks stats.", GAME)
-        self.assert_no_exception(database.get_doinks_stats, "Get doinks stats filtered.", GAME, MY_DISC_ID)
-
-        self.assert_no_exception(database.get_doinks_relations, "Get doinks relations.", GAME, MY_DISC_ID)
+            self.assert_no_exception(database.get_doinks_relations, "Get doinks relations.", MY_DISC_ID)
+    
+            self.assert_no_exception(database.get_played_with_most_doinks, "Get played with most doinks", MY_DISC_ID)
 
     @test
     def test_intfar_queries(self):
-        database: MetaDatabase = self.database
+        for game in SUPPORTED_GAMES:
+            database: GameDatabase = self.game_databases[game]
 
-        self.assert_no_exception(database.get_intfar_count, "Get intfar counts.", GAME)
-        self.assert_no_exception(database.get_intfar_count, "Get intfar counts filtered.", GAME, MY_DISC_ID)
+            self.assert_no_exception(database.get_intfar_count, "Get intfar counts.")
+            self.assert_no_exception(database.get_intfar_count, "Get intfar counts filtered.", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_intfar_reason_counts, "Get intfar reason counts.", GAME)
-        self.assert_no_exception(database.get_intfars_of_the_month, "Get intfars of the month.", GAME)
-        self.assert_no_exception(database.get_longest_intfar_streak, "Get longest intfar streak.", GAME, MY_DISC_ID)
-        self.assert_no_exception(database.get_longest_no_intfar_streak, "Get longest no intfar streak.", GAME, MY_DISC_ID)
+            self.assert_no_exception(database.get_intfar_reason_counts, "Get intfar reason counts.")
+            self.assert_no_exception(database.get_intfars_of_the_month, "Get intfars of the month.")
+            self.assert_no_exception(database.get_longest_intfar_streak, "Get longest intfar streak.", MY_DISC_ID)
+            self.assert_no_exception(database.get_longest_no_intfar_streak, "Get longest no intfar streak.", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_current_intfar_streak, "Get current intfar streak.", GAME)
+            self.assert_no_exception(database.get_current_intfar_streak, "Get current intfar streak.")
 
-        self.assert_no_exception(database.get_max_intfar_details, "Get max intfar details.", GAME)
+            self.assert_no_exception(database.get_max_intfar_details, "Get max intfar details.")
 
-        self.assert_no_exception(database.get_intfar_stats, "Get intfar stats.", GAME, MY_DISC_ID)
-        self.assert_no_exception(database.get_intfar_stats, "Get intfar stats.", GAME, 331082926475182081, monthly=True)
+            self.assert_no_exception(database.get_intfar_stats, "Get intfar stats.", MY_DISC_ID)
+            self.assert_no_exception(database.get_intfar_stats, "Get intfar stats.", 331082926475182081, monthly=True)
 
-        self.assert_no_exception(database.get_intfar_relations, "Get intfar relations.", GAME, MY_DISC_ID)
+            self.assert_no_exception(database.get_intfar_relations, "Get intfar relations.", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_champ_with_most_intfars, "Get champ with most intfars", MY_DISC_ID)
+            self.assert_no_exception(database.get_played_with_most_intfars, "Get played with most intfars", MY_DISC_ID)
 
     @test
     def test_betting_queries(self):
-        database: MetaDatabase = self.database
+        database: MetaDatabase = self.meta_database
 
         self.assert_no_exception(database.generate_ticket_id, "Generate ticket.", MY_DISC_ID)
 
@@ -215,7 +243,7 @@ class TestWrapper(TestRunner):
 
     @test
     def test_shop_queries(self):
-        database: MetaDatabase = self.database
+        database: MetaDatabase = self.meta_database
 
         def add_items_to_shop_func():
             items = [
@@ -259,20 +287,21 @@ class TestWrapper(TestRunner):
 
     @test
     def test_sound_queries(self):
-        database: MetaDatabase = self.database
+        for game in SUPPORTED_GAMES:
+            database: GameDatabase = self.game_databases[game]
 
-        self.assert_no_exception(database.get_event_sound, "Get event sound.", GAME, MY_DISC_ID, "intfar")
-        self.assert_no_exception(database.get_event_sound, "Get event sound.", GAME, MY_DISC_ID, "doinks")
+            self.assert_no_exception(database.get_event_sound, "Get event sound.", MY_DISC_ID, "intfar")
+            self.assert_no_exception(database.get_event_sound, "Get event sound.", MY_DISC_ID, "doinks")
 
-        self.assert_no_exception(database.set_event_sound, "Set event sound.", GAME, MY_DISC_ID, "sound", "intfar")
-        self.assert_no_exception(database.set_event_sound, "Set event sound.", GAME, MY_DISC_ID, "sound", "doinks")
+            self.assert_no_exception(database.set_event_sound, "Set event sound.", MY_DISC_ID, "sound", "intfar")
+            self.assert_no_exception(database.set_event_sound, "Set event sound.", MY_DISC_ID, "sound", "doinks")
 
-        self.assert_no_exception(database.remove_event_sound, "Remove event sound.", GAME, MY_DISC_ID, "intfar")
-        self.assert_no_exception(database.remove_event_sound, "Remove event sound.", GAME, MY_DISC_ID, "doinks")
+            self.assert_no_exception(database.remove_event_sound, "Remove event sound.", MY_DISC_ID, "intfar")
+            self.assert_no_exception(database.remove_event_sound, "Remove event sound.", MY_DISC_ID, "doinks")
 
     @test
     def test_list_queries(self):
-        database: MetaDatabase = self.database
+        database: MetaDatabase = self.game_databases["lol"]
 
         def create_list_func():
             database.create_list(MY_DISC_ID, "test_list1")
@@ -328,8 +357,12 @@ class TestWrapper(TestRunner):
 
     @test
     def test_misc_queries(self):
-        database: MetaDatabase = self.database
-        self.assert_no_exception(database.get_meta_stats, "Get meta stats.", GAME)
+        for game in SUPPORTED_GAMES:
+            database: GameDatabase = self.game_databases[game]
 
-        self.assert_no_exception(database.get_performance_score, "Get performance score", GAME)
-        self.assert_no_exception(database.get_performance_score, "Get performance score", GAME, MY_DISC_ID)
+            self.assert_no_exception(database.get_meta_stats, "Get meta stats.")
+
+            self.assert_no_exception(database.get_performance_score, "Get performance score")
+            self.assert_no_exception(database.get_performance_score, "Get performance score", MY_DISC_ID)
+
+            self.assert_no_exception(database.get_performance_score, "Get performance score", MY_DISC_ID)

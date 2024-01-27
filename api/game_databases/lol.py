@@ -128,19 +128,20 @@ class LoLGameDatabase(GameDatabase):
             return result or [(disc_id, None, None)]
 
     def get_played_with_most_doinks(self, disc_id):
+        query = f"""
+            SELECT sub.champ_id, MAX(sub.c) FROM (
+                SELECT
+                    COUNT(DISTINCT p.game_id) AS c,
+                    champ_id
+                FROM participants AS p
+                WHERE
+                    p.disc_id=?
+                    AND p.doinks IS NOT NULL
+                GROUP BY champ_id
+            ) sub
+        """
+
         with self:
-            query = f"""
-                SELECT sub.champ_id, MAX(sub.c) FROM (
-                    SELECT
-                        COUNT(DISTINCT p.game_id) AS c,
-                        champ_id
-                    FROM participants p
-                    WHERE
-                        p.disc_id=?
-                        AND p.doinks IS NOT NULL
-                    GROUP BY champ_id
-                ) sub
-            """
             return self.execute_query(query, disc_id).fetchone()
 
     def get_played_with_most_intfars(self, disc_id):
@@ -148,7 +149,8 @@ class LoLGameDatabase(GameDatabase):
             SELECT sub.champ_id, MAX(sub.c) FROM (
                 SELECT
                     COUNT(DISTINCT p.game_id) AS c,
-                    champ_id FROM games AS g
+                    champ_id
+                FROM games AS g
                 JOIN participants AS p
                 ON p.game_id = g.game_id
                     AND g.intfar_id = p.disc_id

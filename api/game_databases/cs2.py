@@ -104,10 +104,40 @@ class CS2GameDatabase(GameDatabase):
             return result or [(disc_id, None, None)]
 
     def get_played_with_most_doinks(self, disc_id):
-        pass # TODO: Implement for CS2 with maps
+        query = f"""
+            SELECT sub.map_id, MAX(sub.c) FROM (
+                SELECT
+                    COUNT(DISTINCT p.game_id) AS c,
+                    map_id
+                FROM participants AS p
+                INNER JOIN games AS g
+                ON g.game_id = p.game_id
+                WHERE
+                    p.disc_id=?
+                    AND p.doinks IS NOT NULL
+                GROUP BY map_id
+            ) sub
+        """
+
+        with self:
+            return self.execute_query(query, disc_id).fetchone()
 
     def get_played_with_most_intfars(self, disc_id):
-        pass # TODO: Implement for CS2 with maps
+        query = """
+            SELECT sub.map_id, MAX(sub.c) FROM (
+                SELECT
+                    COUNT(DISTINCT g.game_id) AS c,
+                    map_id
+                FROM games AS g
+                WHERE
+                    g.intfar_id IS NOT NULL
+                    AND g.intfar_id = ?
+                GROUP BY map_id
+            ) sub
+        """
+
+        with self:
+            return self.execute_query(query, disc_id).fetchone()
 
     def get_played_ids(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)

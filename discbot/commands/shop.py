@@ -61,7 +61,7 @@ async def handle_shop_msg(client, message):
         await message.channel.send(response)
         return
 
-    items = client.database.get_items_in_shop()
+    items = client.meta_database.get_items_in_shop()
 
     dt_now = datetime.now()
     time_to_closing = api_util.format_duration(dt_now, client.shop_handler.shop_closing_dt)
@@ -110,7 +110,7 @@ async def handle_cancel_sell_msg(client, message, quantity, item, price):
     await message.channel.send(response)
 
 async def handle_inventory_msg(client, message, target_id):
-    items = client.database.get_items_for_user(target_id)
+    items = client.meta_database.get_items_for_user(target_id)
     target_name = client.get_discord_nick(target_id, message.guild.id)
     if items == []:
         response = f"{target_name} currently owns no items."

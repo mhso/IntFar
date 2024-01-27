@@ -118,7 +118,7 @@ class Command:
 
     async def parse_args(self, client, message, args):
         author_id = message.author.id
-        user = client.database.all_users.get(author_id)
+        user = client.meta_database.all_users.get(author_id)
 
         # If command requires user to be registered, and he is not, send error msg.
         if user is None and self.access_level == "all":
