@@ -60,6 +60,20 @@ CREATE TABLE [participants] (
     [rank] INTEGER,
     PRIMARY KEY (game_id, disc_id)
 );
+CREATE TABLE [bets] (
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [better_id] INTEGER NOT NULL,
+    [guild_id] INTEGER NOT NULL,
+    [game_id] NVARCHAR(64),
+    [timestamp] INTEGER NOT NULL,
+    [event_id] NVARCHAR(32) NOT NULL,
+    [amount] INTEGER NOT NULL,
+    [game_duration] INTEGER DEFAULT(0),
+    [target] INTEGER,
+    [ticket] INTEGER,
+    [result] INTEGER(2),
+    [payout] INTEGER
+);
 CREATE TABLE [event_sounds] (
     [disc_id] INTEGER NOT NULL,
     [sound] NVARCHAR(24) NOT NULL,

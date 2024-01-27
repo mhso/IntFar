@@ -9,21 +9,6 @@ CREATE TABLE [betting_balance] (
     [disc_id] INTEGER PRIMARY KEY,
     [tokens] INTEGER
 );
-CREATE TABLE [bets] (
-    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
-    [better_id] INTEGER NOT NULL,
-    [guild_id] INTEGER NOT NULL,
-    [game_id] NVARCHAR(64),
-    [game] NVARCHAR(64),
-    [timestamp] INTEGER NOT NULL,
-    [event_id] NVARCHAR(32) NOT NULL,
-    [amount] INTEGER NOT NULL,
-    [game_duration] INTEGER DEFAULT(0),
-    [target] INTEGER,
-    [ticket] INTEGER,
-    [result] INTEGER(2),
-    [payout] INTEGER
-);
 CREATE TABLE [shop_items] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,
     [name] NVARCHAR(64) NOT NULL,

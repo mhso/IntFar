@@ -151,7 +151,7 @@ class CS2GameDatabase(GameDatabase):
         """
 
         with self:
-            return self.execute_query(query, *params).fetchone()[0]
+            return self.execute_query(query, *params).fetchall()
 
     def get_played_winrate(self, disc_id, map_id):
         query = f"""

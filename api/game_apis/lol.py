@@ -281,13 +281,13 @@ class RiotAPIClient(GameAPIClient):
 
         return response
 
-    def get_summoner_id(self, summ_name):
+    def get_summoner_data(self, summ_name):
         endpoint = "/lol/summoner/v4/summoners/by-name/{0}"
         response = self.make_request(endpoint, API_PLATFORM, summ_name)
         if response.status_code != 200:
             return None
 
-        return response.json()["id"]
+        return response.json()
 
     def get_active_game(self, summ_id):
         endpoint = "/lol/spectator/v4/active-games/by-summoner/{0}"
@@ -344,9 +344,9 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()["info"]
 
-    def get_champion_mastery(self, summoner_id):
-        endpoint = "/lol/champion-mastery/v4/champion-masteries/by-summoner/{0}"
-        response = self.make_request(endpoint, API_PLATFORM, summoner_id)
+    def get_champion_mastery(self, puuid):
+        endpoint = "/lol/champion-mastery/v4/champion-masteries/by-puuid/{0}"
+        response = self.make_request(endpoint, API_PLATFORM, puuid)
 
         if response.status_code != 200:
             return None

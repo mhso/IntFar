@@ -6,15 +6,14 @@ from api.betting import MAX_BETTING_THRESHOLD
 
 betting_page = flask.Blueprint("betting", __name__, template_folder="templates")
 
-def get_bets(game, database, only_active):
-    bet_handler = flask.current_app.config["BET_HANDLERS"][game]
-    all_bets = database.get_bets(game, only_active)
+def get_bets(database, bet_handler, only_active):
     names = app_util.discord_request("func", "get_discord_nick", None)
     avatars = app_util.discord_request("func", "get_discord_avatar", None)
     avatars = {
         disc_id: flask.url_for("static", filename=avatars[disc_id].replace("app/static/", ""))
         for disc_id in avatars
     }
+    all_bets = database.get_bets(only_active)
 
     presentable_data = []
     for disc_id in all_bets:
@@ -44,11 +43,12 @@ def get_bets(game, database, only_active):
 def home():
     game = flask.current_app.config["CURRENT_GAME"]
 
-    database = flask.current_app.config["DATABASE"]
+    meta_database = flask.current_app.config["DATABASE"]
+    game_database = flask.current_app.config["GAME_DATABASES"][game]
     betting_handler = flask.current_app.config["BET_HANDLERS"][game]
 
-    resolved_bets = get_bets(game, database, False)
-    active_bets = get_bets(game, database, True)
+    resolved_bets = get_bets(game_database, betting_handler, False)
+    active_bets = get_bets(game_database, betting_handler, True)
     logged_in_user = app_util.get_user_details()[0]
 
     all_events = [(bet.event_id, bet.event_id.replace("_", " ").capitalize()) for bet in betting_handler.all_bets]
@@ -57,7 +57,7 @@ def home():
     guild_names = app_util.discord_request("func", "get_guild_name", None)
 
     user_token_balance = "?"
-    all_balances = database.get_token_balance()
+    all_balances = meta_database.get_token_balance()
     all_token_balances = []
     for balance, disc_id in all_balances:
         name = all_names[disc_id]

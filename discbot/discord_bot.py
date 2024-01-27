@@ -652,6 +652,7 @@ class DiscordClient(discord.Client):
         """
         guild_id = game_stats.guild_id
         tokens_name = self.config.betting_tokens
+        game_database = self.game_databases[game_stats.game]
 
         if game_stats.win == 1:
             game_desc = "Game won!"
@@ -680,7 +681,7 @@ class DiscordClient(discord.Client):
         betting_handler = self.betting_handlers[game_stats.game]
 
         any_bets = False # Bool to indicate whether any bets were made.
-        for disc_id in self.game_databases[game_stats.game].game_users.keys():
+        for disc_id in game_database.game_users.keys():
             # See if the user corresponding to 'disc_id' was in-game.
             player_stats = game_stats.find_player_stats(disc_id, game_stats.filtered_player_stats)
 
@@ -694,7 +695,7 @@ class DiscordClient(discord.Client):
                 betting_handler.award_tokens_for_playing(disc_id, gain_for_user)
 
             # Get list of active bets for the current user.
-            bets_made = self.meta_database.get_bets(game_stats.game, True, disc_id, guild_id)
+            bets_made = game_database.get_bets(True, disc_id, guild_id)
             balance_before = self.meta_database.get_token_balance(disc_id)
             tokens_earned = gain_for_user # Variable for tracking tokens gained for the user.
             tokens_lost = -1 # Variable for tracking tokens lost for the user.

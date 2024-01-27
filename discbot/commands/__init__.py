@@ -58,7 +58,7 @@ class TargetParam:
     def __str__(self):
         return self.name
 
-class PlayedParam:
+class PlayableParam:
     def __init__(self, name):
         self.name = name
 
@@ -151,7 +151,7 @@ class Command:
                 parsed_args.append(value)
                 index += 1
 
-            elif isinstance(param, PlayedParam):
+            elif isinstance(param, PlayableParam):
                 # Try to find game from previously parsed args
                 game = user.default_game if user is not None else DEFAULT_GAME
                 for arg in parsed_args:
@@ -465,7 +465,7 @@ def initialize_commands():
         True,
         "self",
         mandatory_params=[RegularParam("stat")],
-        optional_params=[GameParam("game"), PlayedParam("champion_or_map"), TargetParam("person")],
+        optional_params=[GameParam("game"), PlayableParam("champion_or_map"), TargetParam("person")],
         aliases=["avg"]
     )
 
@@ -543,7 +543,7 @@ def initialize_commands():
     # betting command
     betting_name = "betting"
     betting_desc = "Show information about betting, as well as a list of possible events to bet on."
-    register_command(betting_name, betting_desc, handle_betting_msg)
+    register_command(betting_name, betting_desc, handle_betting_msg, optional_params=[GameParam("game")])
 
     # bet command
     bet_name = "bet"
@@ -1010,7 +1010,7 @@ def initialize_commands():
         champion_desc,
         handle_champion_msg,
         access_level="self",
-        mandatory_params=[PlayedParam("champion")],
+        mandatory_params=[PlayableParam("champion")],
         optional_params=[GameParam("game"), TargetParam("person")],
         aliases=["champ"]
     )

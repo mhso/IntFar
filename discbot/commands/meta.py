@@ -164,7 +164,7 @@ async def handle_status_msg(client, message, game):
     pct_doinks = int((doinks_games / games) * 100)
     earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
     doinks_emote = client.insert_emotes("{emote_Doinks}")
-    all_bets = client.meta_database.get_bets(game, False)
+    all_bets = client.game_databases[game].get_bets(False)
 
     tokens_name = client.config.betting_tokens
     bets_won = 0
@@ -194,7 +194,7 @@ async def handle_status_msg(client, message, game):
             if result == 1:
                 bets_won += 1
 
-    pct_bets_won = int((bets_won / total_bets) * 100)
+    pct_bets_won = int((bets_won / total_bets) * 100) if total_bets > 0 else 0
     highest_payout_name = client.get_discord_nick(highest_payout_user, message.guild.id)
 
     intfar_reasons = get_intfar_reasons(game).values()
@@ -213,6 +213,11 @@ async def handle_status_msg(client, message, game):
 
     reason_multi_ratio_msg = "\n".join(multi_criterias_msg(index, len(intfar_multi_ratios)) for index in range(1, len(intfar_multi_ratios)+1))
 
+    highest_payout_msg = (
+        "" if highest_payout_user is None
+        else f"- **{api_util.format_tokens_amount(highest_payout)}** {tokens_name} was the biggest single win, by **{highest_payout_name}**\n"
+    )
+
     response += (
         f"--- Since **{earliest_time}** ---\n"
         f"- **{games}** games of **{api_util.SUPPORTED_GAMES[game]}** have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
@@ -225,7 +230,7 @@ async def handle_status_msg(client, message, game):
         f"- Bets were made in **{len(unique_guilds)}** different servers\n"
         f"- **{api_util.format_tokens_amount(total_amount)}** {tokens_name} have been spent on bets\n"
         f"- **{api_util.format_tokens_amount(total_payout)}** {tokens_name} have been won from bets\n"
-        f"- **{api_util.format_tokens_amount(highest_payout)}** {tokens_name} was the biggest single win, by **{highest_payout_name}**\n"
+        f"{highest_payout_msg}"
         "--- Of all games played ---\n"
         f"- **{pct_intfar}%** resulted in someone being Int-Far\n"
         f"- **{pct_doinks}%** resulted in {doinks_emote} being handed out\n"
@@ -254,7 +259,7 @@ async def handle_website_msg(client, message):
 async def handle_profile_msg(client, message, game, target_id=None):
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
-    response = f"URL to {target_name}'s Int-Far profile for {api_util.SUPPORTED_GAMES[game]}:\n"
+    response = f"URL to {target_name}'s personal Int-Far profile for {api_util.SUPPORTED_GAMES[game]}:\n"
     response += f"{api_util.get_website_link(game)}/user/{target_id}"
 
     await message.channel.send(response)

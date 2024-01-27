@@ -207,39 +207,42 @@ class TestWrapper(TestRunner):
 
     @test
     def test_betting_queries(self):
-        database: MetaDatabase = self.meta_database
+        meta_database: MetaDatabase = self.meta_database
 
-        self.assert_no_exception(database.generate_ticket_id, "Generate ticket.", MY_DISC_ID)
+        self.assert_no_exception(meta_database.get_token_balance, "Get token balance.")
+        self.assert_no_exception(meta_database.get_token_balance, "Get token balance.", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_bets, "Get bets.", GAME, True)
-        self.assert_no_exception(database.get_bets, "Get bets.", GAME, False)
-        self.assert_no_exception(database.get_bets, "Get bets.", GAME, True, MY_DISC_ID)
-        self.assert_no_exception(database.get_bets, "Get bets.", GAME, False, MY_DISC_ID)
-        self.assert_no_exception(database.get_bets, "Get bets.", GAME, True, guild_id=MAIN_GUILD_ID)
-        self.assert_no_exception(database.get_bets, "Get bets.", GAME, False, guild_id=MAIN_GUILD_ID)
-        self.assert_no_exception(database.get_bets, "Get bets.", GAME, True, MY_DISC_ID, guild_id=MAIN_GUILD_ID)
-        self.assert_no_exception(database.get_bets, "Get bets.", GAME, False, MY_DISC_ID, guild_id=MAIN_GUILD_ID)
+        self.assert_no_exception(meta_database.get_max_tokens_details, "Get max token details.")
 
-        self.assert_no_exception(database.get_token_balance, "Get token balance.")
-        self.assert_no_exception(database.get_token_balance, "Get token balance.", MY_DISC_ID)
+        self.assert_no_exception(meta_database.update_token_balance, "Update token balance.", MY_DISC_ID, 10, True)
+        self.assert_no_exception(meta_database.update_token_balance, "Update token balance.", MY_DISC_ID, 10, False)
 
-        self.assert_no_exception(database.get_max_tokens_details, "Get max token details.")
+        self.assert_no_exception(meta_database.get_max_tokens_details, "Get max token balance ID.")
 
-        self.assert_no_exception(database.update_token_balance, "Update token balance.", MY_DISC_ID, 10, True)
-        self.assert_no_exception(database.update_token_balance, "Update token balance.", MY_DISC_ID, 10, False)
+        for game in SUPPORTED_GAMES:
+            database: GameDatabase = self.game_databases[game]
 
-        self.assert_no_exception(database.get_bet_id, "Get bet ID.", GAME, MY_DISC_ID, MAIN_GUILD_ID, 0, MY_DISC_ID, 0)
-        self.assert_no_exception(database.get_bet_id, "Get bet ID.", GAME, MY_DISC_ID, MAIN_GUILD_ID, 0, ticket=0)
-        self.assert_no_exception(database.get_bet_id, "Get bet ID.", GAME, MY_DISC_ID, MAIN_GUILD_ID, 0, MY_DISC_ID)
-        self.assert_no_exception(database.get_bet_id, "Get bet ID.", GAME, MY_DISC_ID, MAIN_GUILD_ID, 0)
+            self.assert_no_exception(database.generate_ticket_id, "Generate ticket.", MY_DISC_ID)
 
-        self.assert_no_exception(database.get_better_id, "Get better ID.", 30)
+            self.assert_no_exception(database.get_bets, "Get bets.", True)
+            self.assert_no_exception(database.get_bets, "Get bets.", False)
+            self.assert_no_exception(database.get_bets, "Get bets.", True, MY_DISC_ID)
+            self.assert_no_exception(database.get_bets, "Get bets.", False, MY_DISC_ID)
+            self.assert_no_exception(database.get_bets, "Get bets.", True, guild_id=MAIN_GUILD_ID)
+            self.assert_no_exception(database.get_bets, "Get bets.", False, guild_id=MAIN_GUILD_ID)
+            self.assert_no_exception(database.get_bets, "Get bets.", True, MY_DISC_ID, guild_id=MAIN_GUILD_ID)
+            self.assert_no_exception(database.get_bets, "Get bets.", False, MY_DISC_ID, guild_id=MAIN_GUILD_ID)
 
-        self.assert_no_exception(database.get_max_tokens_details, "Get max token balance ID.")
+            self.assert_no_exception(database.get_bet_id, "Get bet ID.", MY_DISC_ID, MAIN_GUILD_ID, 0, MY_DISC_ID, 0)
+            self.assert_no_exception(database.get_bet_id, "Get bet ID.", MY_DISC_ID, MAIN_GUILD_ID, 0, ticket=0)
+            self.assert_no_exception(database.get_bet_id, "Get bet ID.", MY_DISC_ID, MAIN_GUILD_ID, 0, MY_DISC_ID)
+            self.assert_no_exception(database.get_bet_id, "Get bet ID.", MY_DISC_ID, MAIN_GUILD_ID, 0)
 
-        with database:
-            self.assert_no_exception(database.make_bet, "Make bet.", GAME, MY_DISC_ID, MAIN_GUILD_ID, "game_win", 10, 0, int(time()))
-            self.assert_no_exception(database.make_bet, "Make bet.", GAME, MY_DISC_ID, MAIN_GUILD_ID, "intfar", 10, 0, int(time()), MY_DISC_ID)
+            self.assert_no_exception(database.get_better_id, "Get better ID.", 30)
+
+            with database:
+                self.assert_no_exception(database.make_bet, "Make bet.", MY_DISC_ID, MAIN_GUILD_ID, "game_win", 10, 0, int(time()))
+                self.assert_no_exception(database.make_bet, "Make bet.", MY_DISC_ID, MAIN_GUILD_ID, "intfar", 10, 0, int(time()), MY_DISC_ID)
 
     @test
     def test_shop_queries(self):

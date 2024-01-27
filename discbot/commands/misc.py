@@ -37,7 +37,7 @@ async def handle_game_msg(client, message, target_id, game):
         await asyncio.sleep(1)
 
     if game_data is not None:
-        stat_parser = get_stat_parser(game, game_data, client.api_clients[game], database.game_users[game], message.guild.id)
+        stat_parser = get_stat_parser(game, game_data, client.api_clients[game], database.game_users, message.guild.id)
         response = f"{target_name} is "
         summary = stat_parser.get_active_game_summary(active_id)
         response += summary
@@ -113,7 +113,7 @@ async def handle_summary_msg(client, message, game, target_id):
     num_played_ids = len(database.get_played_ids(target_id))
 
     total_winrate = database.get_total_winrate(target_id)
-    total_ids = len(client.api_clients[game].playable_count)
+    total_ids = client.api_clients[game].playable_count
 
     longest_win_streak = database.get_longest_win_or_loss_streak(target_id, 1)
     longest_loss_streak = database.get_longest_win_or_loss_streak(target_id, -1)
@@ -145,7 +145,7 @@ async def handle_summary_msg(client, message, game, target_id):
         response += (
             f"They perform best on **{best_playable_name}** (won " +
             f"**{best_playable_wr:.1f}%** of **{best_playable_games}** games).\n" +
-            f"He performs worst on **{worst_playable_name}** (won " +
+            f"They perform worst on **{worst_playable_name}** (won " +
             f"**{worst_playable_wr:.1f}%** of **{worst_playable_games}** games).\n"
         )
 

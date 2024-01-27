@@ -1,10 +1,11 @@
 from asyncio import sleep
 import api.util as api_util
+from api.meta_database import DEFAULT_GAME
 from api import betting
 from discbot.commands import util as commands_util
 from discbot.commands.meta import handle_usage_msg
 
-async def handle_betting_msg(client, message):
+async def handle_betting_msg(client, message, game):
     max_mins = betting.MAX_BETTING_THRESHOLD
     tokens_name = client.config.betting_tokens
     response = "Betting usage: `!bet [game] [amount] [event] (person)`\n"
@@ -13,16 +14,15 @@ async def handle_betting_msg(client, message):
     response += f"You can place a bet during a game, but it has to be done before {max_mins} "
     response += "minutes. Betting during a game returns a lower reward, based on "
     response += "how much time has passed in the game.\n"
-    response += "**--- List of available events to bet on ---**"
+    response += f"**--- List of available events to bet on for {api_util.SUPPORTED_GAMES[game]} ---**"
     await message.channel.send(response)
 
-    for game in api_util.SUPPORTED_GAMES:
-        game_response = f"\n\nFor **{api_util.SUPPORTED_GAMES[game]}**:"
-        for bet in client.betting_handlers[game].all_bets:
-            game_response += f"\n`{bet.event_id}` - Bet on {bet.description}"
+    game_response = ""
+    for bet in client.betting_handlers[game].all_bets:
+        game_response += f"\n`{bet.event_id}` - Bet on {bet.description}"
 
-        await sleep(0.5)
-        await message.channel.send(game_response)
+    await sleep(0.5)
+    await message.channel.send(game_response)
 
 def get_bet_params(client, args):
     amounts = []
@@ -93,15 +93,16 @@ async def handle_make_bet_msg(client, message, game, amounts, events, targets):
         target_names.append(discord_name)
 
     with client.meta_database:
-        response = client.betting_handlers[game].place_bet(
-            message.author.id,
-            message.guild.id,
-            amounts,
-            client.get_game_start(game, message.guild.id),
-            events,
-            target_ids,
-            target_names
-        )[1]
+        with client.game_databases[game]:
+            response = client.betting_handlers[game].place_bet(
+                message.author.id,
+                message.guild.id,
+                amounts,
+                client.get_game_start(game, message.guild.id),
+                events,
+                target_ids,
+                target_names
+            )[1]
 
     await message.channel.send(response)
 
@@ -127,7 +128,7 @@ async def handle_give_tokens_msg(client, message, amount, target_id):
 
     max_tokens_before, max_tokens_holder = client.meta_database.get_max_tokens_details()
 
-    response = client.betting_handlers["lol"].give_tokens(
+    response = client.betting_handlers[DEFAULT_GAME].give_tokens(
         message.author.id, amount, target_id, target_name
     )[1]
 
@@ -143,7 +144,7 @@ async def handle_give_tokens_msg(client, message, amount, target_id):
 
 async def handle_active_bets_msg(client, message, game, target_id):
     def get_bet_description(game, disc_id, single_person=True):
-        active_bets = client.meta_database.get_bets(game, True, disc_id)
+        active_bets = client.game_databases[game].get_bets(True, disc_id)
         recepient = client.get_discord_nick(disc_id, message.guild.id)
 
         response = ""
@@ -225,7 +226,7 @@ async def handle_active_bets_msg(client, message, game, target_id):
 
 async def handle_all_bets_msg(client, message, game, target_id):
     game_name = api_util.SUPPORTED_GAMES[game]
-    all_bets = client.meta_database.get_bets(game, False, target_id)
+    all_bets = client.game_databases[game].get_bets(False, target_id)
     tokens_name = client.config.betting_tokens
     bets_won = 0
     had_target = 0

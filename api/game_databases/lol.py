@@ -6,6 +6,10 @@ class LoLGameDatabase(GameDatabase):
     def __init__(self, game: str, config: Config):
         super().__init__(game, config)
 
+    @property
+    def game_user_params(self):
+        return ["puuid"]
+
     def get_played_count_for_stat(self, stat, maximize, disc_id):
         aggregator = "MAX" if maximize else "MIN"
 
@@ -176,7 +180,7 @@ class LoLGameDatabase(GameDatabase):
         """
 
         with self:
-            return self.execute_query(query, *params).fetchone()[0]
+            return self.execute_query(query, *params).fetchall()
 
     def get_played_winrate(self, disc_id, champ_id):
         query = f"""

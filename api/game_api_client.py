@@ -6,8 +6,8 @@ class GameAPIClient(ABC):
         self.game = game
         self.config = config
 
-    @abstractmethod
     @property
+    @abstractmethod
     def playable_count(self):
         ...
 

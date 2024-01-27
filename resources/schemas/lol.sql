@@ -4,6 +4,7 @@ CREATE TABLE [users] (
     [disc_id] INTEGER NOT NULL,
     [ingame_name] NVARCHAR(64) NOT NULL,
     [ingame_id] NVARCHAR(64) NOT NULL,
+    [puuid] NVARCHAR(78) NOT NULL,
     [main] INTEGER(1),
     [active] INTEGER DEFAULT(1),
     PRIMARY KEY (disc_id, ingame_id)
@@ -36,6 +37,20 @@ CREATE TABLE [participants] (
     [vision_score] INTEGER,
     [steals] INTEGER,
     PRIMARY KEY (game_id, disc_id)
+);
+CREATE TABLE [bets] (
+    [id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [better_id] INTEGER NOT NULL,
+    [guild_id] INTEGER NOT NULL,
+    [game_id] NVARCHAR(64),
+    [timestamp] INTEGER NOT NULL,
+    [event_id] NVARCHAR(32) NOT NULL,
+    [amount] INTEGER NOT NULL,
+    [game_duration] INTEGER DEFAULT(0),
+    [target] INTEGER,
+    [ticket] INTEGER,
+    [result] INTEGER(2),
+    [payout] INTEGER
 );
 CREATE TABLE [champ_lists] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,

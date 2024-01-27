@@ -224,7 +224,7 @@ class BettingHandler(ABC):
         base_return = self.get_dynamic_bet_return(bet, target_id)
         readable_return = round_digits(base_return)
 
-        response = f"Betting on `{event_desc}` would return {readable_return} times your investment.\n"
+        response = f"Betting on `{event_desc}` would return **{readable_return}** times your investment.\n"
         response += "If you bet after the game has started, the return will be lower.\n"
         if bet.target_required != bet.TARGET_INVALID:
             start = "If" if target_id is None else "Since"
@@ -345,7 +345,7 @@ class BettingHandler(ABC):
 
         for bet_id in bet_ids:
             try:
-                self.meta_database.mark_bet_as_resolved(
+                self.game_database.mark_bet_as_resolved(
                     bet_id, game_stats.game_id, timestamp, all_success, total_value
                 )
             except DBException:
@@ -489,7 +489,7 @@ class BettingHandler(ABC):
 
             return (False, err_msg)
 
-        if self.meta_database.get_bet_id(self.game, disc_id, guild_id, event_id, bet_target, ticket) is not None:
+        if self.game_database.get_bet_id(disc_id, guild_id, event_id, bet_target, ticket) is not None:
             err_msg = self._get_bet_error_msg(bet_desc, "Such a bet has already been made!")
             return (False, err_msg)
 
@@ -531,7 +531,7 @@ class BettingHandler(ABC):
         IDs of the bet, which are necessary if the bet should be cancelled.
         """
         tokens_name = self.config.betting_tokens
-        ticket = None if len(amounts) == 1 else self.meta_database.generate_ticket_id(disc_id)
+        ticket = None if len(amounts) == 1 else self.game_database.generate_ticket_id(disc_id)
         bet_data = []
         reward_equation = ""
         game_duration = 0
@@ -580,8 +580,7 @@ class BettingHandler(ABC):
             # Run through the parsed bet data and generate a string describing
             # the bet and the potential reward it could give
             for amount, event_id, bet_target, base_return, bet_desc in bet_data:
-                bet_id = self.meta_database.make_bet(
-                    self.game,
+                bet_id = self.game_database.make_bet(
                     disc_id,
                     guild_id,
                     event_id,
@@ -590,6 +589,7 @@ class BettingHandler(ABC):
                     bet_target,
                     ticket
                 )
+                self.meta_database.update_token_balance(disc_id, amount, False)
 
                 if not first:
                     reward_equation += " + "
@@ -686,14 +686,15 @@ class BettingHandler(ABC):
         if game_timestamp is not None: # Game has already started.
             return (False, "Bet was not cancelled: Game is underway!")
 
-        if ticket is None and self.meta_database.get_better_id(bet_id) != disc_id:
+        if ticket is None and self.game_database.get_better_id(bet_id) != disc_id:
             return (False, "Bet was not cancelled: Bet does not exist, or you don't own the bet!")
 
         if ticket is None:
-            amount_refunded = self.meta_database.cancel_bet(bet_id, disc_id)
+            amount_refunded = self.game_database.cancel_bet(bet_id, disc_id)
         else:
-            amount_refunded = self.meta_database.cancel_multi_bet(ticket, disc_id)
+            amount_refunded = self.game_database.cancel_multi_bet(ticket, disc_id)
 
+        self.meta_database.update_token_balance(disc_id, amount_refunded, True)
         new_balance = self.meta_database.get_token_balance(disc_id)
 
         return (True, (new_balance, amount_refunded))
@@ -737,7 +738,7 @@ class BettingHandler(ABC):
                 return (False, f"Bet was not cancelled: Not a valid betting event: '{bet_str}'")
 
         try:
-            bet_id = self.meta_database.get_bet_id(self.game, disc_id, guild_id, event_id, target_id, ticket)
+            bet_id = self.game_database.get_bet_id(disc_id, guild_id, event_id, target_id, ticket)
             if bet_id is None:
                 return (
                     False,
