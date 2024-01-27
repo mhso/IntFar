@@ -7,6 +7,11 @@ class GameAPIClient(ABC):
         self.config = config
 
     @abstractmethod
+    @property
+    def playable_count(self):
+        ...
+
+    @abstractmethod
     def get_active_game(self, user_id) -> dict:
         ...
 
@@ -15,9 +20,13 @@ class GameAPIClient(ABC):
         ...
 
     @abstractmethod
+    def get_playable_name(self, played_id):
+        ...
+
+    @abstractmethod
     def get_map_name(self, map_id):
         ...
 
     @abstractmethod
-    def try_find_played(self, played_name):
+    def try_find_playable_id(self, played_name):
         ...

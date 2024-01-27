@@ -11,13 +11,13 @@ async def handle_doinks_msg(client, message, game, target_id):
         total_doinks = database.get_doinks_count(disc_id)[1]
         doinks_counts = organize_doinks_stats(game, doinks_reason_ids)
 
-        champ_id, champ_count = database.get_played_with_most_doinks(disc_id)
-        champ_name = client.api_clients[game].get_champ_name(champ_id)
+        played_id, played_count = database.get_played_with_most_doinks(disc_id)
+        played_name = client.api_clients[game].get_playable_name(played_id)
 
         msg = f"{person_to_check} has earned {total_doinks} " + "{emote_Doinks}"
         if expanded and total_doinks > 0:
             msg += "\nHe has earned the most {emote_Doinks} " 
-            msg += f"when playing **{champ_name}** (**{champ_count}** times)"
+            msg += f"when playing **{played_name}** (**{played_count}** times)"
 
             reason_desc = "\n" + "Big doinks awarded so far:"
             for reason_id, reason in enumerate(doinks_reasons):

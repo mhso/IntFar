@@ -34,11 +34,11 @@ async def handle_intfar_msg(client, message, game, target_id):
             monthly_games, monthly_infar_ids = database.get_intfar_stats(disc_id, True)
             monthly_games, monthly_intfars, _, pct_monthly = organize_intfar_stats(game, monthly_games, monthly_infar_ids)
 
-            ratio_desc = f"\nHe has inted the most when playing **{played_name}** (**{played_count}** times)"
-            ratio_desc += f"\nIn total, he was Int-Far in **{pct_intfar:.2f}%** of his "
+            ratio_desc = f"\nHe has inted the most when playing **{played_name}** (**{played_count}** times).\n"
+            ratio_desc += f"In total, he was Int-Far in **{pct_intfar:.2f}%** of his "
             ratio_desc += f"{games_played} games played.\n"
             ratio_desc += f"In {current_month}, he was Int-Far in **{monthly_intfars}** "
-            ratio_desc += f"of his {monthly_games} games played (**{pct_monthly:.2f}%**)\n"
+            ratio_desc += f"of his {monthly_games} games played (**{pct_monthly:.2f}%**).\n"
 
             reason_desc = "Int-Fars awarded so far:\n"
             for reason_id, reason in enumerate(intfar_reasons):

@@ -71,6 +71,10 @@ class SteamAPIClient(GameAPIClient):
         else:
             logger.warning("No Steam 2FA code provided. Steam/CS2 functionality wont work!")
 
+    @property
+    def playable_count(self):
+        return len(self.map_names)
+
     def get_latest_data(self):
         url = "https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive/Maps"
 
@@ -239,6 +243,9 @@ class SteamAPIClient(GameAPIClient):
     def get_map_id(self, game_type):
         return self.game_types.get(int(game_type))
 
+    def get_playable_name(self, map_id):
+        return self.get_map_name(map_id)
+
     def get_steam_display_name(self, steam_id):
         url = _ENDPOINT_PLAYER_SUMMARY.replace(
             "[key]", self.config.steam_key
@@ -276,9 +283,9 @@ class SteamAPIClient(GameAPIClient):
 
         return False
 
-    def try_find_played(self, search_term):
+    def try_find_playable_id(self, search_term):
         """
-        Search for a played map by name.
+        Search for the ID of a map by name.
 
         Tries to find candidates that have `search_term` as part
         of their name. If only one candidate is found it is returned,

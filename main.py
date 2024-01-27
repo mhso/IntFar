@@ -83,7 +83,7 @@ def main():
     if conf.env == "production":
         load_opus("/usr/local/lib/libopus.so")
 
-    logger.info("Initializing database...")
+    logger.info("Initializing databases...")
     sync_manager = Manager()
 
     game_databases = {game: get_database_client(game, conf) for game in SUPPORTED_GAMES}
@@ -105,7 +105,7 @@ def main():
     }
 
     betting_handlers = {
-        game: get_betting_handler(game, conf, meta_database, game_database[game])
+        game: get_betting_handler(game, conf, meta_database, game_databases[game])
         for game in SUPPORTED_GAMES
     }
 

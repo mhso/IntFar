@@ -92,6 +92,11 @@ class ProxyManager(object):
                         proxy.send("exiting...")
                         break
 
+                    if self.steam_process.poll() is not None:
+                        # Steam process isn't running, no point in sending commands
+                        proxy.send(None)
+                        continue
+
                     result = None
                     self.database.enqueue_command(command_id, self.target_name, command, *args)
                     wait_time = 0

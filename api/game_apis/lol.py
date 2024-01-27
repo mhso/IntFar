@@ -30,6 +30,10 @@ class RiotAPIClient(GameAPIClient):
         self.get_latest_data()
 
     @property
+    def playable_count(self):
+        return len(self.champ_ids)
+
+    @property
     def champions_file(self):
         return f"resources/champions-{self.latest_patch}.json"
 
@@ -352,6 +356,9 @@ class RiotAPIClient(GameAPIClient):
     def get_champ_name(self, champ_id):
         return self.champ_names.get(champ_id)
 
+    def get_playable_name(self, champ_id):
+        return self.get_champ_name(champ_id)
+
     def get_champ_portrait_path(self, champ_id):
         return f"{self.champ_portraits_path}/{champ_id}.png"
 
@@ -364,9 +371,9 @@ class RiotAPIClient(GameAPIClient):
     def get_champ_data_path(self, champ_id):
         return f"{self.champ_data_path}/{champ_id}.json"
 
-    def try_find_played(self, search_term):
+    def try_find_playable_id(self, search_term):
         """
-        Search for a played champion by name.
+        Search for the ID of a champion by name.
 
         Tries to find candidates that have `search_term` as part
         of their name. If only one candidate is found it is returned,

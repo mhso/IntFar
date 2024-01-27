@@ -10,10 +10,11 @@ from discbot.commands.shop import *
 from discbot.commands.stats import *
 from discbot.commands.sounds import *
 from discbot.commands import util as commands_util
-from api.meta_database import DBException, DEFAULT_GAME
+from api.meta_database import DEFAULT_GAME
 from api.util import GUILD_IDS, GUILD_MAP, MY_GUILD_ID, SUPPORTED_GAMES
 
 from mhooge_flask.logging import logger
+from mhooge_flask.database import DBException
 
 class TargetParam:
     def __init__(self, name, default="me", end_index=None):
@@ -71,7 +72,7 @@ class PlayedParam:
             name = name + cmd_input[index]
 
             for game in games_to_try:
-                played_id = client.api_clients[game].try_find_played(name)
+                played_id = client.api_clients[game].try_find_playable_id(name)
                 if played_id is None and prev_played_id is not None:
                     return prev_played_id, index - start_index
 

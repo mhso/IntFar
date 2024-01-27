@@ -12,8 +12,9 @@ from api.game_data.cs2 import RANKS
 from discbot.commands.misc import get_winrate
 
 async def handle_stats_msg(client, message, game):
+    game_name = api_util.SUPPORTED_GAMES[game]
     valid_stats = ", ".join(f"'{cmd}'" for cmd in get_stat_quantity_descriptions(game))
-    response = "**--- Valid stats ---**\n```"
+    response = f"**--- Valid stats for {game_name} ---**\n```"
     response += valid_stats
     response += "\n```"
     response += "You can use these stats with the following commands: "
@@ -220,11 +221,10 @@ async def handle_stat_msg(client, message, best, game, stat, target_id):
                 stat, maximize, target_id
             )
 
+            played_name = client.api_clients[game].get_playable_name(played_id)
             if game == "lol":
-                played_name = client.api_clients[game].get_champ_name(played_id)
                 played_type = "champion"
             elif game == "cs2":
-                played_name = client.api_clients[game].get_map_name(played_id)
                 played_type = "map"
 
             game_specific_desc = f"The {played_type} he most often gets {readable_stat} on is **{played_name}** (**{played_count}** games)\n"
