@@ -29,7 +29,7 @@ class GameMonitor(ABC):
 
         :param config:              Config instance that holds all the configuration
                                     options for Int-Far
-        :param database:            SQLiteDatabase instance that handles the logic
+        :param database:            GameDatabase instance that handles the logic
                                     of interacting with the sqlite database
         :param game_over_callback:  asyncio Coroutine called when a game is finished
         :param game_client:         GameAPICLient instance that handles the logic of

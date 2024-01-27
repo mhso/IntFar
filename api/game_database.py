@@ -1,7 +1,8 @@
 from abc import abstractmethod
 from datetime import datetime
+from sqlite3 import Cursor
 
-from mhooge_flask.database import SQLiteDatabase, DBException
+from mhooge_flask.database import SQLiteDatabase, DBException, Query
 from mhooge_flask.logging import logger
 
 from api.util import SUPPORTED_GAMES, TimeZone
@@ -243,7 +244,7 @@ class GameDatabase(SQLiteDatabase):
 
             return self.execute_query(query).fetchone()
 
-    def get_best_or_worst_query(self, stat, disc_id=None, maximize=True):
+    def get_best_or_worst_stat(self, stat, disc_id=None, maximize=True):
         aggregator = "MAX" if maximize else "MIN"
 
         min_condition = f"AND {stat} <> 0" if stat != "deaths" else ""
@@ -339,20 +340,17 @@ class GameDatabase(SQLiteDatabase):
                 {player_condition}
             """
 
-        return query, params
+        def format_result(cursor: Cursor):
+            return cursor.fetchall() if disc_id is None else cursor.fetchone()
 
-    def get_best_or_worst_stat(self, stat, disc_id=None, maximize=True):
-        with self:
-            query, params = self.get_best_or_worst_query(stat, disc_id, maximize)
-            result = self.execute_query(query, *params)
-            return result.fetchall() if disc_id is None else result.fetchone()
+        return self.query(query, *params, format_func=format_result)
 
     @abstractmethod
     def get_played_count_for_stat(self, stat, maximize, disc_id):
         ...
 
     @abstractmethod
-    def get_average_stat(self, stat, disc_id=None, played_id=None, min_games=10):
+    def get_average_stat(self, stat: str, disc_id=None, played_id=None, min_games=10) -> Query:
         ...
 
     @abstractmethod
@@ -1219,7 +1217,7 @@ class GameDatabase(SQLiteDatabase):
 
         prev_join = "doinks.disc_id"
         for stat in stat_keys:
-            query_best = self.get_best_or_worst_query(stat, maximize=stat != "deaths")[0]
+            query_best = self.get_best_or_worst_stat(stat, maximize=stat != "deaths").query
 
             stat_joins.append(f"LEFT JOIN ({query_best}) {stat}_best\nON {stat}_best.disc_id = {prev_join}")
             prev_join = f"{stat}_best.disc_id"
@@ -1315,8 +1313,8 @@ class GameDatabase(SQLiteDatabase):
             ORDER BY sub.score DESC
         """
 
-        with self:
-            performance_scores = self.execute_query(query).fetchall()
+        def format_result(cursor: Cursor):
+            performance_scores = cursor.fetchall()
             if disc_id is None:
                 return performance_scores
 
@@ -1329,6 +1327,8 @@ class GameDatabase(SQLiteDatabase):
                     break
 
             return score, rank + 1, len(performance_scores)
+
+        return self.query(query, format_func=format_result)
 
     def get_stat_data(self, parsed_game_stats: GameStats, stat: str, reverse_order=False):
         (

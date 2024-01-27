@@ -119,9 +119,12 @@ class TestWrapper(TestRunner):
             if game == "lol":
                 self.assert_no_exception(database.get_most_extreme_stat, "Get most extreme stat.", "first_blood", True)
 
-            self.assert_no_exception(database.get_best_or_worst_stat, "Get stat.", "kills", MY_DISC_ID, True)
+            def get_best_or_worst_stat(*args):
+                return database.get_best_or_worst_stat(*args)()
+
+            self.assert_no_exception(get_best_or_worst_stat, "Get stat.", "kills", MY_DISC_ID, True)
             if game == "lol":
-                self.assert_no_exception(database.get_best_or_worst_stat, "Get stat.", "first_blood", MY_DISC_ID, True)
+                self.assert_no_exception(get_best_or_worst_stat, "Get stat.", "first_blood", MY_DISC_ID, True)
 
             self.assert_no_exception(database.get_total_winrate, "Get total winrate.", MY_DISC_ID)
 
@@ -129,10 +132,13 @@ class TestWrapper(TestRunner):
             self.assert_no_exception(database.get_played_count_for_stat, "Get played count for stat", "kda", True, MY_DISC_ID)
             self.assert_no_exception(database.get_played_count_for_stat, "Get played count for stat", "kda", False, MY_DISC_ID)
 
-            self.assert_no_exception(database.get_average_stat, "Get average stat", "kills")
-            self.assert_no_exception(database.get_average_stat, "Get average stat", "kills", MY_DISC_ID)
-            self.assert_no_exception(database.get_average_stat, "Get average stat", "kills", 4)
-            self.assert_no_exception(database.get_average_stat, "Get average stat", "kills", MY_DISC_ID, 4)
+            def get_average_stat(*args):
+                return database.get_average_stat(*args)()
+
+            self.assert_no_exception(get_average_stat, "Get average stat", "kills")
+            self.assert_no_exception(get_average_stat, "Get average stat", "kills", MY_DISC_ID)
+            self.assert_no_exception(get_average_stat, "Get average stat", "kills", 4)
+            self.assert_no_exception(get_average_stat, "Get average stat", "kills", MY_DISC_ID, 4)
 
             self.assert_no_exception(database.get_min_or_max_winrate_played, "Get min or max winrate played best.", MY_DISC_ID, True)
             self.assert_no_exception(database.get_min_or_max_winrate_played, "Get min or max winrate played worst.", MY_DISC_ID, False)
@@ -365,7 +371,8 @@ class TestWrapper(TestRunner):
 
             self.assert_no_exception(database.get_meta_stats, "Get meta stats.")
 
-            self.assert_no_exception(database.get_performance_score, "Get performance score")
-            self.assert_no_exception(database.get_performance_score, "Get performance score", MY_DISC_ID)
+            def get_performance_score(*args):
+                return database.get_performance_score(*args)()
 
-            self.assert_no_exception(database.get_performance_score, "Get performance score", MY_DISC_ID)
+            self.assert_no_exception(get_performance_score, "Get performance score")
+            self.assert_no_exception(get_performance_score, "Get performance score", MY_DISC_ID)

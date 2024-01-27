@@ -22,113 +22,7 @@ async def handle_stats_msg(client, message, game):
 
     await message.channel.send(response)
 
-async def handle_average_msg_lol(client, message, stat, champ_id=None, disc_id=None):
-    champ_name = None
-    if champ_id is not None:
-        champ_name = client.api_clients["lol"].get_champ_name(champ_id)
-
-    minimum_games = 10 if champ_id is None else 5
-    values = client.game_databases["lol"].get_average_stat(stat, disc_id, champ_id, minimum_games)
-
-    for_all = disc_id is None
-    readable_stat = stat.replace("_", " ")
-
-    response = ""
-
-    for index, (disc_id, avg_value, games) in enumerate(values):
-        if for_all:
-            response += "- "
-
-        target_name = client.get_discord_nick(disc_id, message.guild.id)
-
-        if avg_value is None:
-            # No games or no games on the given champ.
-            response += f"{target_name} has not yet played at least {minimum_games} games "
-
-            if champ_id is not None:
-                response += f"on {champ_name} "
-
-            response += "{emote_perker_nono}"
-
-        elif stat == "first_blood":
-            percent = f"{avg_value * 100:.2f}"
-            response += f"{target_name} got first blood in **{percent}%** of **{games}** games "
-
-            if champ_id is not None:
-                response += f"when playing **{champ_name}** "
-
-            if not for_all:
-                response += "{emote_poggers}"
-
-        else:
-            ratio = f"{avg_value:.2f}"
-            response += f"{target_name} averages **{ratio}** {readable_stat} in **{games}** games "
-
-            if champ_id is not None:
-                response += f"of playing **{champ_name}** "
-
-            if not for_all:
-                response += "{emote_poggers}"
-
-        if index < len(values) - 1:
-            response += "\n"
-
-    await message.channel.send(client.insert_emotes(response))
-
-async def handle_average_msg_cs2(client, message, stat, map_id=None, disc_id=None):
-    map_name = None
-    if map_id is not None:
-        map_name = client.api_clients["cs2"].get_map_name(map_id)
-
-    minimum_games = 10 if map_id is None else 5
-    values = client.game_databases["cs2"].get_average_stat(stat, disc_id, map_id, minimum_games)
-
-    for_all = disc_id is None
-    readable_stat = stat.replace("_", " ")
-
-    response = ""
-
-    for index, (disc_id, avg_value, games) in enumerate(values):
-        if for_all:
-            response += "- "
-
-        target_name = client.get_discord_nick(disc_id, message.guild.id)
-
-        if avg_value is None:
-            # No games or no games on the given map.
-            response += f"{target_name} doesn't have at least {minimum_games} games with that stat "
-
-            if map_name is not None:
-                response += f"on {map_name} "
-
-            response += "{emote_perker_nono}"
-
-        elif stat == "rank":
-            avg_rank = RANKS[int(avg_value)]
-            response += f"{target_name}'s average rank is **{avg_rank}** in **{games}** games "
-
-            if map_name is not None:
-                response += f"when playing **{map_name}** "
-
-            if not for_all:
-                response += "{emote_poggers}"
-
-        else:
-            ratio = f"{avg_value:.2f}"
-            response += f"{target_name} averages **{ratio}** {readable_stat} in **{games}** games "
-
-            if map_name is not None:
-                response += f"of playing **{map_name}** "
-
-            if not for_all:
-                response += "{emote_poggers}"
-
-        if index < len(values) - 1:
-            response += "\n"
-
-    await message.channel.send(client.insert_emotes(response))
-
-async def handle_average_msg(client, message, stat, game, champ_or_map=None, disc_id=None):
+async def handle_average_msg(client, message, stat, game, playable_id=None, disc_id=None):
     quantity_descs = get_stat_quantity_descriptions(game)
     if stat not in quantity_descs: # Check if the requested stat is a valid stat.
         emote = "{emote_carole_fucking_baskin}"
@@ -136,10 +30,67 @@ async def handle_average_msg(client, message, stat, game, champ_or_map=None, dis
         await message.channel.send(client.insert_emotes(response))
         return
 
-    if game == "lol":
-        await handle_average_msg_lol(client, message, stat, champ_or_map, disc_id)
-    elif game == "cs2":
-        await handle_average_msg_cs2(client, message, stat, champ_or_map, disc_id)
+    playable_name = None
+    if playable_id is not None:
+        playable_name = client.api_clients[game].get_playable_name(playable_id)
+
+    minimum_games = 10 if playable_id is None else 5
+    values = client.game_databases[game].get_average_stat(stat, disc_id, playable_id, minimum_games)()
+
+    for_all = disc_id is None
+    readable_stat = stat.replace("_", " ")
+
+    response = ""
+
+    for index, (disc_id, avg_value, games) in enumerate(values):
+        if for_all:
+            response += "- "
+
+        target_name = client.get_discord_nick(disc_id, message.guild.id)
+
+        if avg_value is None:
+            # No games or no games on the given champ/map.
+            response += f"{target_name} has not yet played at least {minimum_games} games "
+
+            if playable_id is not None:
+                response += f"on {playable_name} "
+
+            response += "{emote_perker_nono}"
+
+        elif stat == "first_blood":
+            percent = f"{avg_value * 100:.2f}"
+            response += f"{target_name} got first blood in **{percent}%** of **{games}** games "
+
+            if playable_id is not None:
+                response += f"when playing **{playable_name}** "
+
+            if not for_all:
+                response += "{emote_poggers}"
+
+        elif stat == "rank":
+            avg_rank = RANKS[int(avg_value)]
+            response += f"{target_name}'s average rank is **{avg_rank}** in **{games}** games "
+
+            if playable_name is not None:
+                response += f"when playing **{playable_name}** "
+
+            if not for_all:
+                response += "{emote_poggers}"
+
+        else:
+            ratio = f"{avg_value:.2f}"
+            response += f"{target_name} averages **{ratio}** {readable_stat} in **{games}** games "
+
+            if playable_id is not None:
+                response += f"of playing **{playable_name}** "
+
+            if not for_all:
+                response += "{emote_poggers}"
+
+        if index < len(values) - 1:
+            response += "\n"
+
+    await message.channel.send(client.insert_emotes(response))
 
 def get_game_summary(client, game, game_id, target_id, guild_id):
     """
@@ -194,7 +145,7 @@ async def handle_stat_msg(client, message, best, game, stat, target_id):
                 game_count, # <- How many games were the stat was relevant
                 min_or_max_value, # <- Highest/lowest occurance of the stat value
                 game_id
-            ) = client.game_databases[game].get_best_or_worst_stat(stat, target_id, maximize)
+            ) = client.game_databases[game].get_best_or_worst_stat(stat, target_id, maximize)()
 
         recepient = client.get_discord_nick(target_id, message.guild.id)
 

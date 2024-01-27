@@ -167,7 +167,7 @@ async def handle_summary_msg(client, message, game, target_id):
         )
 
     # Get performance score for person.
-    score, rank, num_scores = database.get_performance_score(target_id)
+    score, rank, num_scores = database.get_performance_score(target_id)()
 
     response += (
         f"The *Personally Evaluated Normalized Int-Far Score* for {nickname} is " +
@@ -177,7 +177,7 @@ async def handle_summary_msg(client, message, game, target_id):
     await message.channel.send(response)
 
 async def handle_performance_msg(client, message, game, target_id=None):
-    performance_data = client.game_databases[game].get_performance_score(target_id)
+    performance_data = client.game_databases[game].get_performance_score(target_id)()
     game_name = api_util.SUPPORTED_GAMES[game]
     if target_id is None:
         response = f"*Personally Evaluated Normalized Int-Far Scores* for {game_name} for all users:"

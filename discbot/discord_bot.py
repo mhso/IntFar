@@ -217,7 +217,7 @@ class DiscordClient(discord.Client):
         """        
         for disc_id in game_monitor.users_in_game[guild_id]:
             steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
-            self.game_databases["cs2]"].set_new_cs2_sharecode(disc_id, steam_id, game_info["matchID"])
+            self.game_databases["cs2"].set_new_cs2_sharecode(disc_id, steam_id, game_info["matchID"])
 
         if status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
             # Game was too short, most likely an early surrender

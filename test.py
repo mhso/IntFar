@@ -10,6 +10,7 @@ from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, util
 from api.meta_database import MetaDatabase
 from api.game_database import GameDatabase
+from api.game_databases import get_database_client
 from api.awards import get_awards_handler
 from api.game_data import get_stat_parser, get_formatted_stat_names, get_stat_quantity_descriptions
 from api.game_apis.lol import RiotAPIClient
@@ -25,7 +26,7 @@ class TestFuncs:
         self.riot_api = riot_api
 
     def test_performance_score(self):
-        for stuff in self.game_databases["lol"].get_performance_score():
+        for stuff in self.game_databases["lol"].get_performance_score()():
             print(stuff)
 
     def test_cool_stats(self):
@@ -244,7 +245,7 @@ class TestFuncs:
         print(timeline_events)
 
     def test_average_stats(self):
-        stats = self.game_databases["lol"].get_average_stat("kda", 267401734513491969, min_games=1)
+        stats = self.game_databases["lol"].get_average_stat("kda", 267401734513491969, min_games=1)()
         for row in stats:
             print(row)
 
@@ -255,7 +256,7 @@ if __name__ == "__main__":
 
     CONFIG = config.Config()
     META_DATABASE = MetaDatabase(CONFIG)
-    GAME_DATABASES = {game: GameDatabase(game, CONFIG) for game in util.SUPPORTED_GAMES}
+    GAME_DATABASES = {game: get_database_client(game, CONFIG) for game in util.SUPPORTED_GAMES}
     RIOT_API = RiotAPIClient("lol", CONFIG)
 
     TEST_RUNNER = TestFuncs(CONFIG, META_DATABASE, GAME_DATABASES, RIOT_API)

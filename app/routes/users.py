@@ -279,7 +279,7 @@ def get_game_stats(game, disc_id, database):
                 min_or_max_value = stat_count
                 pretty_desc = pretty_stat
 
-            stat_data = database.get_best_or_worst_stat(stat, disc_id, maximize)
+            stat_data = database.get_best_or_worst_stat(stat, disc_id, maximize)()
             if stat_data is None:
                 list_to_add_to.append(([pretty_desc, "N/A", "N/A"], False))
                 continue

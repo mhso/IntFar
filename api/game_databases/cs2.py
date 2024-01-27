@@ -1,3 +1,4 @@
+from sqlite3 import Cursor
 from api.game_database import GameDatabase
 from api.config import Config
 
@@ -99,9 +100,11 @@ class CS2GameDatabase(GameDatabase):
             ORDER BY avg_val DESC
         """
 
-        with self:
-            result = self.execute_query(query, *params).fetchall()
+        def format_result(cursor: Cursor):
+            result = cursor.fetchall()
             return result or [(disc_id, None, None)]
+
+        return self.query(query, *params, format_func=format_result)
 
     def get_played_with_most_doinks(self, disc_id):
         query = f"""

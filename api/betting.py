@@ -191,7 +191,7 @@ class BettingHandler(ABC):
         return reason_count, num_games
 
     def get_stats_return(self, stat, target_id):
-        result = self.game_database.get_best_or_worst_stat(stat, target_id)
+        result = self.game_database.get_best_or_worst_stat(stat, target_id)()
         if result is None:
             return 0, 0
 
