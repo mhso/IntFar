@@ -306,6 +306,12 @@ class LoLAwardQualifiers(AwardQualifiers):
 
         return cool_stats
 
+    def _get_line_coeficient(self, p_1, p_2, x, y):
+        slope = (p_2[1] - p_1[1]) / (p_2[0] - p_1[0])
+        intercept = (slope * p_1[0] - p_1[1]) * -1
+
+        return slope * x + intercept - y
+
     def _is_event_on_our_side(self, x, y):
         if x < y: # Top side
             redside_p1 = (2420, 13000)
@@ -327,11 +333,29 @@ class LoLAwardQualifiers(AwardQualifiers):
             p_1 = redside_p1
             p_2 = redside_p2
 
-        slope = (p_2[1] - p_1[1]) / (p_2[0] - p_1[0])
-        intercept = (slope * p_1[0] - p_1[1]) * -1
+        coef = self._get_line_coeficient(p_1, p_2, x, y)
 
-        coef = slope * x + intercept - y
-        
+        if blue_side:
+            return coef > 0
+
+        return coef < 0
+
+    def _is_event_in_fountain(self, x, y):
+        blueside_p1 = (2920, 7680)
+        blueside_p2 = (6720, 4160)
+        redside_p1 = (34240, 33600)
+        redside_p2 = (38120, 30920)
+
+        blue_side = self.parsed_game_stats.team_id == 100
+        if blue_side:
+            p_1 = blueside_p1
+            p_2 = blueside_p2
+        else:
+            p_1 = redside_p1
+            p_2 = redside_p2
+
+        coef = self._get_line_coeficient(p_1, p_2, x, y)
+
         if blue_side:
             return coef > 0
 
@@ -450,8 +474,12 @@ class LoLAwardQualifiers(AwardQualifiers):
                         people_buying_items.add(event["participantId"])
 
                 people_with_no_items = set(int(participant_id) for participant_id in frame_data["participantFrames"]) - people_buying_items
+    
                 for participant_id in people_with_no_items:
-                    if (disc_id := participant_dict.get(participant_id)) is not None:
+                    part_frame = frame_data["participantFrames"][str(participant_id)]
+                    x = part_frame["position"]["x"]
+                    y = part_frame["position"]["y"]
+                    if not self._is_event_in_fountain(x, y) and (disc_id := participant_dict.get(participant_id)) is not None:
                         people_forgetting_items.append(disc_id)
 
             if frame_data["timestamp"] < 130_000:

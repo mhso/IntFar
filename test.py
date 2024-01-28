@@ -128,7 +128,7 @@ class TestFuncs:
         print(response)
 
     def test_timeline(self):
-        game_id = 6748316771
+        game_id = 6788182214
         game = "lol"
         game_data = self.riot_api.get_game_details(game_id)
         parser = get_stat_parser(game, game_data, self.riot_api, self.game_databases["lol"].game_users, 803987403932172359)
@@ -250,6 +250,17 @@ class TestFuncs:
             print(row)
 
         print(len(stats), "rows")
+
+    def test_convert_coords(self):
+        x = 906
+        y = 546
+
+        scaling = 40000 / 2000
+
+        x = (x + 1000) * scaling
+        y = (y + 1000) * scaling
+
+        print(x, y)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

@@ -1,11 +1,13 @@
-import os
 from time import time
+from sqlite3 import OperationalError, ProgrammingError
 from argparse import ArgumentParser
-import sqlite3
+
 from api.config import Config
 from api.meta_database import MetaDatabase
 from api.game_databases import get_database_client
 from api.util import SUPPORTED_GAMES
+
+from mhooge_flask.database import Query
 
 parser = ArgumentParser()
 
@@ -27,6 +29,13 @@ else:
     exit(0)
 
 def _try_cast(param):
+    if param == "None":
+        return None
+    if param == "True":
+        return True
+    if param == "False":
+        return False
+
     try:
         return int(param)
     except ValueError:
@@ -43,14 +52,19 @@ def run_query(database, query, *params, raw=False, print_query=False):
     query_func = getattr(database, query)
     params = list(map(_try_cast, params))
 
-    query_obj = query_func(*params)
-
-    if print_query:
-        print(query_obj)
-        exit(0)
-
     time_start = time()
-    result = query_obj(raw=raw)
+
+    query_obj = query_func(*params)
+    if isinstance(query_obj, Query):
+        if print_query:
+            print(query_obj)
+            exit(0)
+
+        result = query_obj(raw=raw)
+    else:
+        result = query_obj
+        raw = False
+
     rows_returned = 0
 
     if raw:
@@ -118,7 +132,7 @@ with database:
                     rows_affected = conn.cursor().execute("SELECT changes()").fetchone()[0]
                     print(f"Rows affected: {rows_affected} in {time_taken}")
 
-            except (sqlite3.OperationalError, sqlite3.ProgrammingError) as exc:
+            except (OperationalError, ProgrammingError) as exc:
                 print(exc.args)
             except KeyboardInterrupt:
                 pass

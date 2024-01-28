@@ -42,6 +42,85 @@ class LoLGameDatabase(GameDatabase):
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
+    def _average_rank_query(self, stat, disc_id, champ_id, comparison, min_games=10):
+        parameters = []
+
+        where_clause = ""
+        group_clause = ""
+        if comparison == 1: # Compare to other champs played by person
+            where_clause = "WHERE disc_id=?"
+            group_clause = "GROUP BY champ_id"
+            parameters.extend([disc_id] * 2)
+        elif comparison == 2: # Compare to other people playing the same champ
+            where_clause = "WHERE champ_id=?"
+            group_clause = "GROUP BY disc_id"
+            parameters.extend([champ_id] * 2)
+        elif comparison == 3: # Compare to all people across all champs
+            group_clause = "GROUP BY disc_id, champ_id"
+
+        parameters.extend([disc_id, champ_id])
+        ordering = "ASC" if stat == "deaths" else "DESC"
+
+        query = f"""
+            WITH ranking AS (
+                SELECT
+                    played.disc_id,
+                    played.champ_id,
+                    CAST(played.c AS int) AS games,
+                    ROW_NUMBER() OVER (ORDER BY stat_values.s / played.c {ordering}) AS rank
+                FROM (
+                    SELECT
+                        disc_id,
+                        champ_id,
+                        game_id,
+                        SUM({stat}) AS s
+                    FROM participants AS p
+                    {where_clause}
+                    {group_clause}
+                ) stat_values
+                INNER JOIN (
+                    SELECT
+                        disc_id,
+                        champ_id,
+                        CAST(COUNT(g.game_id) as real) AS c
+                    FROM games AS g
+                    LEFT JOIN participants AS p
+                        ON g.game_id = p.game_id
+                    {where_clause}
+                    {group_clause}
+                ) played
+                ON played.champ_id = stat_values.champ_id
+                    AND played.disc_id = stat_values.disc_id
+                INNER JOIN users AS u
+                ON u.disc_id = played.disc_id
+                WHERE u.active = 1
+                    AND played.c >= {min_games}
+                GROUP BY played.champ_id,
+                    played.disc_id
+            )
+            SELECT rank, max_rank
+            FROM (
+                SELECT rank
+                FROM ranking
+                WHERE disc_id = ?
+                    AND champ_id = ?
+            ) sub_1,
+            (
+                SELECT MAX(rank) AS max_rank
+                FROM ranking
+            ) sub_2
+            """
+
+        return query, parameters
+
+    def get_average_stat_rank(self, stat, disc_id, champ_id, comparison=1, min_games=10):
+        # Find: 
+        # How does the value rank in relation to my other champs
+        # How does the value rank in relation to other players playing this champ
+        # How does the value rank in relation to all players and all champs
+        query_champ_rank, parameters = self._average_rank_query(stat, disc_id, champ_id, comparison, min_games)
+        return self.query(query_champ_rank, *parameters, format_func="one")
+
     def get_average_stat(self, stat, disc_id=None, champ_id=None, min_games=10):
         params = []
         player_condition = ""
@@ -127,11 +206,7 @@ class LoLGameDatabase(GameDatabase):
                 ORDER BY avg_val DESC
             """
 
-        def format_result(cursor: Cursor):
-            result = cursor.fetchall()
-            return result or [(disc_id, None, None)]
-
-        return self.query(query, *params, format_func=format_result)
+        return self.query(query, *params, format_func="all", default=[(disc_id, None, None)])
 
     def get_played_with_most_doinks(self, disc_id):
         query = f"""

@@ -316,20 +316,49 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
         "vision_score",
         "vision_wards"
     ]
+    min_games = 1
+    text_rows = [
+        ["Stat", "Value", "vs. Self", f"vs. {champ_name}s", "vs. All"]
+    ]
 
-    stats = {
-        stat: get_formatted_stat_value(
-            game,
-            stat,
-            client.game_databases["lol"].get_average_stat(stat, target_id, champ_id, 1)[0][1]
-        )
-        for stat in stats_to_get
-    }
+    with client.game_databases["lol"] as database:
+        stats = {
+            stat: get_formatted_stat_value(
+                game,
+                stat,
+                database.get_average_stat(stat, target_id, champ_id, min_games)()[0][1]
+            )
+            for stat in stats_to_get
+        }
 
-    response += f"KDA: **{stats['kills']}**/**{stats['deaths']}**/**{stats['assists']}** (**{stats['kda']}**)\n"
-    response += f"CS: **{stats['cs']}** (**{stats['cs_per_min']}** per min)\n"
-    response += f"Damage: **{stats['damage']}**\n"
-    response += f"Gold: **{stats['gold']}**\n"
-    response += f"Vision: **{stats['vision_score']}** (**{stats['vision_wards']}** pink wards)\n"
+        formatted_stat_names = get_formatted_stat_names(game)
+        for stat in stats:
+            stat_name = formatted_stat_names[stat]
+
+            row = [f"{stat_name}", f"{stats[stat]}"]
+
+            for comparison in range(3):
+                rank, total = database.get_average_stat_rank(
+                    stat, target_id, champ_id, comparison + 1, min_games
+                )()
+                row.append(f"{rank}/{total}")
+
+            text_rows.append(row)
+
+    col_lengths = [max(len(row[col]) for row in text_rows) for col in range(len(text_rows[0]))]
+    response += "```css\n"
+    for row_index, row in enumerate(text_rows):
+        if row_index == 1:
+            response += "-" * (sum(col_lengths) + 15) + "\n"
+
+        for col_index, entry in enumerate(row):
+            padding = col_lengths[col_index] - len(entry)
+            response += entry + " " * padding
+            if col_index < len(row) - 1:
+                response += " | "
+
+        response += "\n"
+
+    response += "```"
 
     await message.channel.send(response)

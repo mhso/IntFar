@@ -392,13 +392,9 @@ class GameDatabase(SQLiteDatabase):
         ### Parameters
 
         `:param game:`          Supported game to look for doinks for (fx. 'lol' for League of Legends)
-
         `:param disc_id:`       Optional Discord ID to only include counts for a single person
-
         `:param time_after:`    Optional UNIX timestamp to only include results after this point
-
         `:param time_before:`   Optional UNIX timestamp to only include results before this point
-
         `:param guild_id:`      Optional Discord guild ID to only include results of games played in that server
 
         ### Returns
@@ -1365,6 +1361,9 @@ class GameDatabase(SQLiteDatabase):
         beaten_records_worst = []
 
         for stat in parsed_game_stats.filtered_player_stats[0].stat_quantity_desc():
+            if stat == "first_blood":
+                continue
+
             reverse_order = stat == "deaths"
             (
                 min_id, min_value, max_id, max_value,
