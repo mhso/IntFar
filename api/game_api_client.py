@@ -30,3 +30,7 @@ class GameAPIClient(ABC):
     @abstractmethod
     def try_find_playable_id(self, played_name):
         ...
+
+    @abstractmethod
+    def get_ingame_name(self, ingame_id):
+        ...

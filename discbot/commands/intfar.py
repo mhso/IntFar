@@ -22,7 +22,7 @@ async def handle_intfar_msg(client, message, game, target_id):
         intfars_of_the_month = database.get_intfars_of_the_month()
         user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
 
-        played_id, played_count = database.get_played_with_most_intfars(disc_id)
+        played_id, played_count = database.get_played_with_most_intfars(disc_id)()
         if game == "lol":
             played_name = client.api_clients["lol"].get_champ_name(played_id)
         elif game == "cs2":

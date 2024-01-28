@@ -11,7 +11,7 @@ async def handle_doinks_msg(client, message, game, target_id):
         total_doinks = database.get_doinks_count(disc_id)[1]
         doinks_counts = organize_doinks_stats(game, doinks_reason_ids)
 
-        played_id, played_count = database.get_played_with_most_doinks(disc_id)
+        played_id, played_count = database.get_played_with_most_doinks(disc_id)()
         played_name = client.api_clients[game].get_playable_name(played_id)
 
         msg = f"{person_to_check} has earned {total_doinks} " + "{emote_Doinks}"

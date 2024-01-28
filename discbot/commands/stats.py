@@ -293,55 +293,70 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
         await message.channel.send(f"Champion is not valid.")
         return
 
-    champ_name, winrate, games = get_winrate(client, champ_id, game, target_id)
-
-    if winrate is None or games == 0:
-        response = f"{user_name} has not played any games on {champ_name}."
-        await message.channel.send(response)
-        return
-
-    user_name = client.get_discord_nick(target_id, message.guild.id)
-    response = f"Stats for {user_name} on *{champ_name}*:\n"
-    response += f"Winrate: **{winrate:.2f}%** in **{int(games)}** games.\n"
-
-    stats_to_get = [
-        "kills",
-        "deaths",
-        "assists",
-        "kda",
-        "cs",
-        "cs_per_min",
-        "damage",
-        "gold",
-        "vision_score",
-        "vision_wards"
-    ]
-    min_games = 1
-    text_rows = [
-        ["Stat", "Value", "vs. Self", f"vs. {champ_name}s", "vs. All"]
-    ]
-
     with client.game_databases["lol"] as database:
+        champ_name, winrate, games = get_winrate(client, champ_id, game, target_id)
+
+        if winrate is None or games == 0:
+            response = f"{user_name} has not played any games on {champ_name}."
+            await message.channel.send(response)
+            return
+
+        doinks = database.get_played_doinks_count(target_id, champ_id)()
+        intfars = database.get_played_intfar_count(target_id, champ_id)()
+
+        user_name = client.get_discord_nick(target_id, message.guild.id)
+        response = f"Stats for {user_name} on *{champ_name}*:\n"
+        response += f"Winrate: **{winrate:.2f}%** in **{int(games)}** games.\n"
+        response += f"Doinks: **{doinks}**\n"
+        response += f"Int-Fars: **{intfars}**\n"
+
+        stats_to_get = [
+            "kills",
+            "deaths",
+            "assists",
+            "kda",
+            "cs",
+            "cs_per_min",
+            "damage",
+            "gold",
+            "vision_score",
+            "vision_wards"
+        ]
+        text_rows = [
+            ["Stat", "Value", "Self", "Others", "All", "Best"]
+        ]
+
         stats = {
             stat: get_formatted_stat_value(
                 game,
                 stat,
-                database.get_average_stat(stat, target_id, champ_id, min_games)()[0][1]
+                database.get_average_stat(stat, target_id, champ_id, 1)()[0][1]
             )
             for stat in stats_to_get
         }
 
+        min_games = 5
+        totals = []
         formatted_stat_names = get_formatted_stat_names(game)
-        for stat in stats:
+        for index, stat in enumerate(stats):
             stat_name = formatted_stat_names[stat]
 
             row = [f"{stat_name}", f"{stats[stat]}"]
+            best_at_champ = None
 
-            for comparison in range(3):
-                rank, total = database.get_average_stat_rank(
-                    stat, target_id, champ_id, comparison + 1, min_games
+            for comparison in range(1, 4):
+                rank, best_id, total = database.get_average_stat_rank(
+                    stat, target_id, champ_id, comparison, min_games
                 )()
-                row.append(f"{rank}/{total}")
+                row.append(str(rank))
+
+                if index == 0:
+                    totals.append(total)
+                if comparison == 2:
+                    best_at_champ = best_id
+
+            best_name = client.get_discord_nick(best_at_champ, message.guild.id)
+            row.append(best_name)
 
             text_rows.append(row)
 
@@ -349,7 +364,7 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
     response += "```css\n"
     for row_index, row in enumerate(text_rows):
         if row_index == 1:
-            response += "-" * (sum(col_lengths) + 15) + "\n"
+            response += "-" * (sum(col_lengths) + 14) + "\n"
 
         for col_index, entry in enumerate(row):
             padding = col_lengths[col_index] - len(entry)
@@ -359,6 +374,13 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
 
         response += "\n"
 
-    response += "```"
+    person = "person" if totals[1] - 1 == 1 else "people"
+
+    response += "```\n"
+    response += f"**Self**: Rank compared to {user_name}'s **{totals[0]}** other champs played\n"
+    response += f"**Others**: Rank compared to **{totals[1] - 1}** other {person} playing {champ_name}\n"
+    response += f"**All**: Rank compared to **{totals[2]}** other people playing any champ\n"
+    response += f"**Best**: Who has the best rank on a stat with {champ_name}\n"
+    response += f"A minimum of **{min_games}** games on a champ is required"
 
     await message.channel.send(response)

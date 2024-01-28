@@ -42,7 +42,7 @@ class LoLGameDatabase(GameDatabase):
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
-    def _average_rank_query(self, stat, disc_id, champ_id, comparison, min_games=10):
+    def get_average_stat_rank(self, stat, disc_id, champ_id, comparison, min_games=10):
         parameters = []
 
         where_clause = ""
@@ -98,7 +98,7 @@ class LoLGameDatabase(GameDatabase):
                 GROUP BY played.champ_id,
                     played.disc_id
             )
-            SELECT rank, max_rank
+            SELECT rank, best_id, max_rank
             FROM (
                 SELECT rank
                 FROM ranking
@@ -108,18 +108,16 @@ class LoLGameDatabase(GameDatabase):
             (
                 SELECT MAX(rank) AS max_rank
                 FROM ranking
-            ) sub_2
+            ) sub_2,
+            (
+                SELECT
+                    disc_id AS best_id,
+                    MIN(rank)
+                FROM ranking
+            )
             """
 
-        return query, parameters
-
-    def get_average_stat_rank(self, stat, disc_id, champ_id, comparison=1, min_games=10):
-        # Find: 
-        # How does the value rank in relation to my other champs
-        # How does the value rank in relation to other players playing this champ
-        # How does the value rank in relation to all players and all champs
-        query_champ_rank, parameters = self._average_rank_query(stat, disc_id, champ_id, comparison, min_games)
-        return self.query(query_champ_rank, *parameters, format_func="one")
+        return self.query(query, *parameters, format_func="one")
 
     def get_average_stat(self, stat, disc_id=None, champ_id=None, min_games=10):
         params = []
@@ -208,42 +206,77 @@ class LoLGameDatabase(GameDatabase):
 
         return self.query(query, *params, format_func="all", default=[(disc_id, None, None)])
 
+    def get_played_doinks_count(self, disc_id, champ_id=None):
+        champ_condition = ""
+        parameters = [disc_id]
+        if champ_id is not None:
+            champ_condition = "AND p.champ_id=?"
+            parameters.append(champ_id)
+        else:
+            champ_condition = "GROUP BY p.champ_id"
+
+        query = f"""
+            SELECT
+                p.champ_id,
+                COUNT(DISTINCT p.game_id) AS c
+            FROM participants AS p
+            WHERE p.doinks IS NOT NULL
+                AND p.disc_id=?
+                {champ_condition}
+        """
+
+        def format_result(cursor):
+            return cursor.fetchone()[1] if champ_id is not None else cursor.fetchall()
+
+        return self.query(query, disc_id, champ_id, format_func=format_result)
+
+    def get_played_intfar_count(self, disc_id, champ_id=None):
+        champ_condition = ""
+        parameters = [disc_id]
+        if champ_id is not None:
+            champ_condition = "AND p.champ_id=?"
+            parameters.append(champ_id)
+        else:
+            champ_condition = "GROUP BY p.champ_id"
+
+        query = f"""
+            SELECT
+                p.champ_id,
+                COUNT(DISTINCT p.game_id) AS c
+            FROM games AS g
+            JOIN participants AS p
+            ON p.game_id = g.game_id
+                AND g.intfar_id = p.disc_id
+            WHERE
+                g.intfar_id IS NOT NULL
+                AND g.intfar_id = ?
+                {champ_condition}
+        """
+
+        def format_result(cursor):
+            return cursor.fetchone()[1] if champ_id is not None else cursor.fetchall()
+
+        return self.query(query, disc_id, champ_id, format_func=format_result)
+
     def get_played_with_most_doinks(self, disc_id):
+        doinks_query = self.get_played_intfar_count(disc_id).query
         query = f"""
             SELECT sub.champ_id, MAX(sub.c) FROM (
-                SELECT
-                    COUNT(DISTINCT p.game_id) AS c,
-                    champ_id
-                FROM participants AS p
-                WHERE
-                    p.disc_id=?
-                    AND p.doinks IS NOT NULL
-                GROUP BY champ_id
+                {doinks_query}
             ) sub
         """
 
-        with self:
-            return self.execute_query(query, disc_id).fetchone()
+        return self.query(query, disc_id, format_func="one")
 
     def get_played_with_most_intfars(self, disc_id):
-        query = """
+        intfar_query = self.get_played_intfar_count(disc_id).query
+        query = f"""
             SELECT sub.champ_id, MAX(sub.c) FROM (
-                SELECT
-                    COUNT(DISTINCT p.game_id) AS c,
-                    champ_id
-                FROM games AS g
-                JOIN participants AS p
-                ON p.game_id = g.game_id
-                    AND g.intfar_id = p.disc_id
-                WHERE
-                    g.intfar_id IS NOT NULL
-                    AND g.intfar_id = ?
-                GROUP BY champ_id
+                {intfar_query}
             ) sub
         """
 
-        with self:
-            return self.execute_query(query, disc_id).fetchone()
+        return self.query(query, disc_id, format_func="one")
 
     def get_played_ids(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)

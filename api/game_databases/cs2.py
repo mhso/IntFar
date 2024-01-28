@@ -106,19 +106,63 @@ class CS2GameDatabase(GameDatabase):
 
         return self.query(query, *params, format_func=format_result)
 
+    def get_played_doinks_count(self, disc_id, map_id=None):
+        champ_condition = ""
+        parameters = [disc_id]
+        if map_id is not None:
+            champ_condition = "AND g.map_id=?"
+            parameters.append(map_id)
+        else:
+            champ_condition = "GROUP BY g.map_id"
+
+        query = f"""
+            SELECT
+                map_id,
+                COUNT(DISTINCT p.game_id) AS c
+            FROM participants AS p
+            INNER JOIN games AS g
+            ON g.game_id = p.game_id
+            WHERE
+                p.disc_id=?
+                AND p.doinks IS NOT NULL
+                {champ_condition}
+        """
+
+        def format_result(cursor):
+            return cursor.fetchone()[1] if map_id is not None else cursor.fetchall()
+
+        return self.query(query, *parameters, format_func=format_result)
+
+    def get_played_intfar_count(self, disc_id, map_id=None):
+        champ_condition = ""
+        parameters = [disc_id]
+        if map_id is not None:
+            champ_condition = "AND g.map_id=?"
+            parameters.append(map_id)
+        else:
+            champ_condition = "GROUP BY g.map_id"
+
+        query = f"""
+            SELECT
+                COUNT(DISTINCT g.game_id) AS c,
+                map_id
+            FROM games AS g
+            WHERE
+                g.intfar_id IS NOT NULL
+                AND g.intfar_id = ?
+                {champ_condition}
+        """
+
+        def format_result(cursor):
+            return cursor.fetchone()[1] if map_id is not None else cursor.fetchall()
+
+        return self.query(query, disc_id, map_id, format_func=format_result)
+
     def get_played_with_most_doinks(self, disc_id):
+        doinks_query = self.get_played_doinks_count(disc_id).query
         query = f"""
             SELECT sub.map_id, MAX(sub.c) FROM (
-                SELECT
-                    COUNT(DISTINCT p.game_id) AS c,
-                    map_id
-                FROM participants AS p
-                INNER JOIN games AS g
-                ON g.game_id = p.game_id
-                WHERE
-                    p.disc_id=?
-                    AND p.doinks IS NOT NULL
-                GROUP BY map_id
+                {doinks_query}
             ) sub
         """
 
@@ -126,16 +170,10 @@ class CS2GameDatabase(GameDatabase):
             return self.execute_query(query, disc_id).fetchone()
 
     def get_played_with_most_intfars(self, disc_id):
-        query = """
+        doinks_query = self.get_played_intfar_count(disc_id).query
+        query = f"""
             SELECT sub.map_id, MAX(sub.c) FROM (
-                SELECT
-                    COUNT(DISTINCT g.game_id) AS c,
-                    map_id
-                FROM games AS g
-                WHERE
-                    g.intfar_id IS NOT NULL
-                    AND g.intfar_id = ?
-                GROUP BY map_id
+                {doinks_query}
             ) sub
         """
 

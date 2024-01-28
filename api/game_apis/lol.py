@@ -289,6 +289,14 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()
 
+    def get_ingame_name(self, summ_id):
+        endpoint = "/lol/summoner/v4/summoners/{0}"
+        response = self.make_request(endpoint, API_PLATFORM, summ_id)
+        if response.status_code != 200:
+            return None
+
+        return response.json()
+
     def get_active_game(self, summ_id):
         endpoint = "/lol/spectator/v4/active-games/by-summoner/{0}"
         try:

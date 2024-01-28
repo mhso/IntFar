@@ -126,6 +126,11 @@ class GameDatabase(SQLiteDatabase):
 
         del self.game_users[disc_id]
 
+    def set_user_name(self, disc_id, ingame_id, ingame_name):
+        with self:
+            query = "UPDATE users SET ingame_name=? WHERE disc_id=? AND ingame_id=?"
+            self.execute_query(query, ingame_name, disc_id, ingame_id)
+
     def game_user_data_from_discord_id(self, disc_id):
         return self.game_users.get(disc_id)
 
@@ -351,6 +356,14 @@ class GameDatabase(SQLiteDatabase):
 
     @abstractmethod
     def get_average_stat(self, stat: str, disc_id=None, played_id=None, min_games=10) -> Query:
+        ...
+
+    @abstractmethod
+    def get_played_doinks_count(self, disc_id, playable_id):
+        ...
+
+    @abstractmethod
+    def get_played_intfar_count(self, disc_id, playable_id):
         ...
 
     @abstractmethod

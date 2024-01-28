@@ -185,7 +185,14 @@ class TestWrapper(TestRunner):
 
             self.assert_no_exception(database.get_doinks_relations, "Get doinks relations.", MY_DISC_ID)
     
-            self.assert_no_exception(database.get_played_with_most_doinks, "Get played with most doinks", MY_DISC_ID)
+            def get_played_doinks(*args):
+                return database.get_played_doinks_count(*args)
+            self.assert_no_exception(get_played_doinks, "Get played doinks", MY_DISC_ID)
+
+            def get_played_with_most_doinks(*args):
+                return database.get_played_with_most_doinks(*args)
+
+            self.assert_no_exception(get_played_with_most_doinks, "Get played with most doinks", MY_DISC_ID)
 
     @test
     def test_intfar_queries(self):
@@ -209,7 +216,13 @@ class TestWrapper(TestRunner):
 
             self.assert_no_exception(database.get_intfar_relations, "Get intfar relations.", MY_DISC_ID)
 
-            self.assert_no_exception(database.get_played_with_most_intfars, "Get played with most intfars", MY_DISC_ID)
+            def get_played_intfars(*args):
+                return database.get_played_intfar_count(*args)
+            self.assert_no_exception(get_played_intfars, "Get played intfars", MY_DISC_ID)
+
+            def get_played_with_most_intfars(*args):
+                return database.get_played_with_most_intfars(*args)
+            self.assert_no_exception(get_played_with_most_intfars, "Get played with most intfars", MY_DISC_ID)
 
     @test
     def test_betting_queries(self):

@@ -1562,6 +1562,19 @@ class DiscordClient(discord.Client):
 
         await self.assign_monthly_intfar_role(game, current_month, winners)
 
+    async def set_newest_usernames(self):
+        for game in api_util.SUPPORTED_GAMES:
+            database = self.game_databases[game]
+            for disc_id in database.game_users:
+                user_info = database.game_users[disc_id]
+                for ingame_id, old_name in zip(user_info.ingame_id, user_info.ingame_name):
+                    new_name = self.api_clients[game].get_ingame_name(ingame_id)
+                    if new_name != old_name:
+                        logger.info(f"Updated username from {old_name} to {new_name} in {game}")
+                        database.set_user_name(disc_id, ingame_id, new_name)
+
+                    asyncio.sleep(2)
+
     async def polling_loop(self):
         """
         Incrementally polls for a few things.
@@ -1589,6 +1602,10 @@ class DiscordClient(discord.Client):
             if new_day != curr_day:
                 # Download latest information from Riot API.
                 self.api_clients["lol"].get_latest_data()
+
+                # Get latest usernames for all players in all games, if they've changed
+                self.set_newest_usernames()
+
                 curr_day = new_day
 
             await asyncio.sleep(time_to_sleep)
