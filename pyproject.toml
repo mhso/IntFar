@@ -1,0 +1,33 @@
+[project]
+name = "intfar"
+version = "1.0.0"
+description = "Int-Far - Now with PDM"
+authors = [
+    {name = "Mikkel Sørensen", email = "m_hooge@hotmail.com"},
+]
+dependencies = [
+    "awpy==1.2.3",
+    "beautifulsoup4==4.12.2",
+    "discord-py==2.2.2",
+    "flask==2.3.2",
+    "flask-cors==3.0.10",
+    "PyNaCl==1.5.0",
+    "python-dateutil==2.8.2",
+    "protobuf==3.19.0",
+    "requests==2.31.0",
+    "steam==1.4.4",
+    "csgo==1.0.0",
+    "Levenshtein==0.24.0",
+    "file:///${PROJECT_ROOT}/../scripts/streamscape",
+    "file:///${PROJECT_ROOT}/../scripts/mhooge_flask",
+    "numpy>=1.26.3",
+    "pillow>=10.2.0",
+    "dateutils>=0.6.12",
+    "gevent>=23.9.1",
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+
+[tool.pdm]
+distribution = false

@@ -31,7 +31,7 @@ conf_1 = Config()
 database_client_1 = Database(conf_1)
 
 conf_2 = Config()
-conf_2.database = "resources/copy.db"
+conf_2.database = "../resources/copy.db"
 
 if os.path.exists(conf_2.database):
     os.remove(conf_2.database)
