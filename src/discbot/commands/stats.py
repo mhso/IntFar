@@ -295,16 +295,16 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
 
     with client.game_databases["lol"] as database:
         champ_name, winrate, games = get_winrate(client, champ_id, game, target_id)
+        user_name = client.get_discord_nick(target_id, message.guild.id)
 
         if winrate is None or games == 0:
-            response = f"{user_name} has not played any games on {champ_name}."
+            response = f"{user_name} has not played enough games on {champ_name}."
             await message.channel.send(response)
             return
 
         doinks = database.get_played_doinks_count(target_id, champ_id)()
         intfars = database.get_played_intfar_count(target_id, champ_id)()
 
-        user_name = client.get_discord_nick(target_id, message.guild.id)
         response = f"Stats for {user_name} on *{champ_name}*:\n"
         response += f"Winrate: **{winrate:.2f}%** in **{int(games)}** games.\n"
         response += f"Doinks: **{doinks}**\n"

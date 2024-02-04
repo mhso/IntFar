@@ -1,4 +1,3 @@
-import json
 from multiprocessing.connection import Connection
 from multiprocessing import Lock
 

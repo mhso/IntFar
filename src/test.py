@@ -252,10 +252,10 @@ class TestFuncs:
         print(len(stats), "rows")
 
     def test_convert_coords(self):
-        x = 906
-        y = 546
+        x = -616
+        y = 638
 
-        scaling = 40000 / 2000
+        scaling = 16000 / 2000
 
         x = (x + 1000) * scaling
         y = (y + 1000) * scaling
