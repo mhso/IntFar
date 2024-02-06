@@ -23,7 +23,6 @@ class LoLPlayerStats(PlayerStats):
     total_time_dead: int = None
     turret_kills: int = None
     inhibitor_kills: int = None
-    puuid: str = None
 
     @classmethod
     def stats_to_save(cls):
@@ -109,7 +108,7 @@ class LoLGameStats(GameStats):
         our_team_lower = True
 
         for stats in self.filtered_player_stats:
-            puuid = stats.puuid
+            puuid = stats.player_id
             for participant_data in timeline_data["participants"]:
                 if participant_data["puuid"] == puuid:
                     our_team_lower = participant_data["participantId"] <= 5
@@ -162,6 +161,7 @@ class LoLGameStatsParser(GameStatsParser):
             players_in_game = []
             for disc_id in player_stats:
                 player_stats[disc_id]["champ_name"] = self.api_client.get_champ_name(player_stats[disc_id]["champ_id"])
+                player_stats[disc_id]["player_id"] = database.game_users[disc_id].puuid[0]
                 all_player_stats.append(LoLPlayerStats(**player_stats[disc_id]))
 
                 user_game_info = self.all_users[disc_id]
@@ -226,6 +226,7 @@ class LoLGameStatsParser(GameStatsParser):
                     stats_for_player = LoLPlayerStats(
                         game_id=self.raw_data["gameId"],
                         disc_id=player_disc_id,
+                        player_id=participant["stats"]["puuid"],
                         kills=participant["stats"]["kills"],
                         deaths=participant["stats"]["deaths"],
                         assists=participant["stats"]["assists"],
@@ -245,8 +246,7 @@ class LoLGameStatsParser(GameStatsParser):
                         pentakills=participant["stats"]["pentaKills"],
                         total_time_dead=participant["stats"]["totalTimeSpentDead"],
                         turret_kills=participant["stats"]["turretKills"],
-                        inhibitor_kills=participant["stats"]["inhibitorKills"],
-                        puuid=participant["stats"]["puuid"]
+                        inhibitor_kills=participant["stats"]["inhibitorKills"]
                     )
                     player_stats.append(stats_for_player)
 
@@ -358,6 +358,7 @@ class LoLGameStatsParser(GameStatsParser):
                 stats_for_player = LoLPlayerStats(
                     game_id=self.raw_data["gameId"],
                     disc_id=player_disc_id,
+                    player_id=participant["puuid"],
                     kills=participant["kills"],
                     deaths=participant["deaths"],
                     assists=participant["assists"],
@@ -377,8 +378,7 @@ class LoLGameStatsParser(GameStatsParser):
                     pentakills=participant["pentaKills"],
                     total_time_dead=participant["totalTimeSpentDead"],
                     turret_kills=participant["turretKills"],
-                    inhibitor_kills=participant["inhibitorKills"],
-                    puuid=participant["puuid"],
+                    inhibitor_kills=participant["inhibitorKills"]
                 )
 
                 if participant["firstBloodKill"]:

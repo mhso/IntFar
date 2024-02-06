@@ -1188,9 +1188,10 @@ class DiscordClient(discord.Client):
             reason = ""
 
             # Go through the criteria the chosen Int-Far met and list them in a readable format.
-            for (count, (reason_index, stat_value)) in enumerate(final_intfar_data):
-                stat = list(awards_handler.INTFAR_REASONS())[reason_index]
-                reason_text = awards_handler.get_flavor_text("intfar", reason_index, "random", **{stat: stat_value})
+            reasons_list = list(awards_handler.INTFAR_REASONS())
+            for (count, (stat, stats)) in enumerate(final_intfar_data):
+                reason_index = reasons_list.index(stat)
+                reason_text = awards_handler.get_flavor_text("intfar", reason_index, "random", **{stat: getattr(stats, stat)})
                 reason_ids[reason_index] = "1"
 
                 if count > 0:
@@ -1574,7 +1575,7 @@ class DiscordClient(discord.Client):
                         logger.info(f"{disc_id}({type(disc_id)}), {ingame_id}({type(ingame_id)})")
                         database.set_user_name(int(disc_id), ingame_id, new_name)
 
-                    asyncio.sleep(2)
+                    await asyncio.sleep(2)
 
     async def polling_loop(self):
         """

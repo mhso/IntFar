@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import random
 
-from api.game_stats import GameStats
+from api.game_stats import GameStats, PlayerStats
 from api.config import Config
 from api.game_database import GameDatabase
 from api.util import load_flavor_texts, SUPPORTED_GAMES
@@ -210,26 +210,27 @@ class AwardQualifiers(ABC):
     def get_intfar(self) -> tuple[int, list[tuple], list[int], str]:
         ... 
 
-    def get_intfar_candidates(self, intfar_details: list[tuple]) -> tuple[dict[int, list[tuple]], int, int]:
+    def get_intfar_candidates(self, intfar_details: list[tuple[str, list[PlayerStats]]]) -> tuple[dict[int, list[tuple[str, PlayerStats]]], int, int]:
         max_intfar_count = 1
-        intfar_counts = {}
         max_count_intfar = None
+        intfar_counts = {}
         qualifier_data = {}
 
         # Look through details for the people qualifying for Int-Far.
         # The one with most criteria met gets chosen.
-        for (index, (tied_intfars, stat_value)) in enumerate(intfar_details):
+        for stat, tied_intfars in intfar_details:
             if tied_intfars is not None:
-                for intfar_disc_id in tied_intfars:
-                    current_intfar_count = intfar_counts.get(intfar_disc_id, 0) + 1
-                    intfar_counts[intfar_disc_id] = current_intfar_count
+                for stats in tied_intfars:
+                    current_intfar_count = intfar_counts.get(stats.player_id, 0) + 1
+                    intfar_counts[stats.player_id] = current_intfar_count
 
                     if current_intfar_count >= max_intfar_count:
                         max_intfar_count = current_intfar_count
-                        max_count_intfar = intfar_disc_id
+                        max_count_intfar = stats.player_id
 
-                    data_list = qualifier_data.get(intfar_disc_id, [])
-                    data_list.append((index, stat_value))
-                    qualifier_data[intfar_disc_id] = data_list
+                    data_list = qualifier_data.get(stats.player_id, [])
+                    stat_value = getattr(stats, stat)
+                    data_list.append((stat, stat_value))
+                    qualifier_data[stats.player_id] = data_list
 
         return qualifier_data, max_count_intfar, max_intfar_count

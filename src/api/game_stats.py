@@ -12,6 +12,7 @@ class PlayerStats(ABC):
     """
     game_id: int
     disc_id: int
+    player_id: str
     kills: int
     deaths: int
     assists: int
@@ -192,7 +193,7 @@ def get_outlier(
     stat: str,
     asc=True,
     include_ties=False
-):
+) -> list[PlayerStats] | PlayerStats | None:
     """
     Get the best or worse stat for a player in a finished game, fx.
     the player with most kills, and how many kills that was.
@@ -210,30 +211,28 @@ def get_outlier(
     filtered_data = list(filter(lambda p: outlier_func_short(p) is not None, player_stats_list))
 
     if filtered_data == []:
-        return None, None
+        return None
 
     sorted_data = sorted(filtered_data, key=outlier_func_short, reverse=not asc)
 
     if include_ties: # Determine whether there are tied outliers.
         outlier = outlier_func_short(sorted_data[0])
-        ties_ids = []
         ties_data = []
         index = 0
 
         while index < len(sorted_data) and outlier_func_short(sorted_data[index]) == outlier:
-            ties_ids.append(sorted_data[index].disc_id)
             ties_data.append(sorted_data[index])
             index += 1
 
-        return ties_ids, ties_data
+        return ties_data
 
-    return (sorted_data[0].disc_id, getattr(sorted_data[0], stat))
+    return sorted_data[0]
 
 def get_outlier_stat(
     player_stats_list: list[PlayerStats],
     stat: str,
     reverse_order=False
-):
+) -> tuple[int, int, int, int]:
     """
     Get data about the outlier (both good and bad)
     for a specific stat in a finished game.
@@ -242,10 +241,20 @@ def get_outlier_stat(
     :param reverse_order    Whether to reverse the order in order to find the outliers
                             Fx. for kills, most are best, for deaths, fewest is best
     """
-    most_id, most = get_outlier(player_stats_list, stat, asc=not reverse_order)
-    least_id, least = get_outlier(player_stats_list, stat, asc=reverse_order)
+    most = get_outlier(player_stats_list, stat, asc=not reverse_order)
+    least = get_outlier(player_stats_list, stat, asc=reverse_order)
 
-    return most_id, most, least_id, least
+    most_id, most_val = None, None
+    if most is not None:
+        most_id = most.disc_id
+        most_val = getattr(most, stat)
+
+    least_id, least_val = None, None
+    if least is not None:
+        least_id = least.disc_id
+        least_val = getattr(least, stat)
+
+    return most_id, most_val, least_id, least_val
 
 def are_unfiltered_stats_well_formed(game_info):
     game_keys = [

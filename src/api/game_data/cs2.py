@@ -805,6 +805,7 @@ class CS2GameStatsParser(GameStatsParser):
             parsed_player_stats = CS2PlayerStats(
                 game_id=self.raw_data["matchID"],
                 disc_id=player_data.get("disc_id"),
+                player_id=steam_or_account_id,
                 kills=player_data["kills"],
                 deaths=player_data["deaths"],
                 assists=player_data["assists"],
@@ -875,6 +876,7 @@ class CS2GameStatsParser(GameStatsParser):
             all_player_stats = []
             players_in_game = []
             for disc_id in player_stats:
+                player_stats[disc_id]["player_id"] = database.game_users[disc_id].ingame_id[0]
                 all_player_stats.append(CS2PlayerStats(**player_stats[disc_id]))
 
                 user_game_info = self.all_users[disc_id]

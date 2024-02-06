@@ -72,8 +72,8 @@ class TestFuncs:
             print(champ)
 
     def test_intfar_stuff(self):
-        game_id = 6678873918
-        guild_id = 803987403932172359
+        game_id = 6803032678
+        guild_id = 619073595561213953
         game_data = self.riot_api.get_game_details(game_id)
         parser = get_stat_parser("lol", game_data, self.riot_api, self.game_databases["lol"].game_users, guild_id)
         parsed_stats = parser.parse_data()

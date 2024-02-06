@@ -1,5 +1,6 @@
 from mhooge_flask.logging import logger
 
+from api.game_data.cs2 import CS2PlayerStats
 from api.award_qualifiers import AwardQualifiers
 from api.game_stats import get_outlier
 from api.util import round_digits
@@ -329,7 +330,7 @@ class CS2AwardQualifiers(AwardQualifiers):
 
         return timeline_events
 
-    def _intfar_by_kda(self):
+    def _intfar_by_kda(self) -> list[CS2PlayerStats]:
         """
         Returns the info of the Int-Far, if this person has a truly terrible KDA.
         This is determined by:
@@ -338,35 +339,35 @@ class CS2AwardQualifiers(AwardQualifiers):
             - Number of deaths being more than 5
         Returns None if none of these criteria matches a registered person.
         """
-        tied_intfars, tied_stats = get_outlier(
+        tied_intfars = get_outlier(
             self.parsed_game_stats.all_player_stats, "kda", include_ties=True
         )
 
         if tied_intfars is None: # No data for stat
-            return None, None
+            return None
 
-        lowest_kda = tied_stats[0].kda
+        lowest_kda = tied_intfars[0].kda
         criterias = self.INTFAR_CRITERIAS()["kda"]
 
         kda_criteria = criterias["lower_threshold"]
         death_criteria = criterias["deaths_criteria"]
 
         potential_intfars = []
-        for intfar, stats in zip(tied_intfars, tied_stats):
+        for stats in tied_intfars:
             if lowest_kda < kda_criteria and stats.deaths > death_criteria:
-                potential_intfars.append(intfar)
+                potential_intfars.append(stats)
 
         if potential_intfars == []:
-            return (None, None)
+            return None
 
         # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
+        all_intfars_randos = not any(stats.disc_id for stats in potential_intfars)
         if all_intfars_randos:
             logger.info("Int-Far for low KDA goes to a random!")
 
-        return (potential_intfars, lowest_kda)
+        return potential_intfars
 
-    def _intfar_by_mvps(self):
+    def _intfar_by_mvps(self) -> list[CS2PlayerStats]:
         """
         Returns the info of the Int-Far, if this person has least MVPs.
         This is determined by:
@@ -381,36 +382,36 @@ class CS2AwardQualifiers(AwardQualifiers):
 
         if self.parsed_game_stats.rounds_us + self.parsed_game_stats.rounds_them <= rounds_criteria:
             # If game lasted less than 16 rounds, we don't give out Int-Far for least MVPs.
-            return (None, None)
+            return None
 
-        tied_intfars, tied_stats = get_outlier(
+        tied_intfars = get_outlier(
             self.parsed_game_stats.all_player_stats, "mvps", include_ties=True
         )
 
         if tied_intfars is None: # No data for stat
-            return None, None
+            return None
 
-        least_mvps = tied_stats[0].mvps
+        least_mvps = tied_intfars[0].mvps
 
         mvp_criteria = criterias["lower_threshold"]
         kda_criteria = criterias["kda_criteria"]
 
         potential_intfars = []
-        for intfar, stats in zip(tied_intfars, tied_stats):
+        for stats in tied_intfars:
             if least_mvps < mvp_criteria and stats.kda < kda_criteria:
-                potential_intfars.append(intfar)
+                potential_intfars.append(stats)
 
         if potential_intfars == []:
-            return (None, None)
+            return None
 
         # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
+        all_intfars_randos = not any(stats.disc_id for stats in potential_intfars)
         if all_intfars_randos:
             logger.info("Int-Far for least MVPs goes to a random!")
 
-        return (potential_intfars, least_mvps)
+        return potential_intfars
 
-    def _intfar_by_adr(self):
+    def _intfar_by_adr(self) -> list[CS2PlayerStats]:
         """
         Returns the info of the Int-Far, if this person has low ADR.
         This is determined by:
@@ -419,36 +420,36 @@ class CS2AwardQualifiers(AwardQualifiers):
             - Number of deaths being more than 3
         Returns None if none of these criteria matches a person.
         """
-        tied_intfars, tied_stats = get_outlier(
+        tied_intfars = get_outlier(
             self.parsed_game_stats.all_player_stats, "adr", include_ties=True
         )
 
         if tied_intfars is None: # No data for stat
-            return None, None
+            return None
 
-        lowest_adr = tied_stats[0].adr
+        lowest_adr = tied_intfars[0].adr
         criterias = self.INTFAR_CRITERIAS()["adr"]
 
         adr_criteria = criterias["lower_threshold"]
         deaths_criteria = criterias["deaths_criteria"]
 
         potential_intfars = []
-        for intfar, stats in zip(tied_intfars, tied_stats):
+        for stats in tied_intfars:
             if lowest_adr < adr_criteria and stats.deaths > deaths_criteria:
-                potential_intfars.append(intfar)
+                potential_intfars.append(stats)
 
         # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
+        all_intfars_randos = not any(stats.disc_id for stats in potential_intfars)
 
         if potential_intfars == [] or all_intfars_randos:
-            return (None, None)
+            return None
 
         if all_intfars_randos:
             logger.info("Int-Far for lowest ADR goes to a random!")
 
-        return (potential_intfars, lowest_adr)
+        return potential_intfars
 
-    def _intfar_by_score(self):
+    def _intfar_by_score(self) -> list[CS2PlayerStats]:
         """
         Returns the info of the Int-Far, if this person has low score.
         This is determined by:
@@ -463,35 +464,35 @@ class CS2AwardQualifiers(AwardQualifiers):
 
         if self.parsed_game_stats.rounds_us + self.parsed_game_stats.rounds_them <= rounds_criteria:
             # If game lasted less than 16 rounds, we don't give out Int-Far for lowest score.
-            return (None, None)
+            return None
 
-        tied_intfars, tied_stats = get_outlier(
+        tied_intfars = get_outlier(
             self.parsed_game_stats.all_player_stats, "score", include_ties=True
         )
 
         if tied_intfars is None: # No data for stat
-            return None, None
+            return None
 
-        lowest_score = tied_stats[0].score
+        lowest_score = tied_intfars[0].score
 
         score_criteria = criterias["lower_threshold"]
         kda_criteria = criterias["kda_criteria"]
 
         potential_intfars = []
-        for intfar, stats in zip(tied_intfars, tied_stats):
+        for stats in tied_intfars:
             if lowest_score < score_criteria and stats.kda < kda_criteria:
-                potential_intfars.append(intfar)
+                potential_intfars.append(stats)
 
         # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
+        all_intfars_randos = not any(stats.disc_id for stats in potential_intfars)
 
         if potential_intfars == [] or all_intfars_randos:
-            return (None, None)
+            return None
 
         if all_intfars_randos:
             logger.info("Int-Far for lowest score goes to a random!")
 
-        return (potential_intfars, lowest_score)
+        return potential_intfars
 
     def resolve_intfar_ties(self, intfar_data, max_count):
         """
@@ -540,25 +541,25 @@ class CS2AwardQualifiers(AwardQualifiers):
         return sorted_by_score[0].disc_id, True, "Ties resolved by lowest score."
 
     def get_intfar_qualifiers(self):
-        intfar_kda_id, kda = self._intfar_by_kda()
-        if intfar_kda_id is not None:
+        intfar_kda = self._intfar_by_kda()
+        if intfar_kda is not None:
             logger.info("Int-Far because of KDA.")
 
-        intfar_mvps_id, mvps = self._intfar_by_mvps()
-        if intfar_mvps_id is not None:
+        intfar_mvps= self._intfar_by_mvps()
+        if intfar_mvps is not None:
             logger.info("Int-Far because of MVPs.")
 
-        intfar_adr_id, adr = self._intfar_by_adr()
-        if intfar_adr_id is not None:
+        intfar_adr = self._intfar_by_adr()
+        if intfar_adr is not None:
             logger.info("Int-Far because of ADR.")
 
-        intfar_score_id, score = self._intfar_by_score()
-        if intfar_score_id is not None:
+        intfar_score = self._intfar_by_score()
+        if intfar_score is not None:
             logger.info("Int-Far because of score.")
 
         return [
-            (intfar_kda_id, kda), (intfar_mvps_id, mvps),
-            (intfar_adr_id, adr), (intfar_score_id, score)
+            ("kda", intfar_kda), ("mvps", intfar_mvps),
+            ("adr", intfar_adr), ("score", intfar_score)
         ]
 
     def get_intfar(self):
@@ -574,9 +575,10 @@ class CS2AwardQualifiers(AwardQualifiers):
             return None, None, None, None
 
         (
-            final_intfar,
+            intfar_disc_id,
+            intfar_player_id,
             ties,
             tie_desc
         ) = self.resolve_intfar_ties(intfar_data, max_intfar_count)
 
-        return final_intfar, intfar_data[final_intfar], ties, tie_desc
+        return intfar_disc_id, intfar_data.get(intfar_player_id), ties, tie_desc

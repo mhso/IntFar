@@ -97,8 +97,8 @@ class RiotAPIClient(GameAPIClient):
             response_json = requests.get(url).json()
             f_out = open(self.champions_file, "w", encoding="utf-8")
             json.dump(response_json, f_out)
-            if old_files != []:
-                remove(old_files[0])
+            for old_file in old_files:
+                remove(old_file)
         except requests.exceptions.RequestException:
             logger.exception("Exception when getting newest champion.json file from Riot API.")
 
@@ -112,8 +112,8 @@ class RiotAPIClient(GameAPIClient):
             response_json = requests.get(url).json()
             f_out = open(self.items_file, "w", encoding="utf-8")
             json.dump(response_json, f_out)
-            if old_files != []:
-                remove(old_files)
+            for old_file in old_files:
+                remove(old_file)
         except requests.exceptions.RequestException:
             logger.exception("Exception when getting newest item.json file from Riot API.")
 

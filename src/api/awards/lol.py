@@ -1,5 +1,6 @@
 from mhooge_flask.logging import logger
 
+from api.game_data.lol import LoLPlayerStats
 from api.award_qualifiers import AwardQualifiers
 from api.util import round_digits
 from api.game_stats import get_outlier
@@ -551,7 +552,7 @@ class LoLAwardQualifiers(AwardQualifiers):
 
         return timeline_events
 
-    def _intfar_by_kda(self):
+    def _intfar_by_kda(self) -> list[LoLPlayerStats]:
         """
         Returns the info of the Int-Far, if this person has a truly terrible KDA.
         This is determined by:
@@ -560,36 +561,35 @@ class LoLAwardQualifiers(AwardQualifiers):
             - Number of deaths being more than 2.
         Returns None if none of these criteria matches a registered person.
         """
-        tied_intfars, tied_stats = get_outlier(
+        tied_intfars = get_outlier(
             self.parsed_game_stats.all_player_stats, "kda", include_ties=True
         )
 
         if tied_intfars is None: # No data for stat
-            return None, None
+            return None
 
-        lowest_kda = tied_stats[0].kda
+        lowest_kda = tied_intfars[0].kda
         criterias = self.INTFAR_CRITERIAS()["kda"]
 
         kda_criteria = criterias["lower_threshold"]
         death_criteria = criterias["death_criteria"]
 
         potential_intfars = []
-        for intfar, stats in zip(tied_intfars, tied_stats):
+        for stats in tied_intfars:
             if lowest_kda < kda_criteria and stats.deaths > death_criteria:
-                potential_intfars.append(intfar)
-
+                potential_intfars.append(stats)
 
         if potential_intfars == []:
-            return (None, None)
+            return None
 
         # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
+        all_intfars_randos = not any(stats.disc_id for stats in potential_intfars)
         if all_intfars_randos:
             logger.info("Int-Far for low KDA goes to a random!")
 
-        return (potential_intfars, lowest_kda)
+        return potential_intfars
 
-    def _intfar_by_deaths(self):
+    def _intfar_by_deaths(self) -> list[LoLPlayerStats]:
         """
         Returns the info of the Int-Far, if this person has hecking many deaths.
         This is determined by:
@@ -598,35 +598,35 @@ class LoLAwardQualifiers(AwardQualifiers):
             - KDA being less than 2.1
         Returns None if none of these criteria matches a person.
         """
-        tied_intfars, tied_stats = get_outlier(
+        tied_intfars = get_outlier(
             self.parsed_game_stats.all_player_stats, "deaths", asc=False, include_ties=True
         )
 
         if tied_intfars is None: # No data for stat
-            return None, None
+            return None
 
-        highest_deaths = tied_stats[0].deaths
+        highest_deaths = tied_intfars[0].deaths
         criterias = self.INTFAR_CRITERIAS()["deaths"]
 
         death_criteria = criterias["lower_threshold"]
         kda_criteria = criterias["kda_criteria"]
 
         potential_intfars = []
-        for intfar, stats in zip(tied_intfars, tied_stats):
+        for stats in tied_intfars:
             if highest_deaths > death_criteria and stats.kda < kda_criteria:
-                potential_intfars.append(intfar)
+                potential_intfars.append(stats)
 
         if potential_intfars == []:
-            return (None, None)
+            return None
 
         # Check if all Int-Far candidates are randos (not registered with Int-Far)
-        all_intfars_randos = not any(potential_intfars)
+        all_intfars_randos = not any(stats.disc_id for stats in potential_intfars)
         if all_intfars_randos:
             logger.info("Int-Far for many deaths goes to a random!")
 
-        return (potential_intfars, highest_deaths)
+        return potential_intfars
 
-    def _intfar_by_kp(self):
+    def _intfar_by_kp(self) -> list[LoLPlayerStats]:
         """
         Returns the info of the Int-Far, if this person has very low kill participation.
         This is determined by:
@@ -637,14 +637,14 @@ class LoLAwardQualifiers(AwardQualifiers):
             - Deaths > 2
         Returns None if none of these criteria matches a person.
         """
-        tied_intfars, tied_stats = get_outlier(
+        tied_intfars = get_outlier(
             self.parsed_game_stats.filtered_player_stats, "kp", include_ties=True
         )
 
         if tied_intfars is None: # No data for stat
             return None, None
 
-        lowest_kp = tied_stats[0].kp
+        lowest_kp = tied_intfars[0].kp
         criterias = self.INTFAR_CRITERIAS()["kp"]
 
         kp_criteria = criterias["lower_threshold"]
@@ -653,7 +653,7 @@ class LoLAwardQualifiers(AwardQualifiers):
         deaths_criteria = criterias["deaths_criteria"]
 
         potential_intfars = []
-        for intfar, stats in zip(tied_intfars, tied_stats):
+        for stats in tied_intfars:
             structures_destroyed = stats.turret_kills + stats.inhibitor_kills
 
             if (
@@ -662,14 +662,14 @@ class LoLAwardQualifiers(AwardQualifiers):
                 and stats.deaths > deaths_criteria
                 and structures_destroyed < structures_criteria
             ):
-                potential_intfars.append(intfar)
+                potential_intfars.append(stats)
 
         if potential_intfars == []:
-            return (None, None)
+            return None
 
-        return (potential_intfars, lowest_kp)
+        return potential_intfars
 
-    def _intfar_by_vision_score(self):
+    def _intfar_by_vision_score(self) -> list[LoLPlayerStats]:
         """
         Returns the info of the Int-Far, if this person has very low kill vision score.
         This is determined by:
@@ -684,29 +684,29 @@ class LoLAwardQualifiers(AwardQualifiers):
 
         if self.parsed_game_stats.duration < time_criteria:
             # If game is less than 20 minutes, we don't give out Int-Far for vision score.
-            return (None, None)
+            return None
 
-        tied_intfars, tied_stats = get_outlier(
+        tied_intfars = get_outlier(
             self.parsed_game_stats.filtered_player_stats, "vision_score", include_ties=True
         )
 
         if tied_intfars is None: # No data for stat
-            return None, None
+            return None
 
-        lowest_score = tied_stats[0].vision_score
+        lowest_score = tied_intfars[0].vision_score
 
         vision_criteria = criterias["lower_threshold"]
         kda_criteria = criterias["kda_criteria"]
 
         potential_intfars = []
-        for intfar, stats in zip(tied_intfars, tied_stats):
+        for stats in tied_intfars:
             if lowest_score < vision_criteria and stats.kda < kda_criteria:
-                potential_intfars.append(intfar)
+                potential_intfars.append(stats)
 
         if potential_intfars == []:
-            return (None, None)
+            return None
 
-        return (potential_intfars, lowest_score)
+        return potential_intfars
 
     def resolve_intfar_ties(self, intfar_data, max_count):
         """
@@ -715,67 +715,66 @@ class LoLAwardQualifiers(AwardQualifiers):
         If so, the one with either most deaths or least gold gets chosen as Int-Far.
         """
         ties = []
-        for disc_id in intfar_data:
-            if len(intfar_data[disc_id]) == max_count:
-                ties.append(disc_id)
+        for player_id in intfar_data:
+            if len(intfar_data[player_id]) == max_count:
+                for stats in self.parsed_game_stats.all_player_stats:
+                    if stats.player_id == player_id:
+                        ties.append(stats)
+                        break
 
         if len(ties) == 1:
-            return ties[0], False, "There are no ties."
+            return ties[0].disc_id, ties[0].player_id, False, "There are no ties."
 
-        filtered_data = []
-        for stats in self.parsed_game_stats.filtered_player_stats:
-            if stats.disc_id in ties:
-                filtered_data.append(stats)
-
-        sorted_by_deaths = sorted(filtered_data, key=lambda x: x.deaths, reverse=True)
+        sorted_by_deaths = sorted(ties, key=lambda x: x.deaths, reverse=True)
         max_count = sorted_by_deaths[0].deaths
+
         ties = []
         for stats in sorted_by_deaths:
             if stats.deaths == max_count:
-                ties.append(stats.disc_id)
+                ties.append(stats)
             else:
                 break
 
         if len(ties) == 1:
-            return ties[0], True, "Ties resolved by most amount of deaths."
+            return ties[0].disc_id, ties[0].player_id, True, "Ties resolved by most amount of deaths."
 
-        sorted_by_kda = sorted(filtered_data, key=lambda x: x.kda)
+        sorted_by_kda = sorted(ties, key=lambda x: x.kda)
         max_count = sorted_by_kda[0].kda
         ties = []
         for stats in sorted_by_kda:
             if stats.kda == max_count:
-                ties.append(disc_id)
+                ties.append(stats)
             else:
                 break
 
         if len(ties) == 1:
-            return ties[0], True, "Ties resolved by lowest KDA."
+            return ties[0].disc_id, ties[0].player_id, True, "Ties resolved by lowest KDA."
 
-        sorted_by_gold = sorted(filtered_data, key=lambda x: x.gold)
-        return sorted_by_gold[0].disc_id, True, "Ties resolved by fewest gold earned."
+        sorted_by_gold = sorted(ties, key=lambda x: x.gold)
+        return sorted_by_gold[0].disc_id, sorted_by_gold[0].player_id, True, "Ties resolved by fewest gold earned."
 
     def get_intfar_qualifiers(self):
-        intfar_kda_id, kda = self._intfar_by_kda()
-        if intfar_kda_id is not None:
+        intfar_kda = self._intfar_by_kda()
+        if intfar_kda is not None:
             logger.info("Int-Far because of KDA.")
 
-        intfar_deaths_id, deaths = self._intfar_by_deaths()
-        if intfar_deaths_id is not None:
+        intfar_deaths = self._intfar_by_deaths()
+        if intfar_deaths is not None:
             logger.info("Int-Far because of deaths.")
 
-        intfar_kp_id, kp = self._intfar_by_kp()
-        if intfar_kp_id is not None:
+        intfar_kp = self._intfar_by_kp()
+        if intfar_kp is not None:
             logger.info("Int-Far because of kill participation.")
 
-        intfar_vision_id, vision_score = None, None
+        intfar_vision = None
         if self.parsed_game_stats.map_id != 21:
-            intfar_vision_id, vision_score = self._intfar_by_vision_score()
-            if intfar_vision_id is not None:
+            intfar_vision = self._intfar_by_vision_score()
+            if intfar_vision is not None:
                 logger.info("Int-Far because of vision score.")
 
         return [
-            (intfar_kda_id, kda), (intfar_deaths_id, deaths),
-            (intfar_kp_id, kp), (intfar_vision_id, vision_score)
+            ("kda", intfar_kda), ("deaths", intfar_deaths),
+            ("kp", intfar_kp), ("vision_score", intfar_vision)
         ]
 
     def get_intfar(self):
@@ -791,9 +790,10 @@ class LoLAwardQualifiers(AwardQualifiers):
             return None, None, None, None
 
         (
-            final_intfar,
+            intfar_disc_id,
+            intfar_player_id,
             ties,
             tie_desc
         ) = self.resolve_intfar_ties(intfar_data, max_intfar_count)
 
-        return final_intfar, intfar_data[final_intfar], ties, tie_desc
+        return intfar_disc_id, intfar_data.get(intfar_player_id), ties, tie_desc
