@@ -171,9 +171,6 @@ class GameMonitor(ABC):
             try:
                 game_info, status_code = await self.get_finished_game_info(guild_id)
 
-                # Print who was in the game, for sanity checks.
-                logger.debug(f"Users in game before: {self.users_in_game.get(guild_id)}")
-
                 # Send update to Int-Far website that the game is over.
                 game_id = self.active_game.get(guild_id, {}).get("id")
                 req_data = {

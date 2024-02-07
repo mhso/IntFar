@@ -160,8 +160,8 @@ class DiscordClient(discord.Client):
             await self.channels_to_write[guild_id].send(response)
 
         else:
-            funcs = {"lol": self.on_lol_game_over, "cs2": self.on_cs2_game_over}
-            await funcs[game](game_monitor, game_info, guild_id, status_code)
+            func = getattr(self, f"on_{game}_game_over")
+            await func(game_monitor, game_info, guild_id, status_code)
 
     async def on_lol_game_over(self, game_monitor: LoLGameMonitor, game_info: dict, guild_id: int, status_code: int):
         """
@@ -1189,9 +1189,9 @@ class DiscordClient(discord.Client):
 
             # Go through the criteria the chosen Int-Far met and list them in a readable format.
             reasons_list = list(awards_handler.INTFAR_REASONS())
-            for (count, (stat, stats)) in enumerate(final_intfar_data):
+            for (count, (stat, value)) in enumerate(final_intfar_data):
                 reason_index = reasons_list.index(stat)
-                reason_text = awards_handler.get_flavor_text("intfar", reason_index, "random", **{stat: getattr(stats, stat)})
+                reason_text = awards_handler.get_flavor_text("intfar", reason_index, "random", **{stat: value})
                 reason_ids[reason_index] = "1"
 
                 if count > 0:

@@ -131,7 +131,7 @@ class LoLGameMonitor(GameMonitor):
             game_info = self.api_client.get_game_details(game_id, tries=2)
 
             retry = 0
-            retries = 4
+            retries = 5
             time_to_sleep = 30
             while game_info is None and retry < retries:
                 logger.warning(
@@ -139,6 +139,7 @@ class LoLGameMonitor(GameMonitor):
                 )
 
                 await asyncio.sleep(time_to_sleep)
+                time_to_sleep += 10
                 game_info = self.api_client.get_game_details(game_id)
                 retry += 1
 

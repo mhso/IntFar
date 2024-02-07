@@ -272,8 +272,9 @@ class AudioHandler:
                 valid_sites = ", ".join(f"{site}.com" for site in SITES)
                 err_msg = (
                     f"Can't play sound `{sound}`. " +
-                    f"Either provide a link to one of `{valid_sites}` or the name of a sound. "
-                    "Use !sounds for a list of available sounds."
+                    f"Either provide a link to one of `{valid_sites}` or the name of a sound.\n"
+                    "Use !sounds for a list of available sounds.\n"
+                    "Use !search to search for a video on YouTube."
                 )
                 if len(sounds) == 1:
                     return False, err_msg
