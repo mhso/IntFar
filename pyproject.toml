@@ -18,12 +18,12 @@ dependencies = [
     "steam==1.4.4",
     "csgo==1.0.0",
     "Levenshtein==0.24.0",
-    "file:///${PROJECT_ROOT}/../scripts/streamscape",
-    "file:///${PROJECT_ROOT}/../scripts/mhooge_flask",
     "numpy>=1.26.3",
     "pillow>=10.2.0",
     "dateutils>=0.6.12",
     "gevent>=23.9.1",
+    "file:///${PROJECT_ROOT}/../scripts/mhooge_flask#egg=mhooge-flask",
+    "file:///${PROJECT_ROOT}/../scripts/streamscape#egg=streamscape"
 ]
 requires-python = ">=3.10"
 readme = "README.md"

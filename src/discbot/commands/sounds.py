@@ -50,6 +50,13 @@ async def handle_play_sound_msg(client, message, sound):
     if not success:
         await message.channel.send(client.insert_emotes(status))
 
+async def handle_seek_sound_msg(client, message, time_str):
+    voice_state = message.author.voice
+    status = await client.audio_handler.seek_sound(voice_state, time_str)
+
+    if status is not None:
+        await message.channel.send(client.insert_emotes(status))
+
 async def handle_skip_sound_msg(client, message):
     voice_state = message.author.voice
     status = await client.audio_handler.skip_sound(voice_state)

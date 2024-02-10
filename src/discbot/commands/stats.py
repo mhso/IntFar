@@ -342,6 +342,15 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
         }
 
         min_games = 5
+
+        if games < min_games:
+            response += (
+                f"Can't display stat rankings on {champ_name}, "
+                f"because {user_name} has not played at least {min_games} games with them."
+            )
+            await message.channel.send(response)
+            return
+
         totals = []
         formatted_stat_names = get_formatted_stat_names(game)
         for index, stat in enumerate(stats):

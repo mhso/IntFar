@@ -259,7 +259,7 @@ class LoLGameDatabase(GameDatabase):
         return self.query(query, disc_id, champ_id, format_func=format_result)
 
     def get_played_with_most_doinks(self, disc_id):
-        doinks_query = self.get_played_intfar_count(disc_id).query
+        doinks_query = self.get_played_doinks_count(disc_id).query
         query = f"""
             SELECT sub.champ_id, MAX(sub.c) FROM (
                 {doinks_query}

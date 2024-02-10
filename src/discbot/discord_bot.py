@@ -11,7 +11,6 @@ from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
 from mhooge_flask.logging import logger
 from mhooge_flask.database import DBException
 from streamscape import Streamscape
-from api.game_api_client import GameAPIClient
 
 from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
@@ -19,6 +18,7 @@ from discbot import commands
 from discbot.commands.meta import handle_usage_msg
 from api.award_qualifiers import AwardQualifiers
 from api.awards import get_awards_handler
+from api.game_api_client import GameAPIClient
 from api.game_data import get_stat_parser, get_empty_game_data
 from api.game_stats import GameStats
 from api.game_monitors import get_game_monitor
@@ -91,7 +91,7 @@ class DiscordClient(discord.Client):
         self.api_clients = api_clients
 
         if self.config.env == "production":
-           streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome", log_level="DEBUG")
+           streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome")
         else:
            streamscape = None
 
@@ -1962,7 +1962,7 @@ class DiscordClient(discord.Client):
                 await self.user_left_voice(member.id, member.guild.id)
 
     async def close(self):
-        super().close()
+        await super().close()
 
         self.api_clients["cs2"].close()
 

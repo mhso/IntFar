@@ -479,7 +479,7 @@ class LoLGameStatsParser(GameStatsParser):
             for other_id in champions:
                 if other_id != active_id:
                     name, champ = champions[other_id]
-                    response += f"\n - {name} ({champ})"
+                    response += f"\n- {name} ({champ})"
 
         return response
 

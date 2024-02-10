@@ -736,7 +736,7 @@ def initialize_commands():
 
     # play command
     play_name = "play"
-    play_desc = "Play a sound (or a youtube/soundcloud link)! (See `!sounds` for a list of sounds)."
+    play_desc = "Play a sound (or a YouTube/Soundcloud link)! (See `!sounds` for a list of sounds)."
     register_command(
         play_name,
         play_desc,
@@ -744,16 +744,26 @@ def initialize_commands():
         mandatory_params=[RegularParam("sound")]
     )
 
+    # jump command
+    seek_name = "jump"
+    seek_desc = (
+        "Jump to a specific point in an active YouTube/Soundcloud sound. "
+        "Fx. '!jump 01:45', '!jump 1:5:34', or '!jump 30'"
+    )
+    register_command(
+        seek_name, seek_desc, handle_seek_sound_msg, mandatory_params=[RegularParam("time")]
+    )
+
     # skip command
     skip_name = "skip"
-    skip_desc = "Skip an active youtube/soundcloud sound (if one is playing)."
+    skip_desc = "Skip an active YouTube/Soundcloud sound (if one is playing)."
     register_command(
         skip_name, skip_desc, handle_skip_sound_msg
     )
 
     # stop command
     stop_name = "stop"
-    stop_desc = "Stop playing any active youtube/soundcloud sound and clear the queue of upcoming sounds"
+    stop_desc = "Stop playing any active YouTube/Soundcloud sound and clear the queue of upcoming sounds"
     register_command(
         stop_name, stop_desc, handle_stop_sound_msg
     )

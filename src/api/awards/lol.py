@@ -534,7 +534,9 @@ class LoLAwardQualifiers(AwardQualifiers):
         for disc_id in people_forgetting_items:
             timeline_events.append((4, None, disc_id))
 
-        if invade_kills > 0 or invade_victims > 0:
+        invade_most_relevant = invade_kills + invade_victims > anti_invade_kills + anti_invade_victims
+
+        if invade_most_relevant and (invade_kills > 0 or invade_victims > 0):
             if invade_kills > invade_victims: # We won an invade
                 timeline_events.append((5, invade_kills, None))
             elif invade_kills < invade_victims: # We lost an invade
