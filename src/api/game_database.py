@@ -115,7 +115,7 @@ class GameDatabase(SQLiteDatabase):
                     self.execute_query(query, *values_list)
 
         except DBException:
-            return (0, "A user with that summoner name is already registered!")
+            return (0, "DB error: A user with that summoner name is probably already registered!")
 
         return (status_code, status)
 

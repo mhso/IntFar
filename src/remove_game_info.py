@@ -1,4 +1,3 @@
-from sys import argv
 from api.config import Config
 from api.game_databases import get_database_client
 from argparse import ArgumentParser

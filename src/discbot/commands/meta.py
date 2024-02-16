@@ -11,7 +11,8 @@ async def handle_register_msg(client, message, game, username, *extra_args):
         client.meta_database,
         client.game_databases[game],
         client.api_clients[game],
-        disc_id, username,
+        disc_id,
+        username,
         *extra_args
     )
 

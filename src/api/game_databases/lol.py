@@ -388,13 +388,13 @@ class LoLGameDatabase(GameDatabase):
             result = self.execute_query(query, *params).fetchall()
 
             if return_top_n == 1:
-                result = result[0] if result != [] else None, None, None
+                result = result[0] if result != [] else (None, None, None)
 
             if result is None and min_games == 10:
                 # If no champs are found with min 10 games, try again with 5.
                 return self.get_min_or_max_winrate_played(disc_id, best, included_champs, return_top_n, min_games=5)
 
-            return result or (None, None, None)
+            return result if result[0] is not None else (None, None, None)
 
     def create_list(self, disc_id, name):
         query = "INSERT INTO champ_lists(name, owner_id) VALUES (?, ?)"

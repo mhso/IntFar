@@ -62,6 +62,11 @@ def run_query(database, query, *params, raw=False, print_query=False):
 
         result = query_obj(raw=raw)
     else:
+        if print_query:
+            raise TypeError(
+                f"The method '{query}' did not return a Query object and can't be printed."
+            )
+
         result = query_obj
         raw = False
 

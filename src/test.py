@@ -262,6 +262,18 @@ class TestFuncs:
 
         print(x, y)
 
+    def test_items(self):
+        with open("../resources/items-14.3.1.json", encoding="utf-8") as fp:
+            items = json.load(fp)
+
+        with open("items.txt", "w", encoding="utf-8") as fp:
+            for index, item_id in enumerate(items["data"]):
+                name = items["data"][item_id]["name"]
+                print(name)
+                if index > 0:
+                    name = "," + name
+                fp.write(name)
+
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
 

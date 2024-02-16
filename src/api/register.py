@@ -11,15 +11,17 @@ def register_for_lol(
     game_database: GameDatabase,
     api_client: RiotAPIClient,
     disc_id: int,
-    summ_name: str
+    *summ_name: tuple[str]
 ):
-    if summ_name is None:
+    if len(summ_name) == 0:
         return 0, "You must supply a summoner name."
 
-    if game_database.discord_id_from_ingame_info(ingame_name=summ_name):
+    summ_name_joined = " ".join(summ_name)
+
+    if game_database.discord_id_from_ingame_info(ingame_name=summ_name_joined):
         return 0, "User with that summoner name is already registered."
 
-    elif (summ_info := api_client.get_summoner_data(summ_name.replace(" ", "%20"))) is None:
+    elif (summ_info := api_client.get_summoner_data(summ_name_joined.replace(" ", "%20"))) is None:
         return 0, "Invalid summoner name."
 
     # Add user to Int-Far base users if they are new
@@ -28,7 +30,7 @@ def register_for_lol(
     # Add user to game database
     status_code, status = game_database.add_user(
         disc_id,
-        ingame_name=summ_name,
+        ingame_name=summ_name_joined,
         ingame_id=summ_info["id"],
         puuid=summ_info["puuid"]
     )

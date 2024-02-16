@@ -404,6 +404,27 @@ class AudioHandler:
         # No active stream, do nothing
         return None
 
+    async def pause_sound(self, voice_state):
+        # Check if user is in a voice channel.
+        if voice_state is None:
+            err_msg = (
+                "You must be in a voice channel to pause sounds {emote_simp_but_closeup}"
+            )
+            return err_msg
+
+        guild_id = voice_state.channel.guild.id
+
+        if (web_stream := self.web_streams.get(guild_id)) is not None:
+            pausing = self.web_stream_status[guild_id] in ("Now Playing", "Resuming...")
+            self.web_stream_status[guild_id] = "Pausing..." if pausing else "Resuming..."
+            web_stream.pause_or_play()
+
+            await asyncio.sleep(2)
+            self.web_stream_status[guild_id] = "Paused" if pausing else "Now Playing"
+
+        # No active stream, do nothing
+        return None
+
     async def stop_sound(self, voice_state):
         # Check if user is in a voice channel.
         if voice_state is None:
@@ -436,17 +457,14 @@ class AudioHandler:
         Called when a user reacts to the currently active playback status message
         with a valid audio control emoji such as play, pause, stop, or skip.
         """
-        guild_id = channel.guild.id
-        if (web_stream := self.web_streams.get(guild_id)) is not None and member.voice is not None:
+        if channel.guild.id in self.web_streams and member.voice is not None:
             if emoji.name == self.EMOJI_NEXT:
                 # Stop the active stream and skip to the next sound in the queue
                 if (msg := await self.skip_sound(member.voice)) is not None:
                     await channel.send(msg)
             elif emoji.name == self.EMOJI_PLAY:
                 # Pause or resume the active stream
-                prev_msg = self.web_stream_status[guild_id]
-                self.web_stream_status[guild_id] = "Now Playing" if prev_msg == "Paused" else "Paused"
-                web_stream.pause_or_play()
+                await self.pause_sound(member.voice)
             elif emoji.name == self.EMOJI_STOP:
                 # Stop the active stream and empty the sound queue
                 if (msg := await self.stop_sound(member.voice)) is not None:

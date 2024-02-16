@@ -23,7 +23,8 @@ dependencies = [
     "dateutils>=0.6.12",
     "gevent>=23.9.1",
     "file:///${PROJECT_ROOT}/../scripts/mhooge_flask#egg=mhooge-flask",
-    "file:///${PROJECT_ROOT}/../scripts/streamscape#egg=streamscape"
+    "file:///${PROJECT_ROOT}/../scripts/streamscape#egg=streamscape",
+    "pytest>=8.0.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"

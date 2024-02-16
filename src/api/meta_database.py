@@ -40,7 +40,7 @@ class MetaDatabase(SQLiteDatabase):
         with self:
             query = "INSERT INTO users(disc_id, secret, reports) VALUES (?, ?, ?)"
             secret = generate_user_secret()
-            self.execute_query(query, discord_id, secret, 0)
+            self.execute_query(query, discord_id, secret, 0, commit=False)
 
             query = "INSERT INTO betting_balance VALUES (?, ?)"
             self.execute_query(query, discord_id, 100)
