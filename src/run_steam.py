@@ -3,6 +3,8 @@ monkey.patch_all()
 
 import json
 
+from mhooge_flask.logging import logger
+
 from api.config import Config
 from api.meta_database import MetaDatabase
 from api.game_apis.cs2 import SteamAPIClient
@@ -18,6 +20,8 @@ if __name__ == "__main__":
 
     if args.steam_2fa_code is None or args.steam_2fa_code == "None":
         exit(0)
+
+    logger.info("Starting Steam command handler process")
 
     config = Config()
     config.steam_2fa_code = args.steam_2fa_code

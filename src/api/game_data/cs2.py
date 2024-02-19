@@ -654,7 +654,7 @@ class CS2GameStatsParser(GameStatsParser):
             rounds_us = rounds_ct if started_t else rounds_t
             rounds_them = rounds_t if started_t else rounds_ct
 
-            if rounds_us + rounds_them < 16: # Swap scores if game finished before halftime
+            if rounds_us + rounds_them < 12: # Swap scores if game finished before halftime
                 rounds_us, rounds_them = rounds_them, rounds_us
 
             win_score = 1 if rounds_us > rounds_them else -1
@@ -664,9 +664,11 @@ class CS2GameStatsParser(GameStatsParser):
             account_id_map = {self.api_client.get_account_id(int(steam_id)): steam_id for steam_id in player_stats}
 
             map_id = self.raw_data["mapName"].split("_")[-1]
-            game_type = round_stats[-1]["reservation"]["gameType"]
-            print("game_type:", game_type, flush=True)
-            print("map_id:", map_id)
+            if not map_id:
+                game_type = round_stats[-1]["reservation"]["gameType"]
+                map_id = self.api_client.get_map_id(game_type)
+
+            logger.bind(event="cs2_map_id").info(f"Game type: {game_type}, map ID: {map_id}")
 
         else: # Parse (a subset of) stats from basic game data
             # Get players in game from the round were most players are present (in case of disconnects)

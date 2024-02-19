@@ -27,16 +27,16 @@ class CS2AwardQualifiers(AwardQualifiers):
             "mvps": {
                 "lower_threshold": 1,
                 "kda_criteria": 1.25,
-                "rounds_criteria": 15
+                "rounds_criteria": 12
             },
             "adr": {
-                "lower_threshold": 25,
+                "lower_threshold": 30,
                 "deaths_criteria": 3
             },
             "score": {
-                "lower_threshold": 25,
+                "lower_threshold": 20,
                 "kda_criteria": 1.25,
-                "rounds_criteria": 15
+                "rounds_criteria": 12
             }
         }
 
@@ -74,12 +74,12 @@ class CS2AwardQualifiers(AwardQualifiers):
         super().__doc__
         return {
             "kda": "KDA larger than or equal to 2.5",
-            "kills": "30 kills or more",
-            "headshot": "Headshot percentage of 60% or higher (min. 10 kills)",
+            "kills": "25 kills or more",
+            "headshot": "Headshot percentage of 60% or higher (min. 8 kills)",
             "adr": "120 or more ADR",
-            "utility": "300 or more utility damage",
-            "mvp": "8 or more MVPs",
-            "entries": "10 or more entry-frags",
+            "utility": "250 or more utility damage",
+            "mvp": "6 or more MVPs",
+            "entries": "8 or more entry-frags",
             "ace": "Getting an ace",
             "clutch": "Clutching a 1v4",
             "ace_clutch": "Clutching and acing a 1v5"
@@ -157,6 +157,7 @@ class CS2AwardQualifiers(AwardQualifiers):
             cls.INTFAR_FLAVOR_TEXTS() +
             cls.HONORABLE_MENTIONS_FLAVOR_TEXTS() +
             cls.COOL_STATS_FLAVOR_TEXTS() +
+            cls.TIMELINE_FLAVOR_TEXTS() +
             cls.DOINKS_FLAVOR_TEXTS()
         )
 
@@ -266,21 +267,20 @@ class CS2AwardQualifiers(AwardQualifiers):
         """
         Returns a list of miscellaneous interesting stats for each player in the game.
         These stats include:
-            - Having more than 10 assists
-            - Having more than 20 enemies flashed
+            - Having more than 8 assists
+            - Having more than 18 enemies flashed
             - Having more than 1 4K
             - Winning more than 60% of clutches (and being in more than 2)
-            - Doing the big comeback or the big throw
         """
         cool_stats = {}
 
         for stats in self.parsed_game_stats.filtered_player_stats:
             cool_stats[stats.disc_id] = []
 
-            if stats.assists > 10:
+            if stats.assists > 8:
                 cool_stats[stats.disc_id].append((0, stats.assists))
 
-            if stats.enemies_flashed is not None and stats.enemies_flashed > 20:
+            if stats.enemies_flashed is not None and stats.enemies_flashed > 18:
                 cool_stats[stats.disc_id].append((1, stats.enemies_flashed))
 
             if stats.quads is not None and stats.quads > 1:
@@ -315,17 +315,17 @@ class CS2AwardQualifiers(AwardQualifiers):
         """
         Returns a list of cool/embarrasing events that happened during the course of the game.
         These events include:
-            - We lost the game after being up by more than 8 rounds (the big throw)
-            - We won the game after being down by more than 8 rounds (the epic comeback)
+            - We lost the game after being up by more than 7 rounds (the big throw)
+            - We won the game after being down by more than 7 rounds (the epic comeback)
         """
         timeline_events = []
 
-        if self.parsed_game_stats.biggest_deficit > 8 and self.parsed_game_stats.win == 1:
-            # Epic comeback!
+        # Epic comeback!
+        if self.parsed_game_stats.biggest_deficit > 7 and self.parsed_game_stats.win == 1:
             timeline_events.append((0, self.parsed_game_stats.biggest_deficit, None))
 
-        if self.parsed_game_stats.biggest_lead > 8 and self.parsed_game_stats.win != 1:
-            # Huge throw...
+        # Huge throw...
+        if self.parsed_game_stats.biggest_lead > 7 and self.parsed_game_stats.win != 1:
             timeline_events.append((1, self.parsed_game_stats.biggest_lead, None))
 
         return timeline_events
@@ -335,7 +335,7 @@ class CS2AwardQualifiers(AwardQualifiers):
         Returns the info of the Int-Far, if this person has a truly terrible KDA.
         This is determined by:
             - KDA being the lowest of the group
-            - KDA being less than 0.6
+            - KDA being less than 0.5
             - Number of deaths being more than 5
         Returns None if none of these criteria matches a registered person.
         """
@@ -374,7 +374,7 @@ class CS2AwardQualifiers(AwardQualifiers):
             - Having the lowest amount of MVPs in the group
             - Number of MVPs being 0
             - KDA being less than 1.25
-            - Rounds played in the game being more than 15
+            - Rounds played in the game being more than 12
         Returns None if none of these criteria matches a person.
         """
         criterias = self.INTFAR_CRITERIAS()["mvps"]
@@ -416,7 +416,7 @@ class CS2AwardQualifiers(AwardQualifiers):
         Returns the info of the Int-Far, if this person has low ADR.
         This is determined by:
             - Having the lowest ADR in the group
-            - ADR being less than 25
+            - ADR being less than 30
             - Number of deaths being more than 3
         Returns None if none of these criteria matches a person.
         """
@@ -454,9 +454,9 @@ class CS2AwardQualifiers(AwardQualifiers):
         Returns the info of the Int-Far, if this person has low score.
         This is determined by:
             - Having the lowest score in the group
-            - Score being less than 25
+            - Score being less than 20
             - KDA being less than 1.25
-            - Rounds played in the game being more than 15
+            - Rounds played in the game being more than 12
         Returns None if none of these criteria matches a person.
         """
         criterias = self.INTFAR_CRITERIAS()["score"]
@@ -501,44 +501,43 @@ class CS2AwardQualifiers(AwardQualifiers):
         If so, the one with either most deaths, lowest kda, or lowest score gets chosen as Int-Far.
         """
         ties = []
-        for disc_id in intfar_data:
-            if len(intfar_data[disc_id]) == max_count:
-                ties.append(disc_id)
+        for player_id in intfar_data:
+            if len(intfar_data[player_id]) == max_count:
+                for stats in self.parsed_game_stats.all_player_stats:
+                    if stats.player_id == player_id:
+                        ties.append(stats)
+                        break
 
         if len(ties) == 1:
-            return ties[0], False, "There are no ties."
+            return ties[0].disc_id, ties[0].player_id, False, "There are no ties."
 
-        filtered_data = []
-        for stats in self.parsed_game_stats.filtered_player_stats:
-            if stats.disc_id in ties:
-                filtered_data.append(stats)
-
-        sorted_by_deaths = sorted(filtered_data, key=lambda x: x.deaths, reverse=True)
+        sorted_by_deaths = sorted(ties, key=lambda x: x.deaths, reverse=True)
         max_count = sorted_by_deaths[0].deaths
+
         ties = []
         for stats in sorted_by_deaths:
             if stats.deaths == max_count:
-                ties.append(stats.disc_id)
+                ties.append(stats)
             else:
                 break
 
         if len(ties) == 1:
-            return ties[0], True, "Ties resolved by most amount of deaths."
+            return ties[0].disc_id, ties[0].player_id, True, "Ties resolved by most amount of deaths."
 
-        sorted_by_kda = sorted(filtered_data, key=lambda x: x.kda)
+        sorted_by_kda = sorted(ties, key=lambda x: x.kda)
         max_count = sorted_by_kda[0].kda
         ties = []
         for stats in sorted_by_kda:
             if stats.kda == max_count:
-                ties.append(disc_id)
+                ties.append(stats)
             else:
                 break
 
         if len(ties) == 1:
-            return ties[0], True, "Ties resolved by lowest KDA."
+            return ties[0].disc_id, ties[0].player_id, True, "Ties resolved by lowest KDA."
 
-        sorted_by_score = sorted(filtered_data, key=lambda x: x.score)
-        return sorted_by_score[0].disc_id, True, "Ties resolved by lowest score."
+        sorted_by_score = sorted(ties, key=lambda x: x.score)
+        return sorted_by_score[0].disc_id, sorted_by_score[0].player_id, True, "Ties resolved by lowest score."
 
     def get_intfar_qualifiers(self):
         intfar_kda = self._intfar_by_kda()

@@ -734,6 +734,17 @@ def initialize_commands():
         optional_params=[GameParam("game"), RegularParam("sound")]
     )
 
+    # join sound command
+    join_sound_name = "join_sound"
+    join_sound_desc = "Set a sound to trigger when joining a voice channel."
+    register_command(
+        join_sound_name,
+        join_sound_desc,
+        handle_set_join_sound,
+        access_level="all",
+        optional_params=[RegularParam("sound")]
+    )
+
     # play command
     play_name = "play"
     play_desc = "Play a sound (or a YouTube/Soundcloud link)! (See `!sounds` for a list of sounds)."

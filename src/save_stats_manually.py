@@ -10,6 +10,7 @@ from api.config import Config
 from api.meta_database import MetaDatabase
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from discbot.discord_bot import DiscordClient
+from api.game_stats import GameStats
 
 GUILDS = {
     "nibs": GUILD_IDS[0],
@@ -18,7 +19,13 @@ GUILDS = {
 }
 
 class MockChannel:
+    def __init__(self, dry_run=False):
+        self.dry_run = dry_run
+
     async def send(self, data):
+        if self.dry_run:
+            print(data)
+
         await asyncio.sleep(0.1)
 
 class TestMock(DiscordClient):
@@ -30,6 +37,7 @@ class TestMock(DiscordClient):
         self.guild_to_use = GUILDS.get(args.guild)
         self.task = args.task if not self.missing else "all"
         self.loud = not args.silent if not self.missing else False
+        self.dry_run = args.dry_run
         self.forget_sharecode = args.forget_sharecode
         self.play_sound = args.sound.lower() in ("yes", "true", "1") if not self.missing else False
         self.users_in_game = args.users
@@ -76,6 +84,12 @@ class TestMock(DiscordClient):
         if self.play_sound:
             await super().play_event_sounds(game, intfar, doinks, guild_id)
 
+    def save_stats(self, parsed_game_stats: GameStats):
+        if self.task in ("all", "stats") and not self.dry_run:
+            return super().save_stats(parsed_game_stats)
+
+        return [], []
+
     async def on_ready(self):
         await super(TestMock, self).on_ready()
 
@@ -88,10 +102,10 @@ class TestMock(DiscordClient):
             game_monitor = self.game_monitors[self.game]
             game_monitor.active_game[guild_id] = {"id": game_id}
 
-            if not self.loud:
-                self.channels_to_write[guild_id] = MockChannel()
+            if not self.loud or self.dry_run:
+                self.channels_to_write[guild_id] = MockChannel(self.dry_run)
 
-            if self.forget_sharecode:
+            if self.forget_sharecode or self.dry_run:
                 self.game_databases["cs2"].set_new_cs2_sharecode = self.set_sharecode_mock
 
             try:
@@ -111,7 +125,11 @@ class TestMock(DiscordClient):
 
             await self.on_game_over(self.game, game_info, guild_id, status)
 
-            self.game_databases[self.game].remove_missed_game(game_id)
+            if not self.dry_run:
+                self.game_databases[self.game].remove_missed_game(game_id)
+
+        await self.close()
+        exit(0)
 
     async def user_joined_voice(self, member, guild, poll=False):
         pass
@@ -127,6 +145,7 @@ parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Ye
 parser.add_argument("--forget_sharecode", "-fs", action="store_true")
 parser.add_argument("--steam_2fa_code", type=str)
 parser.add_argument("--users", type=int, nargs="+")
+parser.add_argument("--dry_run", action="store_true")
 parser.add_argument("-s", "--silent", action="store_true")
 
 args = parser.parse_args()

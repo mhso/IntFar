@@ -120,8 +120,7 @@ class LoLGameMonitor(GameMonitor):
     async def get_finished_game_info(self, guild_id):
         game_id = self.active_game[guild_id]["id"]
 
-        logger.info("GAME OVER!!")
-        logger.debug(f"Active game: {game_id}")
+        logger.bind(event="lol_game_over").info(f"GAME OVER! Active game: {game_id}")
 
         # Check if game was a custom game, if so don't save stats.
         custom_game = self.active_game[guild_id].get("game_type", "") == "CUSTOM_GAME"

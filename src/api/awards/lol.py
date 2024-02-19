@@ -715,6 +715,7 @@ class LoLAwardQualifiers(AwardQualifiers):
         Resolve a potential tie in who should be Int-Far. This can happen if two or more
         people meet the same criteria, with the same stats within these criteria.
         If so, the one with either most deaths or least gold gets chosen as Int-Far.
+        If so, the one with either most deaths, lowest kda, or least gold gets chosen as Int-Far.
         """
         ties = []
         for player_id in intfar_data:

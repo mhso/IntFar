@@ -111,7 +111,8 @@ class GameMonitor(ABC):
         self.polling_active[guild_id] = True
         time_slept = 0
         sleep_per_loop = 0.2
-        logger.info(f"People are active in {guild_name}! Polling for games for {self.game}...")
+        bound_logger = logger.bind(event="poll_start", game=self.game, guild_id=guild_id)
+        bound_logger.info(f"People are active in {guild_name}! Polling for games for {self.game}...")
 
         if not immediately:
             try:
@@ -137,7 +138,14 @@ class GameMonitor(ABC):
             req_data.update(self.active_game[guild_id])
             self._send_game_update("game_started", self.game, req_data)
 
-            logger.info(f"Game of {self.game} is now active in {guild_name}, polling for game end...")
+            bound_logger = logger.bind(
+                event="game_start",
+                game=self.game,
+                guild_id=guild_id,
+                users_in_game=self.users_in_game,
+                users_in_voice=self.users_in_voice
+            )
+            bound_logger.info(f"Game of {self.game} is now active in {guild_name}, polling for game end...")
 
             await self.poll_for_game_end(guild_id, guild_name)
 
@@ -191,7 +199,8 @@ class GameMonitor(ABC):
             except Exception as e:
                 # Something went wrong when doing end-of-game stuff
                 game_id = self.active_game.get(guild_id, {}).get("id")
-                logger.bind(game_id=game_id).exception("Exception after game was over!!!")
+                bound_logger = logger.bind(event="game_over_error", game=self.game, guild_id=guild_id, game_id=game_id)
+                bound_logger.exception("Exception after game was over!!!")
 
                 await self.game_over_callback(self.game, None, guild_id, self.POSTGAME_STATUS_ERROR)
 

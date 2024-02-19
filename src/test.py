@@ -179,7 +179,7 @@ class TestFuncs:
 
     def test_pyppeteer_stream(self):
         url = "https://www.youtube.com/watch?v=esdTLuEtwNM"
-        client = DiscordClient(CONFIG, DATABASE, None, RIOT_API)
+        client = DiscordClient(CONFIG, META_DATABASE, None, RIOT_API)
         client.add_event_listener("ready", self.play_sound, url, client)
         client.run(CONFIG.discord_token)
 
@@ -212,12 +212,12 @@ class TestFuncs:
         api_client = SteamAPIClient("cs2", self.config)
         user = self.game_databases["cs2"].game_users[267401734513491969]
         print(user.latest_match_token[0])
-        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], "CSGO-DARih-4Y65Q-AHxyw-e9ZBZ-FFzQN")
+        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], user.latest_match_token[0])
         print(next_code)
 
     def test_cs_parse(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
-        sharecode = "CSGO-qZ7Xk-WiBSq-Utoyr-Nxt5y-mVt8O"
+        sharecode = "CSGO-rCDRM-HfoZB-UrbG2-xkiNo-us68F"
         api_client = SteamAPIClient("cs2", self.config)
 
         game_stats = api_client.get_game_details(sharecode)

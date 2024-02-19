@@ -43,6 +43,41 @@ async def handle_set_event_sound(client, message, game, sound, event):
 
     await message.channel.send(client.insert_emotes(response))
 
+async def handle_set_join_sound(client, message, sound=None):
+    response = ""
+
+    if sound is None: # Get current set sound for joining.
+        current_sound = client.meta_database.get_join_sound(message.author.id)
+        if current_sound is None:
+            response = (
+                f"You have not yet set a sound that triggers when joining a voice channel. " +
+                "Do so by writing `!join_sound [sound]` {emote_uwucat}\n" +
+                "See a list of available sounds with `!sounds`"
+            )
+
+        else:
+            response = (
+                f"You currently have `{current_sound}` as the sound that triggers " +
+                "when joining a voice channel {emote_Bitcoinect}\n" +
+                "Use `!join_sound remove` to remove this sound."
+            )
+
+    elif sound == "remove":
+        client.meta_database.remove_join_sound(message.author.id)
+        response = "Removed sound from triggering when joining a voice channel."
+
+    elif not audio_handler.is_valid_sound(sound):
+        response = f"Invalid sound: `{sound}`. See `!sounds` for a list of valid sounds."
+
+    else:
+        client.meta_database.set_join_sound(message.author.id, sound)
+        response = (
+            f"The sound `{sound}` will now play when you join a voice channel " +
+            "{emote_poggers}"
+        )
+
+    await message.channel.send(client.insert_emotes(response))
+
 async def handle_play_sound_msg(client, message, sound):
     voice_state = message.author.voice
     success, status = await client.audio_handler.play_sound(sound, voice_state, message)

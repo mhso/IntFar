@@ -1,5 +1,3 @@
-from sqlite3 import DatabaseError
-
 from mhooge_flask.database import SQLiteDatabase
 
 from api.user import User
@@ -66,6 +64,26 @@ class MetaDatabase(SQLiteDatabase):
 
             query = "REPLACE INTO default_game VALUES (?, ?)"
             self.execute_query(query, disc_id, game)
+
+    def get_join_sound(self, disc_id):
+        query = "SELECT sound FROM join_sounds WHERE disc_id=?"
+
+        with self:
+            result = self.execute_query(query, disc_id).fetchone()
+
+            return result[0] if result is not None else None
+
+    def set_join_sound(self, disc_id, sound):
+        query = "REPLACE INTO join_sounds(disc_id, sound) VALUES (?, ?)"
+
+        with self:
+            self.execute_query(query, disc_id, sound)
+
+    def remove_join_sound(self, disc_id):
+        query = "DELETE FROM join_sounds WHERE disc_id=?"
+
+        with self:
+            self.execute_query( query, disc_id)
 
     def get_token_balance(self, disc_id=None):
         with self:

@@ -446,16 +446,16 @@ class DiscordClient(discord.Client):
 
     def get_discord_id(self, nickname, guild_id=api_util.MAIN_GUILD_ID, exact_match=True):
         matches = []
-        for guild in self.guilds:
-            if guild.id == guild_id:
-                for member in guild.members:
-                    for attribute in (member.nick, member.display_name, member.name):
-                        if attribute is not None:
-                            if exact_match and attribute.lower() == nickname:
-                                return member.id
-                            elif not exact_match and nickname in attribute.lower():
-                                matches.append(member.id)
-                                break
+        guild = self.get_guild(guild_id)
+        for member in guild.members:
+            for attribute in (member.global_name, member.nick, member.display_name, member.name):
+                if attribute is not None:
+                    if exact_match and attribute.lower() == nickname:
+                        return member.id
+                    elif not exact_match and nickname in attribute.lower():
+                        matches.append(member.id)
+                        break
+
         return matches[0] if len(matches) == 1 else None
 
     def get_guilds_for_user(self, disc_id):
@@ -468,6 +468,7 @@ class DiscordClient(discord.Client):
             for member in guild.members:
                 if member.id == disc_id:
                     guild_ids.append(guild_id)
+
         return guild_ids
 
     def get_guild_name(self, guild_id=None):
@@ -1407,6 +1408,13 @@ class DiscordClient(discord.Client):
         """
         guild_name = self.get_guild_name(guild_id)
         logger.debug(f"User joined voice in {guild_name}: {disc_id}")
+
+        # Play sound that triggers when joining a voice channel, if any is set
+        if (
+            (join_sound := self.meta_database.get_join_sound(disc_id)) is not None
+            and (member := self.get_member_safe(disc_id, guild_id)) is not None
+        ):
+            await self.audio_handler.play_sound(join_sound, member.voice)
 
         users_in_voice = self.get_users_in_voice()[guild_id]
         for game in users_in_voice:
