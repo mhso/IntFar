@@ -1,3 +1,4 @@
+from datetime import datetime
 import random
 
 from api.util import SUPPORTED_GAMES, get_website_link
@@ -156,3 +157,80 @@ async def handle_sounds_msg(client, message, ordering="newest"):
     footer = f"Upload your own at `{get_website_link()}/soundboard`!"
 
     await client.paginate(message.channel, sounds_list, 0, 10, header, footer)
+
+async def handle_billboard_msg(client, message):
+    database = client.meta_database
+    timestamp = datetime.now()
+
+    date_start_1, date_end_1 = database.get_weekly_timestamp(timestamp, 2)
+    week_old = {
+        sound: (plays, rank)
+        for sound, plays, rank
+        in database.get_weekly_sound_hits(date_start_1, date_end_1)
+    }
+
+    date_start_2, date_end_2 = database.get_weekly_timestamp(timestamp, 1)
+    week_new = [
+        (sound, plays, rank)
+        for sound, plays, rank
+        in database.get_weekly_sound_hits(date_start_2, date_end_2)
+    ]
+
+    billboard_data = []
+    for index, (sound, plays_now, rank_now) in enumerate(week_new, start=1):
+        if sound in week_old:
+            plays_then, rank_then = week_old[sound]
+            rank_shift = rank_then - rank_now
+            plays_diff = plays_now - plays_then
+        else:
+            rank_shift = 0
+            plays_diff = 0
+
+        sound_part = f"`{index}. {sound}:"
+        plays_part = f"{plays_now} play{'' if plays_now == 1 else 's'}"
+        if plays_diff != 0:
+            plays_diff_part = f"({'+' if plays_diff > 0 else '-'}{abs(plays_diff)})"
+        else:
+            plays_diff_part = ""
+
+        if rank_shift != 0:
+            emoji = ":arrow_up_small:" if rank_shift > 0 else ":small_red_triangle_down:"
+            rank_diff_part = f"{emoji} {abs(rank_shift)}"
+        else:
+            rank_diff_part = ""
+
+        billboard_data.append((sound_part, plays_part, plays_diff_part, rank_diff_part))
+
+    # Calculate padding for each row of billboard data
+    paddings = []
+    index = 0
+    chunk_size = 10
+    while index < len(billboard_data):
+        chunk = billboard_data[index : index + chunk_size]
+        row_padding = [0 for _ in billboard_data[0]]
+        for row in chunk:
+            for col_index, col_data in enumerate(row):
+                row_padding[col_index] = max(len(col_data), row_padding[col_index])
+
+        paddings.extend([row_padding for _ in range(chunk_size)])
+        index += chunk_size
+
+    # Apply padding to each row
+    formatted_data = []
+    for (padding, row_data) in zip (paddings, billboard_data):
+        line = ""
+        for index, (pad, data) in enumerate(zip(padding, row_data)):
+            pad_str = " " * (pad - len(data))
+            line += data + " " + pad_str
+
+            if index == 2:
+                line += "`  "
+
+        formatted_data.append(line)
+
+    dt_start = datetime.fromtimestamp(date_start_2).strftime("%d/%m/%Y")
+    dt_end = datetime.fromtimestamp(date_end_2).strftime("%d/%m/%Y")
+
+    header = f"The hottest hit sounds from **{dt_start}** - **{dt_end}**:"
+
+    await client.paginate(message.channel, formatted_data, 0, chunk_size, header)

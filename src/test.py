@@ -276,14 +276,9 @@ class TestFuncs:
                 fp.write(name)
 
     def test_weekly_stuff(self):
-        start, end = self.meta_database.get_weekly_timestamp(datetime.now(), 0)
-        print(datetime.fromtimestamp(start).strftime("%Y-%m-%d %H:%M:%S"))
-        print(datetime.fromtimestamp(end).strftime("%Y-%m-%d %H:%M:%S"))
-
-    def test_get_cs2_maps(self):
-        api_client = SteamAPIClient("cs2", self.config)
-        api_client.get_latest_data()
-        print(api_client.map_names)
+        timestamp = datetime.now()
+        date_start_1, date_end_1 = self.meta_database.get_weekly_timestamp(timestamp, 0)
+        print(date_start_1, date_end_1)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

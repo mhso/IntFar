@@ -88,7 +88,9 @@ class MetaDatabase(SQLiteDatabase):
             days = 7 - timestamp.weekday()
             end_date = timestamp + relativedelta(days=days, hour=0, minute=0, second=0)
         else:
+            start_date = end_date
             for _ in range(week_offset):
+                end_date = start_date
                 start_date = end_date - relativedelta(days=7)
 
         return int(start_date.timestamp()), int(end_date.timestamp())
@@ -150,17 +152,17 @@ class MetaDatabase(SQLiteDatabase):
         if sound is None:
             query += "sound, "
 
-        query += "plays FROM sound_hits"
+        query += "plays FROM sound_hits "
         if date_from is not None:
-            query += "WHERE start_date > ?"
+            query += "WHERE start_date = ? "
             params.append(date_from)
 
         if date_to is not None:
-            query += f"{'AND' if date_from else 'WHERE'} end_date < ?"
+            query += f"{'AND' if date_from else 'WHERE'} end_date = ? "
             params.append(date_to)
-        
+
         if sound is not None:
-            query += f"{'AND' if date_to else 'WHERE'} sound = ?"
+            query += f"{'AND' if date_to else 'WHERE'} sound = ? "
             params.append(sound)
 
         def format_result(cursor):
@@ -168,11 +170,30 @@ class MetaDatabase(SQLiteDatabase):
 
         return self.query(query, *params, format_func=format_result)
 
+    def get_weekly_sound_hits(self, date_start, date_end, sound=None):
+        query_week = f"""
+            WITH hits AS (
+                {self.get_sound_hits(sound, date_start, date_end).query}
+            )
+            SELECT
+                hits.sound,
+                hits.plays,
+                ROW_NUMBER() OVER (ORDER BY hits.plays DESC) AS rank
+            FROM hits
+        """
+
+        params = [date_start, date_end]
+        if sound is not None:
+            params.append(sound)
+
+        with self:
+            return self.execute_query(query_week, *params).fetchall()
+
     def get_total_sound_hits(self, sound=None):
         query = "SELECT "
         if sound is None:
             query += "sound, "
-    
+
         params = []
         query += "SUM(plays) FROM sound_hits GROUP BY sound"
         if sound is not None:
@@ -183,11 +204,6 @@ class MetaDatabase(SQLiteDatabase):
             return cursor.fetchone() if sound is not None else cursor.fetchall()
 
         return self.query(query, *params, format_func=format_result)
-
-    def get_weekly_sound_hits(self, week_offset: int = 1, sound=None):
-        date_start, date_end = self.get_weekly_timestamp(datetime.now(), week_offset)
-
-        self.get_sound_hits(sound, date_start, date_end)
 
     def get_join_sound(self, disc_id):
         query = "SELECT sound FROM join_sounds WHERE disc_id=?"

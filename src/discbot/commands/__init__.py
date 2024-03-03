@@ -804,6 +804,15 @@ def initialize_commands():
         optional_params=[RegularParam("ordering")]
     )
 
+    # billboard command
+    billboard_name = "billboard"
+    billboard_desc = "billboard"
+    register_command(
+        billboard_name,
+        billboard_desc,
+        handle_billboard_msg
+    )
+
     # shop command
     shop_name = "shop"
     shop_desc = (
