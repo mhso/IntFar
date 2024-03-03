@@ -399,11 +399,11 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
     person = "person" if totals[1] - 1 == 1 else "people"
 
     response += "```\n"
-    response += f"**{text_rows[0][2]}**: Rank compared to {user_name}'s **{totals[0]}** other champs played\n"
-    response += f"**{text_rows[0][3]}**: Rank compared to **{totals[1] - 1}** other {person} playing {champ_name}\n"
-    response += f"**{text_rows[0][4]}**: Rank compared to **{totals[2]}** other people playing any champ\n"
+    response += f"**{text_rows[0][2]}**: Rank compared to {user_name}'s **{totals[0]}*** other champs played\n"
+    response += f"**{text_rows[0][3]}**: Rank compared to **{totals[1] - 1}*** other {person} playing {champ_name}\n"
+    response += f"**{text_rows[0][4]}**: Rank compared to **{totals[2]}*** other people playing any champ\n"
     if show_best:
         response += f"**Best**: Who has the best rank on a stat with {champ_name}\n"
-    response += f"A minimum of **{min_games}** games on a champ is required"
+    response += f"*A minimum of **{min_games}** games on a champ is required"
 
     await message.channel.send(response)

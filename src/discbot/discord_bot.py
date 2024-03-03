@@ -81,7 +81,7 @@ class DiscordClient(discord.Client):
                 emojis=True,
                 reactions=True,
                 guild_messages=True,
-                message_content=True
+                message_content=True,
             )
         )
         self.config = config
@@ -95,7 +95,7 @@ class DiscordClient(discord.Client):
         else:
            streamscape = None
 
-        self.audio_handler = AudioHandler(self.config, streamscape)
+        self.audio_handler = AudioHandler(self.config, self.meta_database, streamscape)
         self.shop_handler = ShopHandler(self.config, self.meta_database)
 
         self.ai_conn = kwargs.get("ai_pipe")
@@ -138,6 +138,7 @@ class DiscordClient(discord.Client):
         if status_code == game_monitor.POSTGAME_STATUS_ERROR:
             # Something went terribly wrong when handling the end of game logic
             # Send error message to Discord to indicate things went bad.
+            self.game_databases[game].save_missed_game(game_info["gameId"], guild_id, int(time()))
             await self.send_error_msg(guild_id)
 
         elif status_code == game_monitor.POSTGAME_STATUS_MISSING:
@@ -1395,7 +1396,13 @@ class DiscordClient(discord.Client):
 
             raise exception
 
-    async def user_joined_voice(self, disc_id: int, guild_id: int, poll_immediately=False):
+    async def user_joined_voice(
+        self,
+        disc_id: int,
+        guild_id: int,
+        poll_immediately=False,
+        play_join_sound=True
+    ):
         """
         Called when a user joins a voice channel in a server.
         Starts polling for active games whenever 2 or more people
@@ -1411,7 +1418,8 @@ class DiscordClient(discord.Client):
 
         # Play sound that triggers when joining a voice channel, if any is set
         if (
-            (join_sound := self.meta_database.get_join_sound(disc_id)) is not None
+            play_join_sound
+            and (join_sound := self.meta_database.get_join_sound(disc_id)) is not None
             and (member := self.get_member_safe(disc_id, guild_id)) is not None
         ):
             await self.audio_handler.play_sound(join_sound, member.voice)
@@ -1686,16 +1694,24 @@ class DiscordClient(discord.Client):
         message += f"{mention_me}, come and fix me!!! " + "{emote_angry_gual}"
         await self.channels_to_write[guild_id].send(self.insert_emotes(message))
 
-    async def get_all_messages(self, guild_id):
+    async def get_all_messages(self, channel):
         counter = 0
-        with open("all_messages.txt", "w", encoding="utf-8") as fp:
-            async for message in self.channels_to_write[guild_id].history(limit=None, oldest_first=True):
-                if message.author.id == self.user.id:
-                    fp.write(str(message.created_at.timestamp()) + " - " + message.content + "\n")
-                    counter += 1
-                    if counter % 100 == 0:
-                        print(f"Saved {counter} messages.", flush=True)
-        print("Done writing messages!", flush=True)
+        with self.meta_database:
+            try:
+                print(f"Retrieving messages from guild {channel.guild.name}, channel {channel.name}")
+                async for message in channel.history(limit=None, oldest_first=True):
+                    if message.content.startswith("!play"):
+                        split = message.content.split(" ")
+                        if len(split) > 1 and self.audio_handler.is_valid_sound(split[1].strip()):
+                            self.meta_database.add_sound_hit(split[1].strip(), message.created_at)
+
+                            counter += 1
+                            if counter % 100 == 0:
+                                print(f"Saved {counter} plays.", flush=True)
+            except discord.errors.Forbidden:
+                print(f"Can't retrieve messages, insufficient permissions")
+
+        print(f"Done getting {counter} plays!", flush=True)
 
     def get_main_channel(self):
         return (
@@ -1734,7 +1750,7 @@ class DiscordClient(discord.Client):
                     for member in members_in_voice:
                         # Start polling for an active game
                         # if more than one user is active in voice.
-                        await self.user_joined_voice(member.id, guild.id, True)
+                        await self.user_joined_voice(member.id, guild.id, True, False)
 
                 for text_channel in guild.text_channels:
                     # Find the channel to write in for each guild.

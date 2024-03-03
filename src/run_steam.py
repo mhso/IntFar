@@ -66,7 +66,10 @@ if __name__ == "__main__":
             if close:
                 break
 
-            sleep(sleep_time)
+            try:
+                sleep(sleep_time)
+            except KeyboardInterrupt:
+                pass
 
     finally:
         client.close()

@@ -1,5 +1,3 @@
-from time import time
-from sqlite3 import OperationalError, ProgrammingError
 from argparse import ArgumentParser
 
 from api.config import Config
@@ -7,7 +5,7 @@ from api.meta_database import MetaDatabase
 from api.game_databases import get_database_client
 from api.util import SUPPORTED_GAMES
 
-from mhooge_flask.database import Query
+from mhooge_flask.query_db import query_or_repl
 
 parser = ArgumentParser()
 
@@ -28,116 +26,4 @@ else:
     print("Database does not seem to exist. Exiting...")
     exit(0)
 
-def _try_cast(param):
-    if param == "None":
-        return None
-    if param == "True":
-        return True
-    if param == "False":
-        return False
-
-    try:
-        return int(param)
-    except ValueError:
-        try:
-            return float(param)
-        except ValueError:
-            return str(param)
-
-def run_query(database, query, *params, raw=False, print_query=False):
-    if not hasattr(database, query):
-        print("The query is not supported by the given database. Exiting...")
-        exit(0)
-
-    query_func = getattr(database, query)
-    params = list(map(_try_cast, params))
-
-    time_start = time()
-
-    query_obj = query_func(*params)
-    if isinstance(query_obj, Query):
-        if print_query:
-            print(query_obj)
-            exit(0)
-
-        result = query_obj(raw=raw)
-    else:
-        if print_query:
-            raise TypeError(
-                f"The method '{query}' did not return a Query object and can't be printed."
-            )
-
-        result = query_obj
-        raw = False
-
-    rows_returned = 0
-
-    if raw:
-        for row in result:
-            print(row)
-            rows_returned += 1
-    else:
-        print(result)
-        try:
-            rows_returned = len(result)
-        except AttributeError:
-            rows_returned = None
-
-    time_end = time()
-    time_taken = f"{time_end - time_start:.3f} seconds."
-
-    rows_affected = database.connection.cursor().execute("SELECT changes()").fetchone()[0]
-    if rows_affected > 0:
-        print(f"Rows affected: {rows_affected} in {time_taken}")
-    elif rows_affected is None:
-        print("Unknown rows affected.")
-    else:
-        print(f"Rows returned: {rows_returned} in {time_taken}")
-
-with database:
-    # Execute a single given query
-    if args.query is not None:
-        query, *params = args.query
-        run_query(database, query, *params, raw=args.raw, print_query=args.print)
-
-    else:
-        # Launch REPL-like loop
-        conn = database.connection
-        while True:
-            try:
-                query = input(">")
-                if query in ("q", "quit", "exit"):
-                    break
-
-                if query.startswith("run"):
-                    _, query, *params = query.split(" ")
-                    run_query(database, query, *params, raw=True)
-                    continue
-
-                time_start = time()
-                result = conn.cursor().execute(query)
-
-                column_names = result.description
-                if column_names is not None:
-                    print(", ".join(tup[0] for tup in column_names))
-                    print("-" * 100)
-
-                rows_returned = 0
-                for row in result:
-                    print(", ".join(str(v) for v in row))
-                    rows_returned += 1
-
-                conn.commit()
-                time_end = time()
-                time_taken = f"{time_end - time_start:.3f} seconds."
-
-                if rows_returned != 0:
-                    print(f"Rows returned: {rows_returned} in {time_taken}")
-                else:
-                    rows_affected = conn.cursor().execute("SELECT changes()").fetchone()[0]
-                    print(f"Rows affected: {rows_affected} in {time_taken}")
-
-            except (OperationalError, ProgrammingError) as exc:
-                print(exc.args)
-            except KeyboardInterrupt:
-                pass
+query_or_repl(database, args.query, args.raw, args.print)

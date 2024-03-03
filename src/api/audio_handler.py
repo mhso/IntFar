@@ -1,7 +1,4 @@
-from glob import glob
 import asyncio
-import json
-import os
 import math
 from datetime import datetime
 
@@ -15,35 +12,11 @@ from streamscape.stream import AudioStream
 from mhooge_flask.logging import logger
 
 from api.config import Config
+from api.meta_database import MetaDatabase
 from api.youtube_api import YouTubeAPIClient, NUM_SEARCH_RESULTS
 from discbot.commands.util import ADMIN_DISC_ID
 
 SOUNDS_PATH = "app/static/sounds/"
-
-def get_available_sounds(ordering="newest"):
-    sounds = [
-        (os.path.basename(sound).split(".")[0], os.stat(sound).st_ctime)
-        for sound in glob(f"{SOUNDS_PATH}/*.mp3")
-    ]
-
-    def order_func(sound_tuple):
-        if ordering == "newest":
-            return -sound_tuple[1]
-
-        if ordering == "oldest":
-            return sound_tuple[1]
-
-        return sound_tuple[0]
-
-    return sorted(sounds, key=order_func)
-
-def is_valid_sound(sound):
-    return sound.strip() in [tup[0] for tup in get_available_sounds()]
-
-def get_sound_owners():
-    owner_file_path = os.path.join(os.path.abspath(SOUNDS_PATH), "owners.json")
-    with open(owner_file_path, encoding="utf-8") as fp:
-        return json.load(fp)
 
 def _get_time_str(seconds):
     secs = int(seconds)
@@ -124,10 +97,11 @@ class AudioHandler:
         EMOJI_PREV, EMOJI_PLAY, EMOJI_STOP, EMOJI_NEXT
     ]
 
-    def __init__(self, config: Config, stream_handler: Streamscape):
-        self.youtube_api = YouTubeAPIClient(config)
+    def __init__(self, config: Config, meta_database: MetaDatabase, stream_handler: Streamscape):
+        self.meta_database = meta_database
         self.config = config
         self.stream_handler = stream_handler
+        self.youtube_api = YouTubeAPIClient(config)
         self.voice_streams = {} # Keep track of connections to voice channels.
         self.web_streams: dict[int, AudioStream] = {}
         self.web_stream_status = {}
@@ -257,7 +231,7 @@ class AudioHandler:
         validated_sounds = []
         for sound in sounds:
             # Check if 'sound' refers to a valid mp3 sound snippet.
-            if is_valid_sound(sound):
+            if self.is_valid_sound(sound):
                 validated_sounds.append((sound, message, "file"))
                 continue
 
@@ -286,8 +260,8 @@ class AudioHandler:
                 err_msg = (
                     f"Can't play sound `{sound}`. " +
                     f"Either provide a link to one of `{valid_sites}` or the name of a sound.\n"
-                    "Use !sounds for a list of available sounds.\n"
-                    "Use !search to search for a video on YouTube."
+                    "Use `!sounds` for a list of available sounds.\n"
+                    "Use `!search` to search for a video on YouTube."
                 )
                 if len(sounds) == 1:
                     return False, err_msg
@@ -470,16 +444,16 @@ class AudioHandler:
                 if (msg := await self.stop_sound(member.voice)) is not None:
                     await channel.send(msg)
 
-    def get_sounds(self, ordering):
+    def get_sounds(self, ordering="newest"):
         sounds = []
-        for sound, timestamp in get_available_sounds(ordering):
+        for sound, owner_id, plays, timestamp in self.meta_database.get_sounds(ordering):
             dt_fmt = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
-            sounds.append(f"- `{sound}` ({dt_fmt})")
+            sounds.append((sound, owner_id, plays, dt_fmt))
 
         return sounds
 
-    def get_sound_owners(self):
-        return get_sound_owners()
+    def is_valid_sound(self, sound):
+        return self.meta_database.is_valid_sound(sound)
 
     def get_youtube_suggestions(self, search_term, message):
         success, suggestions = self.youtube_api.query(search_term)

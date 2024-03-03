@@ -385,10 +385,7 @@ def live_league_data(date):
     lock = flask.current_app.config["LEAGUE_EVENTS_LOCK"]
     lock.acquire()
     events = flask.current_app.config["LEAGUE_EVENTS"]
-    print("New events:", events, flush=True)
     flask.current_app.config["LEAGUE_EVENTS"] = []
-    print("Events after:", events, flush=True)
-    print(flask.current_app.config["LEAGUE_EVENTS"], flush=True)
     data = {"events": events}
     lock.release()
 

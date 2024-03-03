@@ -1,6 +1,5 @@
 import random
 
-from api import audio_handler
 from api.util import SUPPORTED_GAMES, get_website_link
 
 async def handle_set_event_sound(client, message, game, sound, event):
@@ -31,7 +30,7 @@ async def handle_set_event_sound(client, message, game, sound, event):
         database.remove_event_sound(message.author.id, event)
         response = f"Removed sound from triggering when getting {event_fmt}."
 
-    elif not audio_handler.is_valid_sound(sound):
+    elif not client.audio_handler.is_valid_sound(sound):
         response = f"Invalid sound: `{sound}`. See `!sounds` for a list of valid sounds."
 
     else:
@@ -66,7 +65,7 @@ async def handle_set_join_sound(client, message, sound=None):
         client.meta_database.remove_join_sound(message.author.id)
         response = "Removed sound from triggering when joining a voice channel."
 
-    elif not audio_handler.is_valid_sound(sound):
+    elif not client.audio_handler.is_valid_sound(sound):
         response = f"Invalid sound: `{sound}`. See `!sounds` for a list of valid sounds."
 
     else:
@@ -109,7 +108,7 @@ async def handle_stop_sound_msg(client, message):
 async def handle_random_sound_msg(client, message):
     voice_state = message.author.voice
 
-    sounds_list = audio_handler.get_available_sounds()
+    sounds_list = client.audio_handler.get_sounds()
     sound = sounds_list[random.randint(0, len(sounds_list)-1)][0]
 
     await message.channel.send(f"Playing random sound: `{sound}`")
@@ -141,7 +140,7 @@ async def handle_search_msg(client, message, *search_args):
     client.audio_handler.youtube_suggestions_msg[message.guild.id] = suggestions_msg
 
 async def handle_sounds_msg(client, message, ordering="newest"):
-    valid_orders = ["alphabetical", "oldest", "newest"]
+    valid_orders = ["alphabetical", "oldest", "newest", "most_played", "least_played"]
 
     if ordering not in valid_orders:
         await message.channel.send(
@@ -149,7 +148,10 @@ async def handle_sounds_msg(client, message, ordering="newest"):
         )
         return
 
-    sounds_list = client.audio_handler.get_sounds(ordering)
+    sounds_list = [
+        f"- `{sound}` (uploaded **{timestamp}** by {client.get_discord_nick(owner_id, message.guild.id) or 'Unknown'}, **{plays}** plays)"
+        for sound, owner_id, plays, timestamp in client.audio_handler.get_sounds(ordering)
+    ]
     header = "Available sounds:"
     footer = f"Upload your own at `{get_website_link()}/soundboard`!"
 

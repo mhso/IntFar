@@ -82,7 +82,7 @@ class SteamAPIClient(GameAPIClient):
             response = requests.get(url)
             html = BeautifulSoup(response.text, "html.parser")
 
-            former_header = html.find(id="UI-related")
+            former_header = html.find(id="Former_Maps")
 
             maps_table = former_header.find_previous("table")
             table_rows = maps_table.find_all("tr")
@@ -229,6 +229,12 @@ class SteamAPIClient(GameAPIClient):
 
         json_response = response.json()
 
+        logger.bind(
+            url=url,
+            response=response.text,
+            status_code=response.status_code 
+        ).info("Next sharecode valid response")
+
         if response.status_code == 202 and json_response["result"]["nextcode"] == "n/a":
             return None
 
@@ -347,7 +353,7 @@ class SteamAPIClient(GameAPIClient):
         self.steam_client.run_forever()
 
     def _handle_steam_error(self, error):
-        logger.bind(steam_error=error).error("Steam Client error")
+        logger.bind(steam_error=error, auth_code=self.config.steam_2fa_code).error("Steam Client error")
 
     def _handle_channel_secured(self):
         if self.logged_on_once and self.steam_client.relogin_available:

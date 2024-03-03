@@ -267,7 +267,6 @@ class RiotAPIClient(GameAPIClient):
             req_string = req_string.replace("{" + str(index) + "}", str(param))
 
         full_url = api_route + req_string
-        logger.debug(f"URL: {full_url}")
 
         token_header = {"X-Riot-Token": self.config.riot_key}
         response = requests.get(full_url, headers=token_header)
@@ -310,22 +309,23 @@ class RiotAPIClient(GameAPIClient):
         return response.json()
 
     def get_game_details(self, game_id, tries=0):
-        endpoint = "/lol/match/v5/matches/{0}"
-        response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
+        api_v4_cutoff = 6000000000
+        if int(game_id) > api_v4_cutoff:
+            endpoint = "/lol/match/v5/matches/{0}"
+            response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
+
+        else:
+            endpoint = "/lol/match/v4/matches/{0}"
+            response = self.make_request(endpoint, API_PLATFORM, game_id)
+
+            return response.json()
+
+        if response.status_code != 200 and tries > 0:
+            sleep(15)
+            return self.get_game_details(game_id, tries-1)
 
         if response.status_code != 200:
-            if tries > 0:
-                sleep(10)
-                return self.get_game_details(game_id, tries-1)
-
-            else:
-                endpoint = "/lol/match/v4/matches/{0}"
-                response = self.make_request(endpoint, API_PLATFORM, game_id)
-
-                if response.status_code != 200:
-                    return None
-
-                return response.json()
+            return None
 
         data = response.json()["info"]
         duration = data["gameDuration"]

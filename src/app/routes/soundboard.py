@@ -5,7 +5,9 @@ import shutil
 import flask
 from werkzeug.utils import secure_filename
 
-from api.audio_handler import get_available_sounds, get_sound_owners, SOUNDS_PATH
+from mhooge_flask.logging import logger
+
+from api.audio_handler import AudioHandler, SOUNDS_PATH
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
@@ -23,16 +25,12 @@ def valid_filetype(filename):
 def valid_filename(filename):
     return filename.replace("\\", "/").split("/")[-1].split(".")[0] not in INVALID_FILE_NAMES
 
-def soundboard_template(success=False, status_msg=None):
-    available_sounds = get_available_sounds()
-
-    file_owners = get_sound_owners()
-
-    sound_list = [(name, ctime, file_owners.get(name, False)) for name, ctime in available_sounds]
-
+def soundboard_template(sounds, success=False, status_msg=None):
     return app_util.make_template_context(
-        "soundboard.html", upload_success=success,
-        status_msg=status_msg, sounds=sound_list
+        "soundboard.html",
+        upload_success=success,
+        status_msg=status_msg,
+        sounds=sounds
     )
 
 def normalize_sound_volume(filename):
@@ -49,40 +47,45 @@ def normalize_sound_volume(filename):
 
 @soundboard_page.route('/', methods=["GET", "POST"])
 def home():
+    config = flask.current_app.config["APP_CONFIG"]
+    database = flask.current_app.config["DATABASE"]
+    audio_handler = AudioHandler(config, database, None)
+    sounds = audio_handler.get_sounds()
+
     if flask.request.method == "POST":
         if "file" not in flask.request.files:
-            return soundboard_template(False, "File is missing.")
+            return soundboard_template(sounds, False, "File is missing.")
 
         logged_in_user = app_util.get_user_details()[0]
         if logged_in_user is None:
             return soundboard_template(
-                False, "You must be logged in to upload a sound file."
+                sounds, False, "You must be logged in to upload a sound file."
             )
 
         file = flask.request.files["file"]
         if file.filename == "":
             return soundboard_template(
-                False, "No file selected."
+                sounds, False, "No file selected."
             )
 
         if not valid_filetype(file.filename):
-            return soundboard_template(False, "Invalid file type (must be .mp3).")
+            return soundboard_template(sounds, False, "Invalid file type (must be .mp3).")
 
         if len(file.filename) > FILENAME_MAX_LENGTH:
             return soundboard_template(
-                False, f"Filename too long (max {FILENAME_MAX_LENGTH} characters)."
+                sounds, False, f"Filename too long (max {FILENAME_MAX_LENGTH} characters)."
             )
 
         secure_name = secure_filename(file.filename.replace(" ", "_").lower())
         if not valid_filename(secure_name):
             return soundboard_template(
-                False, f"Invalid filename '{secure_name}' Name is reserved."
+                sounds, False, f"Invalid filename '{secure_name}' Name is reserved."
             )
 
         path = os.path.join(UPLOAD_FOLDER, secure_name)
         if os.path.exists(path):
             return soundboard_template(
-                False, f"Sound file with the name '{secure_name}' already exists."
+                sounds, False, f"Sound file with the name '{secure_name}' already exists."
             )
 
         file.save(path)
@@ -101,9 +104,9 @@ def home():
         with open(owner_file_path, "w", encoding="utf-8") as fp:        
             json.dump(owner_data, fp, indent=4)
 
-        return soundboard_template(True, f"'{secure_name}' successfully uploaded.")
+        return soundboard_template(sounds, True, f"'{secure_name}' successfully uploaded.")
 
-    return soundboard_template()
+    return soundboard_template(sounds)
 
 @soundboard_page.route('/delete', methods=["POST"])
 def delete():
@@ -111,43 +114,44 @@ def delete():
         # Redirect to 'upload file' page
         return flask.redirect(flask.url_for("soundboard.home"))
 
+    config = flask.current_app.config["APP_CONFIG"]
+    database = flask.current_app.config["DATABASE"]
+    audio_handler = AudioHandler(config, database, None)
+    sounds = audio_handler.get_sounds()
+
     data = flask.request.form
     if "filename" not in data:
-        return soundboard_template(False, "Filename is missing.")
+        return soundboard_template(sounds, False, "Filename is missing.")
 
     logged_in_user = app_util.get_user_details()[0]
     if logged_in_user is None:
         return soundboard_template(
-            False, "You must be logged in to delete a sound file."
+            sounds, False, "You must be logged in to delete a sound file."
         )
 
     filename = data["filename"]
-    file_owners = get_sound_owners()
+    permission_to_delete = False
+    for sound, owner_id, _ in sounds:
+        if sound == filename:
+            permission_to_delete = logged_in_user == ADMIN_DISC_ID or owner_id == logged_in_user
+            break
 
-    if logged_in_user != ADMIN_DISC_ID and file_owners.get(filename) != logged_in_user:
+    if not permission_to_delete:
         return soundboard_template(
-            False, "You can't delete this sound as you did not upload it."
+            sounds, False, "You can't delete this sound as you did not upload it."
         )
 
     path = os.path.join(SOUNDS_PATH, filename + ".mp3")
     try:
+        database.remove_sound(filename)
         os.remove(path)
-    except IOError:
+    except Exception:
+        logger.bind(filename=filename, user_id=logged_in_user).exception("Could not delete sound file on website!")
         return soundboard_template(
-            False, "File could not be deleted, an error occured."
+            sounds, False, "File could not be deleted, an error occured."
         )
 
-    # Remove sound/user from owners.json file.
-    owner_file_path = os.path.join(UPLOAD_FOLDER, "owners.json")
-    with open(owner_file_path, encoding="utf-8") as fp:
-        owner_data = json.load(fp)
-
-    del owner_data[filename]
-
-    with open(owner_file_path, "w", encoding="utf-8") as fp:        
-        json.dump(owner_data, fp, indent=4)
-
-    return soundboard_template(True, f"'{filename}.mp3' successfully deleted.")
+    return soundboard_template(sounds, True, f"'{filename}.mp3' successfully deleted.")
 
 def file_too_large(e):
     return app_util.make_template_context(

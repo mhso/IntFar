@@ -131,7 +131,7 @@ class TestMock(DiscordClient):
         await self.close()
         exit(0)
 
-    async def user_joined_voice(self, member, guild, poll=False):
+    async def user_joined_voice(self, member, guild, poll=False, join_sound=False):
         pass
 
 parser = argparse.ArgumentParser()

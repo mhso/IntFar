@@ -23,8 +23,8 @@
             </div>
 
             <div class="all-sounds-wrapper">
-                {% for sound_file, ctime, owner_id in sounds %}
-                <div class="audio-player-wrapper" data-name="{{ sound_file }}" data-ctime="{{ ctime }}">
+                {% for sound_file, owner_id, plays, timestamp in sounds %}
+                <div class="audio-player-wrapper" data-name="{{ sound_file }}" data-timestamp="{{ timestamp }}">
                     <h3>{{ sound_file }}</h3>
                     {% if logged_in_user %}
                     <audio controls>

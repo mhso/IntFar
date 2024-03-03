@@ -184,7 +184,7 @@ class CS2GameDatabase(GameDatabase):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
 
         query = f"""
-            SELECT COUNT(DISTINCT map_id)
+            SELECT DISTINCT map_id
             FROM participants AS p
             JOIN games AS g
                 ON p.game_id = g.game_id

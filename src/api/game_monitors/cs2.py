@@ -29,8 +29,8 @@ class CS2GameMonitor(GameMonitor):
         Retrieves codes for 
         """
         code_retrieved = {disc_id: False for disc_id in users}
-        next_code = None
         for disc_id in users:
+            new_code = None
             user_data = users[disc_id]
 
             curr_code = user_data.latest_match_token[0]
@@ -41,16 +41,18 @@ class CS2GameMonitor(GameMonitor):
                     curr_code
                 )
                 if curr_code is not None:
-                    next_code = curr_code
+                    new_code = curr_code
 
                 await asyncio.sleep(2)
 
-            if next_code is not None and next_code != user_data.latest_match_token[0]:
-                logger.info(f"Match share code for '{disc_id}' was: '{user_data.latest_match_token[0]}', now: '{next_code}'")
+            if new_code is not None and new_code != user_data.latest_match_token[0]:
+                old_code = user_data.latest_match_token[0]
+                text = f"Match share code for '{disc_id}' was: '{old_code}', now: '{new_code}'"
+                logger.bind(event="cs_sharecode", name=user_data.ingame_name[0], old_code=old_code, new_code=new_code).info(text)
                 code_retrieved[disc_id] = True
 
         if all(code_retrieved.values()):
-            return next_code
+            return new_code
 
         return None
 

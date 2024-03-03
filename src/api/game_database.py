@@ -1439,6 +1439,19 @@ class GameDatabase(SQLiteDatabase):
         with self:
             return self.execute_query(query).fetchall()
 
+    def inspect_missed_games(self):
+        query = "SELECT game_id, guild_id, timestamp FROM missed_games"
+        
+        def format_result(cursor):
+            results = []
+            for game_id, guild_id, timestamp in cursor.fetchall():
+                fmt_time = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+                results.append(f"{game_id} in {guild_id} on {fmt_time}")
+
+            return results
+
+        return self.query(query, format_func=format_result)
+
     def remove_missed_game(self, game_id):
         query = "DELETE FROM missed_games WHERE game_id=?"
         with self:

@@ -7,7 +7,7 @@ function sort_by_name(a, b) {
 }
 
 function sort_by_time(a, b) {
-    return a.dataset.ctime == b.dataset.ctime ? 0 : (a.dataset.ctime > b.dataset.ctime ? 1 : -1);
+    return a.dataset.timestamp == b.dataset.timestamp ? 0 : (a.dataset.timestamp > b.dataset.timestamp ? 1 : -1);
 }
 
 function adjustOrderArrow() {

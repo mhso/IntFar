@@ -51,8 +51,20 @@ def kill_all_processes(processes):
     for process in processes:
         process.kill()
 
-    while any(p.is_alive() for p in processes):
-        sleep(0.1)
+    max_sleep = 10
+    time_slept = 0
+    interval = 0.5
+
+    while time_slept < max_sleep and any(p.is_alive() for p in processes):
+        sleep(interval)
+        time_slept += interval
+
+    sleep(0.25)
+
+    if time_slept >= max_sleep:
+        logger.warning("Some processes could not be killed!")
+        sleep(0.25)
+        exit(1)
 
 
 # def start_ai_process(config):

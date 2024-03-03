@@ -20,11 +20,11 @@ class GameAPIClient(ABC):
         ...
 
     @abstractmethod
-    def get_playable_name(self, played_id):
+    def get_playable_name(self, played_id) -> str:
         ...
 
     @abstractmethod
-    def get_map_name(self, map_id):
+    def get_map_name(self, map_id) -> str:
         ...
 
     @abstractmethod
@@ -32,5 +32,5 @@ class GameAPIClient(ABC):
         ...
 
     @abstractmethod
-    def get_ingame_name(self, ingame_id):
+    def get_ingame_name(self, ingame_id) -> str:
         ...

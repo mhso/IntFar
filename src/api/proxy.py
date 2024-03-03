@@ -6,6 +6,8 @@ from multiprocessing import Pipe
 from multiprocessing.connection import wait
 from threading import Thread, Event
 
+from mhooge_flask.logging import logger
+
 from api.config import Config
 from api.meta_database import MetaDatabase
 
@@ -31,6 +33,10 @@ class Proxy(object):
     @property
     def map_names(self):
         return self._call_proxy("map_names")
+
+    @property
+    def playable_count(self):
+        return self._call_proxy("playable_count")
 
     def _set_attributes(self):
         for attr in dir(self.target_cls):
@@ -121,8 +127,10 @@ class ProxyManager(object):
                             value_str = json.loads(value_str)
                         elif dtype == "int":
                             value_str = int(value_str)
+                        elif dtype == "float":
+                            value_str = float(value_str)
                         elif dtype == "bool":
-                            value_str = bool(value_str)
+                            value_str = value_str == "True"
                         else:
                             value_str = str(value_str)
 
@@ -149,7 +157,23 @@ class ProxyManager(object):
             proxy.close()
 
         if self.steam_process.poll() is None:
-            self.database.enqueue_command(-1, self.target_name, "close")
+            logger.info("Shutting down Steam process...")
+            try:
+                # Try to shut down steam process gracefully via a command
+                self.database.enqueue_command(-1, self.target_name, "close")
 
-            while self.steam_process.poll() is None:
-                sleep(0.1)
+                max_sleep = 10
+                time_slept = 0
+                interval = 0.1
+                while self.steam_process.poll() is None and time_slept < max_sleep:
+                    sleep(interval)
+                    time_slept += interval
+
+            except Exception:
+                pass
+
+            finally:
+                if self.steam_process.poll() is None:
+                    # Diplomacy failed, seems we have to do things the hard away!
+                    logger.info("Killing Steam process...")
+                    self.steam_process.kill()

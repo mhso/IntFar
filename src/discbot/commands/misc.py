@@ -172,7 +172,7 @@ async def handle_summary_msg(client, message, game, target_id):
     response += (
         f"The *Personally Evaluated Normalized Int-Far Score* for {nickname} is " +
         f"**{score:.2f}**/**10**\nThis ranks them at **{rank}**/**{num_scores}**."
-    )   
+    )
 
     await message.channel.send(response)
 
@@ -205,22 +205,20 @@ async def handle_performance_msg(client, message, game, target_id=None):
     await message.channel.send(response)
 
 def get_winrate(client, champ_or_map, game, target_id):
-    winrate = None
-    games = None
-    qualified_name = None
-
     winrate, games = client.game_databases[game].get_played_winrate(target_id, champ_or_map)
     qualified_name = client.api_clients[game].get_playable_name(champ_or_map)
 
     return qualified_name, winrate, games
 
 async def handle_winrate_msg(client, message, champ_or_map, game, target_id):
-    if champ_or_map is None:
+    playable_id = client.api_clients[game].try_find_playable_id(champ_or_map)
+
+    if playable_id is None:
         played_name = "Champion" if game == "lol" else "Map"
         await message.channel.send(f"{played_name} is not valid.")
         return
 
-    qualified_name, winrate, games = get_winrate(client, champ_or_map, game, target_id)
+    qualified_name, winrate, games = get_winrate(client, playable_id, game, target_id)
 
     user_name = client.get_discord_nick(target_id, message.guild.id)
     if winrate is not None:

@@ -1,3 +1,5 @@
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from mhooge_flask.database import SQLiteDatabase
 
 from api.user import User
@@ -64,6 +66,128 @@ class MetaDatabase(SQLiteDatabase):
 
             query = "REPLACE INTO default_game VALUES (?, ?)"
             self.execute_query(query, disc_id, game)
+
+    def add_sound(self, sound, owner_id, timestamp):
+        query = "INSERT INTO sounds (sound, owner_id, timestamp) VALUES (?, ?, ?)"
+        with self:
+            self.execute_query(query, sound, owner_id, timestamp)
+
+    def remove_sound(self, sound):
+        query_sound = "DELETE FROM sounds WHERE sound = ?"
+        query_hits = "DELETE FROM sound_hits WHERE sound = ?"
+        with self:
+            self.execute_query(query_sound, sound, commit=False)
+            self.execute_query(query_hits, sound)
+
+    def get_weekly_timestamp(self, timestamp: datetime, week_offset: int = 1):
+        days = timestamp.weekday()
+        end_date = timestamp - relativedelta(days=days, hour=0, minute=0, second=0)
+
+        if week_offset == 0:
+            start_date = end_date
+            days = 7 - timestamp.weekday()
+            end_date = timestamp + relativedelta(days=days, hour=0, minute=0, second=0)
+        else:
+            for _ in range(week_offset):
+                start_date = end_date - relativedelta(days=7)
+
+        return int(start_date.timestamp()), int(end_date.timestamp())
+
+    def add_sound_hit(self, sound: str, timestamp: datetime = None):
+        if timestamp is None:
+            timestamp = datetime.now()
+
+        date_start, date_end = self.get_weekly_timestamp(timestamp, 0)
+        with self:
+            query_select = "SELECT plays FROM sound_hits WHERE sound = ? AND start_date = ? AND end_date = ?"
+
+            result = self.execute_query(query_select, sound, date_start, date_end).fetchone()
+
+            if result is None or result[0] is None:
+                query = """
+                    INSERT INTO sound_hits (sound, start_date, end_date, plays)
+                    VALUES (?, ?, ?, 1)
+                """
+            else:
+                query = """
+                    UPDATE sound_hits
+                    SET plays = plays + 1
+                    WHERE sound = ? AND start_date = ? AND end_date = ?
+                """
+    
+            self.execute_query(query, sound, date_start, date_end)
+
+    def get_sounds(self, ordering):
+        order_by = "sound ASC"
+        if ordering == "newest":
+            order_by = "timestamp DESC"
+        elif ordering == "oldest":
+            order_by = "timestamp ASC"
+        elif ordering == "most_played":
+            order_by = "total_plays DESC"
+        elif ordering == "least_played":
+            order_by = "total_plays ASC"
+
+        query = f"""
+            SELECT sounds.sound, owner_id, SUM(plays) AS total_plays, timestamp
+            FROM sounds
+            INNER JOIN sound_hits
+            ON sound_hits.sound = sounds.sound
+            GROUP BY sounds.sound
+            ORDER BY {order_by}
+        """
+        with self:
+            return self.execute_query(query).fetchall()
+
+    def is_valid_sound(self, sound):
+        query = "SELECT sound FROM sounds WHERE sound = ?"
+        with self:
+            return self.execute_query(query, sound).fetchone() is not None
+
+    def get_sound_hits(self, sound=None, date_from: int = None, date_to: int = None):
+        query = "SELECT "
+        params = []
+        if sound is None:
+            query += "sound, "
+
+        query += "plays FROM sound_hits"
+        if date_from is not None:
+            query += "WHERE start_date > ?"
+            params.append(date_from)
+
+        if date_to is not None:
+            query += f"{'AND' if date_from else 'WHERE'} end_date < ?"
+            params.append(date_to)
+        
+        if sound is not None:
+            query += f"{'AND' if date_to else 'WHERE'} sound = ?"
+            params.append(sound)
+
+        def format_result(cursor):
+            return cursor.fetchone() if sound is not None else cursor.fetchall()
+
+        return self.query(query, *params, format_func=format_result)
+
+    def get_total_sound_hits(self, sound=None):
+        query = "SELECT "
+        if sound is None:
+            query += "sound, "
+    
+        params = []
+        query += "SUM(plays) FROM sound_hits GROUP BY sound"
+        if sound is not None:
+            query += f"WHERE sound = ?"
+            params.append(sound)
+
+        def format_result(cursor):
+            return cursor.fetchone() if sound is not None else cursor.fetchall()
+
+        return self.query(query, *params, format_func=format_result)
+
+    def get_weekly_sound_hits(self, week_offset: int = 1, sound=None):
+        date_start, date_end = self.get_weekly_timestamp(datetime.now(), week_offset)
+
+        self.get_sound_hits(sound, date_start, date_end)
 
     def get_join_sound(self, disc_id):
         query = "SELECT sound FROM join_sounds WHERE disc_id=?"
