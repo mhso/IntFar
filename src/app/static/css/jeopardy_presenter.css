@@ -3,11 +3,6 @@
 \****************##############****************/
 
 @font-face {
-    font-family: tektur;
-    src: url(../fonts/TekturNarrow-Bold.ttf);
-}
-
-@font-face {
     font-family: league;
     src: url(../fonts/Friz_Quadrata_Bold.otf);
 }
@@ -85,8 +80,13 @@ h3 {
     filter: drop-shadow(5px 5px 5px black);
 }
 
+#menu-wrapper > h3 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+}
+
 #menu-wrapper > #logo-wrapper {
-    margin-top: 260px;
+    margin-top: 80px;
     padding-bottom: 20px;
     border-bottom: 2px solid white;
 }
@@ -114,11 +114,18 @@ h3 {
     pointer-events: none;
 }
 
+#menu-vi {
+    position: fixed !important;
+    bottom: 20px;
+    width: 320px;
+    left: 200px;
+}
+
 #menu-quinn {
     position: fixed !important;
-    top: -35px;
-    width: 350px;
-    left: calc(50% - 175px);
+    bottom: 20px;
+    right: 200px;
+    width: 320px;
 }
 
 #menu-teemo {
@@ -134,7 +141,7 @@ h3 {
 }
 
 #menu-alistar {
-    top: 250px;
+    top: 310px;
     width: 350px;
     right: 100px
 }
@@ -151,31 +158,48 @@ h3 {
 }
 
 #menu-nidalee {
-    top: 350px;
+    top: 400px;
     left: 20px;
     width: 50%;
 }
 
+#lobby-code {
+    display: inline-block;
+    background-color: rgba(0, 0, 0, 0.884);
+    border: 2px inset white;
+    padding: 10px;
+    font-size: 2rem;
+}
+
 #menu-contestants {
-    width: 300px;
+    width: 200px;
     font-size: 20px;
     margin: 0 auto;
 }
 
 .menu-contestant-entry {
     margin-bottom: 15px;
+    text-align: left;
+    border: 2px solid white;
+    border-radius: 10px;
+    padding: 10px;
+    background-color: #101010;
+}
+
+.menu-contestant-avatar {
+    width: 42px;
+    border-radius: 24px;
+    border: 2px solid white;
 }
 
 .menu-contestant-id {
-    width: 200px;
     text-align: left;
-    font-size: 18px;
-    color: black;
+    font-size: 20px;
+    color: white;
     padding: 5px;
-    border: 2px solid white;
-    border-radius: 10px;
     height: 40px;
-    vertical-align: top;
+    display: inline-block;
+    margin-left: 10px;
 }
 
 .menu-contestant-color {

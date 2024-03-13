@@ -74,3 +74,9 @@ CREATE TABLE [missed_games] (
     [guild_id] INTEGER NOT NULL,
     [timestamp] INTEGER
 );
+CREATE TABLE [lan_bingo] (
+    [id] NVARCHAR(32) PRIMARY KEY,
+    [name] NVARCHAR(64) NOT NULL,
+    [active] INTEGER,
+    [completed] INTEGER
+);

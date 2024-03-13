@@ -655,15 +655,16 @@ class DiscordClient(discord.Client):
         guild_id = game_stats.guild_id
         tokens_name = self.config.betting_tokens
         game_database = self.game_databases[game_stats.game]
+        duration_fmt = api_util.format_duration_seconds(game_stats.duration)
 
         if game_stats.win == 1:
-            game_desc = "Game won!"
+            game_desc = f"**Game won** after {duration_fmt}!"
             tokens_gained = self.config.betting_tokens_for_win
         elif game_stats.win == -1:
-            game_desc = "Game lost."
+            game_desc = f"**Game lost** after {duration_fmt}."
             tokens_gained = self.config.betting_tokens_for_loss
         else:
-            game_desc = "Game tied."
+            game_desc = f"**Game tied** after {duration_fmt}."
             tokens_gained = 0
 
         bet_multiplier = 1

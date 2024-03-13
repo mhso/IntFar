@@ -154,11 +154,11 @@ class MetaDatabase(SQLiteDatabase):
 
         query += "plays FROM sound_hits "
         if date_from is not None:
-            query += "WHERE start_date = ? "
+            query += "WHERE start_date >= ? "
             params.append(date_from)
 
         if date_to is not None:
-            query += f"{'AND' if date_from else 'WHERE'} end_date = ? "
+            query += f"{'AND' if date_from else 'WHERE'} end_date <= ? "
             params.append(date_to)
 
         if sound is not None:

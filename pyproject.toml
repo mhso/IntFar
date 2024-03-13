@@ -24,6 +24,7 @@ dependencies = [
     "pytest>=8.0.0",
     "file:///${PROJECT_ROOT}/../scripts/mhooge_flask#egg=mhooge-flask",
     "file:///${PROJECT_ROOT}/../scripts/streamscape#egg=streamscape",
+    "flask-socketio>=5.3.6",
 ]
 requires-python = ">=3.11"
 readme = "README.md"

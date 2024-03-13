@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-    {% include 'jeopardy/head.html' %}
+    {% include 'jeopardy/presenter_head.html' %}
     <body>
         <div id="bg-image"></div>
 
@@ -11,6 +11,7 @@
 
             <!-- Categories -->
             {% if round < 3 %}
+
             <!-- Jeopardy! and Double Jeopardy! question selection -->
             <div id="selection-categories-wrapper">
                 {% for category in categories %}

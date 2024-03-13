@@ -4,6 +4,7 @@ const TIME_FOR_DOUBLE_ANSWER = 10;
 const TIME_FOR_WAGERING = 60;
 const TIME_FOR_FINAL_ANSWER = 30;
 const CONTESTANT_KEYS = ["z",  "q", "p", "m"]
+const socket = io();
 
 var countdownInterval;
 var activeRound;
@@ -28,7 +29,7 @@ function canPlayersBuzzIn() {
 }
 
 function getBaseURL() {
-    return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
+    return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port + "/intfar/jeopardy/presenter";
 }
 
 function getQueryParams() {
@@ -55,19 +56,19 @@ function getQueryParams() {
 }
 
 function getSelectionURL(round) {
-    return `${getBaseURL()}/intfar/jeopardy/${round}?${getQueryParams()}`;
+    return `${getBaseURL()}/${round}?${getQueryParams()}`;
 }
 
 function getQuestionURL(round, category, difficulty) {
-    return `${getBaseURL()}/intfar/jeopardy/${round}/${category}/${difficulty}?${getQueryParams()}`;
+    return `${getBaseURL()}/${round}/${category}/${difficulty}?${getQueryParams()}`;
 }
 
 function getFinaleURL(question_id) {
-    return `${getBaseURL()}/intfar/jeopardy/finale/${question_id}?${getQueryParams()}`;
+    return `${getBaseURL()}/finale/${question_id}?${getQueryParams()}`;
 }
 
 function getEndscreenURL() {
-    return `${getBaseURL()}/intfar/jeopardy/endscreen?${getQueryParams()}`;
+    return `${getBaseURL()}/endscreen?${getQueryParams()}`;
 }
 
 function getRandomSound(sounds) {
@@ -113,6 +114,12 @@ function revealAnswerImageIfPresent() {
     }
 }
 
+function listenForBuzzIn() {
+    socket.once("buzz_winner", function(winnerId) {
+        playerBuzzedIn(winnerId);
+    });
+}
+
 function afterQuestion() {
     activeAnswer = null;
     window.onkeydown = function(e) {
@@ -141,11 +148,7 @@ function afterAnswer() {
         videoElem.onended = afterShowQuestion;
 
         // Let players interrupt the video and buzz in early
-        window.onkeydown = function(e) {
-            if (keyIsContestant(e.key)) {
-                playerBuzzedIn(CONTESTANT_KEYS.indexOf(e.key));
-            }
-        }
+        listenForBuzzIn();
 
         setTimeout(function() {
             // Resume playing video after a delay if no one has buzzed in
@@ -435,11 +438,7 @@ function questionAsked(countdownDelay) {
 
     if (canPlayersBuzzIn()) {
         // Enable participants to buzz in if we are in round 1 or 2
-        window.onkeydown = function(e) {
-            if (keyIsContestant(e.key)) {
-                playerBuzzedIn(CONTESTANT_KEYS.indexOf(e.key));
-            }
-        }
+        listenForBuzzIn();
     }
     else if (isDailyDouble) {
         answeringPlayer = playerTurn;
@@ -509,11 +508,7 @@ function showQuestion() {
 
                         if (canPlayersBuzzIn()) {
                             // Let players interrupt the video and buzz in early
-                            window.onkeydown = function(e) {
-                                if (keyIsContestant(e.key)) {
-                                    playerBuzzedIn(CONTESTANT_KEYS.indexOf(e.key));
-                                }
-                            }
+                            listenForBuzzIn();
                         }
                     }
                 }
@@ -670,7 +665,6 @@ function chooseStartingPlayer() {
 
 function beginJeopardy() {
     let contestantIdElems = document.getElementsByClassName("menu-contestant-id");
-    let contestantColorElems = document.getElementsByClassName("menu-contestant-color");
 
     playerIds = [];
     playerColors = [];
@@ -678,8 +672,9 @@ function beginJeopardy() {
     playerTurn = -1;
 
     for (let i = 0; i < contestantIdElems.length; i++) {
-        playerIds.push(contestantIdElems.item(i).value);
-        playerColors.push(contestantColorElems.item(i).value.replace("#", ""));
+        let elem = contestantIdElems.item(i);
+        playerIds.push(elem.dataset["disc_id"]);
+        playerColors.push(elem.style.color.replace("#", ""));
         playerScores.push(0);
     }
 
@@ -688,7 +683,7 @@ function beginJeopardy() {
 
 function resetUsedQuestions(button) {
     let baseUrl = getBaseURL();
-    $.ajax(baseUrl + "/intfar/jeopardy/reset_questions", {
+    $.ajax(baseUrl + "/reset_questions", {
         method: "POST"
     }).then((data) => {
         console.log(data)
@@ -699,78 +694,33 @@ function resetUsedQuestions(button) {
     });
 }
 
-function addPlayerDiv() {
+function addPlayerDiv(id, name, avatar, color) {
     let wrapper = document.getElementById("menu-contestants");
 
     let div = document.createElement("div");
     div.className = "menu-contestant-entry";
+    div.style.border = "2px solid " + color;
 
-    let player = wrapper.children.length + 1;
-    let keyDesc = "";
-    if (player < CONTESTANT_KEYS.length + 1) {
-        let key = CONTESTANT_KEYS[player - 1].toUpperCase();
-        keyDesc = ` (${key})`;
-    }
+    let avatarElem = document.createElement("img");
+    avatarElem.className = "menu-contestant-avatar";
+    avatarElem.src = avatar;
 
-    let nameSelect = document.createElement("select");
-    nameSelect.className = "menu-contestant-id";
-    for (let i = 0; i < menuPlayerData.length; i++) {
-        if (chosenPlayers.includes(menuPlayerData[i]["id"])) {
-            continue;
-        }
+    let nameElem = document.createElement("div");
+    nameElem.className = "menu-contestant-id";
+    nameElem.textContent = name;
+    nameElem.dataset["disc_id"] = id;
 
-        let idOption = document.createElement("option");
-        idOption.textContent = menuPlayerData[i]["name"];
-        idOption.value = menuPlayerData[i]["id"];
-        idOption.onclick = () => chosenPlayers.push(menuPlayerData[i]["id"]);
-
-        nameSelect.appendChild(idOption);
-    }
-
-    let placeholderOption = document.createElement("option");
-    placeholderOption.textContent = `Deltager ${player}${keyDesc}`;
-    placeholderOption.selected = true;
-    nameSelect.appendChild(placeholderOption);
-
-    nameSelect.onclick = () => {
-        try {
-            nameSelect.removeChild(placeholderOption)
-        }
-        catch {}
-    }
-
-    let colorInput = document.createElement("input");
-    colorInput.className = "menu-contestant-color";
-
-    let randRed = (Math.random() * 255).toString(16).split(".")[0];
-    if (randRed == "0") {
-        randRed = "00";
-    }
-    let randGreen = (Math.random() * 255).toString(16).split(".")[0];
-    if (randGreen == "0") {
-        randGreen = "00";
-    }
-    let randBlue = (Math.random() * 255).toString(16).split(".")[0];
-    if (randBlue == "0") {
-        randBlue = "00";
-    }
-
-    colorInput.type = "color";
-    colorInput.value = `#${randRed}${randGreen}${randBlue}`;
-
-    let deleteButton = document.createElement("button");
-    deleteButton.className = "menu-contestant-delete";
-    deleteButton.innerHTML = "&times;";
-    deleteButton.onclick = () => {
-        wrapper.removeChild(div);
-        chosenPlayers.pop(chosenPlayers.indexOf(nameSelect.value));
-    }
-
-    div.appendChild(nameSelect);
-    div.appendChild(colorInput);
-    div.appendChild(deleteButton);
+    div.appendChild(avatarElem);
+    div.appendChild(nameElem);
 
     wrapper.appendChild(div);
+}
+
+function monitorPlayersJoining() {
+    socket.on("player_joined", function(disc_id, name, avatar, color) {
+        console.log("Player joined!");
+        addPlayerDiv(disc_id, name, avatar, color);
+    });
 }
 
 function showFinaleCategory(category) {

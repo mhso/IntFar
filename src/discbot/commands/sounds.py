@@ -177,7 +177,7 @@ async def handle_billboard_msg(client, message):
     ]
 
     billboard_data = []
-    for index, (sound, plays_now, rank_now) in enumerate(week_new, start=1):
+    for sound, plays_now, rank_now in week_new:
         if sound in week_old:
             plays_then, rank_then = week_old[sound]
             rank_shift = rank_then - rank_now
@@ -186,7 +186,10 @@ async def handle_billboard_msg(client, message):
             rank_shift = 0
             plays_diff = 0
 
-        sound_part = f"`{index}. {sound}:"
+        if len(sound) > 10:
+            sound = sound[:7] + "..."
+
+        sound_part = f"`{sound}:"
         plays_part = f"{plays_now} play{'' if plays_now == 1 else 's'}"
         if plays_diff != 0:
             plays_diff_part = f"({'+' if plays_diff > 0 else '-'}{abs(plays_diff)})"
@@ -217,14 +220,16 @@ async def handle_billboard_msg(client, message):
 
     # Apply padding to each row
     formatted_data = []
-    for (padding, row_data) in zip (paddings, billboard_data):
+    for row_index, (padding, row_data) in enumerate(zip(paddings, billboard_data), start=1):
         line = ""
-        for index, (pad, data) in enumerate(zip(padding, row_data)):
+        for col_index, (pad, data) in enumerate(zip(padding, row_data)):
             pad_str = " " * (pad - len(data))
+            if col_index == 0:
+                line += f"{row_index}. "
             line += data + " " + pad_str
 
-            if index == 2:
-                line += "`  "
+            if col_index == 2:
+                line += "` "
 
         formatted_data.append(line)
 

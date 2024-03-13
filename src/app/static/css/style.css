@@ -622,6 +622,7 @@ td:last-child {
 #error-page-wrapper {
     margin-top: 5vh;
     text-align: center;
+    padding: 10px;
 }
 
 #error-page-wrapper img {

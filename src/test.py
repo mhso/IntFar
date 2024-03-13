@@ -2,7 +2,6 @@ import json
 import argparse
 from glob import glob
 from datetime import datetime
-from sys import stderr
 
 from dateutil.relativedelta import relativedelta
 from api.lan import LAN_PARTIES
@@ -277,8 +276,25 @@ class TestFuncs:
 
     def test_weekly_stuff(self):
         timestamp = datetime.now()
-        date_start_1, date_end_1 = self.meta_database.get_weekly_timestamp(timestamp, 0)
+        date_start_1, date_end_1 = self.meta_database.get_weekly_timestamp(timestamp, 2)
+        week_old = {
+            sound: (plays, rank)
+            for sound, plays, rank
+            in self.meta_database.get_weekly_sound_hits(date_start_1, date_end_1)
+        }
+
+        date_start_2, date_end_2 = self.meta_database.get_weekly_timestamp(timestamp, 1)
+        week_new = [
+            (sound, plays, rank)
+            for sound, plays, rank
+            in self.meta_database.get_weekly_sound_hits(date_start_2, date_end_2)
+        ]
+
         print(date_start_1, date_end_1)
+        print(date_start_2, date_end_2)
+
+        print(week_old)
+        print(week_new)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

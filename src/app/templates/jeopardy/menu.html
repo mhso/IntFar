@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-    {% include 'jeopardy/head.html' %}
+    {% include 'jeopardy/presenter_head.html' %}
     
     <body>
         <div id="bg-image"></div>
@@ -8,12 +8,13 @@
         <div id="menu-wrapper">
             {% include 'jeopardy/logo.html' %}
 
+            <h2>Lobby kode</h2>
+            <div style="text-align: center;"><div id="lobby-code">{{ lobby_code }}</div></div>
+
             <h2>Deltagere</h2>
-            <div id="menu-contestants">
-            </div>
+            <div id="menu-contestants"></div>
 
             <div id="menu-buttons">
-                <button onclick="addPlayerDiv();">Tilføj Deltager</button>
                 <button onclick="resetUsedQuestions(this);">Reset Spørgsmål</button>
             </div>
 
@@ -24,15 +25,24 @@
             <img id="menu-brand" src="{{ url_for('static', filename='img/brand_dance.gif') }}">
             <img id="menu-nidalee" src="{{ url_for('static', filename='img/nidalee_dance.gif') }}">
             <img id="menu-quinn" src="{{ url_for('static', filename='img/quinn_thonk.gif') }}">
+            <img id="menu-vi" src="{{ url_for('static', filename='img/vi_point.gif') }}">
         </div>
     </body>
 
     <script>
+        socket.on("connect", function() {
+            socket.emit("presenter_joined")
+            monitorPlayersJoining();
+        });
+
+        {% for player in joined_players %}
+        addPlayerDiv("{{ player['disc_id'] }}", "{{ player['name'] }}", "{{ player['avatar'] }}", "{{ player['color'] }}");
+        {% endfor %}
+
         window.onkeydown = function(e) {
             if (e.key == "NumLock") {
                 beginJeopardy();
             }
         }
-        menuPlayerData = {{ player_data | tojson }};
     </script>
 </html>

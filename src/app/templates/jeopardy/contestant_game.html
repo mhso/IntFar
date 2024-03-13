@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/contestant_head.html' %}
+    
+    <body>
+
+        <div id="contestant-game-wrapper">
+            <h1>Jeopardy!</h1>
+
+            <div id="contestant-game-header" style="border: 2px solid {{ color }};">
+                <div>
+                    <img src="{{ avatar }}">
+                    <div id="contestant-game-name">{{ nickname }}</div>
+                </div>
+                <div id="contestant-game-info">
+                    <div id="contestant-game-score">Score:<br><span style="font-weight: 800;">{{ score }} GBP</span></div>
+                    <div id="contestant-game-ping">{{ ping }} ms</div>
+                </div>
+            </div>
+    
+            {% if round == 0 %}
+
+                <h2 id="contestant-game-waiting">Venter på at spillet starter</h2>
+
+            {% else %}
+                <h2>Runde {{ round }}/3</h2>
+
+                {% if question %}
+
+                    <!-- Question screen -->
+                    <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
+
+                    {% if daily_double %}
+
+                        {% if turn_id == player_turn %}
+                        <h3>Tid til at satse!</h3>
+
+                        {% else %}
+                        <h3>Venter på en anden spiller svarer på Daily Double...</h3>
+
+                        {% endif %}
+                    
+                    {% else %}
+
+                    <h3 id="contestant-buzzer-status" class="d-none"></h3>
+
+                    <div id="buzzer-wrapper" onclick="pressBuzzer('{{ active_player }}');">
+                        <img id="buzzer-active" src="{{ url_for('static', filename='img/jeopardy/buzzer_active.png') }}" class="d-none">
+                        <img id="buzzer-inactive" src="{{ url_for('static', filename='img/jeopardy/buzzer_inactive.png') }}">
+                        <img id="buzzer-pressed" src="{{ url_for('static', filename='img/jeopardy/buzzer_pressed.png') }}" class="d-none">
+                    </div>
+
+                    {% endif %}
+                    
+                {% else %}
+
+                <!-- Selection screen -->
+                    
+                    {% if turn_id == player_turn %}
+                    <h3>Din tur til at vælge en kategori!</h3>
+                    {% else %}
+                    <h3>Venter på en anden spiller vælger en kategori...</h3>
+                    {% endif %}
+
+                {% endif %}
+
+            {% endif %}
+
+            <script>
+                socket.on("connect", function() {
+                    sendPingMessage("{{ active_player }}");
+                    socket.on("ping_calculated", function(ping) {
+                        document.getElementById("contestant-game-ping").textContent = ping + " ms";
+                    });
+
+                    {% if round == 0 %}
+                    socket.emit("join_lobby", "{{ active_player }}", "{{ nickname }}", "{{ avatar }}", "{{ color }}");
+                    animateWaitingText();
+                    {% endif %}
+                    monitorGame({{ turn_id }});
+                });
+            </script>
+        </div>
+    </body>
+</html>

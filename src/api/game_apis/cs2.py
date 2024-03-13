@@ -282,7 +282,11 @@ class SteamAPIClient(GameAPIClient):
             "[steam_id]", str(steam_id)
         )
 
-        response = requests.get(url)
+        try:
+            response = requests.get(url, timeout=20)
+        except requests.exceptions.Timeout:
+            return False
+
         if response.status_code != 200:
             return False
 

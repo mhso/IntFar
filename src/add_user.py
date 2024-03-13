@@ -10,7 +10,7 @@ from api.util import SUPPORTED_GAMES, GUILD_MAP
 parser = ArgumentParser()
 
 parser.add_argument("game", choices=SUPPORTED_GAMES)
-parser.add_argument("discord_name")
+parser.add_argument("discord_name_or_id")
 parser.add_argument("ingame_name")
 parser.add_argument("--extra_1")
 parser.add_argument("--extra_2")
@@ -35,10 +35,19 @@ async def add_user(disc_id):
     await client.close()
 
 async def find_discord_id():
-    disc_id = client.get_discord_id(args.discord_name, GUILD_MAP[args.guild])
-    if disc_id is None:
-        print(f"Could not find discord ID for user '{args.discord_name}'")
-        await client.close()
+    name_or_id = args.discord_name_or_id
+    try:
+        if not client.meta_database.user_exists(int(name_or_id)):
+            raise ValueError("User not found")
+
+        disc_id = int(name_or_id)
+    except ValueError:
+        disc_id = client.get_discord_id(name_or_id, GUILD_MAP[args.guild])
+
+        if disc_id is None:
+            print(f"Could not find discord ID for user '{name_or_id}'")
+            await client.close()
+            return
 
     await add_user(disc_id)
 

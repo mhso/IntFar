@@ -1,5 +1,5 @@
 from datetime import datetime
-from api.game_data import get_stat_quantity_descriptions
+from api.game_data import get_stat_quantity_descriptions, GameStats
 
 TESTING = False
 
@@ -186,3 +186,6 @@ def get_average_stats(database, lan_info):
     all_ranks_list.sort(key=lambda x: x[1])
 
     return all_avg_stats, all_ranks_list
+
+def update_bingo_events(stats: GameStats):
+    pass

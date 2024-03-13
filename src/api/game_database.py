@@ -91,7 +91,7 @@ class GameDatabase(SQLiteDatabase):
                     """
 
                     if user_info is not None:
-                        if sum(len(user_info.get(param_name, [])) for param_name in game_params) >= 3:
+                        if len(user_info.get("ingame_id", [])) >= 3:
                             return (
                                 False,
                                 "Error: A maximum of three accounts can be registered for one person."

@@ -496,17 +496,17 @@ class LoLAwardQualifiers(AwardQualifiers):
 
                     if self._is_event_on_our_side(x, y):
                         if our_kill:
-                            logger.info(f"Our kill on our side at {x}, {y}")
+                            logger.bind(event="lol_invade_pos").info(f"Our kill on our side at {x}, {y}")
                             anti_invade_kills += 1
                         else:
-                            logger.info(f"Their kill on our side at {x}, {y}")
+                            logger.bind(event="lol_invade_pos").info(f"Their kill on our side at {x}, {y}")
                             anti_invade_victims += 1
                     else:
                         if our_kill:
-                            logger.info(f"Our kill on their side at {x}, {y}")
+                            logger.bind(event="lol_invade_pos").info(f"Our kill on their side at {x}, {y}")
                             invade_kills += 1
                         else:
-                            logger.info(f"Their kill on their side at {x}, {y}")
+                            logger.bind(event="lol_invade_pos").info(f"Their kill on their side at {x}, {y}")
                             invade_victims += 1
 
         if biggest_gold_deficit > self.config.timeline_min_deficit and game_win: # Epic comeback!
