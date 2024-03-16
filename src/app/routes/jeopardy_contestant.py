@@ -19,11 +19,7 @@ def home():
     ]
 
     if "user_data" in flask.request.cookies:
-        contestant = Contestant.from_json(flask.request.cookies["user_data"])
-        if contestant.disc_id not in active_contestants:
-            active_contestants[contestant.disc_id] = contestant
-
-        return flask.redirect(flask.url_for(".question_view", jeopardy_round=0, category="mechanics", tier=1))
+        return flask.redirect(flask.url_for(".game_view"))
 
     return app_util.make_template_context("jeopardy/contestant_lobby.html", player_data=player_data)
 
@@ -58,13 +54,13 @@ def join_lobby():
     turn_id = list(PLAYER_NAMES.keys()).index(disc_id)
     contestant = Contestant(disc_id, turn_id, PLAYER_NAMES[disc_id], avatar, color)
 
-    response = flask.redirect(flask.url_for(".question_view"))
+    response = flask.redirect(flask.url_for(".game_view"))
     response.set_cookie("user_data", contestant.to_json())
 
     return response
 
 @jeopardy_contestant_page.route("/game")
-def question_view():
+def game_view():
     contestant = Contestant.from_json(flask.request.cookies.get("user_data"))
     state = flask.current_app.config["JEOPARDY_DATA"]["state"]
 
@@ -72,7 +68,7 @@ def question_view():
         state_dict = state.__dict__
         contestant.score = state.player_data[contestant.index]["score"]
     else:
-        state_dict = {"round": 0}
+        state_dict = {"jeopardy_round": 0}
 
     return app_util.make_template_context(
         "jeopardy/contestant_game.html",
@@ -87,10 +83,55 @@ def question_view():
     )
 
 @app_util.socket_io.event
-def calculate_ping(disc_id, timestamp):
+def calculate_ping(disc_id: str, timestamp: float):
     contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(int(disc_id))
 
     if contestant is not None:
         contestant.calculate_ping(timestamp)
 
-        emit("ping_calculated", f"{contestant.ping:.1f}")
+        emit("ping_calculated", f"{max(contestant.ping, 0.1):.1f}")
+
+@app_util.socket_io.event
+def make_daily_wager(disc_id: str, amount: str):
+    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
+    contestant: Contestant = jeopardy_data["contestants"][int(disc_id)]
+    state = jeopardy_data["state"]
+
+    max_wager = max(contestant.score, 500 * state.jeopardy_round)
+
+    try:
+        amount = int(amount)
+    except ValueError:
+        emit("invalid_wager", max_wager)
+        return
+
+    if 100 <= amount <= max_wager:
+        emit("daily_wager_made", amount, to="presenter")
+    else:
+        emit("invalid_wager", max_wager)
+
+@app_util.socket_io.event
+def make_finale_wager(disc_id: str, amount: str):
+    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
+    contestant: Contestant = jeopardy_data["contestants"][int(disc_id)]
+
+    max_wager = max(contestant.score, 1000)
+
+    try:
+        amount = int(amount)
+    except ValueError:
+        emit("invalid_wager", max_wager)
+        return
+
+    if 100 <= amount <= max_wager:
+        contestant.finale_wager = amount
+        emit("finale_wager_made")
+    else:
+        emit("invalid_wager", max_wager)
+
+@app_util.socket_io.event
+def give_finale_answer(disc_id: str, answer: str):
+    contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"][int(disc_id)]
+    contestant.finale_answer = answer
+    
+    emit("finale_answer_given")

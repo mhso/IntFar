@@ -31,7 +31,7 @@
 
     <script>
         socket.on("connect", function() {
-            socket.emit("presenter_joined")
+            socket.emit("presenter_joined");
             monitorPlayersJoining();
         });
 

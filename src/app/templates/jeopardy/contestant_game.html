@@ -3,6 +3,7 @@
     {% include 'jeopardy/contestant_head.html' %}
     
     <body>
+        <div id="bg-image"></div>
 
         <div id="contestant-game-wrapper">
             <h1>Jeopardy!</h1>
@@ -14,35 +15,65 @@
                 </div>
                 <div id="contestant-game-info">
                     <div id="contestant-game-score">Score:<br><span style="font-weight: 800;">{{ score }} GBP</span></div>
-                    <div id="contestant-game-ping">{{ ping }} ms</div>
+                    <div id="contestant-game-ping" class="contestant-low-ping">{{ ping }} ms</div>
                 </div>
             </div>
     
-            {% if round == 0 %}
+            {% if jeopardy_round == 0 %}
 
-                <h2 id="contestant-game-waiting">Venter på at spillet starter</h2>
+                <h2 id="contestant-game-waiting">Venter på at spillet starter...</h2>
+
+            {% elif jeopardy_round == 4 %}
+
+            <!-- Endscreen -->
+            {% if active_player in winner_ids %}
+                <h2 class="player-has-turn">Du vandt Jeopardy! TILLYKKE!!!</h2>
+            {% else %}
+                <h2>Spillet er slut! Thanks for playing, Daisy!</h2>
+            {% endif %}
 
             {% else %}
-                <h2>Runde {{ round }}/3</h2>
+                <h2 class="contestant-round-header">Runde {{ jeopardy_round }}/3</h2>
+                {% if jeopardy_round < 3 %}
+                {% set has_turn = turn_id == player_turn %}
+                <h2 class="contestant-round-header">Spørgsmål {{ question_num + 1 }}/30</h2>
+                {% else %}
+                <h2 class="contestant-round-header">Final Jeopardy!</h2>
+                {% endif %}
 
                 {% if question %}
 
+                    {% if jeopardy_round == 3 %}
+                    {% set max_wager = [score, 1000] | max %}
+    
+                    <!-- Final Jeopardy answer -->
+                    <h2 id="finale-category-header">{{ category_name }}</h2>
+                    <h3 id="finale-question-header">{{ question["question"] }}</h3>
+                    <h4>Hvad er svaret?</h4>
+
+                    <input id="finale-answer">
+                    <button id="contestant-wager-btn" onclick="giveFinalJeopardyAnswer('{{ active_player }}');">OK</button>
+
+                    {% else %}
                     <!-- Question screen -->
-                    <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
+                    <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if jeopardy_round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
 
                     {% if daily_double %}
 
-                        {% if turn_id == player_turn %}
-                        <h3>Tid til at satse!</h3>
+                        {% if has_turn %}
+                            {% set max_wager = [score, 500 * jeopardy_round] | max %}
+
+                            <h3 class="player-has-turn">Your move! Hvor mange GBP vil du satse?</h3>
+                            <input id="question-wager-input" type="number" min="100" max="{{ max_wager }}">
+                            <button id="contestant-wager-btn" onclick="makeDailyDoubleWager('{{ active_player }}');">OK</button>
 
                         {% else %}
-                        <h3>Venter på en anden spiller svarer på Daily Double...</h3>
+                            {% set other_player = player_data[player_turn]["name"] %}
+                            <h3>Venter på at <strong>{{ other_player }}</strong> svarer på Daily Double...</h3>
 
                         {% endif %}
                     
                     {% else %}
-
-                    <h3 id="contestant-buzzer-status" class="d-none"></h3>
 
                     <div id="buzzer-wrapper" onclick="pressBuzzer('{{ active_player }}');">
                         <img id="buzzer-active" src="{{ url_for('static', filename='img/jeopardy/buzzer_active.png') }}" class="d-none">
@@ -50,36 +81,72 @@
                         <img id="buzzer-pressed" src="{{ url_for('static', filename='img/jeopardy/buzzer_pressed.png') }}" class="d-none">
                     </div>
 
+                    <div id="contestant-buzzer-status" class="d-none">
+                        <img id="buzzer-winner" src="{{ url_for('static', filename='img/check.png') }}" class="d-none">
+                        <img id="buzzer-loser" src="{{ url_for('static', filename='img/wrong.png') }}" class="d-none">
+                    </div>
+
                     {% endif %}
-                    
+                    {% endif %}
+
+                {% else %}
+    
+                {% if jeopardy_round == 3 %}
+
+                <!-- Final Jeopardy wager -->
+                {% set max_wager = [score, 1000] | max %}
+
+                <h2 id="finale-category-header">{{ category_name }}</h2>
+                <h3>Hvor mange GBP tør du satse?!</h3>
+
+                <input id="finale-wager-amount" type="number" min="0" max="max_wager">
+                <button id="contestant-wager-btn" onclick="makeFinalJeopardyWager('{{ active_player }}');">OK</button>
+
                 {% else %}
 
-                <!-- Selection screen -->
-                    
-                    {% if turn_id == player_turn %}
-                    <h3>Din tur til at vælge en kategori!</h3>
+                    <!-- Selection screen -->
+                    {% if player_turn == -1 %}
+                        <h3 id="contestant-turn-desc"></h3>
                     {% else %}
-                    <h3>Venter på en anden spiller vælger en kategori...</h3>
+
+                        {% if has_turn %}
+                        <h3 id="contestant-turn-desc" class="player-has-turn">Din tur til at vælge en kategori!</h3>
+                        
+                        {% else %}
+                        {% set other_player = player_data[player_turn]["name"] %}
+                        <h3 id="contestant-turn-desc">Venter på at <strong>{{ other_player }}</strong> vælger en kategori...</h3>
+                        {% endif %}
+
                     {% endif %}
+
+                {% endif %}
 
                 {% endif %}
 
             {% endif %}
 
+            {% if jeopardy_round < 4 %}
             <script>
                 socket.on("connect", function() {
                     sendPingMessage("{{ active_player }}");
-                    socket.on("ping_calculated", function(ping) {
-                        document.getElementById("contestant-game-ping").textContent = ping + " ms";
-                    });
-
-                    {% if round == 0 %}
                     socket.emit("join_lobby", "{{ active_player }}", "{{ nickname }}", "{{ avatar }}", "{{ color }}");
                     animateWaitingText();
-                    {% endif %}
                     monitorGame({{ turn_id }});
+
+                    {% if jeopardy_round == 1 and player_turn == -1 %}
+                    socket.on("turn_chosen", function(turnId) {
+                        let elem = document.getElementById("contestant-turn-desc");
+                        if (turnId == {{ turn_id }}) {
+                            elem.textContent = "Din tur til at vælge en kategori!";
+                        }
+                        else {
+                            elem.textContent = "Venter på at en anden spiller vælger en kategori...";
+                        }
+                    });
+                    {% endif %}
                 });
             </script>
+            {% endif %}
         </div>
     </body>
 </html>

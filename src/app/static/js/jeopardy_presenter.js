@@ -2,15 +2,14 @@ const TIME_FOR_BUZZING = 8;
 const TIME_FOR_ANSWERING = 6;
 const TIME_FOR_DOUBLE_ANSWER = 10;
 const TIME_FOR_WAGERING = 60;
-const TIME_FOR_FINAL_ANSWER = 30;
-const CONTESTANT_KEYS = ["z",  "q", "p", "m"]
+const TIME_FOR_FINAL_ANSWER = 40;
 const socket = io();
 
 var countdownInterval;
 var activeRound;
 var activeQuestionId;
 var activeAnswer;
-var activeValue;
+var activeValue = null;
 var answeringPlayer = null;
 var activePlayers = [];
 var questionAnswered = false;
@@ -115,9 +114,9 @@ function revealAnswerImageIfPresent() {
 }
 
 function listenForBuzzIn() {
-    socket.once("buzz_winner", function(winnerId) {
-        playerBuzzedIn(winnerId);
-    });
+    if (activePlayers.length != 0) {
+        socket.emit("enable_buzz", JSON.stringify(activePlayers));
+    }
 }
 
 function afterQuestion() {
@@ -204,6 +203,8 @@ function correctAnswer() {
 
 function wrongAnswer(reason) {
     let elem = document.getElementById("question-answer-wrong");
+    let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
+    let coinElem = elem.getElementsByClassName("question-result-gbp").item(0);
 
     let reasonElem = document.getElementById("question-wrong-reason-text");
     reasonElem.textContent = reason;
@@ -216,17 +217,22 @@ function wrongAnswer(reason) {
 
     if (answeringPlayer != null) {
         // Deduct points from player if someone buzzed in
-        let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
         valueElem.textContent = "-" + activeValue;
         updatePlayerScore(answeringPlayer, -activeValue);
 
-        let coinElem = elem.getElementsByClassName("question-result-gbp").item(0);
         if (coinElem.classList.contains("d-none")) {
             coinElem.classList.remove("d-none");
         }
     }
 
-    if (activePlayers.every((v) => !v) || (reason == "Ikke mere tid" && answeringPlayer == null)) {
+    let outOfTime = reason == "Ikke mere tid" && answeringPlayer == null;
+
+    if (activePlayers.every((v) => !v) || outOfTime) {
+        if (outOfTime && !coinElem.classList.contains("d-none")) {
+            valueElem.textContent = "";
+            coinElem.classList.add("d-none");
+        }
+
         // No players are eligible to answer, go to next question
         revealAnswerImageIfPresent();
 
@@ -255,10 +261,6 @@ function hideAnswerIndicator() {
 function keyIsNumeric(key, min, max) {
     let keys = Array.apply(null, Array(max - min + 1)).map(function (x, i) { return "" + (i + min); });
     return keys.includes(key);
-}
-
-function keyIsContestant(key) {
-    return CONTESTANT_KEYS.includes(key);
 }
 
 function stopCountdown() {
@@ -476,6 +478,10 @@ function afterShowQuestion() {
 }
 
 function showQuestion() {
+    if (activePlayers.length != 0) {
+        return;
+    }
+
     for (let i = 0; i < playerIds.length; i++) {
         activePlayers.push(isDailyDouble ? false : true);
     }
@@ -534,8 +540,11 @@ function showQuestion() {
     }
 }
 
-function afterDailyDoubleWager() {
-    activeValue = parseInt(document.getElementById("question-wager-input").value);
+function afterDailyDoubleWager(amount) {
+    if (activeValue != null) {
+        return;
+    }
+    activeValue = amount;
     document.activeElement.blur();
     document.getElementById("question-wager-wrapper").classList.add("d-none");
     showQuestion();
@@ -630,7 +639,7 @@ function setPlayerTurn(player, save) {
     }
 }
 
-function chooseStartingPlayer() {
+function chooseStartingPlayer(callback) {
     let playerEntries = document.getElementsByClassName("footer-contestant-entry");
     let minIters = 20;
     let maxIters = 32;
@@ -650,6 +659,9 @@ function chooseStartingPlayer() {
             if (iter < iters) {
                 showStartPlayerCandidate(iter + 1);
             }
+            else {
+                callback(player);
+            }
         }, wait);
     }
 
@@ -664,17 +676,17 @@ function chooseStartingPlayer() {
 }
 
 function beginJeopardy() {
-    let contestantIdElems = document.getElementsByClassName("menu-contestant-id");
+    let contestantEntries = document.getElementsByClassName("menu-contestant-entry");
 
     playerIds = [];
     playerColors = [];
     playerScores = [];
     playerTurn = -1;
 
-    for (let i = 0; i < contestantIdElems.length; i++) {
-        let elem = contestantIdElems.item(i);
+    for (let i = 0; i < contestantEntries.length; i++) {
+        let elem = contestantEntries.item(i);
         playerIds.push(elem.dataset["disc_id"]);
-        playerColors.push(elem.style.color.replace("#", ""));
+        playerColors.push(elem.dataset["color"].replace("#", ""));
         playerScores.push(0);
     }
 
@@ -698,6 +710,8 @@ function addPlayerDiv(id, name, avatar, color) {
     let wrapper = document.getElementById("menu-contestants");
 
     let div = document.createElement("div");
+    div.dataset["disc_id"] = id;
+    div.dataset["color"] = color;
     div.className = "menu-contestant-entry";
     div.style.border = "2px solid " + color;
 
@@ -708,7 +722,6 @@ function addPlayerDiv(id, name, avatar, color) {
     let nameElem = document.createElement("div");
     nameElem.className = "menu-contestant-id";
     nameElem.textContent = name;
-    nameElem.dataset["disc_id"] = id;
 
     div.appendChild(avatarElem);
     div.appendChild(nameElem);
@@ -774,29 +787,24 @@ function showFinaleResult() {
     
             window.onkeydown = function(e) {
                 let descElem = wagerDescElems.item(player);
-                let amount = parseInt(wagerInputElems.item(player).value);
+                let amount = parseInt(wagerInputElems.item(player).textContent);
     
                 if (e.key == 1) {
                     // Current player answered correctly
                     descElem.style.opacity = 1;
                     descElem.classList.add("wager-answer-correct");
-                    descElem.innerHTML = `svarede rigtigt og <strong>vinder ${amount} GBP</strong>!`;
+                    descElem.innerHTML = `og <strong>vinder ${amount} GBP</strong>!`;
                     playerScores[player] += amount;
                 }
                 else if (e.key == 2) {
                     // Current player answered incorrectly
                     descElem.style.opacity = 1;
                     descElem.classList.add("wager-answer-wrong");
-                    descElem.innerHTML = `svarede forkert og <strong>taber ${amount} GBP</strong>!`;
+                    descElem.innerHTML = `og <strong>taber ${amount} GBP</strong>!`;
                     playerScores[player] -= amount;
                 }
                 else if (e.key == "NumLock") {
-                    if (player == playerIds.length) {
-                        window.location.href = getEndscreenURL();
-                    }
-                    else {
-                        showNextResult(player + 1)
-                    }
+                    showNextResult(player + 1);
                 }
             }
         }

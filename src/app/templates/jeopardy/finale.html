@@ -16,7 +16,7 @@
             <div id="finale-wagers-wrapper">
                 {% for data in player_data %}
                 <div class="finale-wager-entry">
-                    <span class="finale-wager-name" style="color: #{{ data['color'] }};">{{ data["name"] }}</span>: <input class="finale-wager-amount">
+                    <span class="finale-wager-name" style="color: #{{ data['color'] }};">{{ data["name"] }}</span>: <div class="finale-wager-amount">{{ data["wager"] }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -27,7 +27,7 @@
                 <ul>
                     {% for data in player_data %}
                     <li class="finale-result-name">
-                        <span>{{ data["name"] }}</span> <span class="finale-result-desc"></span>
+                        <span>{{ data["name"] }}</span> svarede '{{ data["answer"] }}' <span class="finale-result-desc"></span>
                     </li>
                     {% endfor %}
                 </ul>
@@ -44,6 +44,10 @@
             null,
             1
         );
+
+        socket.on("connect", function() {
+            socket.emit("presenter_joined");
+        });
 
         window.onkeydown = function(e) {
             if (e.key == "NumLock") {

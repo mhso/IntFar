@@ -287,7 +287,7 @@ async def handle_token_balance_msg(client, message, target_id):
     response = ""
     if target_id is None: # Get betting balance for all.
         balances = []
-        for disc_id in client.meta_database.all_users:
+        for disc_id in client.meta_database.all_users.keys():
             balance, name = get_token_balance(disc_id)
             balances.append((balance, name))
 

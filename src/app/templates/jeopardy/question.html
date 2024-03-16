@@ -10,13 +10,12 @@
             {% include 'jeopardy/logo.html' %}
 
             <!-- Category header -->
-            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
+            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if jeopardy_round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
 
             {% if daily_double %}
-            {% set max_wager = [player_data[player_turn]["score"], 500 * round] | max %}
+            {% set max_wager = [player_data[player_turn]["score"], 500 * jeopardy_round] | max %}
             <div id="question-wager-wrapper" class="d-none">
                 <h3>Hvor mange GBP satser <span style="color: #{{ player_data[player_turn]['color'] }};">{{ player_data[player_turn]["name"] }}</span>? (max {{ max_wager }})</h3>
-                <input id="question-wager-input">
             </div>
             {% endif %}
 
@@ -90,7 +89,7 @@
     </audio>
 
     <!-- Correct/wrong answers sounds -->
-    {% if round < 3 %}
+    {% if jeopardy_round < 3 %}
     {% for sound_list in sounds %}
     {% set correct_sound = loop.first %}
     {% for sound_file in sound_list %}
@@ -100,14 +99,14 @@
     {% endfor %}
     {% endfor %}
     {% else %}
-    <audio id="question-finale-suspense">
-        <source src="{{ url_for('static', filename='img/jeopardy/supsense.mp3 ') }}" type="audio/mpeg">
+    <audio id="question-finale-suspense" class="volume-7">
+        <source src="{{ url_for('static', filename='img/jeopardy/suspense.mp3') }}" type="audio/mpeg">
     </audio>
     {% endif %}
 
     <script>
         setVariables(
-            {{ round }},
+            {{ jeopardy_round }},
             {{ player_data | tojson }},
             {{ player_turn }},
             {{ question_num }},
@@ -116,13 +115,22 @@
             {{ question['id'] }},
             {{ daily_double | tojson }}
         );
+
+        socket.on("connect", function() {
+            socket.emit("presenter_joined");
+            socket.on("buzz_winner", function(winnerId) {
+                playerBuzzedIn(winnerId);
+            });
+
+            {% if daily_double %}
+            socket.on("daily_wager_made", function(amount) {
+                afterDailyDoubleWager(amount);
+            });
+            {% endif %}
+        });
+
         {% if daily_double %}
         document.getElementById("question-wager-wrapper").classList.remove("d-none");
-        window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
-                afterDailyDoubleWager();
-            }
-        }
         {% else %}
         window.onkeydown = function(e) {
             if (e.key == "NumLock") {

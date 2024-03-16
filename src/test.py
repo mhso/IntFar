@@ -296,6 +296,17 @@ class TestFuncs:
         print(week_old)
         print(week_new)
 
+    def test_most_played(self):
+        disc_id = 172757468814770176
+        # 115142485579137029 dave
+        # 331082926475182081 mads
+        # 172757468814770176 murt
+        # 347489125877809155 nø
+
+        for champ_id, count in self.game_databases["lol"].get_most_played_id(disc_id)():
+            champ_name = self.riot_api.get_playable_name(champ_id)
+            print(champ_name, count)
+
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
 

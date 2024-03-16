@@ -1,6 +1,6 @@
 from api.game_database import GameDatabase
 from api.config import Config
-from sqlite3 import Cursor, IntegrityError
+from sqlite3 import IntegrityError
 
 class LoLGameDatabase(GameDatabase):
     def __init__(self, game: str, config: Config):
@@ -205,6 +205,18 @@ class LoLGameDatabase(GameDatabase):
             """
 
         return self.query(query, *params, format_func="all", default=[(disc_id, None, None)])
+
+    def get_most_played_id(self, disc_id):
+        query = f"""
+            SELECT champ_id, COUNT(*) AS c
+            FROM participants
+            WHERE disc_id = ?
+            GROUP BY champ_id
+            ORDER BY COUNT(*) DESC
+            LIMIT 5
+        """
+
+        return self.query(query, disc_id, format_func="all")
 
     def get_played_doinks_count(self, disc_id, champ_id=None):
         champ_condition = ""

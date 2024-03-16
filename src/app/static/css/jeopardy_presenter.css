@@ -44,10 +44,6 @@ h3 {
     font-size: 1.5rem;
 }
 
-.d-none {
-    display: none !important;
-}
-
 #logo-wrapper {
     width: 500px;
     margin: 0 auto;
@@ -93,6 +89,10 @@ h3 {
 
 #menu-buttons {
     margin-top: 10px;
+    position: fixed;
+    bottom: 5px;
+    width: 180px;
+    left: calc(50% - 90px);
 }
 
 #menu-buttons > button {
@@ -168,7 +168,7 @@ h3 {
     background-color: rgba(0, 0, 0, 0.884);
     border: 2px inset white;
     padding: 10px;
-    font-size: 2rem;
+    font-size: 1.75rem;
 }
 
 #menu-contestants {
@@ -344,7 +344,7 @@ h3 {
 }
 
 #finale-wagers-wrapper {
-    width: 250px;
+    width: 200px;
     max-width: 300px;
     margin: 0 auto;
     text-align: center;
@@ -377,7 +377,8 @@ h3 {
 .finale-wager-entry .finale-wager-amount {
     width: 100px;
     float: right;
-    font-size: 18px;
+    text-align: right;
+    font-size: 20px;
 }
 
 #finale-answer {
@@ -490,13 +491,6 @@ h3 {
     right: 30px;
 }
 
-#question-wager-input {
-    font-size: 20px;
-    border: 2px solid black;
-    border-radius: 5px;
-    margin-top: 5px;
-}
-
 .question-divider {
     width: 400px;
     height: 1px;
@@ -551,7 +545,7 @@ h3 {
     color: white;
     font-family: league;
     font-size: 4rem;
-    margin-top: 65px;
+    margin-top: 50px;
     width: 900px;
 }
 

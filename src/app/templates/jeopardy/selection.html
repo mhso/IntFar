@@ -7,10 +7,10 @@
         <div id="selection-wrapper">
             <!-- Logo -->
             {% include 'jeopardy/logo.html' %}
-            {% set first_round = round == 1 and player_turn == -1 %}
+            {% set first_round = jeopardy_round == 1 and player_turn == -1 %}
 
             <!-- Categories -->
-            {% if round < 3 %}
+            {% if jeopardy_round < 3 %}
 
             <!-- Jeopardy! and Double Jeopardy! question selection -->
             <div id="selection-categories-wrapper">
@@ -20,7 +20,7 @@
                         <span>{{ questions[category]["name"] }}</span>
                     </div>
                     {% for category_data in questions[category]["tiers"] %}
-                    {% set final_value = category_data["value"] * round %}
+                    {% set final_value = category_data["value"] * jeopardy_round %}
                     <div class="selection-question-box{% if not category_data['active'] %} inactive{% endif %}"
                     {% if category_data['active'] %}onclick="goToQuestion(event.target, '{{ category }}', {{ loop.index }}, {{ category_data['double'] | tojson }})"{% endif %}>
                         <span>{{ final_value }}</span>
@@ -57,22 +57,25 @@
 
     <script>
         setVariables(
-            {{ round }},
+            {{ jeopardy_round }},
             {{ player_data | tojson }},
             {{ player_turn }},
             {{ question_num }}
         );
 
-        {% if round == 1 and player_turn == -1 %}
-        window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
-                let turn = chooseStartingPlayer();
-                console.log(turn);
-                setPlayerTurn(turn, true);
-            }
-        };
-        {% elif round < 3 %}
-        setPlayerTurn({{ player_turn }});
-        {% endif %}
+        socket.on("connect", function() {
+            {% if jeopardy_round == 1 and player_turn == -1 %}
+            window.onkeydown = function(e) {
+                if (e.key == "NumLock") {
+                    chooseStartingPlayer(function(turn) {
+                        setPlayerTurn(turn, true);
+                        socket.emit("first_turn", turn);
+                    });
+                }
+            };
+            {% elif jeopardy_round < 3 %}
+            setPlayerTurn({{ player_turn }});
+            {% endif %}
+        });
     </script>
 </html>
