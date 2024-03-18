@@ -41,6 +41,9 @@ function makeDailyDoubleWager(userId) {
     btn.disabled = true;
     let value = document.getElementById("question-wager-input").value;
     socket.emit("make_daily_wager", userId, value);
+    socket.once("daily_wager_made", function(amount) {
+        btn.style.backgroundColor = "#00b000";
+    });
 }
 
 function makeFinalJeopardyWager(userId) {
@@ -83,6 +86,22 @@ function resetBuzzerStatusImg(elem) {
     elem.classList.add("d-none");
 }
 
+function handleBuzzInResult(imageToShow) {
+    let buzzerActive = document.getElementById("buzzer-active");
+    let buzzerInactive = document.getElementById("buzzer-inactive");
+    let buzzerPressed = document.getElementById("buzzer-pressed");
+    let buzzerStatus = document.getElementById("contestant-buzzer-status");
+
+    buzzerActive.classList.add("d-none");
+    buzzerPressed.classList.add("d-none");
+    buzzerInactive.classList.remove("d-none");
+
+    buzzerStatus.classList.remove("d-none");
+    buzzerStatus.style.opacity = 1;
+    imageToShow.classList.remove("d-none");
+    imageToShow.style.animationName = "showBuzzerStatus";
+}
+
 function monitorGame(turnId) {
     let buzzerActive = document.getElementById("buzzer-active");
     let buzzerInactive = document.getElementById("buzzer-inactive");
@@ -110,28 +129,33 @@ function monitorGame(turnId) {
         }
     });
 
-    // Called when a person has been declared as the fastest to buzz in during a question.
-    socket.on("buzz_winner", function(winnerId) {
+    socket.on("buzz_disabled", function() {
+        resetBuzzerStatusImg(buzzerWinnerImg);
+        resetBuzzerStatusImg(buzzerLoserImg);
+
+        buzzerActive.classList.add("d-none");
+        buzzerPressed.classList.add("d-none");
+        buzzerInactive.classList.remove("d-none");
+
+        if (buzzerStatus.classList.contains("d-none")) {
+            buzzerStatus.classList.remove("d-none");
+            buzzerStatus.style.opacity = 1;
+        }
+    });
+
+    // Called when this person was the fastest to buzz in during a question.
+    socket.on("buzz_winner", function() {
+        handleBuzzInResult(buzzerWinnerImg);
+    });
+
+    // Called when this person was not the fastest to buzz in during a question.
+    socket.on("buzz_loser", function() {
         if (!buzzerStatus.classList.contains("d-none")) {
             // We already buzzed in (and answered incorrectly) previously
             return;
         }
 
-        buzzerActive.classList.add("d-none");
-        buzzerInactive.classList.remove("d-none");
-        buzzerPressed.classList.add("d-none");
-
-        let img;
-        if (winnerId == turnId) {
-            img = buzzerWinnerImg;
-        }
-        else {
-            img = buzzerLoserImg;
-        }
-        buzzerStatus.classList.remove("d-none");
-        buzzerStatus.style.opacity = 1;
-        img.classList.remove("d-none");
-        img.style.animationName = "showBuzzerStatus";
+        handleBuzzInResult(buzzerLoserImg);
     });
 
     // Called whenever the server has calculated our ping.

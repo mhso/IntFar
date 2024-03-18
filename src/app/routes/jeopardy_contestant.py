@@ -1,11 +1,9 @@
-import json
 import flask
-from time import time
-from flask_socketio import emit, send
+from flask_socketio import emit
 
 import app.util as app_util
 
-from app.routes.jeopardy_presenter import PLAYER_NAMES, LOBBY_CODE, Contestant
+from app.routes.jeopardy_presenter import PLAYER_NAMES, PLAYER_BACKGROUNDS, LOBBY_CODE, Contestant
 
 jeopardy_contestant_page = flask.Blueprint("jeopardy_contestant", __name__, template_folder="templates")
 
@@ -39,9 +37,16 @@ def join_lobby():
     elif lobby_code != LOBBY_CODE:
         error = "Forkert lobby kode"
 
+    player_data = [
+        {"id": str(disc_id), "name": PLAYER_NAMES[disc_id]}
+        for disc_id in PLAYER_NAMES
+        if not disc_id in active_contestants
+    ]
+
     if error:
         return app_util.make_template_context(
             "jeopardy/contestant_lobby.html",
+            player_data=player_data,
             error=error
         )
 
@@ -66,7 +71,10 @@ def game_view():
 
     if state is not None:
         state_dict = state.__dict__
-        contestant.score = state.player_data[contestant.index]["score"]
+        for data in state.player_data:
+            if data["id"] == str(contestant.disc_id):
+                contestant.score = data["score"]
+                break
     else:
         state_dict = {"jeopardy_round": 0}
 
@@ -79,6 +87,7 @@ def game_view():
         color=contestant.color,
         score=contestant.score,
         ping=contestant.ping,
+        player_bg_img=PLAYER_BACKGROUNDS[contestant.disc_id],
         **state_dict
     )
 
@@ -106,6 +115,7 @@ def make_daily_wager(disc_id: str, amount: str):
         return
 
     if 100 <= amount <= max_wager:
+        emit("daily_wager_made", amount)
         emit("daily_wager_made", amount, to="presenter")
     else:
         emit("invalid_wager", max_wager)

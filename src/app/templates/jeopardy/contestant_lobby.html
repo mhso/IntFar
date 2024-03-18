@@ -9,6 +9,9 @@
             <form action="{{ url_for('jeopardy_contestant.join_lobby') }}" method="post">
                 <h2>Lobby kode</h2>
                 <input name="code" required>
+                {% if error %}
+                <div id="contestant-lobby-error">{{ error }}</div>
+                {% endif %}
 
                 <h2>Hvem er du?</h2>
                 <select id="contestant-lobby-name" name="contestant">
@@ -18,13 +21,9 @@
                 </select>
 
                 <input id="contestant-lobby-color" name="color" type="color">
-
                 <input id="contestant-lobby-join" type="submit" value="Join">
             </form>
 
-            {% if error %}
-            <div id="contenstant-lobby-error">{{ error }}</div>
-            {% endif %}
         </div>
     </body>
     

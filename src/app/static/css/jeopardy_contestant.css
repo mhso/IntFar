@@ -13,7 +13,6 @@ h1 {
 #bg-image {
     position: absolute;
     z-index: -1;
-    background-image: url(../img/quiz_bg.jpg);
     background-size: cover;
     backdrop-filter: blur(5px);
     background-blend-mode: luminosity;
@@ -30,6 +29,12 @@ h1 {
 
 #contestant-lobby-wrapper > h1 {
     margin-bottom: 50px;
+}
+
+#contestant-lobby-error {
+    color: red;
+    font-size: 18px;
+    margin-top: 5px;
 }
 
 #contestant-game-wrapper {
@@ -196,6 +201,15 @@ h1 {
     border-radius: 5px;
     margin-top: 20px;
     width: 120px;
+    padding: 5px;
+    height: 45px;
+}
+
+#finale-answer {
+    font-size: 20px;
+    border: 2px solid black;
+    border-radius: 5px;
+    margin-top: 20px;
     padding: 5px;
     height: 45px;
 }

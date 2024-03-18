@@ -3,7 +3,7 @@
     {% include 'jeopardy/contestant_head.html' %}
     
     <body>
-        <div id="bg-image"></div>
+        <div id="bg-image" style="background-image: url({{ url_for('static', filename='img/jeopardy/' + player_bg_img) }});"></div>
 
         <div id="contestant-game-wrapper">
             <h1>Jeopardy!</h1>
@@ -27,7 +27,7 @@
 
             <!-- Endscreen -->
             {% if active_player in winner_ids %}
-                <h2 class="player-has-turn">Du vandt Jeopardy! TILLYKKE!!!</h2>
+                <h2 class="player-has-turn">Du vandt! TILLYKKE!!!</h2>
             {% else %}
                 <h2>Spillet er slut! Thanks for playing, Daisy!</h2>
             {% endif %}
@@ -44,15 +44,17 @@
                 {% if question %}
 
                     {% if jeopardy_round == 3 %}
-                    {% set max_wager = [score, 1000] | max %}
     
                     <!-- Final Jeopardy answer -->
                     <h2 id="finale-category-header">{{ category_name }}</h2>
-                    <h3 id="finale-question-header">{{ question["question"] }}</h3>
-                    <h4>Hvad er svaret?</h4>
-
-                    <input id="finale-answer">
-                    <button id="contestant-wager-btn" onclick="giveFinalJeopardyAnswer('{{ active_player }}');">OK</button>
+                    
+                    <div id="finale-question-wrapper" class="d-none">
+                        <h3 id="finale-question-header">{{ question["question"] }}</h3>
+                        <h4>Skriv svaret herunder</h4>
+    
+                        <input id="finale-answer">
+                        <button id="contestant-wager-btn" onclick="giveFinalJeopardyAnswer('{{ active_player }}');">OK</button>
+                    </div>
 
                     {% else %}
                     <!-- Question screen -->
@@ -138,10 +140,15 @@
                         let elem = document.getElementById("contestant-turn-desc");
                         if (turnId == {{ turn_id }}) {
                             elem.textContent = "Din tur til at vælge en kategori!";
+                            elem.className = "player-has-turn";
                         }
                         else {
                             elem.textContent = "Venter på at en anden spiller vælger en kategori...";
                         }
+                    });
+                    {% elif jeopardy_round == 3 and question %}
+                    socket.on("finale_category_revealed", function(turnId) {
+                        document.getElementById("finale-question-wrapper").classList.remove("d-none");
                     });
                     {% endif %}
                 });

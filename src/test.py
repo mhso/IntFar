@@ -307,6 +307,12 @@ class TestFuncs:
             champ_name = self.riot_api.get_playable_name(champ_id)
             print(champ_name, count)
 
+    def test_reee(self):
+        game_id = 6857569856
+        data = self.riot_api.get_game_details(game_id)
+        with open("test.json", "w", encoding="utf-8") as fp:
+            json.dump(data, fp)
+
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
 

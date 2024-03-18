@@ -135,6 +135,7 @@ function afterAnswer() {
     setPlayerTurn(-1, false);
 
     if (activeAnswer == null) {
+        socket.emit("disable_buzz");
         return;
     }
 
@@ -541,12 +542,12 @@ function showQuestion() {
 }
 
 function afterDailyDoubleWager(amount) {
-    if (activeValue != null) {
+    let wrapper = document.getElementById("question-wager-wrapper");
+    if (wrapper.classList.contains("d-none")) {
         return;
     }
     activeValue = amount;
-    document.activeElement.blur();
-    document.getElementById("question-wager-wrapper").classList.add("d-none");
+    wrapper.classList.add("d-none");
     showQuestion();
 }
 

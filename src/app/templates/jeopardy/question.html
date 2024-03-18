@@ -15,7 +15,7 @@
             {% if daily_double %}
             {% set max_wager = [player_data[player_turn]["score"], 500 * jeopardy_round] | max %}
             <div id="question-wager-wrapper" class="d-none">
-                <h3>Hvor mange GBP satser <span style="color: #{{ player_data[player_turn]['color'] }};">{{ player_data[player_turn]["name"] }}</span>? (max {{ max_wager }})</h3>
+                <h3>Hvor mange GBP satser <span style="color: #{{ player_data[player_turn]['color'] }}; font-weight: 800;">{{ player_data[player_turn]["name"] }}</span>? (max {{ max_wager }})</h3>
             </div>
             {% endif %}
 
@@ -135,6 +135,11 @@
         window.onkeydown = function(e) {
             if (e.key == "NumLock") {
                 showQuestion();
+                {% if jeopardy_round == 3 %}
+                setTimeout(function() {
+                    socket.emit("reveal_finale_category");
+                }, 2000);
+                {% endif %}
             }
         }
         {% endif %}
