@@ -1,6 +1,6 @@
-import json
 import os
 import shutil
+from time import time
 
 import flask
 from werkzeug.utils import secure_filename
@@ -90,19 +90,14 @@ def home():
 
         file.save(path)
 
-        # Normalize sound volumne.
+        # Normalize sound volumne
         normalize_sound_volume(path)
 
-        # Add sound/user to owners.json file.
-        owner_file_path = os.path.join(UPLOAD_FOLDER, "owners.json")
-        with open(owner_file_path, encoding="utf-8") as fp:
-            owner_data = json.load(fp)
+        # Add sound to database
+        base_name = os.path.basename(secure_name).split(".")[0]    
+        database.add_sound(base_name, logged_in_user, int(time()))
 
-        base_name = os.path.basename(secure_name).split(".")[0]
-
-        owner_data[base_name] = logged_in_user
-        with open(owner_file_path, "w", encoding="utf-8") as fp:        
-            json.dump(owner_data, fp, indent=4)
+        sounds = audio_handler.get_sounds()
 
         return soundboard_template(sounds, True, f"'{secure_name}' successfully uploaded.")
 
@@ -131,7 +126,7 @@ def delete():
 
     filename = data["filename"]
     permission_to_delete = False
-    for sound, owner_id, _ in sounds:
+    for sound, owner_id, _, _ in sounds:
         if sound == filename:
             permission_to_delete = logged_in_user == ADMIN_DISC_ID or owner_id == logged_in_user
             break
@@ -150,6 +145,8 @@ def delete():
         return soundboard_template(
             sounds, False, "File could not be deleted, an error occured."
         )
+
+    sounds = audio_handler.get_sounds()
 
     return soundboard_template(sounds, True, f"'{filename}.mp3' successfully deleted.")
 

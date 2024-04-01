@@ -134,6 +134,10 @@ function afterAnswer() {
     answeringPlayer = null;
     setPlayerTurn(-1, false);
 
+    let buzzFeed = document.getElementById("question-buzz-feed");
+    buzzFeed.classList.add("d-none");
+    buzzFeed.getElementsByTagName("ul").item(0).innerHTML = "";
+
     if (activeAnswer == null) {
         socket.emit("disable_buzz");
         return;
@@ -395,14 +399,29 @@ function startAnswerCountdown(duration) {
     }
 }
 
-function playerBuzzedIn(player) {
-    if (!activePlayers[player] || answeringPlayer != null) {
-        return; // Player already buzzed in once this question
+function addToBuzzFeed(playerId, timeTaken) {
+    let playerFooterElem = document.getElementsByClassName("footer-contestant-entry").item(playerId);
+    let color = playerFooterElem.style.backgroundColor;
+    let name = playerFooterElem.getElementsByClassName("footer-contestant-entry-name").item(0).textContent;
+
+    let wrapper = document.getElementById("question-buzz-feed");
+    wrapper.classList.remove("d-none");
+    let listParent = wrapper.getElementsByTagName("ul").item(0);
+    let listElem = document.createElement("li");
+    listElem.innerHTML = `<span style="color: ${color}; font-weight: 800">${name}</span> buzzede ind efter ${timeTaken} sekunder`;
+    listParent.appendChild(listElem);
+}
+
+function playerBuzzedIn(playerId, timeTaken, isWinner) {
+    addToBuzzFeed(playerId, timeTaken);
+
+    if (!isWinner || !activePlayers[playerId] || answeringPlayer != null) {
+        return; // Player already buzzed in once this question or didn't buzz in first
     }
 
     // Buzzer has been hit, let the player answer.
-    answeringPlayer = player;
-    activePlayers[player] = false;
+    answeringPlayer = playerId;
+    activePlayers[playerId] = false;
     document.getElementById("question-buzzer-sound").play();
 
     // Pause video if one is playing
@@ -571,7 +590,7 @@ function scaleAnswerChoices() {
 function setVariables(round, playerData, turn, question, answer=null, value=null, questionId=null, dailyDouble=false) {
     activeRound = round;
     playerData.forEach((data) => {
-        playerIds.push(data["id"]);
+        playerIds.push(data["disc_id"]);
         playerScores.push(data["score"]);
         playerColors.push(data["color"]);
     });
@@ -707,7 +726,7 @@ function resetUsedQuestions(button) {
     });
 }
 
-function addPlayerDiv(id, name, avatar, color) {
+function addPlayerDiv(id, index, name, avatar, color) {
     let wrapper = document.getElementById("menu-contestants");
 
     let div = document.createElement("div");
@@ -727,14 +746,16 @@ function addPlayerDiv(id, name, avatar, color) {
     div.appendChild(avatarElem);
     div.appendChild(nameElem);
 
-    wrapper.appendChild(div);
+    if (index >= wrapper.children.length) {
+        wrapper.appendChild(div);
+    }
+    else {
+        wrapper.insertBefore(div, wrapper.children[index]);
+    }
 }
 
 function monitorPlayersJoining() {
-    socket.on("player_joined", function(disc_id, name, avatar, color) {
-        console.log("Player joined!");
-        addPlayerDiv(disc_id, name, avatar, color);
-    });
+    socket.on("player_joined", addPlayerDiv);
 }
 
 function showFinaleCategory(category) {

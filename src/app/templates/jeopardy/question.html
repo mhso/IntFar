@@ -67,6 +67,11 @@
                 <div id="question-countdown-text">30</div>
             </div>
 
+            <!-- Buzz-in feed -->
+            <div id="question-buzz-feed" class="d-none">
+                <ul></ul>
+            </div>
+
             <!-- Correct answer -->
             <div id="question-answer-correct" class="d-none">
                 <div id="question-correct-reason">Korrekt!{% if "explanation" in question %} ({{ question["explanation"] }}){% endif %} <img class="question-result-avatar" src="{{ url_for('static', filename='img/happy_nono.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', filename='img/gbp_coin.png') }}"></div>
@@ -118,10 +123,7 @@
 
         socket.on("connect", function() {
             socket.emit("presenter_joined");
-            socket.on("buzz_winner", function(winnerId) {
-                playerBuzzedIn(winnerId);
-            });
-
+            socket.on("buzz_received", playerBuzzedIn);
             {% if daily_double %}
             socket.on("daily_wager_made", function(amount) {
                 afterDailyDoubleWager(amount);

@@ -2,7 +2,7 @@ PRAGMA journal_mode = 'wal';
 
 CREATE TABLE [users] (
     [disc_id] INTEGER PRIMARY KEY,
-    [secret] NVARCHAR(32) NOT NULL,
+    [secret] NVARCHAR(64) NOT NULL,
     [reports] INTEGER DEFAULT(0)
 );
 CREATE TABLE [betting_balance] (

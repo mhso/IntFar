@@ -40,7 +40,7 @@ class TestFuncs:
 
         for game_id in game_ids:
             try:
-                with open(f"../resources/data/game_{game_id[0]}.json", "r", encoding="utf-8") as fp:
+                with open(f"{self.config.resources_folder}/data/game_{game_id[0]}.json", "r", encoding="utf-8") as fp:
                     game_info = json.load(fp)
             except FileNotFoundError:
                 continue
@@ -263,7 +263,7 @@ class TestFuncs:
         print(x, y)
 
     def test_items(self):
-        with open("../resources/items-14.3.1.json", encoding="utf-8") as fp:
+        with open(f"{self.config.resources_folder}/items-14.3.1.json", encoding="utf-8") as fp:
             items = json.load(fp)
 
         with open("items.txt", "w", encoding="utf-8") as fp:

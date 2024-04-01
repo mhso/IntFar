@@ -1,4 +1,3 @@
-from glob import glob
 from api.util import find_subclasses_in_dir
 from api.game_api_client import GameAPIClient
 

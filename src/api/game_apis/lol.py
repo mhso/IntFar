@@ -35,15 +35,15 @@ class RiotAPIClient(GameAPIClient):
 
     @property
     def champions_file(self):
-        return f"../resources/champions-{self.latest_patch}.json"
+        return f"{self.config.resources_folder}/champions-{self.latest_patch}.json"
 
     @property
     def items_file(self):
-        return f"../resources/items-{self.latest_patch}.json"
+        return f"{self.config.resources_folder}/items-{self.latest_patch}.json"
 
     @property
     def maps_file(self):
-        return "../resources/maps.json"
+        return f"{self.config.resources_folder}/maps.json"
 
     def get_latest_data(self):
         """
@@ -91,7 +91,7 @@ class RiotAPIClient(GameAPIClient):
         url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/champion.json"
         logger.info(f"Downloading latest champions file: '{self.champions_file}'")
 
-        old_files = glob("../resources/champions-*.json")
+        old_files = glob(f"{self.config.resources_folder}/champions-*.json")
 
         try:
             response_json = requests.get(url).json()
@@ -106,7 +106,7 @@ class RiotAPIClient(GameAPIClient):
         url = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/item.json"
         logger.info(f"Downloading latest item file: '{self.items_file}'")
 
-        old_files = glob("../resources/items-*.json")
+        old_files = glob(f"{self.config.resources_folder}/items-*.json")
 
         try:
             response_json = requests.get(url).json()
@@ -391,7 +391,7 @@ class RiotAPIClient(GameAPIClient):
         Should use _ in place of spaces and should not include
         . or ' (fx. Kai'sa should be Kaisa, Dr. Mundo should be Dr_Mundo)
         """
-        search_name = search_term.strip().lower().replace("_", " ")
+        search_name = search_term.strip().lower().replace("_", " ").replace("'", "")
         candidates = []
 
         # Try to find candidates that have the search_term in ther name.

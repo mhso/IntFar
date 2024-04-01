@@ -5,12 +5,15 @@ import requests
 from mhooge_flask.logging import logger
 
 from api import util as api_util
+from api.config import Config
 from api.game_data import get_stat_parser
 from discbot.commands import util as commands_util
 
+config = Config()
+
 FLIRT_MESSAGES = {
-    "english": api_util.load_flavor_texts("flirt_english"),
-    "spanish": api_util.load_flavor_texts("flirt_spanish")
+    "english": api_util.load_flavor_texts(config, "flirt_english"),
+    "spanish": api_util.load_flavor_texts(config, "flirt_spanish")
 }
 
 async def handle_game_msg(client, message, target_id, game):

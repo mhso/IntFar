@@ -114,8 +114,9 @@ class GameDatabase(SQLiteDatabase):
                     values_list = [discord_id] + list(game_params.values()) + [main]
                     self.execute_query(query, *values_list)
 
-        except DBException:
-            return (0, "DB error: A user with that summoner name is probably already registered!")
+        except DBException as exc:
+            logger.bind(event="add_user_error").exception(exc)
+            return (0, "A user with that summoner name is probably already registered!")
 
         return (status_code, status)
 

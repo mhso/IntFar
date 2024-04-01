@@ -1,10 +1,12 @@
 from datetime import tzinfo, timedelta, datetime
 from glob import glob
+from dateutil.relativedelta import relativedelta
 import importlib
 import os
-from dateutil.relativedelta import relativedelta
 import json
 import secrets
+
+from api.config import Config
 
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
@@ -73,8 +75,8 @@ class TimeZone(tzinfo):
             return timedelta(0, 0, 0, 0, 0, 0, 0)
         return timedelta(0, 0, 0, 0, 0, 1, 0)
 
-def load_flavor_texts(filename, game=None):
-    path = f"../resources/flavor_texts"
+def load_flavor_texts(config: Config, filename, game=None):
+    path = f"{config.resources_folder}/flavor_texts"
     if game is not None:
         path = f"{path}/{game}"
     path = f"{path}/{filename}.txt"
@@ -196,7 +198,9 @@ def get_website_link(game=None):
     return f"{base_url}/{game}"
 
 def find_subclasses_in_dir(dir, base_class):
-    modules = map(lambda x: x.replace(".py", ""), glob(f"{dir}/*.py"))
+    config = Config()
+
+    modules = map(lambda x: x.replace(".py", ""), glob(f"{config.src_folder}/{dir}/*.py"))
 
     subclasses = {}
     for module_name in modules:
@@ -204,7 +208,9 @@ def find_subclasses_in_dir(dir, base_class):
         if module_key not in SUPPORTED_GAMES:
             continue
 
-        module = importlib.import_module(module_name.replace("\\", ".").replace("/", "."))
+        rel_path = module_name.replace(config.src_folder + "/", "")
+
+        module = importlib.import_module(rel_path.replace("\\", ".").replace("/", "."))
         for subclass in base_class.__subclasses__():
             if hasattr(module, subclass.__name__):
                 subclasses[module_key] = subclass
@@ -212,8 +218,8 @@ def find_subclasses_in_dir(dir, base_class):
 
     return subclasses
 
-def create_predictions_timeline_image():
-    filename = "../resources/predictions_temp.json"
+def create_predictions_timeline_image(config: Config):
+    filename = f"{config.resources_folder}/predictions_temp.json"
 
     if not os.path.exists(filename):
         return None

@@ -16,7 +16,7 @@
                 <h2>Hvem er du?</h2>
                 <select id="contestant-lobby-name" name="contestant">
                     {% for player in player_data %}
-                    <option value="{{ player['id'] }}">{{ player['name'] }}</option>
+                    <option value="{{ player['disc_id'] }}">{{ player['name'] }}</option>
                     {% endfor %}
                 </select>
 

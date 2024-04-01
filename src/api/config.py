@@ -2,7 +2,12 @@ import json
 
 class Config:
     def __init__(self):
-        auth = json.load(open("../resources/auth.json"))
+        # ===== File paths =====
+        file_split = __file__.replace("\\", "/").split("/")
+        self.src_folder = "/".join(file_split[:-2])
+        self.resources_folder = "/".join(file_split[:-3]) + "/resources"
+
+        auth = json.load(open(f"{self.resources_folder}/auth.json"))
 
         # ===== Meta and Auth =====
         self.use_dev_token = False
@@ -18,8 +23,8 @@ class Config:
         self.steam_username = auth["steamUsername"]
         self.steam_password = auth["steamPassword"]
         self.env = auth["env"]
-        self.database_folder = "../resources/databases"
-        self.schema_folder = "../resources/schemas"
+        self.database_folder = f"{self.resources_folder}/databases"
+        self.schema_folder = f"{self.resources_folder}/schemas"
         self.generate_predictions_img = False
         self.performance_mimimum_games = 10
 

@@ -32,3 +32,9 @@ license = {text = "MIT"}
 
 [tool.pdm]
 distribution = false
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "src"
+]
+testpaths = ["tests"]

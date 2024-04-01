@@ -141,7 +141,7 @@ class AwardQualifiers(ABC):
     def _load_flavor_texts(self) -> dict[str, list[str]]:
         flavor_text_dict = {}
         for filename in self.ALL_FLAVOR_TEXTS():
-            flavor_text_dict[filename] = load_flavor_texts(filename, self.game)
+            flavor_text_dict[filename] = load_flavor_texts(self.config, filename, self.game)
 
         return flavor_text_dict
 

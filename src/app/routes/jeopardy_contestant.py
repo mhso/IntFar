@@ -9,9 +9,15 @@ jeopardy_contestant_page = flask.Blueprint("jeopardy_contestant", __name__, temp
 
 @jeopardy_contestant_page.route("/")
 def home():
-    active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
+    active_contestants = jeopardy_data["contestants"]
+    state = jeopardy_data["state"]
+
+    if state is None:
+        return app_util.make_template_context("jeopardy/contestant_nogame.html")
+
     player_data = [
-        {"id": str(disc_id), "name": PLAYER_NAMES[disc_id]}
+        {"disc_id": str(disc_id), "name": PLAYER_NAMES[disc_id]}
         for disc_id in PLAYER_NAMES
         if not disc_id in active_contestants
     ]
@@ -25,7 +31,12 @@ def home():
 def join_lobby():
     lobby_code = flask.request.form.get("code")
     disc_id = int(flask.request.form.get("contestant"))
-    active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
+    active_contestants = jeopardy_data["contestants"]
+    state = jeopardy_data["state"]
+
+    if state is None:
+        return app_util.make_template_context("jeopardy/contestant_nogame.html")
 
     error = None
     if disc_id is None:
@@ -38,7 +49,7 @@ def join_lobby():
         error = "Forkert lobby kode"
 
     player_data = [
-        {"id": str(disc_id), "name": PLAYER_NAMES[disc_id]}
+        {"disc_id": str(disc_id), "name": PLAYER_NAMES[disc_id]}
         for disc_id in PLAYER_NAMES
         if not disc_id in active_contestants
     ]
@@ -66,17 +77,21 @@ def join_lobby():
 
 @jeopardy_contestant_page.route("/game")
 def game_view():
-    contestant = Contestant.from_json(flask.request.cookies.get("user_data"))
+    if "user_data" not in flask.request.cookies:
+        return flask.redirect(flask.url_for(".home"))
+
+    contestant = Contestant.from_json(flask.request.cookies["user_data"])
     state = flask.current_app.config["JEOPARDY_DATA"]["state"]
 
-    if state is not None:
-        state_dict = state.__dict__
-        for data in state.player_data:
-            if data["id"] == str(contestant.disc_id):
-                contestant.score = data["score"]
-                break
-    else:
-        state_dict = {"jeopardy_round": 0}
+    if state is None:
+        return app_util.make_template_context("jeopardy/contestant_nogame.html")
+
+    state_dict = state.__dict__
+    for data in state.player_data:
+        print(data)
+        if data["disc_id"] == str(contestant.disc_id):
+            contestant.score = data["score"]
+            break
 
     return app_util.make_template_context(
         "jeopardy/contestant_game.html",
@@ -98,7 +113,7 @@ def calculate_ping(disc_id: str, timestamp: float):
     if contestant is not None:
         contestant.calculate_ping(timestamp)
 
-        emit("ping_calculated", f"{max(contestant.ping, 0.1):.1f}")
+        emit("ping_calculated", f"{min(999.0, max(contestant.ping, 1.0)):.1f}")
 
 @app_util.socket_io.event
 def make_daily_wager(disc_id: str, amount: str):

@@ -133,6 +133,7 @@ def get_active_game_data(face_images, lan_info):
     return game_data
 
 def get_data(lan_info):
+    config = flask.current_app.config["APP_CONFIG"]
     database = flask.current_app.config["GAME_DATABASES"]["lol"]
     riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
@@ -289,7 +290,7 @@ def get_data(lan_info):
         tilt_value, tilt_color = lan_api.get_tilt_value([x[0] for x in recent_games])
 
         # Team Comp ideas
-        with open("../resources/team_comps.txt") as fp:
+        with open(f"{config.resources_folder}/team_comps.txt") as fp:
             team_comps = []
             for line in fp.readlines():
                 split_1 = line.strip().split(":")

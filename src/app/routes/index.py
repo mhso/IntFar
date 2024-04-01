@@ -307,7 +307,7 @@ def active_game_ended():
     flask.current_app.config["ACTIVE_GAME"][int(data["guild_id"])][game] = None
 
     if flask.current_app.config["GAME_PREDICTION"].get(data["game_id"]) is not None:
-        remove("../resources/predictions_temp.json")
+        remove(f"{conf.resources_folder}/predictions_temp.json")
 
     flask.current_app.config["GAME_PREDICTION"][data["game_id"]] = None
 
@@ -331,8 +331,8 @@ def restart():
 
     exit(2)
 
-def save_prediction_to_file(prediction, game_duration):
-    filename = "../resources/predictions_temp.json"
+def save_prediction_to_file(conf, prediction, game_duration):
+    filename = f"{conf.resources_folder}/predictions_temp.json"
     if exists(filename):
         snapshot_json = json.load(open(filename, "r", encoding="utf-8"))
     else:
@@ -360,7 +360,7 @@ def set_prediction():
 
     logger.info(f"Updated game prediction: {data['pct_win']}% chance of winning.")
 
-    save_prediction_to_file(data["pct_win"], int(data["game_duration"]))
+    save_prediction_to_file(conf, data["pct_win"], int(data["game_duration"]))
 
     flask.current_app.config["GAME_PREDICTION"][game_id] = data["pct_win"]
 

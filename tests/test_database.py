@@ -1,32 +1,41 @@
-from shutil import copy
-from os import remove
+import os
 from time import time
 from unittest import TestCase
 
-from intfar.api.config import Config
-from intfar.api.meta_database import MetaDatabase
-from intfar.api.game_database import GameDatabase
-from intfar.api.game_databases import get_database_client
-from intfar.api.util import MAIN_GUILD_ID, SUPPORTED_GAMES
+from src.api.config import Config
+from src.api.meta_database import MetaDatabase, DEFAULT_GAME
+from src.api.game_database import GameDatabase
+from src.api.game_databases import get_database_client
+from src.api.util import MAIN_GUILD_ID, SUPPORTED_GAMES
 
 MY_DISC_ID = 267401734513491969
 GAME = "lol"
 
 class TestWrapper(TestCase):
-    def __init__(self):
-        conf = Config()
-        remove(f"{conf.database_folder}/test/meta.db")
-        copy(f"{conf.database_folder}/meta.db", f"{conf.database_folder}/test/meta.db")
-        for game in SUPPORTED_GAMES:
-            remove(f"{conf.database_folder}/test/{game}.db")
-            copy(f"{conf.database_folder}/{game}.db", f"{conf.database_folder}/test/{game}.db")
+    def setUp(self):
+        self.config = Config()
+        self.config.database_folder += "/test"
 
-        conf.database_folder = f"{conf.database_folder}/test"
-        meta_database = MetaDatabase(conf)
-        game_databases = {game: get_database_client(game, conf) for game in SUPPORTED_GAMES}
+        self._remove_databases()
+
+        meta_database = MetaDatabase(self.config)
+        game_databases = {game: get_database_client(game, self.config) for game in SUPPORTED_GAMES}
 
         self.meta_database = meta_database
         self.game_databases = game_databases
+
+    def tearDown(self):
+        self._remove_databases()
+
+    def _remove_databases(self):
+        meta_database_path = f"{self.config.database_folder}/meta.db"
+        if os.path.exists(meta_database_path):
+            os.remove(meta_database_path)
+
+        for game in SUPPORTED_GAMES:
+            game_database_path = f"{self.config.database_folder}/{game}.db"
+            if os.path.exists(game_database_path):
+                os.remove(game_database_path)
 
     def _assert_no_exception(self, func, message, *args, **kwargs):
         try:
@@ -34,54 +43,86 @@ class TestWrapper(TestCase):
         except Exception as exc:
             self.fail(f"Failed: {message}, {type(exc)} was raised")
 
-    def test_user_queries(self):
-        meta_database: MetaDatabase = self.meta_database
+    def _add_user(self, game, disc_id, ingame_name, ingame_id):
+        kwargs = {"ingame_name": ingame_name, "ingame_id": ingame_id}
+
+        for param in self.game_databases[game].game_user_params:
+            kwargs[param] = param
+
+        status, msg = self.game_databases[game].add_user(disc_id, **kwargs)
+        if status > 0:
+            self.meta_database.add_user(disc_id)
+
+        return status, msg
+
+    def test_add_user(self):
+        all_users_before = len(self.meta_database.all_users)
 
         for game in SUPPORTED_GAMES:
-            game_database: GameDatabase = self.game_databases[game]
-            game_users_before = len(game_database.game_users)
-            all_users_before = len(meta_database.all_users)
-            def add_user():
-                status, _ = game_database.add_user(123, ingame_name="name", ingame_id="id")
-                if status == 1:
-                    meta_database.add_user(123)
-                    all_users_after = len(meta_database.all_users)
-                    self.assertEqual(all_users_after, all_users_before + 1, "User was added.")
+            game_database = self.game_databases[game]
 
-            self._assert_no_exception(add_user, f"Add user {game}")
+            game_users_before = len(game_database.game_users)
+
+            status, msg = self._add_user(game, 123, "name", "id")
+            self.assertEqual(status, 1, msg)
+
+            all_users_after = len(self.meta_database.all_users)
+            self.assertEqual(all_users_after, all_users_before + 1, "User was added.")
 
             game_users_after = len(game_database.game_users)
             self.assertEqual(game_users_after, game_users_before + 1, "Game user was added.")
 
-            self._assert_no_exception(game_database.discord_id_from_ingame_info, "User from ingame info", ingame_name="name")
+            disc_id = game_database.discord_id_from_ingame_info(ingame_name="name")
+            self.assertEqual(disc_id, 123, "User from ingame info exact match correct")
+
+            disc_id = game_database.discord_id_from_ingame_info(exact_match=False, ingame_name="nam")
+            self.assertEqual(disc_id, 123, "User from ingame info fuzzy match correct")
 
             game_users_before = len(game_database.game_users)
-            self._assert_no_exception(game_database.add_user, "Add Smurf.", 123, ingame_name="name", ingame_id="id2")
+            self._add_user(game, 123, "name", "id2")
             game_users_after = len(game_database.game_users)
 
             self.assertEqual(game_users_after, game_users_before, "Smurf was added.")
 
-            self._assert_no_exception(game_database.remove_user, "Remove User.", 123)
+            game_database.remove_user(123)
             game_users_after = len(game_database.game_users)
 
             self.assertEqual(game_users_after, game_users_before - 1, "User was removed.")
 
             game_users_before = len(game_database.game_users)
-            self._assert_no_exception(game_database.add_user, "Re-add User.", 123, ingame_name="name", ingame_id="id")
+            self._add_user(game, 123, "name", "id")
             game_users_after = len(game_database.game_users)
 
             self.assertEqual(game_users_after, game_users_before + 1, "User was re-added.")
 
-        self._assert_no_exception(meta_database.get_reports, "Get reports.", MY_DISC_ID)
-        self._assert_no_exception(meta_database.get_max_reports_details, "Get max reports.")
-        self._assert_no_exception(meta_database.report_user, "Report user.", MY_DISC_ID)
-        self._assert_no_exception(meta_database.get_client_secret, "Get client secret.", MY_DISC_ID)
+    def test_user_queries(self):
+        self._add_user(DEFAULT_GAME, MY_DISC_ID, "my_id", "my_name")
 
-        def get_user_from_secret_func():
-            secret = meta_database.get_client_secret(MY_DISC_ID)
-            meta_database.get_user_from_secret(secret)
+        reports_before = self.meta_database.get_reports(MY_DISC_ID)[0][1]
+        self.assertEqual(reports_before, 0, "Test reports before")
 
-        self._assert_no_exception(get_user_from_secret_func, "Get client from secret.")
+        self.meta_database.report_user(MY_DISC_ID)
+
+        reports_after = self.meta_database.get_reports(MY_DISC_ID)[0][1]
+        self.assertEqual(reports_after, 1, "Test reports after")
+
+        # Add another user to test getting user with most reports
+        self._add_user(DEFAULT_GAME, 123, "other_id", "other_name")
+
+        self.meta_database.report_user(123)
+        self.meta_database.report_user(123)
+
+        max_reports, max_reports_user = self.meta_database.get_max_reports_details()
+
+        self.assertEqual(max_reports, 2, "Test max reports")
+        self.assertEqual(max_reports_user, 123, "Test max reports user")
+
+        # Test client secret queries
+        client_secret = self.meta_database.get_client_secret(MY_DISC_ID)
+        self.assertEqual(len(client_secret), 64, "Test client secret length")
+
+        user_from_secret = self.meta_database.get_user_from_secret(client_secret)
+        self.assertEqual(user_from_secret, MY_DISC_ID, "Get client from secret.")
 
     def test_game_queries(self):
         test_game_ids = {
@@ -94,10 +135,10 @@ class TestWrapper(TestCase):
             test_game_id = test_game_ids[game]
 
             self._assert_no_exception(database.game_exists, "Game exists.", test_game_id)
-            self.assert_true(database.game_exists(test_game_id), "Game exists before delete.")
+            self.assertTrue(database.game_exists(test_game_id), "Game exists before delete.")
 
             self._assert_no_exception(database.delete_game, "Delete game.", test_game_id)
-            self.assert_false(database.game_exists(test_game_id), "Game doesn't exist after delete.")
+            self.assertFalse(database.game_exists(test_game_id), "Game doesn't exist after delete.")
 
             self._assert_no_exception(database.get_latest_game, "Get latest game.")
 

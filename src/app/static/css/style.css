@@ -130,10 +130,6 @@ table {
     color: rgb(41, 179, 167);
 }
 
-.d-none {
-    display: none !important;
-}
-
 .discord-avatar {
     clip-path: circle();
 }

@@ -9,7 +9,8 @@
             {% include 'jeopardy/logo.html' %}
 
             <h2>Lobby kode</h2>
-            <div style="text-align: center;"><div id="lobby-code">{{ lobby_code }}</div></div>
+            <div style="text-align: center;"><div id="menu-lobby-code">{{ lobby_code }}</div></div>
+            <div id="menu-lobby-url">Hop over til <span style="text-decoration: underline">https://mhooge.com/intfar/jeopardy</span> og join!</div>
 
             <h2>Deltagere</h2>
             <div id="menu-contestants"></div>
@@ -35,7 +36,7 @@
             monitorPlayersJoining();
         });
 
-        {% for player in joined_players %}
+        {% for player in player_data %}
         addPlayerDiv("{{ player['disc_id'] }}", "{{ player['name'] }}", "{{ player['avatar'] }}", "{{ player['color'] }}");
         {% endfor %}
 

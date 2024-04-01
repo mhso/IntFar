@@ -44,6 +44,10 @@ h3 {
     font-size: 1.5rem;
 }
 
+.d-none {
+    display: none !important;
+}
+
 #logo-wrapper {
     width: 500px;
     margin: 0 auto;
@@ -141,7 +145,7 @@ h3 {
 }
 
 #menu-alistar {
-    top: 310px;
+    top: 440px;
     width: 350px;
     right: 100px
 }
@@ -158,17 +162,23 @@ h3 {
 }
 
 #menu-nidalee {
-    top: 400px;
+    top: 520px;
     left: 20px;
     width: 50%;
 }
 
-#lobby-code {
+#menu-lobby-code {
     display: inline-block;
     background-color: rgba(0, 0, 0, 0.884);
     border: 2px inset white;
     padding: 10px;
     font-size: 1.75rem;
+}
+
+#menu-lobby-url {
+    text-align: center;
+    font-size: 20px;
+    margin-top: 10px;
 }
 
 #menu-contestants {
@@ -501,6 +511,10 @@ h3 {
 #question-choices-indicator {
     height: 48px;
     vertical-align: baseline;
+}
+
+#question-buzz-feed {
+    font-size: 18px;
 }
 
 #question-answer-wrong, #question-answer-correct {

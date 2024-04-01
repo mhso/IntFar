@@ -118,9 +118,6 @@ class Contestant:
         if len(self._ping_samples) == self.n_ping_samples:
             self._ping_samples.pop(0)
 
-    def calculate_buzz_time(self):
-        self.latest_buzz = time() - (self.ping * 1000)
-
     @staticmethod
     def from_json(json_str: str):
         data = json.loads(json_str)
@@ -146,6 +143,10 @@ class State:
         return json.dumps(self.__dict__)
 
 @dataclass
+class PregameState(State):
+    lobby_code: str = LOBBY_CODE
+
+@dataclass
 class RoundState(State):
     question_num: int
     player_turn: int
@@ -162,6 +163,7 @@ class QuestionState(RoundState):
     question: dict
     question_value: int
     daily_double: bool
+    question_asked_time: float = field(default=None, init=False)
     buzz_winner_decided: bool = field(default=False, init=False)
 
 @dataclass
@@ -186,13 +188,12 @@ def home():
     active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
     joined_players = [contestant.__dict__ for contestant in active_contestants.values()]
 
-    flask.current_app.config["JEOPARDY_DATA"]["state"] = None
+    pregame_state = PregameState(0, "Lobby", joined_players)
+
+    flask.current_app.config["JEOPARDY_DATA"]["state"] = pregame_state
 
     return app_util.make_template_context(
-        "jeopardy/menu.html",
-        200,
-        lobby_code=LOBBY_CODE,
-        joined_players=joined_players
+        "jeopardy/menu.html", **pregame_state.__dict__
     )
 
 @jeopardy_presenter_page.route("/reset_questions", methods=["POST"])
@@ -238,7 +239,7 @@ def get_round_data(request_args):
                     avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
             player_data.append({
-                "id": str(disc_id),
+                "disc_id": str(disc_id),
                 "name": PLAYER_NAMES[disc_id],
                 "avatar": avatar,
                 "score": int(request_args[score_key]),
@@ -434,7 +435,7 @@ def final_jeopardy(question_id):
 
     contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
     for data in player_data:
-        disc_id = int(data["id"])
+        disc_id = int(data["disc_id"])
         data["wager"] = contestants[disc_id].finale_wager
         answer = contestants[disc_id].finale_answer
         data["answer"] = "ikke" if answer is None else f"'{answer}'"
@@ -467,10 +468,10 @@ def jeopardy_endscreen():
     jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
     contestants = jeopardy_data["contestants"]
 
-    if player_data[0]["id"] in contestants:
-        avatar = contestants[player_data[0]["id"]].avatar
+    if player_data[0]["disc_id"] in contestants:
+        avatar = contestants[player_data[0]["disc_id"]].avatar
     else:
-        avatar = app_util.discord_request("func", "get_discord_avatar", player_data[0]["id"])
+        avatar = app_util.discord_request("func", "get_discord_avatar", player_data[0]["disc_id"])
         if avatar is not None:
             avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
@@ -480,10 +481,10 @@ def jeopardy_endscreen():
         if player_data[index-1]["score"] > data["score"]:
             break
 
-        if data["id"] in contestants:
-            avatar = contestants[data["id"]].avatar
+        if data["disc_id"] in contestants:
+            avatar = contestants[data["disc_id"]].avatar
         else:
-            avatar = app_util.discord_request("func", "get_discord_avatar", data["id"])
+            avatar = app_util.discord_request("func", "get_discord_avatar", data["disc_id"])
             if avatar is not None:
                 avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
 
@@ -510,7 +511,7 @@ def jeopardy_endscreen():
             f"{players_tied} har alle lige mange point! De har alle sammen vundet!!!"
         )
 
-    winner_ids = [str(data["id"]) for data in player_data[:ties + 1]]
+    winner_ids = [str(data["disc_id"]) for data in player_data[:ties + 1]]
     endscreen_state = EndscreenState(
         4, "Endscreen", player_data, winner_desc, winner_ids, avatars
     )
@@ -558,7 +559,7 @@ def join_lobby(disc_id: str, nickname: str, avatar: str, color: str):
         turn_id = list(PLAYER_NAMES.keys()).index(disc_id)
         active_contestants[disc_id] = Contestant(disc_id, turn_id, nickname, avatar, color)
 
-        emit("player_joined", (str(disc_id), nickname, avatar, color), to="presenter")
+        emit("player_joined", (str(disc_id), turn_id, nickname, avatar, color), to="presenter")
 
     # Add socket IO session ID to contestant
     active_contestants[disc_id].sid = flask.request.sid
@@ -572,6 +573,7 @@ def enable_buzz(active_players_str: str):
 
     active_ids = [c.index for c in contestants.values() if active_player_ids[c.index]]
     state.buzz_winner_decided = False
+    state.question_asked_time = time()
 
     emit("buzz_enabled", active_ids, to="contestants")
 
@@ -582,37 +584,43 @@ def buzzer_pressed(disc_id: str):
     contestants = jeopardy_data["contestants"]
     state = jeopardy_data["state"]
 
-    if state.buzz_winner_decided:
-        return
-
     contestant = contestants.get(disc_id)
 
     if contestant is not None:
-        contestant.calculate_buzz_time()
+        contestant.latest_buzz = time() - (contestant.ping / 1000)
+        time_taken = f"{contestant.latest_buzz - state.question_asked_time:.2f}"
+
+        print(f"Buzz from {contestant.name}: {contestant.latest_buzz}, ping: {contestant.ping}", flush=True)
 
         sleep(max(max(c.ping / 1000, 0.001) for c in contestants.values()))
 
-        # Make sure no other requests can declare a winner using a lock
-        flask.current_app.config["JEOPARDY_LOCK"].acquire()
+        try:
+            # Make sure no other requests can declare a winner by using a lock
+            flask.current_app.config["JEOPARDY_LOCK"].acquire()
 
-        state.buzz_winner_decided = True
+            if state.buzz_winner_decided:
+                emit("buzz_received", (contestant.index, time_taken, False), to="presenter")
+                return
 
-        earliest_buzz_time = time()
-        earliest_buzz_player = None
-        for c in contestants.values():
-            if c.latest_buzz is not None and c.latest_buzz < earliest_buzz_time:
-                earliest_buzz_time = c.latest_buzz
-                earliest_buzz_player = c
+            state.buzz_winner_decided = True
 
-        # Reset buzz-in times
-        for c in contestants.values():
-            c.latest_buzz = None
+            earliest_buzz_time = time()
+            earliest_buzz_player = None
+            for c in contestants.values():
+                if c.latest_buzz is not None and c.latest_buzz < earliest_buzz_time:
+                    earliest_buzz_time = c.latest_buzz
+                    earliest_buzz_player = c
 
-        emit("buzz_winner", to=earliest_buzz_player.sid)
-        emit("buzz_loser", to="contestants", skip_sid=earliest_buzz_player.sid)
-        emit("buzz_winner", earliest_buzz_player.index, to="presenter")
+            # Reset buzz-in times
+            for c in contestants.values():
+                c.latest_buzz = None
 
-        flask.current_app.config["JEOPARDY_LOCK"].release()
+            emit("buzz_winner", to=earliest_buzz_player.sid)
+            emit("buzz_loser", to="contestants", skip_sid=earliest_buzz_player.sid)
+            emit("buzz_received", (earliest_buzz_player.index, time_taken, True), to="presenter")
+
+        finally:
+            flask.current_app.config["JEOPARDY_LOCK"].release()
 
 @app_util.socket_io.event
 def disable_buzz():

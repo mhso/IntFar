@@ -20,14 +20,14 @@ class TestWrapper(TestRunner):
         self.before_all(config=conf, database=database)
 
     def before_test(self):
-        auth = json.load(open("../resources/auth.json"))
+        auth = json.load(open(f"{self.config.resources_folder}/auth.json"))
         self.config.riot_key = auth["riotDevKey"] if self.config.use_dev_token else auth["riotAPIKey"]
 
-        shutil.copy("../resources/database.db", "../resources/database_test.db")
-        self.config.database = "../resources/database_test.db"
+        shutil.copy(f"{self.config.resources_folder}/database.db", f"{self.config.resources_folder}/database_test.db")
+        self.config.database = f"{self.config.resources_folder}/database_test.db"
 
     def after_test(self):
-        os.remove("../resources/database_test.db")
+        os.remove(f"{self.config.resources_folder}/database_test.db")
 
     @test
     def test_stat_record(self):
@@ -138,7 +138,7 @@ class TestWrapper(TestRunner):
     @test
     def test_role_info(self):
         all_none = True
-        for game_file in glob("../resources/data/game_*.json"):
+        for game_file in glob(f"{self.config.resources_folder}/data/game_*.json"):
             with open(game_file) as fp:
                 data = json.load(fp)
                 for participant_data in data["participants"]:
@@ -152,7 +152,7 @@ class TestWrapper(TestRunner):
     @test
     def test_cool_stats(self):
         game_id = 5438872497
-        with open(f"../resources/data/game_{game_id}.json", "r", encoding="utf-8") as fp:
+        with open(f"{self.config.resources_folder}/data/game_{game_id}.json", "r", encoding="utf-8") as fp:
             data = json.load(fp)
 
         relevant_stats, users_in_game = game_stats.get_relevant_stats(self.database.summoners, [], data)

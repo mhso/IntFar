@@ -16,7 +16,7 @@ class TestWrapper(TestRunner):
         self.before_all(config=conf, database=database)
 
     def before_test(self):
-        auth = json.load(open("../resources/auth.json"))
+        auth = json.load(open(f"{self.config.resources_folder}/auth.json"))
         self.config.riot_key = auth["riotDevKey"] if self.config.use_dev_token else auth["riotAPIKey"]
 
         # shutil.copy("resources/database.db", "resources/database_test.db")
@@ -56,7 +56,7 @@ class TestWrapper(TestRunner):
         ]
 
         for game_id in game_ids:
-            filename = f"../resources/data/game_{game_id}.json"
+            filename = f"{self.config.resources_folder}/data/game_{game_id}.json"
             with open(filename, "r", encoding="utf-8") as fp:
                 data = json.load(fp)
                 data["gameDuration"] /= 1000

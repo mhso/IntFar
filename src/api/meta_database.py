@@ -131,9 +131,13 @@ class MetaDatabase(SQLiteDatabase):
             order_by = "total_plays ASC"
 
         query = f"""
-            SELECT sounds.sound, owner_id, SUM(plays) AS total_plays, timestamp
+            SELECT
+                sounds.sound,
+                owner_id,
+                COALESCE(SUM(plays), 0) AS total_plays,
+                timestamp
             FROM sounds
-            INNER JOIN sound_hits
+            LEFT JOIN sound_hits
             ON sound_hits.sound = sounds.sound
             GROUP BY sounds.sound
             ORDER BY {order_by}

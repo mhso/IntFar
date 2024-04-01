@@ -14,7 +14,7 @@ class TestWrapper(TestRunner):
     def __init__(self):
         super().__init__()
         conf = Config()
-        conf.database = "../resources/test.db"
+        conf.database = f"{conf.resources_folder}/test.db"
         database_client = Database(conf)
         bet_handlers = {
             game: get_betting_handler(game, conf, database_client)
