@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+
 from api.config import Config
+from api.user import User
 
 class GameAPIClient(ABC):
     def __init__(self, game: str, config: Config):
@@ -13,6 +15,10 @@ class GameAPIClient(ABC):
 
     @abstractmethod
     def get_active_game(self, user_id) -> dict:
+        ...
+
+    @abstractmethod
+    def get_active_game_for_user(self, user: User) -> tuple[dict, str]:
         ...
 
     @abstractmethod

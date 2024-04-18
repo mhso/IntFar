@@ -25,12 +25,19 @@ class LoLGameMonitor(GameMonitor):
             summ_ids = user_dict[disc_id].ingame_id
             player_stats = get_player_stats(game_data, summ_ids)
             if player_stats is not None:
+                active_summ_name = None
+                for summ_id, summ_name in zip(user_dict[disc_id].ingame_id, user_dict[disc_id].ingame_name):
+                    if summ_id == player_stats["summonerId"]:
+                        active_summ_name = summ_name
+                        break
+
                 users_in_game[disc_id] = User(
                     disc_id,
                     user_dict[disc_id].secret,
-                    [player_stats["summonerName"]],
+                    [active_summ_name],
                     [player_stats["summonerId"]],
-                    champ_id=player_stats["championId"]
+                    puuid=[player_stats["puuid"]],
+                    champ_id=player_stats["championId"],
                 )
 
         return users_in_game
@@ -50,27 +57,19 @@ class LoLGameMonitor(GameMonitor):
         users_in_current_game = {}
 
         for disc_id in user_dict:
-            summ_ids = user_dict[disc_id].ingame_id
-            game_for_summoner = None
+            game_data, active_id = await self.api_client.get_active_game_for_user(user_dict[disc_id])
+            if game_data is None:
+                continue
 
-            # Check if any of the summ_names/summ_ids for a given player is in a game.
-            for summ_id in summ_ids:
-                game_data = self.api_client.get_active_game(summ_id)
-                if game_data is not None:
-                    game_start = int(game_data["gameStartTime"]) / 1000
-                    active_game_start = game_start
-                    game_for_summoner = game_data
-                    break
+            game_start = int(game_data["gameStartTime"]) / 1000
+            active_game_start = game_start
 
-                await asyncio.sleep(1)
+            player_stats = get_player_stats(game_data, [active_id])
+            game_ids.add(game_data["gameId"])
+            active_game_team = player_stats["teamId"]
+            active_game = game_data
 
-            if game_for_summoner is not None: # We found a game for the current player
-                player_stats = get_player_stats(game_for_summoner, summ_ids)
-                game_ids.add(game_for_summoner["gameId"])
-                active_game_team = player_stats["teamId"]
-                active_game = game_for_summoner
-
-                users_in_current_game.update(self.get_users_in_game(user_dict, game_for_summoner))
+            users_in_current_game.update(self.get_users_in_game(user_dict, game_data))
 
         if len(game_ids) > 1: # People are in different games.
             return None, users_in_current_game, self.GAME_STATUS_NOCHANGE

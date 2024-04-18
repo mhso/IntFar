@@ -456,12 +456,22 @@ class LoLGameStatsParser(GameStatsParser):
         champions = {}
         for participant in self.raw_data["participants"]:
             for disc_id in self.all_users.keys():
-                if participant["summonerId"] in self.all_users[disc_id].ingame_id:
-                    champ_id = participant["championId"]
-                    champ_played = self.api_client.get_champ_name(champ_id)
-                    if champ_played is None:
-                        champ_played = "Unknown Champ (Rito pls)"
-                    champions[participant["summonerId"]] = (participant["summonerName"], champ_played)
+                user = self.all_users[disc_id]
+                active_name = None
+                for summ_id, summ_name in zip(user.ingame_id, user.ingame_name):
+                    if summ_id == participant["summonerId"]:
+                        active_name = summ_name
+                        break
+
+                if active_name is None:
+                    continue
+
+                champ_id = participant["championId"]
+                champ_played = self.api_client.get_champ_name(champ_id)
+                if champ_played is None:
+                    champ_played = "Unknown Champ (Rito pls)"
+                
+                champions[participant["summonerId"]] = (active_name, champ_played)
 
         game_start = self.raw_data["gameStartTime"] / 1000
         if game_start > 0:

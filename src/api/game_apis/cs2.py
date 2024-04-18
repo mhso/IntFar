@@ -1,3 +1,4 @@
+import asyncio
 import json
 import bz2
 import os
@@ -20,6 +21,7 @@ from awpy import DemoParser
 
 from api.config import Config
 from api.game_api_client import GameAPIClient
+from api.user import User
 
 _ENDPOINT_NEXT_MATCH = (
     "https://api.steampowered.com/ICSGOPlayers_730/GetNextMatchSharingCode/v1"
@@ -208,6 +210,17 @@ class SteamAPIClient(GameAPIClient):
             json.loads(MessageToJson(resp[0]))
 
         return None
+
+    async def get_active_game_for_user(self, user: User):
+        for steam_id in user.ingame_id:
+            game_info = self.get_active_game(steam_id)
+
+            if game_info is not None:
+                return game_info, steam_id
+
+            await asyncio.sleep(1)
+            
+        return None, None
 
     def get_next_sharecode(self, steam_id, auth_code, match_token):
         url = _ENDPOINT_NEXT_MATCH.replace(

@@ -18,26 +18,16 @@ FLIRT_MESSAGES = {
 
 async def handle_game_msg(client, message, target_id, game):
     database = client.game_databases[game]
-    ingame_ids = None
+    target_user = None
     target_name = client.get_discord_nick(target_id, message.guild.id)
 
     for disc_id in database.game_users.keys():
         if disc_id == target_id:
-            ingame_ids = database.game_users[disc_id].ingame_id
+            target_user = database.game_users[disc_id]
             break
 
     response = ""
-    game_data = None
-    active_id = None
-    for ingame_id in ingame_ids:
-        api_client = client.api_clients[game]
-
-        game_data = api_client.get_active_game(ingame_id)
-
-        if game_data is not None:
-            active_id = ingame_id
-            break
-        await asyncio.sleep(1)
+    game_data, active_id = await client.api_clients[game].get_active_game_for_user(target_user)
 
     if game_data is not None:
         stat_parser = get_stat_parser(game, game_data, client.api_clients[game], database.game_users, message.guild.id)

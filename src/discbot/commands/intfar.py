@@ -145,9 +145,11 @@ async def handle_intfar_criteria_msg(client, message, game, criteria=None):
         for line in intfar_criterias[criteria]:
             response += f"\n- {line}"
     else:
-        response = f"Possible criterias for getting Int-Far in {game_name}:"
+        response = f"Possible criterias for getting Int-Far in {game_name}:\n"
         for reason in intfar_reasons:
-            response += f"\n- **{reason}**: {intfar_reasons[reason]}"
+            response += f"- **{reason}**: {intfar_reasons[reason]}\n"
+
+        response += "Write `!intfar_criteria [reason] to see more specific criteria."
 
     if valid_criteria:
         response += "\nThese criteria must **all** be met to be Int-Far."

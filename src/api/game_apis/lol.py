@@ -3,11 +3,13 @@ from glob import glob
 from os import remove
 from os.path import exists
 import json
+import asyncio
 
 from mhooge_flask.logging import logger
 import requests
 
 from api.game_api_client import GameAPIClient
+from api.user import User
 
 API_PLATFORM = "https://euw1.api.riotgames.com"
 API_REGION = "https://europe.api.riotgames.com"
@@ -273,6 +275,7 @@ class RiotAPIClient(GameAPIClient):
 
         if response.status_code != 200 and response.status_code not in ignore_errors:
             logger.bind(
+                event="riot_api_error",
                 url=full_url,
                 response=response.text,
                 status_code=response.status_code 
@@ -296,10 +299,10 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()["name"]
 
-    def get_active_game(self, summ_id):
-        endpoint = "/lol/spectator/v4/active-games/by-summoner/{0}"
+    def get_active_game(self, puuid):
+        endpoint = "/lol/spectator/v5/active-games/by-summoner/{0}"
         try:
-            response = self.make_request(endpoint, API_PLATFORM, summ_id, ignore_errors=[404])
+            response = self.make_request(endpoint, API_PLATFORM, puuid, ignore_errors=[404])
             if response.status_code != 200:
                 return None
 
@@ -307,6 +310,17 @@ class RiotAPIClient(GameAPIClient):
             return None
 
         return response.json()
+
+    async def get_active_game_for_user(self, user: User):
+        for summ_id, puuid in zip(user.ingame_id, user.puuid):
+            game_info = self.get_active_game(puuid)
+
+            if game_info is not None:
+                return game_info, summ_id
+            
+            await asyncio.sleep(1)
+            
+        return None, None
 
     def get_game_details(self, game_id, tries=0):
         api_v4_cutoff = 6000000000
