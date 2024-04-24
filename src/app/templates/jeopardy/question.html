@@ -61,6 +61,22 @@
                 {% endif %}
             </div>
 
+            <!-- Question tips -->
+            {% if 'tips' in question %}
+                {% set tips = question['tips'] %}
+                <div class="question-tip-wrapper d-none">
+                    <h3 class="question-tip-header">Tip 1</h3>
+                    <div class="question-tip-content">{{ tips[0] }}</div>
+                </div>
+    
+                {% if len(tips) > 1 %}
+                <div class="question-tip-wrapper d-none">
+                    <h3 class="question-tip-header">Tip 2</h3>
+                    <div class="question-tip-content">{{ tips[1] }}</div>
+                </div>
+                {% endif %}
+            {% endif %}
+
             <!-- Countdown wrapper -->
             <div id="question-countdown-wrapper">
                 <div id="question-countdown-filled"></div>

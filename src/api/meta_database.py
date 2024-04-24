@@ -120,11 +120,11 @@ class MetaDatabase(SQLiteDatabase):
             self.execute_query(query, sound, date_start, date_end)
 
     def get_sounds(self, ordering):
-        order_by = "sound ASC"
+        order_by = "sounds.sound ASC"
         if ordering == "newest":
-            order_by = "timestamp DESC"
+            order_by = "sounds.timestamp DESC"
         elif ordering == "oldest":
-            order_by = "timestamp ASC"
+            order_by = "sounds.timestamp ASC"
         elif ordering == "most_played":
             order_by = "total_plays DESC"
         elif ordering == "least_played":

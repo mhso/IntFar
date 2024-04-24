@@ -442,11 +442,35 @@ function playerBuzzedIn(playerId, timeTaken, isWinner) {
     }, 500);
 }
 
+function showTip(index, callback) {
+    let tipElems = document.getElementsByClassName("question-tip-wrapper");
+    if (index >= tipElems.length) {
+        callback();
+        return;
+    }
+
+    delay = index == 0 ? 3000 : 5000
+    setTimeout(function() {
+        if (index > 0) {
+            // Hide previously shown tip
+            let prevTipElem = tipElems.item(index - 1);
+            prevTipElem.classList.add("d-none");
+        }
+    
+        tipElems.item(index).classList.remove("d-none");
+        
+        // Reduce the value of the question after a tip is shown
+        activeValue *= 0.5;
+
+        showTip(index + 1, callback);
+    }, delay);
+}
+
 function questionAsked(countdownDelay) {
     setTimeout(function() {
         if (answeringPlayer == null && canPlayersBuzzIn()) {
             hideAnswerIndicator();
-            startCountdown(TIME_FOR_BUZZING);
+            showTip(0, () => startCountdown(TIME_FOR_BUZZING));
         }
         else if (isDailyDouble) {
             startAnswerCountdown(TIME_FOR_DOUBLE_ANSWER);

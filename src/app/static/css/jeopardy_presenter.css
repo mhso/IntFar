@@ -616,6 +616,10 @@ h3 {
     margin: 0 auto;
 }
 
+.question-tip-wrapper {
+    text-align: center;
+}
+
 #question-answers-wrapper {
     display: inline-flex;
     flex-direction: row;

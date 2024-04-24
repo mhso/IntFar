@@ -127,7 +127,11 @@ class GameMonitor(ABC):
                 self.polling_active[guild_id] = False
                 return
 
-        game_status = await self.check_game_status(guild_id, guild_name)
+        try:
+            game_status = await self.check_game_status(guild_id, guild_name)
+        except Exception:
+            bound_logger = logger.bind(event="game_status_error", game=self.game, guild_id=guild_id)
+            bound_logger.exception(f"Error when getting status for {self.game}")
 
         if game_status == self.GAME_STATUS_ACTIVE: # Game has started.
             # Send update to Int-Far website that a game has started.
