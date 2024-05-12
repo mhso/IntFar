@@ -27,12 +27,22 @@
             </div>
 
             <!-- Scores table -->
-            <h2>Final Scorez</h2>
+            <h2>Final Statz</h2>
             <table id="endscreen-scores-table">
+                <tr>
+                    <th>Navn</th>
+                    <th>Score</th>
+                    <th>Buzzes</th>
+                    <th>Korrekt</th>
+                    <th>Forkert</th>
+                </tr>
                 {% for data in player_data %}
                 <tr>
                     <td class="endscreen-score-name" style="color: #{{ data['color'] }};">{{ data['name'] }}</td>
-                    <td class="endscreen-score-score">{{ data['score'] }}</td>
+                    <td class="endscreen-score-data">{{ data['score'] }}</td>
+                    <td class="endscreen-score-data">{{ data['buzzes'] }}</td>
+                    <td class="endscreen-score-data">{{ data['hits'] }}</td>
+                    <td class="endscreen-score-data">{{ data['misses'] }}</td>
                 </tr>
                 {% endfor %}
             </table>

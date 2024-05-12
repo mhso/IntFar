@@ -213,3 +213,27 @@ async def handle_lan_doinks_msg(client, message, target_id=None):
     messages.sort(key=lambda x: x[1], reverse=True)
 
     await send_tally_messages(client, message, messages, "Doinks", target_id is None)
+
+async def handle_jeopardy_join_msg(client, message):
+    if not lan_api.is_lan_ongoing(datetime.now(), message.guild.id):
+        return
+
+    client_secret = client.meta_database.get_client_secret(message.author.id)
+    url = f"{api_util.get_website_link()}/jeopardy/{client_secret}"
+    response_dm = "Go to this link to join Jeopardy!\n"
+    response_dm += url
+
+    mention = client.get_mention_str(message.author.id, message.guild.id)
+    response_server = (
+        f"Psst, {mention}, I sent you a DM with a secret link, "
+        "where you can join Jeopardy {emote_peberno}"
+    )
+
+    await message.channel.send(client.insert_emotes(response_server))
+
+    # Send DM to the user
+    dm_sent = await client.send_dm(response_dm, message.author.id)
+    if not dm_sent:
+        await message.channel.send(
+            "Error: DM Message could not be sent for some reason ;( Try again!"
+        )

@@ -308,9 +308,29 @@ class TestFuncs:
             print(champ_name, count)
 
     def test_reee(self):
-        puuid = "VNoVyAA9kI61EGZKkWqMOOZfc2e0YVuo-YDiipFSgs5-Bt5DU4x2o81kF45cnNXC2uIwsiy20qKxig"
-        data = self.riot_api.get_active_game(puuid)
-        print(data)
+        sum_kdas = {}
+        players_on_champ = {}
+        games_on_champ = {}
+        for champ_id in self.riot_api.champ_names:
+            for _, kda, games in self.game_databases["lol"].get_average_stat("kda", played_id=champ_id, min_games=1)():
+                if games is None:
+                    continue
+
+                sum_kdas[champ_id] = sum_kdas.get(champ_id, 0) + kda
+                players_on_champ[champ_id] = players_on_champ.get(champ_id, 0) + 1
+                games_on_champ[champ_id] = games_on_champ.get(champ_id, 0) + games
+
+        max_kda = 0
+        max_kda_champ = None
+        total_games = 0
+        for champ_id in sum_kdas:
+            avg = sum_kdas[champ_id] / players_on_champ[champ_id]
+            if avg > max_kda:
+                max_kda = avg
+                max_kda_champ = champ_id
+                total_games = games_on_champ[champ_id]
+    
+        print(f"{self.riot_api.get_playable_name(max_kda_champ)}: {max_kda} ({total_games} games)")
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

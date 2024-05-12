@@ -1,11 +1,14 @@
-const TIME_FOR_BUZZING = 8;
+const TIME_FOR_BUZZING = 10;
 const TIME_FOR_ANSWERING = 6;
 const TIME_FOR_DOUBLE_ANSWER = 10;
 const TIME_FOR_WAGERING = 60;
 const TIME_FOR_FINAL_ANSWER = 40;
+const TIME_BEFORE_FIRST_TIP = 4;
+const TIME_BEFORE_EXTRA_TIPS = 4;
+const PRESENTER_ACTION_KEY = "NumLock"
 const socket = io();
 
-var countdownInterval;
+var countdownInterval = null;
 var activeRound;
 var activeQuestionId;
 var activeAnswer;
@@ -14,14 +17,14 @@ var answeringPlayer = null;
 var activePlayers = [];
 var questionAnswered = false;
 var isDailyDouble = false;
-let chosenPlayers = [];
-let menuPlayerData;
 
 let playerTurn = 0;
 var questionNum = 0;
 var playerIds = [];
-let playerColors = [];
+var playerNames = [];
 var playerScores = [];
+let playerColors = [];
+let playersBuzzedIn = [];
 
 function canPlayersBuzzIn() {
     return activeRound < 3 && !isDailyDouble;
@@ -33,9 +36,15 @@ function getBaseURL() {
 
 function getQueryParams() {
     // Encode player information and turns into URL query strings
+    let playerIdQueries = new Array();
+    playerIds.forEach((discId, index) => {
+        playerIdQueries.push(`i${index+1}=${encodeURIComponent(discId)}`);
+    });
+    let idsQueryStr = playerIdQueries.join("&");
+
     let playerNameQueries = new Array();
-    playerIds.forEach((name, index) => {
-        playerNameQueries.push(`i${index+1}=${encodeURIComponent(name)}`);
+    playerNames.forEach((name, index) => {
+        playerNameQueries.push(`n${index+1}=${encodeURIComponent(name)}`);
     });
     let namesQueryStr = playerNameQueries.join("&");
 
@@ -51,7 +60,7 @@ function getQueryParams() {
     });
     let colorsQueryStr = playerColorQueries.join("&");
 
-    return `${namesQueryStr}&${scoresQueryStr}&${colorsQueryStr}&turn=${playerTurn}&question=${questionNum}`
+    return `${idsQueryStr}&${scoresQueryStr}&${namesQueryStr}&${colorsQueryStr}&turn=${playerTurn}&question=${questionNum}`
 }
 
 function getSelectionURL(round) {
@@ -70,21 +79,21 @@ function getEndscreenURL() {
     return `${getBaseURL()}/endscreen?${getQueryParams()}`;
 }
 
-function getRandomSound(sounds) {
-    let index = Math.floor(Math.random() * sounds.length);
-    return sounds.item(index);
-}
-
 function playCorrectSound() {
-    let sounds = document.getElementsByClassName("question-sound-correct");
-    let sound = getRandomSound(sounds);
+    let sound = document.getElementById("question-sound-correct");
     sound.play();
 }
 
 function playWrongSound() {
     let sounds = document.getElementsByClassName("question-sound-wrong");
-    let sound = getRandomSound(sounds);
-    sound.play();
+    for (let i = 0; i < sounds.length; i++) {
+        let sound = sounds.item(i);
+        if (!sound.classList.contains("played")) {
+            sound.play();
+            sound.classList.add("played");
+            return;
+        }
+    }
 }
 
 function placeAnswerImageIfPresent() {
@@ -121,8 +130,9 @@ function listenForBuzzIn() {
 
 function afterQuestion() {
     activeAnswer = null;
+    hideTips();
     window.onkeydown = function(e) {
-        if (e.key == "NumLock") {
+        if (e.key == PRESENTER_ACTION_KEY) {
             questionNum += 1;
             window.location.href = getSelectionURL(activeRound);
         }
@@ -139,6 +149,7 @@ function afterAnswer() {
     buzzFeed.getElementsByTagName("ul").item(0).innerHTML = "";
 
     if (activeAnswer == null) {
+        // Question has been answered or time ran out
         socket.emit("disable_buzz");
         return;
     }
@@ -178,6 +189,15 @@ function correctAnswer() {
     let elem = document.getElementById("question-answer-correct");
 
     let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
+
+    // Reduce the value of the question if tips are shown
+    let shownTips = document.getElementsByClassName("tip-shown").length;
+    activeValue *= (1 / 2 ** shownTips);
+
+    // Reduce the value of the question by how few multiple choice answer are left
+    let wrongAnswers = document.getElementsByClassName("question-answered-wrong").length;
+    activeValue *= (1 / 2 ** wrongAnswers);
+
     valueElem.textContent = "+" + activeValue;
 
     let coinElem = elem.getElementsByClassName("question-result-gbp").item(0);
@@ -200,6 +220,9 @@ function correctAnswer() {
         // Set player as having the turn, if they didn't already
         setPlayerTurn(answeringPlayer, true);
     }
+
+    // Send update to server
+    socket.emit("correct_answer", answeringPlayer);
 
     // Move on to next question
     afterQuestion();
@@ -228,6 +251,9 @@ function wrongAnswer(reason) {
         if (coinElem.classList.contains("d-none")) {
             coinElem.classList.remove("d-none");
         }
+
+        // Send update to server
+        socket.emit("wrong_answer", answeringPlayer);
     }
 
     let outOfTime = reason == "Ikke mere tid" && answeringPlayer == null;
@@ -291,7 +317,7 @@ function answerQuestion(event) {
             setTimeout(function() {
                 elem.classList.remove("question-answering");
 
-                if (answerElem.textContent == activeAnswer) {
+                if (answerElem.textContent === activeAnswer) {
                     elem.classList.add("question-answered-correct");
                     correctAnswer();
                 }
@@ -385,7 +411,7 @@ function startAnswerCountdown(duration) {
 
     // NumLock has to be pressed before an answer can be given (for safety)
     window.onkeydown = function(e) {
-        if (e.key == "NumLock") {
+        if (e.key == PRESENTER_ACTION_KEY) {
             // Pause video if one is playing
             pauseVideo();
 
@@ -400,6 +426,10 @@ function startAnswerCountdown(duration) {
 }
 
 function addToBuzzFeed(playerId, timeTaken) {
+    if (playersBuzzedIn.includes(playerId)) {
+        return;
+    }
+
     let playerFooterElem = document.getElementsByClassName("footer-contestant-entry").item(playerId);
     let color = playerFooterElem.style.backgroundColor;
     let name = playerFooterElem.getElementsByClassName("footer-contestant-entry-name").item(0).textContent;
@@ -412,11 +442,11 @@ function addToBuzzFeed(playerId, timeTaken) {
     listParent.appendChild(listElem);
 }
 
-function playerBuzzedIn(playerId, timeTaken, isWinner) {
-    addToBuzzFeed(playerId, timeTaken);
+function playerBuzzedFirst(playerId) {
+    playersBuzzedIn.push(playerId);
 
-    if (!isWinner || !activePlayers[playerId] || answeringPlayer != null) {
-        return; // Player already buzzed in once this question or didn't buzz in first
+    if (!activePlayers[playerId] || answeringPlayer != null) {
+        return;
     }
 
     // Buzzer has been hit, let the player answer.
@@ -442,35 +472,40 @@ function playerBuzzedIn(playerId, timeTaken, isWinner) {
     }, 500);
 }
 
-function showTip(index, callback) {
+function hideTips() {
+    let tipElems = document.getElementsByClassName("question-tip-wrapper");
+    for (let i = 0; i < tipElems.length; i++) {
+        tipElems.item(i).classList.add("d-none");
+    }
+}
+
+function showTip(index) {
     let tipElems = document.getElementsByClassName("question-tip-wrapper");
     if (index >= tipElems.length) {
-        callback();
         return;
     }
 
-    delay = index == 0 ? 3000 : 5000
+    delay = index == 0 ? TIME_BEFORE_FIRST_TIP : TIME_BEFORE_EXTRA_TIPS;
     setTimeout(function() {
-        if (index > 0) {
-            // Hide previously shown tip
-            let prevTipElem = tipElems.item(index - 1);
-            prevTipElem.classList.add("d-none");
+        if (activeAnswer == null) {
+            // Question is over, don't show tip
+            return;
         }
     
-        tipElems.item(index).classList.remove("d-none");
-        
-        // Reduce the value of the question after a tip is shown
-        activeValue *= 0.5;
+        let tipElem = tipElems.item(index);
+        tipElem.style.setProperty("opacity", 1);
+        tipElem.classList.add("tip-shown");
 
-        showTip(index + 1, callback);
-    }, delay);
+        showTip(index + 1);
+    }, delay * 1000);
 }
 
 function questionAsked(countdownDelay) {
     setTimeout(function() {
         if (answeringPlayer == null && canPlayersBuzzIn()) {
             hideAnswerIndicator();
-            showTip(0, () => startCountdown(TIME_FOR_BUZZING));
+            showTip(0);
+            startCountdown(TIME_FOR_BUZZING);
         }
         else if (isDailyDouble) {
             startAnswerCountdown(TIME_FOR_DOUBLE_ANSWER);
@@ -498,7 +533,7 @@ function showAnswerChoice(index) {
 
     if (index < 3) {
         window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
+            if (e.key == PRESENTER_ACTION_KEY) {
                 showAnswerChoice(index + 1);
             }
         }
@@ -511,7 +546,7 @@ function showAnswerChoice(index) {
 function afterShowQuestion() {
     if (isQuestionMultipleChoice()) {
         window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
+            if (e.key == PRESENTER_ACTION_KEY) {
                 showAnswerChoice(0);
             }
         }
@@ -522,10 +557,6 @@ function afterShowQuestion() {
 }
 
 function showQuestion() {
-    if (activePlayers.length != 0) {
-        return;
-    }
-
     for (let i = 0; i < playerIds.length; i++) {
         activePlayers.push(isDailyDouble ? false : true);
     }
@@ -539,48 +570,45 @@ function showQuestion() {
     let imageElem = document.getElementById("question-question-image");
     let videoElem = document.getElementById("question-question-video");
 
-    let hasAnswerImage = document.getElementById("question-answer-image") != null;
-
     if (imageElem != null || videoElem != null) {
         // If there is an answer image, first show the question, then show
         // the image after pressing NumLock again. Otherwise show image instantly
-        if (hasAnswerImage || videoElem != null) {
-            window.onkeydown = function(e) {
-                if (e.key == "NumLock") {
-                    if (imageElem != null) {
-                        imageElem.style.opacity = 1;
-                        afterShowQuestion();
-                    }
-                    else {
-                        videoElem.style.opacity = 1;
-                        videoElem.play();
-                        videoElem.onended = afterShowQuestion;
-
-                        if (canPlayersBuzzIn()) {
-                            // Let players interrupt the video and buzz in early
-                            listenForBuzzIn();
-                        }
-                    }
+        window.onkeydown = function(e) {
+            if (e.key == PRESENTER_ACTION_KEY) {
+                if (imageElem != null) {
+                    imageElem.style.opacity = 1;
+                    afterShowQuestion();
                 }
-            }
-        }
-        else {
-            if (isQuestionMultipleChoice()) {
-                imageElem.style.opacity = 1;
-                afterShowQuestion();
-            }
-            else {
-                window.onkeydown = function(e) {
-                    if (e.key == "NumLock") {
-                        imageElem.style.opacity = 1;
-                        afterShowQuestion();
+                else {
+                    videoElem.style.opacity = 1;
+                    videoElem.play();
+                    videoElem.onended = afterShowQuestion;
+
+                    if (canPlayersBuzzIn()) {
+                        // Let players interrupt the video and buzz in early
+                        listenForBuzzIn();
                     }
                 }
             }
         }
     }
     else {
-        afterShowQuestion();
+        if (isQuestionMultipleChoice()) {
+            if (imageElem != null) {
+                imageElem.style.opacity = 1;
+            }
+            afterShowQuestion();
+        }
+        else {
+            window.onkeydown = function(e) {
+                if (e.key == PRESENTER_ACTION_KEY) {
+                    if (imageElem != null) {
+                        imageElem.style.opacity = 1;
+                    }
+                    afterShowQuestion();
+                }
+            }
+        }
     }
 }
 
@@ -616,6 +644,7 @@ function setVariables(round, playerData, turn, question, answer=null, value=null
     playerData.forEach((data) => {
         playerIds.push(data["disc_id"]);
         playerScores.push(data["score"]);
+        playerNames.push(data["name"]);
         playerColors.push(data["color"]);
     });
     playerTurn = turn;
@@ -628,7 +657,7 @@ function setVariables(round, playerData, turn, question, answer=null, value=null
 
 function goToQuestion(div, category, tier, isDouble) {
     if (activeRound == 1 && playerTurn == -1) {
-        alert("Choose a starting player first (you idiot)");
+        alert("Choose a starting player first (you bellend)");
         return;
     }
 
@@ -723,13 +752,16 @@ function beginJeopardy() {
     let contestantEntries = document.getElementsByClassName("menu-contestant-entry");
 
     playerIds = [];
+    playerNames = [];
     playerColors = [];
     playerScores = [];
     playerTurn = -1;
 
     for (let i = 0; i < contestantEntries.length; i++) {
         let elem = contestantEntries.item(i);
+        let nameElem = elem.getElementsByClassName("menu-contestant-id").item(0);
         playerIds.push(elem.dataset["disc_id"]);
+        playerNames.push(nameElem.textContent);
         playerColors.push(elem.dataset["color"].replace("#", ""));
         playerScores.push(0);
     }
@@ -778,13 +810,9 @@ function addPlayerDiv(id, index, name, avatar, color) {
     }
 }
 
-function monitorPlayersJoining() {
-    socket.on("player_joined", addPlayerDiv);
-}
-
 function showFinaleCategory(category) {
     window.onkeydown = function(e) {
-        if (e.key == "NumLock") {
+        if (e.key == PRESENTER_ACTION_KEY) {
             let header1 = document.getElementById("selection-finale-header1");
             header1.style.setProperty("opacity", 1);
     
@@ -801,7 +829,7 @@ function showFinaleCategory(category) {
             }, 3000);
 
             window.onkeydown = function(e) {
-                if (e.key == "NumLock") {
+                if (e.key == PRESENTER_ACTION_KEY) {
                     window.location.href = getQuestionURL(3, category, 5);
                 }
             }
@@ -840,16 +868,16 @@ function showFinaleResult() {
                     descElem.style.opacity = 1;
                     descElem.classList.add("wager-answer-correct");
                     descElem.innerHTML = `og <strong>vinder ${amount} GBP</strong>!`;
-                    playerScores[player] += amount;
+                    updatePlayerScore(player, amount);
                 }
                 else if (e.key == 2) {
                     // Current player answered incorrectly
                     descElem.style.opacity = 1;
                     descElem.classList.add("wager-answer-wrong");
                     descElem.innerHTML = `og <strong>taber ${amount} GBP</strong>!`;
-                    playerScores[player] -= amount;
+                    updatePlayerScore(player, -amount);
                 }
-                else if (e.key == "NumLock") {
+                else if (e.key == PRESENTER_ACTION_KEY) {
                     showNextResult(player + 1);
                 }
             }
@@ -857,7 +885,7 @@ function showFinaleResult() {
     }
 
     window.onkeydown = function(e) {
-        if (e.key == "NumLock") {
+        if (e.key == PRESENTER_ACTION_KEY) {
             showNextResult(0);
         }
     }
@@ -868,7 +896,7 @@ function showFinaleResult() {
 
 function startWinnerParty() {
     window.onkeydown = function(e) {
-        if (e.key == "NumLock") {
+        if (e.key == PRESENTER_ACTION_KEY) {
             document.getElementById("endscreen-confetti-video").play();
             document.getElementById("endscreen-music").play();
             let overlay = document.getElementById("endscreen-techno-overlay");

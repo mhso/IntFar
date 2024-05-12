@@ -1586,11 +1586,16 @@ class DiscordClient(discord.Client):
             for disc_id in database.game_users.keys():
                 user_info = database.game_users[disc_id]
                 for ingame_id, old_name in zip(user_info.ingame_id, user_info.ingame_name):
-                    new_name = self.api_clients[game].get_ingame_name(ingame_id)
-                    if new_name is not None and new_name != old_name:
-                        logger.info(f"Updated username from {old_name} to {new_name} in {game}")
-                        logger.info(f"{disc_id}({type(disc_id)}), {ingame_id}({type(ingame_id)})")
-                        database.set_user_name(int(disc_id), ingame_id, new_name)
+                    try:
+                        new_name = self.api_clients[game].get_ingame_name(ingame_id)
+                        if new_name is not None and new_name != old_name:
+                            logger.info(f"Updated username from {old_name} to {new_name} in {game}")
+                            logger.info(f"{disc_id}({type(disc_id)}), {ingame_id}({type(ingame_id)})")
+                            database.set_user_name(int(disc_id), ingame_id, new_name)
+                    except Exception:
+                        logger.bind(event="set_newest_usernames", disc_id=disc_id, game=game).exception(
+                            "Failed to get new username"
+                        )
 
                     await asyncio.sleep(2)
 
@@ -1619,8 +1624,13 @@ class DiscordClient(discord.Client):
         while not ifotm_monitor.should_announce():
             new_day = datetime.now(ifotm_monitor.cph_timezone).day
             if new_day != curr_day:
-                # Download latest information from Riot API.
-                self.api_clients["lol"].get_latest_data()
+                try:
+                    # Download latest information from Riot API.
+                    self.api_clients["lol"].get_latest_data()
+                except Exception:
+                    logger.bind(event="get_latest_data", game="lol").exception(
+                        "Failed to retrieve latest info from Riot API"
+                    )
 
                 # Get latest usernames for all players in all games, if they've changed
                 await self.set_newest_usernames()
@@ -1675,7 +1685,7 @@ class DiscordClient(discord.Client):
         # Hand out a special badge to the winner(s)
         guild_id = api_util.MY_GUILD_ID if self.config.env == "dev" else api_util.GUILD_MAP["core"]
         guild = self.get_guild(guild_id)
-        role = self.get_role("Jeopardy Master", guild)
+        role = self.get_role(f"Jeopardy Master {year}", guild)
         if role is not None:
             for data in player_data[:ties+1]:
                 member = guild.get_member(data["id"])

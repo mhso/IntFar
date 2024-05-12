@@ -1,26 +1,10 @@
-# Jeopardy v2.0
-Add tips that appear after no one has buzzed in for a bit (if question is hard enough to warrant it).
-
-First tip appears after 3 seconds, second tip after 8(?) seconds.
-
-Buzz-in countdown only starts after tips are revealed (or have a countdown for each tip?)
-
-Each tip revealed halves the value of the question.
-
-## Mechanics
-Keep it the same.
-
-## Lore
-Slightly lower difficulty
-
-## Icons
-Higher difficulty
-
-## Who's That Champion?
-Higher difficulty
-
-## Music
-More variety(?), lower difficulty
-
-## Cringe Quotes (New Category)
-Guess champion based on written voiceline, distorted audio, or maybe fill in the blank of a written champ quote.
+# Jeopardy v2.5
+- ~~Fix at man kan blive logged ud og derefter logged ind som en anden (Murt <-> Mads)~~
+- ~~Fix at den nogle gange buzzer ind af sig selv, eller buzzer en anden ind~~
+- Fix bug hvor flere buzz-in countdowns går i gang samtidig og derefter spiller alle lyde samtidig(???)
+- ~~Fix at daily double ikke virker hvis man har under 0 point~~
+- ~~Fix at answer countdown starter instantly, hvis der ikke er multiple choice eller billede på spørgsmål~~
+- ~~Fix at man kan buzze ind på mindre end 0 sekunder (nok pga. at ping udregnes som roundtrip og ikke one-way)~~
+- ~~Fix at man mister færre point hvis man svarer forkert efter et tip er givet~~
+- ~~Evt. lav så et spørgsmål giver mindre point jo flere folk har svaret forkert i multiple choice~~
+- Fix at endscreen timer ud

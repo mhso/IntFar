@@ -8,9 +8,7 @@
         <div id="menu-wrapper">
             {% include 'jeopardy/logo.html' %}
 
-            <h2>Lobby kode</h2>
-            <div style="text-align: center;"><div id="menu-lobby-code">{{ lobby_code }}</div></div>
-            <div id="menu-lobby-url">Hop over til <span style="text-decoration: underline">https://mhooge.com/intfar/jeopardy</span> og join!</div>
+            <div id="menu-lobby-url">Skriv <span id="menu-join-command">!jeopardy</span> i <strong>CoreNibbas</strong> for at joine!</div>
 
             <h2>Deltagere</h2>
             <div id="menu-contestants"></div>
@@ -33,15 +31,15 @@
     <script>
         socket.on("connect", function() {
             socket.emit("presenter_joined");
-            monitorPlayersJoining();
+            socket.on("player_joined", addPlayerDiv);
         });
 
         {% for player in player_data %}
-        addPlayerDiv("{{ player['disc_id'] }}", "{{ player['name'] }}", "{{ player['avatar'] }}", "{{ player['color'] }}");
+        addPlayerDiv("{{ player['disc_id'] }}", "{{ player['index'] }}", "{{ player['name'] }}", "{{ player['avatar'] }}", "{{ player['color'] }}");
         {% endfor %}
 
         window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
+            if (e.key == PRESENTER_ACTION_KEY) {
                 beginJeopardy();
             }
         }

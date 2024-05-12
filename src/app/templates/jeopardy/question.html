@@ -64,13 +64,13 @@
             <!-- Question tips -->
             {% if 'tips' in question %}
                 {% set tips = question['tips'] %}
-                <div class="question-tip-wrapper d-none">
+                <div id="question-tip-1" class="question-tip-wrapper">
                     <h3 class="question-tip-header">Tip 1</h3>
                     <div class="question-tip-content">{{ tips[0] }}</div>
                 </div>
     
-                {% if len(tips) > 1 %}
-                <div class="question-tip-wrapper d-none">
+                {% if tips | length > 1 %}
+                <div id="question-tip-2" class="question-tip-wrapper">
                     <h3 class="question-tip-header">Tip 2</h3>
                     <div class="question-tip-content">{{ tips[1] }}</div>
                 </div>
@@ -111,13 +111,13 @@
 
     <!-- Correct/wrong answers sounds -->
     {% if jeopardy_round < 3 %}
-    {% for sound_list in sounds %}
-    {% set correct_sound = loop.first %}
-    {% for sound_file in sound_list %}
-    <audio class="question-sound-{% if correct_sound %}correct{% else %}wrong{% endif %}">
+    <audio id="question-sound-correct">
+        <source src="{{ url_for('static', filename='sounds/' + correct_sound + '.mp3') }}" type="audio/mpeg">
+    </audio>
+    {% for sound_file in wrong_sounds %}
+    <audio class="question-sound-wrong">
         <source src="{{ url_for('static', filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
     </audio>
-    {% endfor %}
     {% endfor %}
     {% else %}
     <audio id="question-finale-suspense" class="volume-7">
@@ -139,7 +139,9 @@
 
         socket.on("connect", function() {
             socket.emit("presenter_joined");
-            socket.on("buzz_received", playerBuzzedIn);
+            socket.on("buzz_received", addToBuzzFeed);
+            socket.on("buzz_winner", playerBuzzedFirst);
+
             {% if daily_double %}
             socket.on("daily_wager_made", function(amount) {
                 afterDailyDoubleWager(amount);
@@ -151,7 +153,7 @@
         document.getElementById("question-wager-wrapper").classList.remove("d-none");
         {% else %}
         window.onkeydown = function(e) {
-            if (e.key == "NumLock") {
+            if (e.key == PRESENTER_ACTION_KEY) {
                 showQuestion();
                 {% if jeopardy_round == 3 %}
                 setTimeout(function() {

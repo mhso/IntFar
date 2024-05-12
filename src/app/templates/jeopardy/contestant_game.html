@@ -14,7 +14,9 @@
                     <div id="contestant-game-name">{{ nickname }}</div>
                 </div>
                 <div id="contestant-game-info">
-                    <div id="contestant-game-score">Score:<br><span style="font-weight: 800;">{{ score }} GBP</span></div>
+                    <div id="contestant-game-score" style="font-weight: 800;">{{ score }} GBP</div>
+                    <div id="contestant-game-buzzes">{{ buzzes }} buzzes</div>
+                    <div id="contestant-game-stats"><span id="contestant-game-hits">{{ hits }}</span> | <span id="contestant-game-misses">{{ misses }}</span></div>
                     <div id="contestant-game-ping" class="contestant-low-ping">{{ ping }} ms</div>
                 </div>
             </div>
@@ -65,7 +67,7 @@
                         {% if has_turn %}
                             {% set max_wager = [score, 500 * jeopardy_round] | max %}
 
-                            <h3 class="player-has-turn">Your move! Hvor mange GBP vil du satse?</h3>
+                            <h3 class="player-has-turn">Your move! Hvor mange GBP vil du satse?<br>(Min. 100, max. {{ max_wager }})</h3>
                             <input id="question-wager-input" type="number" min="100" max="{{ max_wager }}">
                             <button id="contestant-wager-btn" onclick="makeDailyDoubleWager('{{ active_player }}');">OK</button>
 
@@ -130,6 +132,7 @@
             {% if jeopardy_round < 4 %}
             <script>
                 socket.on("connect", function() {
+                    pingActive = true;
                     sendPingMessage("{{ active_player }}");
                     socket.emit("join_lobby", "{{ active_player }}", "{{ nickname }}", "{{ avatar }}", "{{ color }}");
                     animateWaitingText();
@@ -151,6 +154,9 @@
                         document.getElementById("finale-question-wrapper").classList.remove("d-none");
                     });
                     {% endif %}
+                });
+                socket.on("disconnect", function() {
+                    pingActive = false;
                 });
             </script>
             {% endif %}

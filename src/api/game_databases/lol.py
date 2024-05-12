@@ -119,13 +119,13 @@ class LoLGameDatabase(GameDatabase):
 
         return self.query(query, *parameters, format_func="one")
 
-    def get_average_stat(self, stat, disc_id=None, champ_id=None, min_games=10):
+    def get_average_stat(self, stat, disc_id=None, played_id=None, min_games=10):
         params = []
         player_condition = ""
         champ_condition = ""
 
-        if champ_id is not None:
-            params = [champ_id] * 2
+        if played_id is not None:
+            params = [played_id] * 2
             champ_condition = "WHERE p.champ_id=?"
 
         if disc_id is not None:

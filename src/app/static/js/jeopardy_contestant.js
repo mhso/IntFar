@@ -1,16 +1,5 @@
 const socket = io();
-
-function getBaseURL() {
-    return window.location.protocol + "//" + window.location.hostname + ":" + window.location.port + "/intfar/jeopardy";
-}
-
-function getSelectionURL() {
-    return `${getBaseURL()}/selection`;
-}
-
-function getQuestionURL() {
-    return `${getBaseURL()}/question`;
-}
+var pingActive = true;
 
 function setRandomColor() {
     let colorInput = document.getElementById("contestant-lobby-color");
@@ -158,6 +147,12 @@ function monitorGame(turnId) {
         handleBuzzInResult(buzzerLoserImg);
     });
 
+    // Called whenever the server has received our ping request.
+    socket.on("ping_response", function(userId, timeSent) {
+        let timeReceived = (new Date()).getTime();
+        socket.emit("calculate_ping", userId, timeSent, timeReceived);
+    });
+
     // Called whenever the server has calculated our ping.
     socket.on("ping_calculated", function(ping) {
         pingElem.textContent = ping + " ms";
@@ -176,15 +171,33 @@ function monitorGame(turnId) {
 
     // Called when person has made a wager that is invalid
     socket.on("invalid_wager", function(maxWager) {
+        let btn = document.getElementById("contestant-wager-btn");
+        btn.disabled = false;
         alert("Ugyldig mængde point, skal være mellem 100 og " + maxWager);
     });
 }
 
-function sendPingMessage(user_id) {
+function getUTCTimestamp() {
+    let date = new Date();
+    return new Date(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        date.getUTCHours(),
+        date.getUTCMinutes(),
+        date.getUTCSeconds(),
+        date.getUTCMilliseconds()
+    ).getTime();
+}
+
+function sendPingMessage(userId) {
     setTimeout(function() {
-        now = new Date().getTime();
-        socket.emit("calculate_ping", user_id, now);
-        sendPingMessage(user_id);
+        if (!pingActive) {
+            return;
+        }
+        now = (new Date()).getTime();
+        socket.emit("ping_request", userId, now);
+        sendPingMessage(userId);
     }, 1000);
 }
 

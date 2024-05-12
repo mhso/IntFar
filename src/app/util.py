@@ -7,10 +7,10 @@ from mhooge_flask.logging import logger
 import flask
 
 from api.util import GUILD_IDS, SUPPORTED_GAMES
+from api.meta_database import DEFAULT_GAME
 from discbot.commands.util import ADMIN_DISC_ID
 
 _GAME_SPECIFIC_ROUTES = ["index", "users", "betting", "doinks", "stats", "api", "register"]
-_DEFAULT_GAME = "lol"
 
 # Initialized in run_flask
 socket_io = None
@@ -50,7 +50,7 @@ def check_and_set_game():
     default_game = (
         flask.current_app.config["CURRENT_GAME"]
         if flask.current_app.config["CURRENT_GAME"] is not None
-        else _DEFAULT_GAME
+        else DEFAULT_GAME
     )
 
     if len(url_split) == 2:
@@ -112,14 +112,6 @@ def discord_request(command_types, commands, params, pipe=None):
     @param params Parameters for each of the command_types/commands.
     Can either be a value, a tuple of values, or a list of values or tuple of values.
     """
-    conn_map = flask.current_app.config["CONN_MAP"]
-    if flask.session["user_id"] not in conn_map and command_types != "register":
-        register_discord_connection()
-
-    sess_id = flask.session["user_id"]
-    if pipe is None:
-        pipe = conn_map[sess_id]
-
     args_tuple = (command_types, commands, params)
     any_list = any(isinstance(x, list) for x in args_tuple)
     command_type_list = command_types
@@ -145,6 +137,19 @@ def discord_request(command_types, commands, params, pipe=None):
             tuple_params.append((param,))
         else:
             tuple_params.append(param)
+
+    if flask.current_app.config["BOT_CONN"] is None:
+        return_value = [None for _ in command_list]
+        return return_value[0] if len(return_value) == 1 else return_value
+
+    conn_map = flask.current_app.config["CONN_MAP"]
+    if flask.session["user_id"] not in conn_map and command_types != "register":
+        register_discord_connection()
+
+    sess_id = flask.session["user_id"]
+    if pipe is None:
+        pipe = conn_map[sess_id]
+
     try:
         pipe.send((sess_id, command_type_list, command_list, tuple_params))
         conn_received = pipe.poll(15)

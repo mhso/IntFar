@@ -121,7 +121,6 @@ class AudioHandler:
 
             if sound_type == "file":
                 # Stream audio from a file
-                self.meta_database.add_sound_hit(sound_name, datetime.now())
                 audio_source = FFmpegPCMAudio(f"{SOUNDS_PATH}/{sound_name}.mp3", executable="ffmpeg")
                 volume = 1
             else:

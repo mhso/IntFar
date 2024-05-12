@@ -51,13 +51,13 @@ class CS2GameDatabase(GameDatabase):
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_average_stat(self, stat, disc_id=None, map_id=None, min_games=10):
+    def get_average_stat(self, stat, disc_id=None, played_id=None, min_games=10):
         params = []
         player_condition = ""
         map_condition = ""
 
-        if map_id is not None:
-            params = [map_id] * 2
+        if played_id is not None:
+            params = [played_id] * 2
             map_condition = "AND g.map_id=?"
 
         if disc_id is not None:

@@ -33,8 +33,13 @@ license = {text = "MIT"}
 [tool.pdm]
 distribution = false
 
+[tool.pdm.dev-dependencies]
+dev = [
+    "playwright>=1.43.0",
+]
 [tool.pytest.ini_options]
 pythonpath = [
     "src"
 ]
 testpaths = ["tests"]
+filterWarnings = ["ignore:DeprecationWarning"]

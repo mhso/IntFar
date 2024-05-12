@@ -1,5 +1,5 @@
 from datetime import datetime
-from api.game_data import get_stat_quantity_descriptions, GameStats
+from api.game_data import get_stat_quantity_descriptions
 
 TESTING = False
 
@@ -60,9 +60,21 @@ if not TESTING:
             },
             803987403932172359 # Core Nibs
         ),
+        "april_24": LANInfo(
+            datetime(2024, 4, 27, 10, 0, 0).timestamp(),
+            datetime(2024, 4, 28, 10, 0, 0).timestamp(),
+            {
+                115142485579137029: "Dave",
+                172757468814770176: "Murt",
+                267401734513491969: "Gual",
+                331082926475182081: "Muds",
+                347489125877809155: "Nønø"
+            },
+            803987403932172359 # Core Nibs
+        ),
     }
 
-    LATEST_LAN_PARTY = "december_23"
+    LATEST_LAN_PARTY = "april_24"
 
 else: # Use old data for testing.
     LAN_PARTIES = {
@@ -138,6 +150,7 @@ def get_average_stats(database, lan_info):
     game = "lol"
     stat_quantity_desc = get_stat_quantity_descriptions(game)
     stats_to_get = list(stat_quantity_desc)
+    stats_to_get.remove("first_blood")
 
     all_stats = database.get_player_stats(
         stats_to_get,
@@ -165,7 +178,7 @@ def get_average_stats(database, lan_info):
 
         for stat_tuple in grouped_by_player[disc_id]:
             for index, stat_value in enumerate(stat_tuple):
-                avg_stats[index] += stat_value
+                avg_stats[index] += stat_value if stat_value is not None else 0
 
         for index, sum_value in enumerate(avg_stats):
             all_avg_stats[stats_to_get[index]].append((disc_id, sum_value / len(grouped_by_player[disc_id])))
@@ -186,6 +199,3 @@ def get_average_stats(database, lan_info):
     all_ranks_list.sort(key=lambda x: x[1])
 
     return all_avg_stats, all_ranks_list
-
-def update_bingo_events(stats: GameStats):
-    pass

@@ -380,7 +380,7 @@ class GameDatabase(SQLiteDatabase):
         ...
 
     @abstractmethod
-    def get_played_winrate(self, disc_id, champ_id):
+    def get_played_winrate(self, disc_id, played_id):
         ...
 
     @abstractmethod
