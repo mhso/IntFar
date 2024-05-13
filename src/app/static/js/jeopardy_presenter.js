@@ -409,7 +409,7 @@ function pauseVideo() {
 function startAnswerCountdown(duration) {
     startCountdown(duration, () => wrongAnswer("Ikke mere tid"));
 
-    // NumLock has to be pressed before an answer can be given (for safety)
+    // Action key has to be pressed before an answer can be given (for safety)
     window.onkeydown = function(e) {
         if (e.key == PRESENTER_ACTION_KEY) {
             // Pause video if one is playing
@@ -539,6 +539,7 @@ function showAnswerChoice(index) {
         }
     }
     else {
+        window.onkeydown = null;
         questionAsked(500);
     }
 }
@@ -572,7 +573,7 @@ function showQuestion() {
 
     if (imageElem != null || videoElem != null) {
         // If there is an answer image, first show the question, then show
-        // the image after pressing NumLock again. Otherwise show image instantly
+        // the image after pressing action key again. Otherwise show image instantly
         window.onkeydown = function(e) {
             if (e.key == PRESENTER_ACTION_KEY) {
                 if (imageElem != null) {
@@ -774,7 +775,6 @@ function resetUsedQuestions(button) {
     $.ajax(baseUrl + "/reset_questions", {
         method: "POST"
     }).then((data) => {
-        console.log(data)
         button.style.backgroundColor = "rgb(9, 142, 24)";
     }, (error) => {
         console.log("ERROR when resetting questions: " + error);
