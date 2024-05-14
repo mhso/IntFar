@@ -56,6 +56,10 @@ MONTH_NAMES = [
     "August", "September", "October", "November", "December"
 ]
 
+JEOPARDY_ITERATION = 3
+_suffix = ["st", "nd", "rd", "th"]
+JEOPADY_EDITION = f"{JEOPARDY_ITERATION}{_suffix[min(len(_suffix) - 1, JEOPARDY_ITERATION)]} Edition"
+
 class TimeZone(tzinfo):
     """
     Class for representing the time zone of Copenhagen (UTC+1).

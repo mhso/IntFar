@@ -282,6 +282,10 @@ h3 {
     color: black;
 }
 
+.selection-question-box.selected {
+    border-color: red;
+}
+
 .selection-category-header, .selection-question-box {
     background-color: rgb(15, 12, 118);
     width: 10vw;

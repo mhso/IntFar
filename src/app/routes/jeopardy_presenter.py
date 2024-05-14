@@ -7,6 +7,7 @@ from gevent import sleep
 import flask
 from flask_socketio import join_room, emit
 
+from api.util import JEOPADY_EDITION
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
@@ -20,6 +21,9 @@ ROUND_NAMES = [
 ]
 
 FINALE_CATEGORY = "bois"
+
+QUESTIONS_FILE = "app/static/data/jeopardy_questions.json"
+USED_QUESTIONS_FILE = "app/static/data/jeopardy_used.json"
 
 PLAYER_NAMES = {
     115142485579137029: "Dave",
@@ -193,7 +197,7 @@ def home():
     flask.current_app.config["JEOPARDY_DATA"]["state"] = pregame_state
 
     return app_util.make_template_context(
-        "jeopardy/menu.html", **pregame_state.__dict__
+        "jeopardy/menu.html", **pregame_state.__dict__, edition=JEOPADY_EDITION
     )
 
 @jeopardy_presenter_page.route("/reset_questions", methods=["POST"])
@@ -202,9 +206,9 @@ def reset_questions():
     if logged_in_user != ADMIN_DISC_ID and flask.current_app.config["APP_ENV"] != "dev":
         return flask.abort(404)
 
-    used_questions_file = "app/static/jeopardy_used.json"
+    USED_QUESTIONS_FILE = "app/static/jeopardy_used.json"
 
-    with open(used_questions_file, encoding="utf-8") as fp:
+    with open(USED_QUESTIONS_FILE, encoding="utf-8") as fp:
         used_questions = json.load(fp)
 
     for cat in used_questions:
@@ -213,7 +217,7 @@ def reset_questions():
             for _ in range(5)
         ]
 
-    with open(used_questions_file, "w", encoding="utf-8") as fp:
+    with open(USED_QUESTIONS_FILE, "w", encoding="utf-8") as fp:
         json.dump(used_questions, fp, indent=4)
 
     return app_util.make_text_response("Questions reset", 200)
@@ -279,13 +283,10 @@ def question_view(jeopardy_round, category, tier):
     jeopardy_round = int(jeopardy_round)
     tier = int(tier) - 1
 
-    questions_file = "app/static/jeopardy_questions.json"
-    used_questions_file = "app/static/jeopardy_used.json"
-
-    with open(questions_file, encoding="utf-8") as fp:
+    with open(QUESTIONS_FILE, encoding="utf-8") as fp:
         questions = json.load(fp)
 
-    with open(used_questions_file, encoding="utf-8") as fp:
+    with open(USED_QUESTIONS_FILE, encoding="utf-8") as fp:
         used_questions = json.load(fp)
 
     question_possibilities = []
@@ -301,7 +302,7 @@ def question_view(jeopardy_round, category, tier):
         used_questions[category][tier]["used"].append(question["id"])
         used_questions[category][tier]["active"] = False
 
-        with open(used_questions_file, "w", encoding="utf-8") as fp:
+        with open(USED_QUESTIONS_FILE, "w", encoding="utf-8") as fp:
             json.dump(used_questions, fp, indent=4)
 
     is_daily_double = used_questions[category][tier]["double"]
@@ -370,13 +371,10 @@ def active_jeopardy(jeopardy_round):
 
             player_turn = lowers_score_index
 
-    questions_file = "app/static/jeopardy_questions.json"
-    used_questions_file = "app/static/jeopardy_used.json"
-
-    with open(questions_file, encoding="utf-8") as fp:
+    with open(QUESTIONS_FILE, encoding="utf-8") as fp:
         questions = json.load(fp)
 
-    with open(used_questions_file, encoding="utf-8") as fp:
+    with open(USED_QUESTIONS_FILE, encoding="utf-8") as fp:
         used_questions = json.load(fp)
 
     if jeopardy_round == 3:
@@ -410,7 +408,7 @@ def active_jeopardy(jeopardy_round):
                 used_questions[category][tier]["double"] = True
 
             if TRACK_UNUSED:
-                with open(used_questions_file, "w", encoding="utf-8") as fp:
+                with open(USED_QUESTIONS_FILE, "w", encoding="utf-8") as fp:
                     json.dump(used_questions, fp, indent=4)
 
         for category in used_questions:
@@ -442,9 +440,7 @@ def final_jeopardy(question_id):
 
     question_id = int(question_id)
 
-    questions_file = "app/static/jeopardy_questions.json"
-
-    with open(questions_file, encoding="utf-8") as fp:
+    with open(QUESTIONS_FILE, encoding="utf-8") as fp:
         questions = json.load(fp)
 
     question = questions[FINALE_CATEGORY]["tiers"][-1]["questions"][question_id]
@@ -555,9 +551,7 @@ def cheatsheet():
         response.headers.add("WWW-Authenticate", "Basic")
         return response
 
-    questions_file = "app/static/jeopardy_questions.json"
-
-    with open(questions_file, encoding="utf-8") as fp:
+    with open(QUESTIONS_FILE, encoding="utf-8") as fp:
         questions = json.load(fp)
 
     return app_util.make_template_context("jeopardy/cheat_sheet.html", questions=questions)

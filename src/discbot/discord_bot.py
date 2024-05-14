@@ -1646,7 +1646,8 @@ class DiscordClient(discord.Client):
         asyncio.create_task(self.polling_loop())
 
     async def announce_jeopardy_winner(self, player_data):
-        year = datetime.now().year
+        iteration = api_util.JEOPARDY_ITERATION
+        edition = api_util.JEOPADY_EDITION
 
         ties = 0
         for index, data in enumerate(player_data[1:], start=1):
@@ -1658,7 +1659,7 @@ class DiscordClient(discord.Client):
         if ties == 0:
             mention = self.get_mention_str(player_data[0]["id"])
             winner_desc = (
-                f"{mention} is the winner of the *{year} LoL Jeopardy Bonanza* with **{player_data[0]['score']} points**!!! "
+                f"{mention} is the winner of the *LoL Jeopardy {edition}* with **{player_data[0]['score']} points**!!! "
                 "All hail the king :crown:\n"
                 "They get a special badge of honor on Discord and wins a **1350 RP** skin!"
             )
@@ -1667,7 +1668,7 @@ class DiscordClient(discord.Client):
             mention_1 = self.get_mention_str(player_data[0]["id"])
             mention_2 = self.get_mention_str(player_data[1]["id"])
             winner_desc = (
-                f"{mention_1} and {mention_2} both won the *{year} LoL Jeopardy Bonanza* with "
+                f"{mention_1} and {mention_2} both won the *LoL Jeopardy {edition}* with "
                 f"**{player_data[0]['score']} points**!!!\n"
                 "They both get a special badge of honor on Discord and win a **975 RP** skin!"
             )
@@ -1678,14 +1679,14 @@ class DiscordClient(discord.Client):
             ) + self.get_mention_str(player_data[ties]["id"])
             winner_desc = (
                 f"{players_tied} all got the same score (with **{player_data[0]['score']} points**) "
-                f"in the *{year} LoL Jeopardy Bonanza*!!!\n"
+                f"in the *LoL Jeopardy {edition}*!!!\n"
                 "They all get a special badge of honor on Discord and all win a **975 RP** skin!"
             )
 
         # Hand out a special badge to the winner(s)
         guild_id = api_util.MY_GUILD_ID if self.config.env == "dev" else api_util.GUILD_MAP["core"]
         guild = self.get_guild(guild_id)
-        role = self.get_role(f"Jeopardy Master {year}", guild)
+        role = self.get_role(f"Jeopardy v{iteration} Master", guild)
         if role is not None:
             for data in player_data[:ties+1]:
                 member = guild.get_member(data["id"])

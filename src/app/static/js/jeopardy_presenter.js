@@ -687,6 +687,60 @@ function goToQuestion(div, category, tier, isDouble) {
     }, 2800);
 }
 
+function goToSelectedCategory() {
+    let boxes = document.getElementsByClassName("selection-question-box");
+    for (let i = 0; i < boxes.length; i++) {
+        let box = boxes.item(i);
+        if (box.classList.contains("selected")) {
+            box.classList.remove("selected");
+            box.click();
+            break;
+        }
+    }
+}
+
+function tabulateCategorySelection(key, cols) {
+    // Find currently selected category box, if any
+    let boxes = document.getElementsByClassName("selection-question-box");
+    let selectedBox = null;
+    let selectedIndex = 0;
+    for (let i = 0; i < boxes.length; i++) {
+        let box = boxes.item(i);
+        if (box.classList.contains("selected")) {
+            selectedBox = box;
+            selectedIndex = i;
+            break
+        }
+    }
+
+    // Choose the next selected box based on input
+    let maxIndex = (cols + 1) * 5 - 1;
+    if (key == "ArrowRight") {
+        selectedIndex = selectedBox == null ? 0 : selectedIndex + cols;
+        if (selectedIndex > maxIndex) {
+            return;
+        }
+    }
+    else if (key == "ArrowLeft") {
+        selectedIndex = selectedBox == null ? cols * 5 : selectedIndex - cols;
+        if (selectedIndex < 0) {
+            return;
+        }
+    }
+    else if (key == "ArrowUp") {
+        selectedIndex = selectedBox == null ? cols : Math.max(selectedIndex - 1, 0);
+    }
+    else if (key == "ArrowDown") {
+        selectedIndex = selectedBox == null ? 0 : Math.min(selectedIndex + 1, maxIndex);
+    }
+
+    if (selectedBox != null) {
+        selectedBox.classList.remove("selected");
+    }
+
+    boxes.item(selectedIndex).classList.add("selected");
+}
+
 function setContestantTextColors() {
     let contestantEntries = document.getElementsByClassName("footer-contestant-entry");
     for (let i = 0; i < contestantEntries.length; i++) {

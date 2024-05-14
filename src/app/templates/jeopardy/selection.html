@@ -63,6 +63,8 @@
             {{ question_num }}
         );
 
+        const arrowKeys = ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"];
+
         socket.on("connect", function() {
             {% if jeopardy_round == 1 and player_turn == -1 %}
             window.onkeydown = function(e) {
@@ -71,6 +73,12 @@
                         setPlayerTurn(turn, true);
                         socket.emit("first_turn", turn);
                     });
+                }
+                else if (arrowKeys.includes(e.key)) {
+                    tabulateCategorySelection(e.key, {{ categories | length - 1 }});
+                }
+                else if (e.key == "Enter") {
+                    goToSelectedCategory();
                 }
             };
             {% elif jeopardy_round < 3 %}
