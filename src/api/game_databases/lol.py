@@ -10,6 +10,18 @@ class LoLGameDatabase(GameDatabase):
     def game_user_params(self):
         return ["puuid"]
 
+    def get_played_count(self, disc_id, playable_id):
+        query = """
+            SELECT COUNT(*)
+            FROM participants
+            WHERE disc_id = ?
+            AND champ_id = ?
+        """
+
+        with self:
+            result = self.execute_query(query, disc_id, playable_id).fetchone()
+            return result[0]
+
     def get_played_count_for_stat(self, stat, maximize, disc_id):
         aggregator = "MAX" if maximize else "MIN"
 
@@ -407,6 +419,9 @@ class LoLGameDatabase(GameDatabase):
                 return self.get_min_or_max_winrate_played(disc_id, best, included_champs, return_top_n, min_games=5)
 
             return result if result[0] is not None else (None, None, None)
+
+    def get_split_summary_data(self, disc_id):
+        pass
 
     def create_list(self, disc_id, name):
         query = "INSERT INTO champ_lists(name, owner_id) VALUES (?, ?)"

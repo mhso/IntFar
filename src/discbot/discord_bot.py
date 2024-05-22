@@ -180,9 +180,9 @@ class DiscordClient(discord.Client):
             response += "and no stats will be saved."
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
 
-        elif status_code == game_monitor.POSTGAME_STATUS_NOT_SR:
+        elif status_code == game_monitor.POSTGAME_STATUS_INVALID_MAP:
             # Game is not on summoners rift. Same deal.
-            response = "That game was not on Summoner's Rift "
+            response = "That game was not on SR, Nexus Blitz, or Arena "
             response += "{emote_woahpikachu} no Int-Far will be crowned "
             response += "and no stats will be saved."
             await self.channels_to_write[guild_id].send(self.insert_emotes(response))
@@ -284,7 +284,7 @@ class DiscordClient(discord.Client):
         logger.debug(f"Users in game after: {parsed_game_stats.players_in_game}")
 
         # Get class for handling award qualifiers for the current game
-        awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
+        awards_handler = get_awards_handler(game, self.config, self.api_clients[game], parsed_game_stats)
 
         response = self.insert_emotes(
             f"Good day for a **{api_util.SUPPORTED_GAMES[game]}** game " + "{emote_happy_nono}"
@@ -1556,7 +1556,9 @@ class DiscordClient(discord.Client):
             return
 
         game_stats = get_empty_game_data(game)
-        intro_desc = get_awards_handler(game, self.config, game_stats).get_flavor_text("ifotm", month - 1) + "\n\n"
+        intro_desc = get_awards_handler(
+            game, self.config, self.api_clients[game], game_stats
+        ).get_flavor_text("ifotm", month - 1) + "\n\n"
         intro_desc += f"{api_util.SUPPORTED_GAMES[game]} Int-Far of the month for {month_name} is...\n"
         intro_desc += "***DRUM ROLL***\n"
 
@@ -1584,8 +1586,9 @@ class DiscordClient(discord.Client):
         for game in api_util.SUPPORTED_GAMES:
             database = self.game_databases[game]
             for disc_id in database.game_users.keys():
-                user_info = database.game_users[disc_id]
-                for ingame_id, old_name in zip(user_info.ingame_id, user_info.ingame_name):
+                user = database.game_users[disc_id]
+                ingame_names = self.api_clients[game].get_ingame_names_for_user(user)
+                for ingame_id, old_name, new_name in zip(user.ingame_id, user.ingame_name, ingame_names):
                     try:
                         new_name = self.api_clients[game].get_ingame_name(ingame_id)
                         if new_name is not None and new_name != old_name:

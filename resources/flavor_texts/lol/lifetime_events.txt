@@ -2,3 +2,5 @@ just played his {value}th game of {game} with Int-Far! {emote_poggers}
 just won his {value}th game of {game} with Int-Far! {emote_pog}
 just got his {value}th Int-Far award in {game}! Kinda cringe {emote_sadbuttrue}
 has now smoked a total of {value} doinks in {game}! {emote_big_doinks}
+just played his {value}, big one-trick energy! {emote_uwucat}
+has now played all {value} champions at least once! {emote_nazi}

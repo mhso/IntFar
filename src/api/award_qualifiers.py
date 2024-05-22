@@ -2,15 +2,17 @@ from abc import ABC, abstractmethod
 import random
 
 from api.game_stats import GameStats, PlayerStats
+from api.game_api_client import GameAPIClient
 from api.config import Config
 from api.game_database import GameDatabase
 from api.util import load_flavor_texts, SUPPORTED_GAMES
 
 class AwardQualifiers(ABC):
-    def __init__(self, config: Config, parsed_game_stats: GameStats):
+    def __init__(self, config: Config, api_client: GameAPIClient, parsed_game_stats: GameStats):
         self.game = parsed_game_stats.game
         self.guild_id = parsed_game_stats.guild_id
         self.config = config
+        self.api_client = api_client
         self.parsed_game_stats = parsed_game_stats
         self.flavor_texts = self._load_flavor_texts()
 
@@ -168,7 +170,7 @@ class AwardQualifiers(ABC):
             values = [total_games, total_wins, total_intfars, total_doinks]
             moduli = [1000, 1000, 100, 100]
             conditions = [
-                None,
+                True,
                 self.parsed_game_stats.win == 1,
                 self.parsed_game_stats.intfar_id == stats.disc_id,
                 stats.doinks is not None

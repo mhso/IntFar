@@ -291,13 +291,23 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()
 
-    def get_ingame_name(self, summ_id):
-        endpoint = "/lol/summoner/v4/summoners/{0}"
-        response = self.make_request(endpoint, API_PLATFORM, summ_id)
+    def get_ingame_name(self, puuid):
+        endpoint = " /riot/account/v1/accounts/by-puuid/{0}"
+        response = self.make_request(endpoint, API_PLATFORM, puuid)
         if response.status_code != 200:
             return None
 
-        return response.json()["name"]
+        return response.json()["gameName"]
+
+    async def get_ingame_names_for_user(self, user: User) -> list[str]:
+        names = []
+        for puuid in user.puuid:
+            ingame_name = self.get_ingame_name(puuid)
+            names.append(ingame_name)
+
+            await asyncio.sleep(1)
+
+        return names
 
     def get_active_game(self, puuid):
         endpoint = "/lol/spectator/v5/active-games/by-summoner/{0}"
@@ -436,12 +446,12 @@ class RiotAPIClient(GameAPIClient):
 
         return None
 
-    def map_is_sr(self, map_id):
+    def map_is_valid(self, map_id):
         with open(self.maps_file, encoding="utf-8") as fp:
             map_data = json.load(fp)
             for map_info in map_data:
                 if map_info["mapId"] == map_id:
-                    return map_info["mapName"] in ("Summoner's Rift", "Nexus Blitz")
+                    return map_info["mapName"] in ("Summoner's Rift", "Nexus Blitz")#, "Rings of Wrath")
 
         return False
 

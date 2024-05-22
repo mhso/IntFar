@@ -20,6 +20,20 @@ class CS2GameDatabase(GameDatabase):
                     self.game_users[disc_id].latest_match_token[index] = sharecode
                     break
 
+    def get_played_count(self, disc_id, playable_id):
+        query = """
+            SELECT COUNT(*)
+            FROM games AS g
+            INNER JOIN participants AS p
+            ON p.game_id = g.game_id
+            WHERE p.disc_id = ?
+            AND g.map_id = ?
+        """
+
+        with self:
+            result = self.execute_query(query, disc_id, playable_id).fetchone()
+            return result[0]
+
     def get_played_count_for_stat(self, stat, maximize, disc_id):
         aggregator = "MAX" if maximize else "MIN"
 

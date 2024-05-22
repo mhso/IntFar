@@ -285,6 +285,14 @@ class SteamAPIClient(GameAPIClient):
     def get_ingame_name(self, steam_id):
         return self.get_steam_display_name(steam_id)
 
+    async def get_ingame_names_for_user(self, user: User) -> list[str]:
+        names = []
+        for steam_id in user.ingame_id:
+            ingame_name = self.get_steam_display_name(steam_id)
+            names.append(ingame_name)
+
+        return names
+
     def is_person_ingame(self, steam_id):
         """
         Returns a boolean indicating whether the user with the given Steam ID is in a game of CS.

@@ -3,8 +3,8 @@ from api.award_qualifiers import AwardQualifiers
 
 _GAME_AWARD_HANDLERS: dict[str, AwardQualifiers] = find_subclasses_in_dir("api/awards", AwardQualifiers)
 
-def get_awards_handler(game, config, parsed_game_stats) -> AwardQualifiers:
-    return _GAME_AWARD_HANDLERS[game](config, parsed_game_stats)
+def get_awards_handler(game, config, api_client, parsed_game_stats) -> AwardQualifiers:
+    return _GAME_AWARD_HANDLERS[game](config, api_client, parsed_game_stats)
 
 def get_intfar_reasons(game):
     return _GAME_AWARD_HANDLERS[game].INTFAR_REASONS()

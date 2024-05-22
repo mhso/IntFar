@@ -327,7 +327,7 @@ class LoLGameStatsParser(GameStatsParser):
         active_users = []
         first_blood_id = None
 
-        # First figure out what team we were on
+        # First figure out what team(s) we were on
         our_team = 100
         for participant in self.raw_data["participants"]:
             for disc_id in self.all_users.keys():

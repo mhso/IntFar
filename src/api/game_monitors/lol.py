@@ -13,7 +13,7 @@ from api.game_data.lol import get_player_stats
 class LoLGameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_URF = 5
-    POSTGAME_STATUS_NOT_SR = 6
+    POSTGAME_STATUS_INVALID_MAP = 6
     POSTGAME_STATUS_REMAKE = 7
 
     def __init__(self, game: str, config: Config, database: GameDatabase, game_over_callback: Coroutine, api_client: RiotAPIClient):
@@ -111,9 +111,9 @@ class LoLGameMonitor(GameMonitor):
             # Gamemode was URF.
             return self.POSTGAME_STATUS_URF
 
-        if not self.api_client.map_is_sr(game_info["mapId"]):
-            # Game is not on summoners rift.
-            return self.POSTGAME_STATUS_NOT_SR
+        if not self.api_client.map_is_valid(game_info["mapId"]):
+            # Game is not on a valid map.
+            return self.POSTGAME_STATUS_INVALID_MAP
 
         if game_info["gameDuration"] < self.min_game_minutes * 60:
             # Game was too short to count. Probably a remake.

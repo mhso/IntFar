@@ -4,6 +4,10 @@ from api.game_data.lol import LoLPlayerStats
 from api.award_qualifiers import AwardQualifiers
 from api.util import round_digits
 from api.game_stats import get_outlier
+from api.game_database import GameDatabase
+
+_NEXUS_BLITZ_ID = 21
+_ARENA_ID = 30
 
 class LoLAwardQualifiers(AwardQualifiers):
     @classmethod
@@ -166,6 +170,29 @@ class LoLAwardQualifiers(AwardQualifiers):
             cls.TIMELINE_FLAVOR_TEXTS() +
             cls.DOINKS_FLAVOR_TEXTS()
         )
+
+    def get_lifetime_stats(self, database: GameDatabase):
+        """
+        Returns a list of LoL-specific lifetime awards for each player.
+        These events include:
+            - A player having played a multiple of 100 games on a champion
+            - A player having played every champion
+        """
+        lifetime_mentions = super().get_lifetime_stats(database)
+
+        for stats in self.parsed_game_stats.filtered_player_stats:
+            games_on_champ = database.get_played_count(stats.disc_id, stats.champ_id)
+            unique_champs = len(database.get_played_ids(stats.disc_id))
+
+            if games_on_champ % 100 == 0:
+                champ_name = self.api_client.get_playable_name(stats.champ_id)
+                description = f"{games_on_champ}th game on {champ_name}"
+                lifetime_mentions[stats.disc_id].append((4, description))
+
+            elif games_on_champ == 1 and unique_champs == self.api_client.playable_count:
+                lifetime_mentions[stats.disc_id].append((5, unique_champs))
+
+        return lifetime_mentions
 
     def get_big_doinks(self):
         """

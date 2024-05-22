@@ -352,6 +352,10 @@ class GameDatabase(SQLiteDatabase):
         return self.query(query, *params, format_func=format_result)
 
     @abstractmethod
+    def get_played_count(self, disc_id, playable_id):
+        ...
+
+    @abstractmethod
     def get_played_count_for_stat(self, stat, maximize, disc_id):
         ...
 
