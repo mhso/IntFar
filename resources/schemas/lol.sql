@@ -39,7 +39,7 @@ CREATE TABLE [participants] (
     [role] NVARCHAR(20),
     [rank_solo] NVARCHAR(32),
     [rank_flex] NVARCHAR(32),
-    PRIMARY KEY (game_id, disc_id)
+    PRIMARY KEY (game_id, player_id)
 );
 CREATE TABLE [bets] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,

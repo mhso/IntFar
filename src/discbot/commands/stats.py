@@ -221,7 +221,10 @@ async def handle_match_history_msg(client, message, game, target_id=None):
             continue
 
         if game == "lol":
-            map_or_champ = player_stats.champ_name
+            map_or_champ = f"{player_stats.champ_name}"
+            if player_stats.role is not None:
+                role = get_formatted_stat_value("lol", "role", player_stats.role)
+                map_or_champ += f" {role}"
         else:
             map_or_champ = game_stats.map_name
 
@@ -253,7 +256,7 @@ async def handle_match_history_msg(client, message, game, target_id=None):
             doinks_description = f"No {emote}"
 
         match_str = (
-            f"- **{win_str}** game lasting **{fmt_duration}** on **{date}** playing **{map_or_champ}**\n"
+            f"- **{win_str}** in **{fmt_duration}** on **{date}** playing **{map_or_champ}**\n"
             f"- {doinks_description}\n"
             f"- {intfar_description}\n"
             "```css\n"
@@ -407,3 +410,6 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
     response += f"*A minimum of **{min_games}** games on a champ is required"
 
     await message.channel.send(response)
+
+async def handle_rank_msg(client, message, queue, game, target_id=None):
+    pass

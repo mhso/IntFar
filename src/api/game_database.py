@@ -247,8 +247,8 @@ class GameDatabase(SQLiteDatabase):
                     {aggregator}({stat}),
                     game_id
                 FROM participants AS p
-                JOIN users AS u
-                ON u.disc_id = p.disc_id
+                INNER JOIN users AS u
+                ON u.player_id = p.player_id
                 WHERE u.active = 1
             """
 
@@ -289,7 +289,7 @@ class GameDatabase(SQLiteDatabase):
                     FROM games AS g
                     INNER JOIN participants AS p
                     ON p.game_id = g.game_id
-                    GROUP BY p.disc_id
+                    GROUP BY p.player_id
                 ) AS games
                 ON games.player_id = p.player_id
                 WHERE
@@ -426,7 +426,7 @@ class GameDatabase(SQLiteDatabase):
         ### Returns
         `tuple[int, int]`: Amount of games where doinks was played and amount of doinks earned in total
         """
-        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "u.disc_id", disc_id, "AND")
 
         query_doinks = f"""
             SELECT SUM(sub.doinks_games), SUM(sub.doinks_total) FROM (
@@ -473,7 +473,7 @@ class GameDatabase(SQLiteDatabase):
                     WHERE
                         doinks IS NOT NULL
                         AND u.active = 1
-                    GROUP BY p.disc_id
+                    GROUP BY u.disc_id
                 ) counts
             """
             return self.execute_query(query).fetchone()
@@ -545,7 +545,7 @@ class GameDatabase(SQLiteDatabase):
 
     def get_games_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
         delim_str_1, params_1 = self.get_delimeter(time_after, time_before, guild_id, prefix="AND")
-        delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, prefix="AND")
+        delim_str_2, params_2 = self.get_delimeter(time_after, time_before, guild_id, "u.disc_id", disc_id, prefix="AND")
 
         query = f"""
             WITH game_cte AS (
@@ -1101,7 +1101,7 @@ class GameDatabase(SQLiteDatabase):
         """
         query_intfar = f"""
             SELECT intfar_reason
-            FROM games
+            FROM games AS g
             {delim_str_2}
             GROUP BY g.game_id
         """
@@ -1124,7 +1124,7 @@ class GameDatabase(SQLiteDatabase):
                 AND p2.game_id = p1.game_id
             INNER JOIN users AS u2
                 ON u2.player_id = p2.player_id
-            WHERE p1.disc_id = ?
+            WHERE u1.disc_id = ?
             GROUP BY
                 u1.disc_id,
                 u2.disc_id
@@ -1161,7 +1161,7 @@ class GameDatabase(SQLiteDatabase):
             return games_with_person, intfars_with_person
 
     def get_doinks_stats(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
-        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "p.disc_id", disc_id, "AND")
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "u.disc_id", disc_id, "AND")
 
         query = f"""
             SELECT doinks
@@ -1242,7 +1242,7 @@ class GameDatabase(SQLiteDatabase):
                 FROM (
                     SELECT u.disc_id
                     FROM participants AS p
-                    INNER JOIN user AS u
+                    INNER JOIN users AS u
                         ON u.player_id = p.player_id
                     WHERE u.active = 1
                 ) games
@@ -1325,7 +1325,9 @@ class GameDatabase(SQLiteDatabase):
                 ) wins
                 ON wins.disc_id = played.disc_id
                 LEFT JOIN (
-                    SELECT COALESCE(c, 0.0) AS c, u.disc_id AS intfar_id
+                    SELECT
+                        COALESCE(c, 0.0) AS c,
+                        u.disc_id AS intfar_id
                     FROM participants AS p
                     LEFT JOIN participants AS g
                     ON g.game_id = p.game_id
@@ -1541,11 +1543,23 @@ class GameDatabase(SQLiteDatabase):
             else:
                 stats.insert(0, "disc_id")
                 stats_copy.insert(0, "disc_id")
+        if "player_id" not in stats:
+            if stats_copy[0] == "disc_id":
+                stats.insert(1, "player_id")
+                stats_copy.insert(1, "player_id")
+            else:
+                stats.insert(2, "player_id")
+                stats_copy.insert(2, "player_id")
 
         if stats_copy[0] == "disc_id":
             stats_copy[0] = "u.disc_id"
         elif stats_copy[1] == "disc_id":
             stats_copy[1] = "u.disc_id"
+
+        if stats_copy[1] == "player_id":
+            stats_copy[1] = "p.player_id"
+        elif stats_copy[2] == "player_id":
+            stats_copy[2] = "p.player_id"
 
         try:
             # game_id will be ambigious, so we need to specify table alias
@@ -1563,7 +1577,7 @@ class GameDatabase(SQLiteDatabase):
             INNER JOIN games AS g
             ON g.game_id = p.game_id
             INNER JOIN users AS u
-            ON u.player_id = p.player_id
+                ON u.player_id = p.player_id
             WHERE u.active = 1
             {game_id_delimeter}
             {delim_str}

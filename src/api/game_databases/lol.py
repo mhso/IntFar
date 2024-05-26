@@ -207,7 +207,7 @@ class LoLGameDatabase(GameDatabase):
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
                     {champ_condition}
-                    GROUP BY p.disc_id
+                    GROUP BY u.disc_id
                 ) stat_values
                 INNER JOIN (
                     SELECT
@@ -326,11 +326,13 @@ class LoLGameDatabase(GameDatabase):
         return self.query(query, disc_id, format_func="one")
 
     def get_played_ids(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
-        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id)
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "u.disc_id", disc_id)
 
         query = f"""
-            SELECT DISTINCT champ_id
+            SELECT DISTINCT p.champ_id
             FROM participants AS p
+            INNER JOIN users AS u
+                ON u.player_id = p.player_id
             JOIN games AS g
                 ON p.game_id = g.game_id
                 {delim_str}
@@ -501,20 +503,19 @@ class LoLGameDatabase(GameDatabase):
             return result if result[0] is not None else (None, None, None)
 
     def get_current_rank(self, disc_id) -> tuple[str, str]:
+        main_player_id = self.game_users[disc_id].player_id[0]
         query = """
             SELECT
-                p.rank_solo,
-                p.rank_flex
-            FROM participants AS p
-            INNER JOIN users AS u
-                ON u.player_id = p.player_id
-            WHERE u.disc_id = ?
-            ORDER BY p.game_id DESC
+                rank_solo,
+                rank_flex
+            FROM participants
+            WHERE player_id = ?
+            ORDER BY game_id DESC
             LIMIT 1
         """
 
         with self:
-            return self.execute_query(query, disc_id).fetchone()
+            return self.execute_query(query, main_player_id).fetchone()
 
     def get_split_summary_data(self, disc_id):
         """

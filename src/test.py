@@ -13,7 +13,7 @@ from api.meta_database import MetaDatabase
 from api.game_database import GameDatabase
 from api.game_databases import get_database_client
 from api.awards import get_awards_handler
-from api.game_data import get_stat_parser, get_formatted_stat_names, get_stat_quantity_descriptions
+from api.game_data import get_stat_parser, get_stat_quantity_descriptions, stats_from_database
 from api.game_apis.lol import RiotAPIClient
 from api.game_apis.cs2 import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
@@ -228,10 +228,8 @@ class TestFuncs:
         parser = get_stat_parser("cs2", game_stats, api_client, self.game_databases["cs2"].game_users, 619073595561213953)
         data = parser.parse_data()
 
-    def test_format_stats(self):
-        stat_names = get_formatted_stat_names("lol")
-        for stat in stat_names:
-            print(stat, stat_names[stat])
+    def test_get_stats(self):
+        print(stats_from_database("lol", self.game_databases["lol"], self.riot_api, 803987403932172359, 6952019611))
 
     def test_quadra_steal(self):
         game_id = "6700149519"
@@ -334,26 +332,36 @@ class TestFuncs:
         print(f"{self.riot_api.get_playable_name(max_kda_champ)}: {max_kda} ({total_games} games)")
 
     def test_add_lol_ranks(self):
-        query = "SELECT disc_id, MAX(game_id) FROM participants GROUP BY disc_id"
+        query_select = "SELECT MAX(game_id) FROM participants WHERE player_id = ?"
+        query_update = "UPDATE participants SET rank_solo=?, rank_flex=? WHERE game_id=? AND player_id=?"
         with self.game_databases["lol"] as db:
-            latest_game_ids = db.execute_query(query, disc_id).fetchall()
+            for disc_id in db.game_users.keys():
 
-            query = "UPDATE participants SET rank_solo=?, rank_flex=? WHERE game_id=? AND disc_id=?"
+                for summ_id, summ_name in zip(db.game_users[disc_id].player_id, db.game_users[disc_id].player_name):
+                    latest_game_id = db.execute_query(query_select, summ_id).fetchone()
+                    if latest_game_id is None:
+                        continue
 
-            player_ranks = {}
-            for disc_id, game_id in latest_game_ids:
-                user = self.game_databases["lol"].game_users[disc_id]
+                    rank_info = self.riot_api.get_player_rank(summ_id)
 
-                for summ_
-                summ_id = user.player_id[0]
-                rank_info = self.api_clients["lol"].get_player_rank(summ_id)
-                if rank_info is not None:
-                    player_ranks[disc_id] = rank_info
+                    solo_rank = None
+                    flex_rank = None
+                    for queue_info in rank_info:
+                        if queue_info["queueType"] in ("RANKED_SOLO_SR", "RANKED_FLEX_SR"):
+                            division = queue_info["tier"].lower()
+                            tier = queue_info["rank"]
+                            points = queue_info["leaguePoints"]
+                            rank = f"{division}_{tier}_{points}"
 
-                db.execute_query(query,  game_id, disc_id)
-                print(f"Saved rank for {user.player_name[0]}")
+                            if queue_info["queueType"] == "RANKED_SOLO_SR":
+                                solo_rank = rank
+                            else:
+                                flex_rank = rank
 
-                sleep(1.5)
+                    db.execute_query(query_update, solo_rank, flex_rank, latest_game_id[0], summ_id)
+                    print(f"Saved ranks for {summ_name}: {solo_rank}, {flex_rank}")
+
+                    sleep(1.5)
 
 
 if __name__ == "__main__":

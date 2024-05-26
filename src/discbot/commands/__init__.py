@@ -527,6 +527,17 @@ def initialize_commands():
         aliases=["least", "lowest", "fewest"]
     )
 
+    # rank command
+    rank_name = "rank"
+    rank_desc = "Show your current rank in the given game."
+    register_command(
+        rank_name,
+        rank_desc,
+        handle_rank_msg,
+        mandatory_params=[RegularParam("queue")],
+        optional_params=[GameParam("game"), TargetParam("person")]
+    )
+
     # uptime command
     uptime_name = "uptime"
     uptime_desc = "Show for how long the bot has been up and running."

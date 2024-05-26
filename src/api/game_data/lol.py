@@ -29,6 +29,7 @@ class LoLPlayerStats(PlayerStats):
     role: str = None
     rank_solo: str = None
     rank_flex: str = None
+    puuid: str = None
     quadrakills: int = None
     pentakills: int = None
     total_time_dead: int = None
@@ -93,8 +94,11 @@ class LoLPlayerStats(PlayerStats):
         if stat == "role":
             return value.upper() if value == "adc" else value.capitalize()
         elif stat in ("rank_solo", "rank_flex"):
+            if value is None:
+                return "Unranked"
+
             division, tier, points = value.split("_")
-            return f"{division.capitalize()} {tier} {points} LP"
+            return f"{division.capitalize()} {tier}, {points} LP"
 
         return super().get_formatted_stat_value(stat, value)
 
@@ -128,11 +132,10 @@ class LoLGameStats(GameStats):
         our_team_lower = True
 
         for stats in self.filtered_player_stats:
-            puuid = stats.player_id
             for participant_data in timeline_data["participants"]:
-                if participant_data["puuid"] == puuid:
+                if participant_data["puuid"] == stats.puuid:
                     our_team_lower = participant_data["participantId"] <= 5
-                    puuid_map[puuid] = stats.disc_id
+                    puuid_map[stats.puuid] = stats.disc_id
                     break
 
         timeline_data["puuid_map"] = puuid_map
@@ -181,7 +184,7 @@ class LoLGameStatsParser(GameStatsParser):
             players_in_game = []
             for disc_id in player_stats:
                 player_stats[disc_id]["champ_name"] = self.api_client.get_champ_name(player_stats[disc_id]["champ_id"])
-                player_stats[disc_id]["player_id"] = database.game_users[disc_id].puuid[0]
+                player_stats[disc_id]["puuid"] = database.game_users[disc_id].puuid[0]
                 all_player_stats.append(LoLPlayerStats(**player_stats[disc_id]))
 
                 user_game_info = self.all_users[disc_id]
@@ -418,7 +421,7 @@ class LoLGameStatsParser(GameStatsParser):
                 stats_for_player = LoLPlayerStats(
                     game_id=self.raw_data["gameId"],
                     disc_id=player_disc_id,
-                    player_id=participant["puuid"],
+                    player_id=participant["summonerId"],
                     kills=participant["kills"],
                     deaths=participant["deaths"],
                     assists=participant["assists"],
@@ -437,6 +440,7 @@ class LoLGameStatsParser(GameStatsParser):
                     role=_ROLE_MAP[participant["teamPosition"]],
                     rank_solo=solo_rank,
                     rank_flex=flex_rank,
+                    puuid=participant["puuid"],
                     quadrakills=participant["quadraKills"],
                     pentakills=participant["pentaKills"],
                     total_time_dead=participant["totalTimeSpentDead"],

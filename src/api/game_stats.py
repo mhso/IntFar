@@ -127,7 +127,7 @@ class GameStats(ABC):
         player_stats_by_game_id = {}
         for tup in player_stats:
             game_id = tup[0]
-            disc_id = tup[1]
+            disc_id = int(tup[1])
             if game_id not in player_stats_by_game_id:
                 player_stats_by_game_id[game_id] = {}
 

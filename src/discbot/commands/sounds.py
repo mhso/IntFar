@@ -178,6 +178,9 @@ async def handle_billboard_msg(client, message):
         in database.get_weekly_sound_hits(date_start_2, date_end_2)
     ]
 
+    dt_start = datetime.fromtimestamp(date_start_2).strftime("%d/%m/%Y")
+    dt_end = datetime.fromtimestamp(date_end_2).strftime("%d/%m/%Y")
+
     billboard_data = []
     for sound, plays_now, rank_now in week_new:
         if sound in week_old:
@@ -205,6 +208,12 @@ async def handle_billboard_msg(client, message):
             rank_diff_part = ""
 
         billboard_data.append((sound_part, plays_part, plays_diff_part, rank_diff_part))
+
+    if billboard_data == []:
+        await message.channel.send(
+            f"No sounds were played in between **{dt_start}** - **{dt_end}**"
+        )
+        return
 
     # Calculate padding for each row of billboard data
     paddings = []
@@ -234,9 +243,6 @@ async def handle_billboard_msg(client, message):
                 line += "` "
 
         formatted_data.append(line)
-
-    dt_start = datetime.fromtimestamp(date_start_2).strftime("%d/%m/%Y")
-    dt_end = datetime.fromtimestamp(date_end_2).strftime("%d/%m/%Y")
 
     header = f"The hottest hit sounds from **{dt_start}** - **{dt_end}**:"
 

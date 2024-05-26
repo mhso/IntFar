@@ -53,7 +53,7 @@ class CS2GameDatabase(GameDatabase):
                     INNER JOIN games AS g
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
-                        ON u.disc_id = p.disc_id
+                        ON u.player_id = p.player_id
                     WHERE
                         u.active = 1
                         AND {stat} IS NOT NULL
@@ -94,7 +94,7 @@ class CS2GameDatabase(GameDatabase):
                     ON u.player_id = p.player_id
                 WHERE {stat} IS NOT NULL
                 {map_condition}
-                GROUP BY p.disc_id
+                GROUP BY u.disc_id
             ) stat_values
             INNER JOIN
             (
@@ -108,7 +108,7 @@ class CS2GameDatabase(GameDatabase):
                     ON u.player_id = p.player_id
                 WHERE {stat} IS NOT NULL
                 {map_condition}
-                GROUP BY p.disc_id
+                GROUP BY u.disc_id
             ) played
                 ON played.disc_id = stat_values.disc_id
             INNER JOIN users AS u
@@ -206,7 +206,7 @@ class CS2GameDatabase(GameDatabase):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "u.disc_id", disc_id)
 
         query = f"""
-            SELECT DISTINCT map_id
+            SELECT DISTINCT g.map_id
             FROM participants AS p
             INNER JOIN games AS g
                 ON p.game_id = g.game_id

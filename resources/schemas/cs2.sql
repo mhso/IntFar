@@ -58,7 +58,7 @@ CREATE TABLE [participants] (
     [one_v_fives_tried] INTEGER,
     [one_v_fives_won] INTEGER,
     [rank] INTEGER,
-    PRIMARY KEY (game_id, disc_id)
+    PRIMARY KEY (game_id, player_id)
 );
 CREATE TABLE [bets] (
     [id] INTEGER PRIMARY KEY AUTOINCREMENT,

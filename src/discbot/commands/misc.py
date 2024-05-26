@@ -129,12 +129,11 @@ async def handle_summary_msg(client, message, game, target_id):
 
     if game == "lol":
         rank_solo, rank_flex = database.get_current_rank(target_id)
-        if rank_solo is not None:
-            fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_solo)
-            response += f"Their current rank in Solo/Duo is **{fmt_rank}**.\n"
-        if rank_flex is not None:
-            fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_flex)
-            response += f"Their current rank in Flex is **{fmt_rank}**.\n\n"
+        fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_solo)
+        response += f"Their current rank in Solo/Duo is **{fmt_rank}**.\n"
+
+        fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_flex)
+        response += f"Their current rank in Flex is **{fmt_rank}**.\n\n"
 
     response += f"Their longest winning streak was **{longest_win_streak}** games.\n"
     response += f"Their longest loss streak was **{longest_loss_streak}** games.\n\n"

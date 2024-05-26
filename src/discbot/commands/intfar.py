@@ -140,6 +140,11 @@ async def handle_intfar_criteria_msg(client, message, game, criteria=None):
     valid_criteria = criteria in intfar_criterias
     game_name = api_util.SUPPORTED_GAMES[game]
 
+    if not valid_criteria and criteria is not None:
+        response = f"Not a valid criteria: '{criteria}', should be one of: {', '.join(intfar_reasons)}"
+        await message.channel.send(response)
+        return
+
     if valid_criteria:
         response = f"Criteria for being Int-Far in {game_name} by {intfar_reasons[criteria]}:"
         for line in intfar_criterias[criteria]:
