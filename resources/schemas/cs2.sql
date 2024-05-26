@@ -25,7 +25,7 @@ CREATE TABLE [games] (
 );
 CREATE TABLE [participants] (
     [game_id] NVARCHAR(64) NOT NULL,
-    [disc_id] INTEGER NOT NULL,
+    [player_id] INTEGER NOT NULL,
     [kills] INTEGER,
     [deaths] INTEGER,
     [assists] INTEGER,

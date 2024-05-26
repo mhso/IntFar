@@ -21,7 +21,7 @@ CREATE TABLE [games] (
 );
 CREATE TABLE [participants] (
     [game_id] NVARCHAR(64) NOT NULL,
-    [disc_id] INTEGER NOT NULL,
+    [player_id] NVARCHAR(64) NOT NULL,
     [kills] INTEGER,
     [deaths] INTEGER,
     [assists] INTEGER,
@@ -36,6 +36,9 @@ CREATE TABLE [participants] (
     [vision_wards] INTEGER,
     [vision_score] INTEGER,
     [steals] INTEGER,
+    [role] NVARCHAR(20),
+    [rank_solo] NVARCHAR(32),
+    [rank_flex] NVARCHAR(32),
     PRIMARY KEY (game_id, disc_id)
 );
 CREATE TABLE [bets] (
