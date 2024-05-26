@@ -36,7 +36,7 @@ class CS2GameMonitor(GameMonitor):
             curr_code = user_data.latest_match_token[0]
             while curr_code is not None:
                 curr_code = self.api_client.get_next_sharecode(
-                    user_data.ingame_id[0],
+                    user_data.player_id[0],
                     user_data.match_auth_code[0],
                     curr_code
                 )
@@ -48,7 +48,7 @@ class CS2GameMonitor(GameMonitor):
             if new_code is not None and new_code != user_data.latest_match_token[0]:
                 old_code = user_data.latest_match_token[0]
                 text = f"Match share code for '{disc_id}' was: '{old_code}', now: '{new_code}'"
-                logger.bind(event="cs_sharecode", name=user_data.ingame_name[0], old_code=old_code, new_code=new_code).info(text)
+                logger.bind(event="cs_sharecode", name=user_data.player_name[0], old_code=old_code, new_code=new_code).info(text)
                 code_retrieved[disc_id] = True
 
         if all(code_retrieved.values()):
@@ -70,7 +70,7 @@ class CS2GameMonitor(GameMonitor):
 
         steam_id_map = {}
         for disc_id in user_dict:
-            for steam_id in user_dict[disc_id].ingame_id:
+            for steam_id in user_dict[disc_id].player_id:
                 steam_id_map[int(steam_id)] = disc_id
 
         active_users = []
@@ -90,11 +90,11 @@ class CS2GameMonitor(GameMonitor):
             if self.active_game.get(guild_id) is None: # First time we see this active game
                 steam_name = self.api_client.get_steam_display_name(steam_id)
             else:
-                steam_name = user_dict[disc_id].ingame_name[0]
+                steam_name = user_dict[disc_id].player_name[0]
 
             user = User.clone(self.database.game_users[disc_id])
-            user.ingame_id = [steam_id]
-            user.ingame_name = [steam_name]
+            user.player_id = [steam_id]
+            user.player_name = [steam_name]
             users_in_current_game[disc_id] = user
 
         if self.active_game.get(guild_id) is not None:

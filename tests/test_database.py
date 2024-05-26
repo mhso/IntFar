@@ -43,8 +43,8 @@ class TestWrapper(TestCase):
         except Exception as exc:
             self.fail(f"Failed: {message}, {type(exc)} was raised")
 
-    def _add_user(self, game, disc_id, ingame_name, ingame_id):
-        kwargs = {"ingame_name": ingame_name, "ingame_id": ingame_id}
+    def _add_user(self, game, disc_id, player_name, player_id):
+        kwargs = {"player_name": player_name, "player_id": player_id}
 
         for param in self.game_databases[game].game_user_params:
             kwargs[param] = param
@@ -72,10 +72,10 @@ class TestWrapper(TestCase):
             game_users_after = len(game_database.game_users)
             self.assertEqual(game_users_after, game_users_before + 1, "Game user was added.")
 
-            disc_id = game_database.discord_id_from_ingame_info(ingame_name="name")
+            disc_id = game_database.discord_id_from_ingame_info(player_name="name")
             self.assertEqual(disc_id, 123, "User from ingame info exact match correct")
 
-            disc_id = game_database.discord_id_from_ingame_info(exact_match=False, ingame_name="nam")
+            disc_id = game_database.discord_id_from_ingame_info(exact_match=False, player_name="name")
             self.assertEqual(disc_id, 123, "User from ingame info fuzzy match correct")
 
             game_users_before = len(game_database.game_users)

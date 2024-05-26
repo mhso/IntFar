@@ -60,7 +60,7 @@ async def handle_users_msg(client, message, game=None):
         game_response = ""
         game_name = api_util.SUPPORTED_GAMES[game]
         for disc_id in database.game_users.keys():
-            formatted_names = ", ".join(database.game_users[disc_id].ingame_name)
+            formatted_names = ", ".join(database.game_users[disc_id].player_name)
             nickname = client.get_discord_nick(disc_id, message.guild.id)
             game_response += f"\n- {nickname} ({formatted_names})"
 

@@ -3,8 +3,8 @@ class User(dict):
         self,
         disc_id: int,
         secret: str = None,
-        ingame_name: list[str] = None,
-        ingame_id: list[str] = None,
+        player_name: list[str] = None,
+        player_id: list[str] = None,
         main = True,
         default_game = None,
         **extra_params
@@ -12,8 +12,8 @@ class User(dict):
         all_params = {
             "disc_id": disc_id,
             "secret": secret,
-            "ingame_name": ingame_name,
-            "ingame_id": ingame_id,
+            "player_name": player_name,
+            "player_id": player_id,
             "main": main,
             "default_game": default_game
         }

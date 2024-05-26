@@ -217,7 +217,7 @@ class DiscordClient(discord.Client):
         :param status_code: Integer that describes the status of the finished game
         """        
         for disc_id in game_monitor.users_in_game[guild_id]:
-            steam_id = game_monitor.users_in_game[guild_id][disc_id].ingame_id[0]
+            steam_id = game_monitor.users_in_game[guild_id][disc_id].player_id[0]
             self.game_databases["cs2"].set_new_cs2_sharecode(disc_id, steam_id, game_info["matchID"])
 
         if status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
@@ -573,7 +573,7 @@ class DiscordClient(discord.Client):
 
         disc_id_candidates = set()
         for game in api_util.SUPPORTED_GAMES:
-            discord_id = self.game_databases[game].discord_id_from_ingame_info(exact_match=False, ingame_name=name)
+            discord_id = self.game_databases[game].discord_id_from_ingame_info(exact_match=False, player_name=name)
             if discord_id is not None:
                 disc_id_candidates.add(discord_id)
 
@@ -1456,7 +1456,7 @@ class DiscordClient(discord.Client):
             if user_game_info is not None:
                 game_monitor = self.game_monitors[game]
                 game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
-                logger.debug(f"Game user joined voice: {user_game_info.ingame_name}")
+                logger.debug(f"Game user joined voice: {user_game_info.player_name}")
 
                 if game_monitor.should_poll(guild_id):
                     logger.info(f"Polling is now active for {api_util.SUPPORTED_GAMES[game]}!")
@@ -1612,14 +1612,14 @@ class DiscordClient(discord.Client):
             database = self.game_databases[game]
             for disc_id in database.game_users.keys():
                 user = database.game_users[disc_id]
-                ingame_names = self.api_clients[game].get_ingame_names_for_user(user)
-                for ingame_id, old_name, new_name in zip(user.ingame_id, user.ingame_name, ingame_names):
+                player_names = self.api_clients[game].get_player_names_for_user(user)
+                for player_id, old_name, new_name in zip(user.player_id, user.player_name, player_names):
                     try:
-                        new_name = self.api_clients[game].get_ingame_name(ingame_id)
+                        new_name = self.api_clients[game].get_player_name(player_id)
                         if new_name is not None and new_name != old_name:
                             logger.info(f"Updated username from {old_name} to {new_name} in {game}")
-                            logger.info(f"{disc_id}({type(disc_id)}), {ingame_id}({type(ingame_id)})")
-                            database.set_user_name(int(disc_id), ingame_id, new_name)
+                            logger.info(f"{disc_id}({type(disc_id)}), {player_id}({type(player_id)})")
+                            database.set_user_name(int(disc_id), player_id, new_name)
                     except Exception:
                         logger.bind(event="set_newest_usernames", disc_id=disc_id, game=game).exception(
                             "Failed to get new username"

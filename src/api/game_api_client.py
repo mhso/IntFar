@@ -38,9 +38,9 @@ class GameAPIClient(ABC):
         ...
 
     @abstractmethod
-    def get_ingame_name(self, ingame_id) -> str:
+    def get_player_name(self, player_id) -> str:
         ...
 
     @abstractmethod
-    def get_ingame_names_for_user(self, user: User) -> list[str]:
+    def get_player_names_for_user(self, user: User) -> list[str]:
         ...

@@ -187,8 +187,8 @@ class LoLGameStatsParser(GameStatsParser):
                 user_game_info = self.all_users[disc_id]
                 summ_info = {
                     "disc_id": disc_id,
-                    "summ_name": user_game_info.ingame_name[0],
-                    "summ_id": user_game_info.ingame_id[0],
+                    "summ_name": user_game_info.player_name[0],
+                    "summ_id": user_game_info.player_id[0],
                     "champion_id": player_stats[disc_id],
                 }
                 players_in_game.append(summ_info)
@@ -218,7 +218,7 @@ class LoLGameStatsParser(GameStatsParser):
             for participant in self.raw_data["participants"]:
                 if part_info["participantId"] == participant["participantId"]:
                     for disc_id in self.all_users.keys():
-                        summ_ids = self.all_users[disc_id].ingame_id
+                        summ_ids = self.all_users[disc_id].player_id
                         if part_info["player"]["summonerId"] in summ_ids:
                             our_team = participant["teamId"]
                             break
@@ -232,7 +232,7 @@ class LoLGameStatsParser(GameStatsParser):
 
                     player_disc_id = None
                     for disc_id in self.all_users.keys():
-                        summ_ids = self.all_users[disc_id].ingame_id
+                        summ_ids = self.all_users[disc_id].player_id
                         if part_info["player"]["summonerId"] in summ_ids:
                             player_disc_id = disc_id
                             break
@@ -296,7 +296,7 @@ class LoLGameStatsParser(GameStatsParser):
                     player_stats.append(stats_for_player)
 
                     if participant["stats"]["firstBloodKill"]:
-                        first_blood_id = part_info["player"]["summonerId"]
+                        first_blood_id = player_disc_id
 
                     if player_disc_id is not None:
                         summ_data = {
@@ -313,7 +313,6 @@ class LoLGameStatsParser(GameStatsParser):
                 else int((float(stats.kills + stats.assists) / float(kills_per_team[our_team])) * 100.0)
             )
 
-        first_blood_id = None
         game_win = True
         team_id = None
         our_baron_kills = 0
@@ -376,7 +375,7 @@ class LoLGameStatsParser(GameStatsParser):
         our_team = 100
         for participant in self.raw_data["participants"]:
             for disc_id in self.all_users.keys():
-                if participant["summonerId"] in self.all_users[disc_id].ingame_id:
+                if participant["summonerId"] in self.all_users[disc_id].player_id:
                     our_team = participant["teamId"]
                     break
 
@@ -389,7 +388,7 @@ class LoLGameStatsParser(GameStatsParser):
                 player_disc_id = None
 
                 for disc_id in self.all_users.keys():
-                    if participant["summonerId"] in self.all_users[disc_id].ingame_id:
+                    if participant["summonerId"] in self.all_users[disc_id].player_id:
                         player_disc_id = disc_id
                         break
 
@@ -446,7 +445,7 @@ class LoLGameStatsParser(GameStatsParser):
                 )
 
                 if participant["firstBloodKill"]:
-                    first_blood_id = participant["summonerId"]
+                    first_blood_id = player_disc_id
 
                 player_stats.append(stats_for_player)
 
@@ -522,7 +521,7 @@ class LoLGameStatsParser(GameStatsParser):
             for disc_id in self.all_users.keys():
                 user = self.all_users[disc_id]
                 active_name = None
-                for summ_id, summ_name in zip(user.ingame_id, user.ingame_name):
+                for summ_id, summ_name in zip(user.player_id, user.player_name):
                     if summ_id == participant["summonerId"]:
                         active_name = summ_name
                         break

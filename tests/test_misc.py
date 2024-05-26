@@ -235,7 +235,7 @@ class TestWrapper(TestRunner):
             self.assert_equals(streak, 1, "Win streak is 1 at start")
     
             query_users = f"""
-                INSERT INTO users_{game_to_test} (disc_id, ingame_name, ingame_id, match_auth_code, latest_match_token, active)
+                INSERT INTO users_{game_to_test} (disc_id, player_name, player_id, match_auth_code, latest_match_token, active)
                 VALUES (?, 'Senile Felines', '1337', '42', '420', 1)
             """
             database.execute_query(query_users, disc_id)

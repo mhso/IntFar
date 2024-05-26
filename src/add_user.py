@@ -11,7 +11,7 @@ parser = ArgumentParser()
 
 parser.add_argument("game", choices=SUPPORTED_GAMES)
 parser.add_argument("discord_name_or_id")
-parser.add_argument("ingame_name")
+parser.add_argument("player_name")
 parser.add_argument("--extra_1")
 parser.add_argument("--extra_2")
 parser.add_argument("--guild", choices=GUILD_MAP, default="nibs")
@@ -26,7 +26,7 @@ api_clients = {game: get_api_client(game, config) for game in SUPPORTED_GAMES}
 client = DiscordClient(config, meta_database, game_databases, None, api_clients)
 
 async def add_user(disc_id):
-    game_args = [arg for arg in (args.ingame_name, args.extra_1, args.extra_2) if arg]
+    game_args = [arg for arg in (args.player_name, args.extra_1, args.extra_2) if arg]
     status, msg = register_for_game(meta_database, game_databases[args.game], api_clients[args.game], disc_id, *game_args)
 
     print("Status code:", status)

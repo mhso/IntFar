@@ -13,9 +13,11 @@ class LoLGameDatabase(GameDatabase):
     def get_played_count(self, disc_id, playable_id):
         query = """
             SELECT COUNT(*)
-            FROM participants
-            WHERE disc_id = ?
-            AND champ_id = ?
+            FROM participants AS p
+            INNER JOIN users AS u
+                ON u.player_id = p.player_id
+            WHERE u.disc_id = ?
+            AND p.champ_id = ?
         """
 
         with self:
@@ -37,16 +39,16 @@ class LoLGameDatabase(GameDatabase):
                     SELECT
                         {aggregator}({stat}) AS c,
                         p.champ_id,
-                        p.disc_id
+                        u.disc_id
                     FROM participants AS p
                     INNER JOIN games AS g
                     ON g.game_id = p.game_id
                     INNER JOIN users AS u
-                    ON u.disc_id = p.disc_id
+                    ON u.player_id = p.player_id
                     WHERE u.active = 1
                     GROUP BY p.game_id
                 ) sub
-                WHERE disc_id = ?
+                WHERE sub.disc_id = ?
                 GROUP BY champ_id
             ) sub2
         """
@@ -60,15 +62,15 @@ class LoLGameDatabase(GameDatabase):
         where_clause = ""
         group_clause = ""
         if comparison == 1: # Compare to other champs played by person
-            where_clause = "WHERE disc_id=?"
-            group_clause = "GROUP BY champ_id"
+            where_clause = "WHERE u.disc_id=?"
+            group_clause = "GROUP BY p.champ_id"
             parameters.extend([disc_id] * 2)
         elif comparison == 2: # Compare to other people playing the same champ
-            where_clause = "WHERE champ_id=?"
-            group_clause = "GROUP BY disc_id"
+            where_clause = "WHERE p.champ_id=?"
+            group_clause = "GROUP BY u.disc_id"
             parameters.extend([champ_id] * 2)
         elif comparison == 3: # Compare to all people across all champs
-            group_clause = "GROUP BY disc_id, champ_id"
+            group_clause = "GROUP BY u.disc_id, p.champ_id"
 
         parameters.extend([disc_id, champ_id])
         ordering = "ASC" if stat == "deaths" else "DESC"
@@ -82,22 +84,26 @@ class LoLGameDatabase(GameDatabase):
                     ROW_NUMBER() OVER (ORDER BY stat_values.s / played.c {ordering}) AS rank
                 FROM (
                     SELECT
-                        disc_id,
-                        champ_id,
-                        game_id,
+                        u.disc_id,
+                        p.champ_id,
+                        p.game_id,
                         SUM({stat}) AS s
                     FROM participants AS p
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
                     {where_clause}
                     {group_clause}
                 ) stat_values
                 INNER JOIN (
                     SELECT
-                        disc_id,
-                        champ_id,
+                        u.disc_id,
+                        p.champ_id,
                         CAST(COUNT(g.game_id) as real) AS c
                     FROM games AS g
                     LEFT JOIN participants AS p
                         ON g.game_id = p.game_id
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
                     {where_clause}
                     {group_clause}
                 ) played
@@ -107,7 +113,8 @@ class LoLGameDatabase(GameDatabase):
                 ON u.disc_id = played.disc_id
                 WHERE u.active = 1
                     AND played.c >= {min_games}
-                GROUP BY played.champ_id,
+                GROUP BY
+                    played.champ_id,
                     played.disc_id
             )
             SELECT rank, best_id, max_rank
@@ -157,20 +164,24 @@ class LoLGameDatabase(GameDatabase):
                     FROM games AS g
                     INNER JOIN participants AS p
                         ON p.game_id = g.game_id
-                        AND p.disc_id = g.first_blood
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
+                        AND u.disc_id = g.first_blood
                     {champ_condition}
                     GROUP BY g.first_blood
                 ) first_bloods
                 INNER JOIN
                 (
                     SELECT
-                        p.disc_id,
+                        u.disc_id,
                         CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
                     FROM games AS g
                     LEFT JOIN participants AS p
                         ON g.game_id = p.game_id
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
                     {champ_condition}
-                    GROUP BY p.disc_id
+                    GROUP BY u.disc_id
                 ) played
                     ON played.disc_id = first_bloods.first_blood
                 INNER JOIN users AS u
@@ -190,21 +201,25 @@ class LoLGameDatabase(GameDatabase):
                     CAST(played.c AS int)
                 FROM (
                     SELECT
-                        disc_id,
+                        u.disc_id,
                         SUM({stat}) AS s
                     FROM participants AS p
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
                     {champ_condition}
                     GROUP BY p.disc_id
                 ) stat_values
                 INNER JOIN (
                     SELECT
-                        disc_id,
+                        u.disc_id,
                         CAST(COUNT(DISTINCT g.game_id) as real) AS c
                     FROM games AS g
                     LEFT JOIN participants AS p
                         ON g.game_id = p.game_id
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
                     {champ_condition}
-                    GROUP BY p.disc_id
+                    GROUP BY u.disc_id
                 ) played
                 ON played.disc_id = stat_values.disc_id
                 INNER JOIN users AS u
@@ -220,10 +235,14 @@ class LoLGameDatabase(GameDatabase):
 
     def get_most_played_id(self, disc_id):
         query = f"""
-            SELECT champ_id, COUNT(*) AS c
-            FROM participants
-            WHERE disc_id = ?
-            GROUP BY champ_id
+            SELECT
+                champ_id,
+                COUNT(*) AS c
+            FROM participants AS p
+            INNER JOIN users AS u
+                ON u.player_id = p.player_id
+            WHERE u.disc_id = ?
+            GROUP BY p.champ_id
             ORDER BY COUNT(*) DESC
             LIMIT 5
         """
@@ -244,8 +263,10 @@ class LoLGameDatabase(GameDatabase):
                 p.champ_id,
                 COUNT(DISTINCT p.game_id) AS c
             FROM participants AS p
+            INNER JOIN users AS u
+                ON u.player_id = p.player_id
             WHERE p.doinks IS NOT NULL
-                AND p.disc_id=?
+                AND u.disc_id=?
                 {champ_condition}
         """
 
@@ -268,9 +289,11 @@ class LoLGameDatabase(GameDatabase):
                 p.champ_id,
                 COUNT(DISTINCT p.game_id) AS c
             FROM games AS g
-            JOIN participants AS p
+            INNER JOIN participants AS p
             ON p.game_id = g.game_id
-                AND g.intfar_id = p.disc_id
+            INNER JOIN users AS u
+                ON u.player_id = p.player_id
+                AND g.intfar_id = u.disc_id
             WHERE
                 g.intfar_id IS NOT NULL
                 AND g.intfar_id = ?
@@ -324,25 +347,29 @@ class LoLGameDatabase(GameDatabase):
             FROM (
                 SELECT
                     CAST(COALESCE(COUNT(DISTINCT g.game_id), 0) as real) AS c,
-                    champ_id
+                    p.champ_id
                 FROM games AS g
                 LEFT JOIN participants AS p
                     ON g.game_id = p.game_id
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
                 WHERE
-                    disc_id = ?
-                    AND champ_id = ?
-                    AND win = 1
+                    u.disc_id = ?
+                    AND p.champ_id = ?
+                    AND g.win = 1
             ) wins,
             (
                 SELECT
                     CAST(COUNT(DISTINCT g.game_id) as real) AS c,
-                    champ_id
+                    p.champ_id
                 FROM games AS g
                 LEFT JOIN participants AS p
                     ON g.game_id = p.game_id
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
                 WHERE
-                    disc_id = ?
-                    AND champ_id = ?
+                    u.disc_id = ?
+                    AND p.champ_id = ?
             ) played
             WHERE wins.champ_id = played.champ_id OR wins.champ_id IS NULL
         """
@@ -375,26 +402,30 @@ class LoLGameDatabase(GameDatabase):
                 FROM (
                     SELECT
                         CAST(COUNT(DISTINCT g.game_id) as real) AS c,
-                        champ_id
+                        p.champ_id
                     FROM games AS g
                     LEFT JOIN participants AS p 
                         ON g.game_id = p.game_id
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
                     WHERE
-                        disc_id = ?
-                        AND win = 1
-                    GROUP BY champ_id
-                    ORDER BY champ_id
+                        u.disc_id = ?
+                        AND g.win = 1
+                    GROUP BY p.champ_id
+                    ORDER BY p.champ_id
                ) wins,
                (
                 SELECT
                     CAST(COUNT(DISTINCT g.game_id) as real) AS c,
-                    champ_id
+                    p.champ_id
                 FROM games AS g
                 LEFT JOIN participants AS p
                     ON g.game_id = p.game_id
-                WHERE disc_id = ?
-                GROUP BY champ_id
-                ORDER BY champ_id
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
+                WHERE u.disc_id = ?
+                GROUP BY p.champ_id
+                ORDER BY p.champ_id
                ) played
                WHERE
                     wins.champ_id = played.champ_id
@@ -438,22 +469,26 @@ class LoLGameDatabase(GameDatabase):
                     FROM games AS g
                     LEFT JOIN participants AS p 
                         ON g.game_id = p.game_id
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
                     WHERE
-                        disc_id = ?
-                        AND win = 1
-                    GROUP BY role
-                    ORDER BY role
+                        u.disc_id = ?
+                        AND g.win = 1
+                    GROUP BY p.role
+                    ORDER BY p.role
                ) wins
                INNER JOIN (
                     SELECT
                         CAST(COUNT(DISTINCT g.game_id) AS REAL) AS c,
-                        role
+                        p.role
                     FROM games AS g
                     LEFT JOIN participants AS p
                         ON g.game_id = p.game_id
-                    WHERE disc_id = ?
-                    GROUP BY role
-                    ORDER BY role
+                    INNER JOIN users AS u
+                        ON u.player_id = p.player_id
+                    WHERE u.disc_id = ?
+                    GROUP BY p.role
+                    ORDER BY p.role
                 ) played
                 ON wins.role = played.role
             ) sub
@@ -468,11 +503,13 @@ class LoLGameDatabase(GameDatabase):
     def get_current_rank(self, disc_id) -> tuple[str, str]:
         query = """
             SELECT
-                rank_solo,
-                rank_flex
-            FROM participants
-            WHERE disc_id = ?
-            ORDER BY game_id DESC
+                p.rank_solo,
+                p.rank_flex
+            FROM participants AS p
+            INNER JOIN users AS u
+                ON u.player_id = p.player_id
+            WHERE u.disc_id = ?
+            ORDER BY p.game_id DESC
             LIMIT 1
         """
 

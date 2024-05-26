@@ -18,7 +18,7 @@ def register_for_lol(
 
     summ_name_joined = " ".join(summ_name)
 
-    if game_database.discord_id_from_ingame_info(ingame_name=summ_name_joined):
+    if game_database.discord_id_from_ingame_info(player_name=summ_name_joined):
         return 0, "User with that summoner name is already registered."
 
     elif (summ_info := api_client.get_summoner_data(summ_name_joined.replace(" ", "%20"))) is None:
@@ -30,8 +30,8 @@ def register_for_lol(
     # Add user to game database
     status_code, status = game_database.add_user(
         disc_id,
-        ingame_name=summ_name_joined,
-        ingame_id=summ_info["id"],
+        player_name=summ_name_joined,
+        player_id=summ_info["id"],
         puuid=summ_info["puuid"]
     )
 
@@ -55,7 +55,7 @@ def register_for_cs2(
     if match_token is None:
         return 0, "You must supply the most recent match token."
 
-    if game_database.discord_id_from_ingame_info(ingame_id=steam_id) is not None:
+    if game_database.discord_id_from_ingame_info(player_id=steam_id) is not None:
         return 0, "User with that Steam ID is already registered."
 
     steam_name = api_client.get_steam_display_name(steam_id)
@@ -67,8 +67,8 @@ def register_for_cs2(
 
     status_code, status_msg = game_database.add_user(
         disc_id,
-        ingame_name=steam_name,
-        ingame_id=steam_id,
+        player_name=steam_name,
+        player_id=steam_id,
         match_auth_code=match_auth_code,
         latest_match_token=match_token
     )

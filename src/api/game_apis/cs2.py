@@ -212,7 +212,7 @@ class SteamAPIClient(GameAPIClient):
         return None
 
     async def get_active_game_for_user(self, user: User):
-        for steam_id in user.ingame_id:
+        for steam_id in user.player_id:
             game_info = self.get_active_game(steam_id)
 
             if game_info is not None:
@@ -282,14 +282,14 @@ class SteamAPIClient(GameAPIClient):
 
         return None
 
-    def get_ingame_name(self, steam_id):
+    def get_player_name(self, steam_id):
         return self.get_steam_display_name(steam_id)
 
-    async def get_ingame_names_for_user(self, user: User) -> list[str]:
+    async def get_player_name_for_user(self, user: User) -> list[str]:
         names = []
-        for steam_id in user.ingame_id:
-            ingame_name = self.get_steam_display_name(steam_id)
-            names.append(ingame_name)
+        for steam_id in user.player_id:
+            player_name = self.get_steam_display_name(steam_id)
+            names.append(player_name)
 
         return names
 

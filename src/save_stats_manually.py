@@ -60,7 +60,7 @@ class TestMock(DiscordClient):
                 max_player_round = index
 
         for disc_id in all_users.keys():
-            for steam_id in all_users[disc_id].ingame_id:
+            for steam_id in all_users[disc_id].player_id:
                 account_id = self.api_clients[self.game].get_account_id(int(steam_id))
                 if account_id in round_stats[max_player_round]["reservation"]["accountIds"]:
                     users_in_game[disc_id] = all_users[disc_id]
@@ -74,7 +74,7 @@ class TestMock(DiscordClient):
 
         for participant in game_info["participants"]:
             for disc_id in all_users.keys():
-                if participant["summonerId"] in all_users[disc_id].ingame_id:
+                if participant["summonerId"] in all_users[disc_id].player_id:
                     users_in_game[disc_id] = all_users[disc_id]
                     break
 
@@ -86,7 +86,7 @@ class TestMock(DiscordClient):
 
         player_ranks = {}
         for disc_id in users_in_game:
-            summ_id = users_in_game[disc_id].ingame_id[0]
+            summ_id = users_in_game[disc_id].player_id[0]
             rank_info = self.api_clients["lol"].get_player_rank(summ_id)
             if rank_info is not None:
                 player_ranks[disc_id] = rank_info

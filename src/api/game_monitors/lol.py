@@ -22,11 +22,11 @@ class LoLGameMonitor(GameMonitor):
     def get_users_in_game(self, user_dict: dict[int, User], game_data: dict):
         users_in_game = {}
         for disc_id in user_dict:
-            summ_ids = user_dict[disc_id].ingame_id
+            summ_ids = user_dict[disc_id].player_id
             player_stats = get_player_stats(game_data, summ_ids)
             if player_stats is not None:
                 active_summ_name = None
-                for summ_id, summ_name in zip(user_dict[disc_id].ingame_id, user_dict[disc_id].ingame_name):
+                for summ_id, summ_name in zip(user_dict[disc_id].player_id, user_dict[disc_id].player_name):
                     if summ_id == player_stats["summonerId"]:
                         active_summ_name = summ_name
                         break
@@ -168,7 +168,7 @@ class LoLGameMonitor(GameMonitor):
             await asyncio.sleep(2)
 
             for disc_id in self.users_in_game[guild_id]:
-                summ_id = self.users_in_game[guild_id][disc_id].ingame_id[0]
+                summ_id = self.users_in_game[guild_id][disc_id].player_id[0]
                 rank_info = self.api_client.get_player_rank(summ_id)
                 if rank_info is not None:
                     player_ranks[disc_id] = rank_info

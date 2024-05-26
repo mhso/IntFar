@@ -614,7 +614,7 @@ class CS2GameStatsParser(GameStatsParser):
             started_t = False
             t_side_players = [player["steamID"] for player in self.raw_data["gameRounds"][0]["tSide"]["players"]]
             for steam_id in t_side_players:
-                if any(int(steam_id) in self.all_users[disc_id].ingame_id for disc_id in self.all_users.keys()):
+                if any(int(steam_id) in self.all_users[disc_id].player_id for disc_id in self.all_users.keys()):
                     started_t = True
                     break
 
@@ -635,7 +635,7 @@ class CS2GameStatsParser(GameStatsParser):
             players_in_game = []
             for steam_id in player_stats:
                 for disc_id in self.all_users.keys():
-                    if int(steam_id) in self.all_users[disc_id].ingame_id:
+                    if int(steam_id) in self.all_users[disc_id].player_id:
                         user_game_data = {
                             "disc_id": disc_id,
                             "steam_name": player_stats[steam_id]["playerName"],
@@ -684,7 +684,7 @@ class CS2GameStatsParser(GameStatsParser):
             players_in_game = []
             started_t = False
             for disc_id in self.all_users.keys():
-                for steam_id, steam_name in zip(self.all_users[disc_id].ingame_id, self.all_users[disc_id].ingame_name):
+                for steam_id, steam_name in zip(self.all_users[disc_id].player_id, self.all_users[disc_id].player_name):
                     account_id = self.api_client.get_account_id(int(steam_id))
                     try:
                         index = round_stats[max_player_round]["reservation"]["accountIds"].index(account_id)
@@ -877,14 +877,14 @@ class CS2GameStatsParser(GameStatsParser):
             all_player_stats = []
             players_in_game = []
             for disc_id in player_stats:
-                player_stats[disc_id]["player_id"] = database.game_users[disc_id].ingame_id[0]
+                player_stats[disc_id]["player_id"] = database.game_users[disc_id].player_id[0]
                 all_player_stats.append(CS2PlayerStats(**player_stats[disc_id]))
 
                 user_game_info = self.all_users[disc_id]
                 game_info = {
                     "disc_id": disc_id,
-                    "steam_name": user_game_info.ingame_name[0],
-                    "steam_id": user_game_info.ingame_id[0],
+                    "steam_name": user_game_info.player_name[0],
+                    "steam_id": user_game_info.player_id[0],
                 }
                 players_in_game.append(game_info)
 
@@ -900,9 +900,9 @@ class CS2GameStatsParser(GameStatsParser):
         """
         other_players = []
         for disc_id in self.all_users.keys():
-            for steam_id, ingame_name in zip(self.all_users[disc_id].ingame_id, self.all_users[disc_id].ingame_name):
+            for steam_id, player_name in zip(self.all_users[disc_id].player_id, self.all_users[disc_id].player_name):
                 if steam_id != active_id and self.api_client.get_account_id(steam_id) in self.raw_data["accountIds"]:
-                    other_players.append(ingame_name)
+                    other_players.append(player_name)
 
         game_start = self.raw_data["gameStartTime"]
         if "watchableMatchInfos" in self.raw_data:

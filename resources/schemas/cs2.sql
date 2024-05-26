@@ -2,13 +2,13 @@ PRAGMA journal_mode = 'wal';
 
 CREATE TABLE [users] (
     [disc_id] INTEGER NOT NULL,
-    [ingame_name] NVARCHAR(64) NOT NULL,
-    [ingame_id] INTEGER NOT NULL,
+    [player_name] NVARCHAR(64) NOT NULL,
+    [player_id] INTEGER NOT NULL,
     [match_auth_code] INTEGER NOT NULL,
     [latest_match_token] NVARCHAR(64) NOT NULL,
     [main] INTEGER(1),
     [active] INTEGER DEFAULT(1),
-    PRIMARY KEY (disc_id, ingame_id)
+    PRIMARY KEY (disc_id, player_id)
 );
 CREATE TABLE [games] (
     [game_id] NVARCHAR(64) PRIMARY KEY,

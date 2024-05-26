@@ -291,7 +291,7 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()
 
-    def get_ingame_name(self, puuid):
+    def get_player_name(self, puuid):
         endpoint = " /riot/account/v1/accounts/by-puuid/{0}"
         response = self.make_request(endpoint, API_PLATFORM, puuid)
         if response.status_code != 200:
@@ -299,11 +299,11 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()["gameName"]
 
-    async def get_ingame_names_for_user(self, user: User) -> list[str]:
+    async def get_player_names_for_user(self, user: User) -> list[str]:
         names = []
         for puuid in user.puuid:
-            ingame_name = self.get_ingame_name(puuid)
-            names.append(ingame_name)
+            player_name = self.get_player_name(puuid)
+            names.append(player_name)
 
             await asyncio.sleep(1)
 
@@ -322,7 +322,7 @@ class RiotAPIClient(GameAPIClient):
         return response.json()
 
     async def get_active_game_for_user(self, user: User):
-        for summ_id, puuid in zip(user.ingame_id, user.puuid):
+        for summ_id, puuid in zip(user.player_id, user.puuid):
             game_info = self.get_active_game(puuid)
 
             if game_info is not None:

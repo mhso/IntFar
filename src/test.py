@@ -213,7 +213,7 @@ class TestFuncs:
         api_client = SteamAPIClient("cs2", self.config)
         user = self.game_databases["cs2"].game_users[267401734513491969]
         print(user.latest_match_token[0])
-        next_code = api_client.get_next_sharecode(user.ingame_id[0], user.match_auth_code[0], user.latest_match_token[0])
+        next_code = api_client.get_next_sharecode(user.player_id[0], user.match_auth_code[0], user.latest_match_token[0])
         print(next_code)
 
     def test_cs_parse(self):
@@ -345,13 +345,13 @@ class TestFuncs:
                 user = self.game_databases["lol"].game_users[disc_id]
 
                 for summ_
-                summ_id = user.ingame_id[0]
+                summ_id = user.player_id[0]
                 rank_info = self.api_clients["lol"].get_player_rank(summ_id)
                 if rank_info is not None:
                     player_ranks[disc_id] = rank_info
 
                 db.execute_query(query,  game_id, disc_id)
-                print(f"Saved rank for {user.ingame_name[0]}")
+                print(f"Saved rank for {user.player_name[0]}")
 
                 sleep(1.5)
 
