@@ -311,3 +311,15 @@ class CS2GameDatabase(GameDatabase):
                 return self.get_min_or_max_winrate_played(disc_id, best, included_maps, return_top_n, min_games=5)
 
             return result
+
+    def get_current_rank(self, disc_id) -> str:
+        query = """
+            SELECT rank
+            FROM participants
+            WHERE disc_id = ?
+            ORDER BY game_id DESC
+            LIMIT 1
+        """
+
+        with self:
+            return self.execute_query(query, disc_id).fetchone()

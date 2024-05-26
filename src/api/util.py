@@ -33,24 +33,6 @@ GUILD_MAP = {
     "nibs": MAIN_GUILD_ID, "circus": 347488541397483543, "core": 803987403932172359
 }
 
-DOINKS_REASONS = [
-    "KDA larger than or equal to 10", "20 kills or more", "Half of the teams damage",
-    "Getting a pentakill", "Vision score larger than 100", "Kill participation over 80%",
-    "Securing all epic monsters (and more than 3)", "More than 8 cs/min"
-]
-
-STAT_COMMANDS = [
-    "kills", "deaths", "assists", "kda", "damage", "cs", "cs_per_min", "gold",
-    "kp", "vision_wards", "vision_score", "steals", "first_blood"
-]
-
-STAT_QUANTITY_DESC = [
-    ("most", "fewest"), ("fewest", "most"), ("most", "fewest"), ("highest", "lowest"),
-    ("most", "least"), ("most", "least"), ("most", "lowest"), ("most", "least"),
-    ("highest", "lowest"), ("most", "fewest"), ("highest", "lowest"), ("most", "least"),
-    ("most", "least"),
-]
-
 MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June", "July",
     "August", "September", "October", "November", "December"

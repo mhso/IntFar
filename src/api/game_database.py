@@ -195,16 +195,20 @@ class GameDatabase(SQLiteDatabase):
         query_games = f"SELECT MAX(timestamp), win, intfar_id, intfar_reason FROM games{delim_str}"
         query_doinks = f"""
             SELECT
-                timestamp,
-                disc_id,
-                doinks
+                g.timestamp,
+                u.disc_id,
+                p.doinks
             FROM (
                SELECT MAX(timestamp) AS t
                FROM games{delim_str}
-            ) sub_1, participants AS p
-            JOIN games AS g
+            ) sub_1
+            INNER JOIN games AS g
+            ON g.timestamp = sub_1.t
+            INNER participants AS p
             ON p.game_id = g.game_id
-            WHERE doinks IS NOT NULL AND timestamp = sub_1.t
+            INNER JOIN users AS u
+            ON u.ingame_id = p.player_id
+            WHERE p.doinks IS NOT NULL
         """
         with self:
             game_data = self.execute_query(query_games, *params).fetchone()
@@ -222,12 +226,12 @@ class GameDatabase(SQLiteDatabase):
                         {aggregator}(sub.c)
                     FROM  (
                         SELECT
-                            first_blood,
+                            u.disc_id AS first_blood,
                             Count(DISTINCT game_id) AS c
                         FROM
                             games AS g
                         INNER JOIN users AS u
-                        ON u.disc_id = g.first_blood
+                        ON u.ingame_id = g.first_blood
                         WHERE u.active = 1
                         GROUP BY first_blood
                             HAVING first_blood IS NOT NULL
@@ -239,7 +243,7 @@ class GameDatabase(SQLiteDatabase):
 
             query = f"""
                 SELECT
-                    p.disc_id,
+                    u.disc_id,
                     {aggregator}({stat}),
                     game_id
                 FROM participants AS p
@@ -259,11 +263,11 @@ class GameDatabase(SQLiteDatabase):
 
         if stat == "first_blood":
             if disc_id is not None:
-                player_condition = "AND g.first_blood = ?"
+                player_condition = "AND u.disc_id = ?"
                 params = [disc_id]
             else:
-                player_select = "g.first_blood AS disc_id,"
-                player_condition = "GROUP BY g.first_blood"
+                player_select = "u.disc_id,"
+                player_condition = "GROUP BY u.disc_id"
 
             query = f"""
                 SELECT
@@ -281,13 +285,13 @@ class GameDatabase(SQLiteDatabase):
                 INNER JOIN (
                     SELECT
                         COUNT(*) AS c,
-                        p.disc_id
+                        p.player_id
                     FROM games AS g
                     INNER JOIN participants AS p
                     ON p.game_id = g.game_id
                     GROUP BY p.disc_id
                 ) AS games
-                ON games.disc_id = u.disc_id
+                ON games.player_id = p.player_id
                 WHERE
                     u.active = 1
                     {player_condition}
@@ -391,8 +395,12 @@ class GameDatabase(SQLiteDatabase):
     def get_min_or_max_winrate_played(self, disc_id, best, included_ids=None, return_top_n=1, min_games=10):
         ...
 
+    @abstractmethod
+    def get_current_rank(self, disc_id):
+        ...
+
     def get_game_ids(self):
-        query = f"SELECT game_id FROM games"
+        query = f"SELECT game_id, guild_id FROM games"
         with self:
             return self.execute_query(query).fetchall()
 
@@ -1825,3 +1833,23 @@ class GameDatabase(SQLiteDatabase):
                 self.execute_query(query, commit=False)
 
             self.connection.commit()
+
+    def test_123(self):
+        query = """
+            SELECT sub_1.game_id, sub_1.c, sub_2.c
+            FROM (
+                SELECT game_id, COUNT(DISTINCT disc_id) AS c
+                FROM participants
+                GROUP BY game_id
+            ) sub_1
+            INNER JOIN (
+                SELECT game_id, COUNT(DISTINCT role) AS c
+                FROM participants
+                GROUP BY game_id
+            ) sub_2
+            ON sub_1.game_id = sub_2.game_id
+            WHERE sub_1.c <> sub_2.c
+        """
+
+        with self:
+            return self.execute_query(query).fetchall()

@@ -24,7 +24,7 @@ def get_stat_quantity_descriptions(game) -> dict[str, tuple[str, str]]:
 def get_formatted_stat_names(game) -> dict[str,  str]:
     return _PLAYER_STATS_HOLDERS[game].formatted_stat_names()
 
-def get_formatted_stat_value(game, stat, value) -> dict[str,  str]:
+def get_formatted_stat_value(game, stat, value) -> str:
     return _PLAYER_STATS_HOLDERS[game].get_formatted_stat_value(stat, value)
 
 def get_empty_game_data(game) -> GameStats:

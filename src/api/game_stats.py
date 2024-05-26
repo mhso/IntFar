@@ -27,7 +27,7 @@ class PlayerStats(ABC):
         """
         return [
             "game_id",
-            "disc_id",
+            "player_id",
             "doinks",
             "kills",
             "deaths",
@@ -64,7 +64,7 @@ class PlayerStats(ABC):
         return formatted
 
     @classmethod
-    def get_formatted_stat_value(cls, stat, value) -> dict[str, str]:
+    def get_formatted_stat_value(cls, stat, value) -> str:
         if isinstance(value, float):
             fmt_val = f"{value:.2f}"
         elif value is None:

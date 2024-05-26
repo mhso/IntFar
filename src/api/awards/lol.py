@@ -6,9 +6,6 @@ from api.util import round_digits
 from api.game_stats import get_outlier
 from api.game_database import GameDatabase
 
-_NEXUS_BLITZ_ID = 21
-_ARENA_ID = 30
-
 class LoLAwardQualifiers(AwardQualifiers):
     @classmethod
     def INTFAR_REASONS(cls):
@@ -108,6 +105,14 @@ class LoLAwardQualifiers(AwardQualifiers):
             "mentions_low_cs_min",
             "mentions_no_epic_monsters",
         ]
+    
+    @classmethod
+    def RANK_MENTIONS_FLAVOR_TEXTS(cls):
+        super().__doc__
+        return [
+            "rank_demotion",
+            "rank_promotion",
+        ]
 
     @classmethod
     def COOL_STATS_FLAVOR_TEXTS(cls):
@@ -166,6 +171,7 @@ class LoLAwardQualifiers(AwardQualifiers):
             super().ALL_FLAVOR_TEXTS() + 
             cls.INTFAR_FLAVOR_TEXTS() +
             cls.HONORABLE_MENTIONS_FLAVOR_TEXTS() +
+            cls.RANK_MENTIONS_FLAVOR_TEXTS() +
             cls.COOL_STATS_FLAVOR_TEXTS() +
             cls.TIMELINE_FLAVOR_TEXTS() +
             cls.DOINKS_FLAVOR_TEXTS()
@@ -243,7 +249,7 @@ class LoLAwardQualifiers(AwardQualifiers):
                 self.parsed_game_stats.enemy_herald_kills
             )
 
-            if stats.lane == "JUNGLE" and stats.role == "NONE" and own_epics > 3 and enemy_epics == 0:
+            if stats.lane == "JUNGLE" and stats.position == "NONE" and own_epics > 3 and enemy_epics == 0:
                 mention_list.append((6, own_epics))
 
             if stats.cs_per_min >= 8:
@@ -295,10 +301,44 @@ class LoLAwardQualifiers(AwardQualifiers):
                 self.parsed_game_stats.our_herald_kills
             )
 
-            if stats.lane == "JUNGLE" and stats.role == "NONE" and epic_monsters_secured <= self.config.mentions_epic_monsters:
+            if stats.lane == "JUNGLE" and stats.position == "NONE" and epic_monsters_secured <= self.config.mentions_epic_monsters:
                 mentions[stats.disc_id].append((3, epic_monsters_secured))
 
         return mentions
+
+    def get_rank_mentions(self, prev_ranks: dict[int, tuple[str, str]]) -> dict[int, tuple[int, int]]:
+        curr_ranks = {
+            stats.disc_id: (stats.rank_solo, stats.rank_flex)
+            for stats in self.parsed_game_stats.filtered_player_stats
+        }
+
+        divisions = [
+            "iron",
+            "bronze",
+            "silver",
+            "gold",
+            "platinum",
+            "emerald",
+            "diamond",
+            "master",
+            "grandmaster",
+            "challenger"
+        ]
+
+        rank_mentions = {}
+        for disc_id in curr_ranks:
+            for prev_rank, curr_rank in zip(prev_ranks[disc_id], curr_ranks[disc_id]):
+                if prev_rank is None or curr_rank is None:
+                    continue
+
+                prev_division = divisions.index(prev_rank.split("_")[0])
+                curr_division = divisions.index(curr_rank.split("_")[0])
+                if curr_division < prev_division: # Demotion
+                    rank_mentions[disc_id] = (0, curr_division)
+                elif curr_division > prev_division: # Promotion
+                    rank_mentions[disc_id] = (1, curr_division)
+
+        return rank_mentions
 
     def get_cool_stats(self):
         """
@@ -310,11 +350,10 @@ class LoLAwardQualifiers(AwardQualifiers):
             - Getting one or more quadrakills (but no penta)
         """
         cool_stats = {}
-
         for stats in self.parsed_game_stats.filtered_player_stats:
             cool_stats[stats.disc_id] = []
 
-            if stats.total_time_dead >= self.config.stats_min_time_dead:
+            if stats.total_time_dead and stats.total_time_dead >= self.config.stats_min_time_dead:
                 time_dead_mins = stats.total_time_dead // 60
                 time_dead_secs = stats.total_time_dead % 60
                 fmt_str = f"{time_dead_mins} mins"
@@ -323,7 +362,7 @@ class LoLAwardQualifiers(AwardQualifiers):
 
                 cool_stats[stats.disc_id].append((0, fmt_str))
 
-            if stats.steals >= self.config.stats_min_objectives_stolen:
+            if stats.steals and stats.steals >= self.config.stats_min_objectives_stolen:
                 cool_stats[stats.disc_id].append((1, stats.steals))
 
             if stats.turret_kills >= self.config.stats_min_turrets_killed:

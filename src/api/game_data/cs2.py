@@ -530,7 +530,6 @@ class CS2PlayerStats(PlayerStats):
             one_v_fours_won=("most", "fewest"),
             one_v_fives_tried=("most", "fewest"),
             one_v_fives_won=("most", "fewest"),
-            rank=("highest", "lowest"),
         )
         return stat_quantities
 

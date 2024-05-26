@@ -80,6 +80,21 @@ class TestMock(DiscordClient):
 
         return users_in_game
 
+    async def get_ranks(self, users_in_game):
+        # Get rank of each player in the game, if status is OK
+        await asyncio.sleep(2)
+
+        player_ranks = {}
+        for disc_id in users_in_game:
+            summ_id = users_in_game[disc_id].ingame_id[0]
+            rank_info = self.api_clients["lol"].get_player_rank(summ_id)
+            if rank_info is not None:
+                player_ranks[disc_id] = rank_info
+
+            await asyncio.sleep(1.5)
+
+        return player_ranks
+
     async def play_event_sounds(self, game, intfar, doinks, guild_id):
         if self.play_sound:
             await super().play_event_sounds(game, intfar, doinks, guild_id)
@@ -122,6 +137,10 @@ class TestMock(DiscordClient):
                 game_monitor.users_in_game[guild_id] = self.get_users_in_lol_game(game_info)
 
             status = await game_monitor.get_finished_game_status(game_info, guild_id)
+
+            if status == game_monitor.POSTGAME_STATUS_OK and self.game == "lol":
+                ranks = await self.get_ranks(game_monitor.users_in_game[guild_id])
+                game_info["player_ranks"] = ranks
 
             await self.on_game_over(self.game, game_info, guild_id, status)
 

@@ -162,4 +162,19 @@ class LoLGameMonitor(GameMonitor):
         else:
             status_code = await self.get_finished_game_status(game_info, guild_id)
 
+        # Get rank of each player in the game, if status is OK
+        player_ranks = {}
+        if status_code == self.POSTGAME_STATUS_OK:
+            await asyncio.sleep(2)
+
+            for disc_id in self.users_in_game[guild_id]:
+                summ_id = self.users_in_game[guild_id][disc_id].ingame_id[0]
+                rank_info = self.api_client.get_player_rank(summ_id)
+                if rank_info is not None:
+                    player_ranks[disc_id] = rank_info
+
+                await asyncio.sleep(1.5)
+
+        game_info["player_ranks"] = player_ranks
+
         return game_info, status_code

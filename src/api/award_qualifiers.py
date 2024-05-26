@@ -66,6 +66,13 @@ class AwardQualifiers(ABC):
 
     @classmethod
     @abstractmethod
+    def RANK_MENTIONS_FLAVOR_TEXTS(cls) -> list[str]:
+        """
+        Get a list of filenames for flavor texts related to rank demotion/promotion
+        """
+
+    @classmethod
+    @abstractmethod
     def COOL_STATS_FLAVOR_TEXTS(cls) -> list[str]:
         """
         Get a list of filenames for flavor texts related to cool stats.
@@ -89,6 +96,7 @@ class AwardQualifiers(ABC):
             "intfar": cls.INTFAR_FLAVOR_TEXTS(),
             "doinks": cls.DOINKS_FLAVOR_TEXTS(),
             "honorable": cls.HONORABLE_MENTIONS_FLAVOR_TEXTS(),
+            "rank": cls.RANK_MENTIONS_FLAVOR_TEXTS(),
             "stats": cls.COOL_STATS_FLAVOR_TEXTS(),
         }
 
@@ -188,6 +196,10 @@ class AwardQualifiers(ABC):
 
     @abstractmethod
     def get_honorable_mentions(self) -> dict[int, list[tuple]]:
+        ...
+
+    @abstractmethod
+    def get_rank_mentions(self, prev_ranks: dict) -> dict[int, tuple[int, int]]:
         ...
 
     @abstractmethod

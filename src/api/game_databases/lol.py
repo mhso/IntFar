@@ -416,12 +416,80 @@ class LoLGameDatabase(GameDatabase):
 
             if result is None and min_games == 10:
                 # If no champs are found with min 10 games, try again with 5.
-                return self.get_min_or_max_winrate_played(disc_id, best, included_champs, return_top_n, min_games=5)
+                return self.get_min_or_max_winrate_played(disc_id, best, included_champs, return_top_n, min_games=min_games // 2)
 
             return result if result[0] is not None else (None, None, None)
 
+    def get_role_winrate(self, disc_id):
+        query = f"""
+            SELECT
+                sub.wr,
+                CAST(sub.gs AS INTEGER),
+                sub.role
+            FROM (
+                SELECT
+                    (wins.c / played.c) * 100 AS wr,
+                    played.c AS gs,
+                    played.role as role
+                FROM (
+                    SELECT
+                        CAST(COUNT(DISTINCT g.game_id) AS REAL) AS c,
+                        role
+                    FROM games AS g
+                    LEFT JOIN participants AS p 
+                        ON g.game_id = p.game_id
+                    WHERE
+                        disc_id = ?
+                        AND win = 1
+                    GROUP BY role
+                    ORDER BY role
+               ) wins
+               INNER JOIN (
+                    SELECT
+                        CAST(COUNT(DISTINCT g.game_id) AS REAL) AS c,
+                        role
+                    FROM games AS g
+                    LEFT JOIN participants AS p
+                        ON g.game_id = p.game_id
+                    WHERE disc_id = ?
+                    GROUP BY role
+                    ORDER BY role
+                ) played
+                ON wins.role = played.role
+            ) sub
+            ORDER BY sub.wr DESC
+        """
+
+        with self:
+            params = [disc_id] * 2
+            result = self.execute_query(query, *params).fetchall()
+            return result if result[0] is not None else (None, None, None)
+
+    def get_current_rank(self, disc_id) -> tuple[str, str]:
+        query = """
+            SELECT
+                rank_solo,
+                rank_flex
+            FROM participants
+            WHERE disc_id = ?
+            ORDER BY game_id DESC
+            LIMIT 1
+        """
+
+        with self:
+            return self.execute_query(query, disc_id).fetchone()
+
     def get_split_summary_data(self, disc_id):
-        pass
+        """
+        What to summarize:
+        - Avg stats, compare each to prev split
+        - Int-Fars, doinks, compare to prev split
+        - Games played, compare to prev split
+        - W/L, show best and worst champ
+        - Most played role(?)
+        - Highest rank
+        - New champs played
+        """
 
     def create_list(self, disc_id, name):
         query = "INSERT INTO champ_lists(name, owner_id) VALUES (?, ?)"

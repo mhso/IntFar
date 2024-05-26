@@ -329,11 +329,33 @@ class RiotAPIClient(GameAPIClient):
                 return game_info, summ_id
             
             await asyncio.sleep(1)
-            
+
         return None, None
 
+    def get_game_timeline(self, game_id, tries=0):
+        endpoint = "/lol/match/v5/matches/{0}/timeline"
+
+        response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
+        if response.status_code != 200:
+            if tries > 0:
+                sleep(30)
+                return self.get_game_timeline(game_id, tries-1)
+            else:
+                return None
+
+        return response.json()["info"]
+    
+    def get_player_rank(self, summ_id):
+        endpoint = "/lol/league/v4/entries/by-summoner/{0}"
+
+        response = self.make_request(endpoint, API_PLATFORM, summ_id)
+        if response.status_code != 200:
+            return None
+
+        return response.json()
+
     def get_game_details(self, game_id, tries=0):
-        api_v4_cutoff = 6000000000
+        api_v4_cutoff = 5448295599
         if int(game_id) > api_v4_cutoff:
             endpoint = "/lol/match/v5/matches/{0}"
             response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
@@ -362,19 +384,6 @@ class RiotAPIClient(GameAPIClient):
         data["timeline"] = timeline_data
 
         return data
-
-    def get_game_timeline(self, game_id, tries=0):
-        endpoint = "/lol/match/v5/matches/{0}/timeline"
-
-        response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
-        if response.status_code != 200:
-            if tries > 0:
-                sleep(30)
-                return self.get_game_timeline(game_id, tries-1)
-            else:
-                return None
-
-        return response.json()["info"]
 
     def get_champion_mastery(self, puuid):
         endpoint = "/lol/champion-mastery/v4/champion-masteries/by-puuid/{0}"

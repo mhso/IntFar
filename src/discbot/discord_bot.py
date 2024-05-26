@@ -299,6 +299,11 @@ class DiscordClient(discord.Client):
         if doinks_response is not None:
             response += "\n" + self.insert_emotes(doinks_response)
 
+        # Get data about rank promotion/demotion
+        ranks_reponse = self.get_ranks_data(awards_handler)
+        if ranks_reponse is not None:
+            response += "\n" + self.insert_emotes(ranks_reponse)
+
         # Get data about win or loss streaks.
         game_streak_response = self.get_win_loss_streak_data(awards_handler)
         if game_streak_response is not None:
@@ -940,7 +945,17 @@ class DiscordClient(discord.Client):
 
         return None if not any_mentions else mentions_str
 
-    def get_cool_stats_msg(self, awards_handler: AwardQualifiers, cool_stats: dict[list[tuple]]):
+    def get_rank_mentions_msg(self, awards_handler: AwardQualifiers, rank_mentions: dict[int, int]):
+        ranks_str = "=" * 38
+
+        for disc_id in rank_mentions:
+            demotion, rank_index = rank_mentions[disc_id]
+            formatted_flavor = awards_handler.get_flavor_text("rank", demotion, rank_index)
+            ranks_str += f"\n{self.get_mention_str(disc_id, awards_handler.guild_id)} {formatted_flavor}"
+
+        return None if rank_mentions == {} else self.insert_emotes(ranks_str)
+
+    def get_cool_stats_msg(self, awards_handler: AwardQualifiers, cool_stats: dict[int, list[tuple]]):
         """
         Return a message describing random notable events that happened during
         the game that are not worthy of intfars, doinks, or honorable mentions,
@@ -1257,6 +1272,16 @@ class DiscordClient(discord.Client):
         redeemed_text = self.get_big_doinks_msg(awards_handler, doinks_mentions)
 
         return doinks, redeemed_text
+
+    def get_ranks_data(self, awards_handler: AwardQualifiers):
+        prev_ranks = {
+            stats.disc_id: self.game_databases[awards_handler.game].get_current_rank(stats.disc_id)
+            for stats in awards_handler.parsed_game_stats.filtered_player_stats
+        }
+        rank_mentions = awards_handler.get_rank_mentions(prev_ranks)
+        ranks_msg = self.get_rank_mentions_msg(awards_handler, rank_mentions)
+
+        return ranks_msg
 
     def get_cool_stats_data(self, awards_handler: AwardQualifiers):
         """

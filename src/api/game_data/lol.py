@@ -5,6 +5,14 @@ from time import time
 from api.game_stats import GameStats, PlayerStats, GameStatsParser
 from api.util import format_duration
 
+_ROLE_MAP = {
+    "MIDDLE": "mid",
+    "TOP": "top",
+    "JUNGLE": "jungle",
+    "UTILITY": "support",
+    "BOTTOM": "adc"
+}
+
 @dataclass
 class LoLPlayerStats(PlayerStats):
     champ_id: int = None
@@ -17,7 +25,10 @@ class LoLPlayerStats(PlayerStats):
     vision_score: int = None
     steals: int = None
     lane: str = None
+    position: str = None
     role: str = None
+    rank_solo: str = None
+    rank_flex: str = None
     quadrakills: int = None
     pentakills: int = None
     total_time_dead: int = None
@@ -34,7 +45,10 @@ class LoLPlayerStats(PlayerStats):
             "gold",
             "vision_wards",
             "vision_score",
-            "steals"
+            "steals",
+            "role",
+            "rank_solo",
+            "rank_flex" 
         ]
 
     @classmethod
@@ -72,9 +86,15 @@ class LoLPlayerStats(PlayerStats):
         return formatted
 
     @classmethod
-    def get_formatted_stat_value(cls, stat, value) -> dict[str, str]:
+    def get_formatted_stat_value(cls, stat, value) -> str:
         if isinstance(value, float) and stat in ("damage", "gold"):
             return str(int(value))
+
+        if stat == "role":
+            return value.upper() if value == "adc" else value.capitalize()
+        elif stat in ("rank_solo", "rank_flex"):
+            division, tier, points = value.split("_")
+            return f"{division.capitalize()} {tier} {points} LP"
 
         return super().get_formatted_stat_value(stat, value)
 
@@ -217,41 +237,66 @@ class LoLGameStatsParser(GameStatsParser):
                             player_disc_id = disc_id
                             break
 
+                    # Calculate total CS and KDA
+                    total_cs = participant["stats"]["neutralMinionsKilled"] + participant["stats"]["totalMinionsKilled"]
                     kda =  (
                         participant["stats"]["kills"] + participant["stats"]["assists"]
                         if participant["stats"]["deaths"] == 0
                         else (participant["stats"]["kills"] + participant["stats"]["assists"]) / participant["stats"]["deaths"]
                     )
 
+                    # Get player rank
+                    solo_rank = None
+                    flex_rank = None
+                    for queue_info in self.raw_data.get("player_ranks", {}).get(player_disc_id, []):
+                        if queue_info["queueType"] in ("RANKED_SOLO_SR", "RANKED_FLEX_SR"):
+                            division = queue_info["tier"].lower()
+                            tier = queue_info["rank"]
+                            points = queue_info["leaguePoints"]
+                            rank = f"{division}_{tier}_{points}"
+
+                            if queue_info["queueType"] == "RANKED_SOLO_SR":
+                                solo_rank = rank
+                            else:
+                                flex_rank = rank
+
+                    lane = participant["timeline"]["lane"]
+                    position = participant["timeline"]["role"]
+                    if position == "DUO_SUPPORT":
+                        role = "support"
+                    else:
+                        role = _ROLE_MAP.get(lane)
+
                     stats_for_player = LoLPlayerStats(
                         game_id=self.raw_data["gameId"],
                         disc_id=player_disc_id,
-                        player_id=participant["stats"]["puuid"],
+                        player_id=part_info["player"]["summonerId"],
                         kills=participant["stats"]["kills"],
                         deaths=participant["stats"]["deaths"],
                         assists=participant["stats"]["assists"],
                         kda=kda,
                         champ_id=participant["championId"],
-                        champ_name=participant["stats"]["championName"],
+                        champ_name=self.api_client.get_playable_name(participant["championId"]),
                         damage=participant["stats"]["totalDamageDealtToChampions"],
-                        cs=participant["stats"]["neutralMinionsKilled"] + participant["stats"]["totalMinionsKilled"],
-                        cs_per_min=(participant["stats"]["totalCs"] / self.raw_data["gameDuration"]) * 60,
+                        cs=total_cs,
+                        cs_per_min=(total_cs / self.raw_data["gameDuration"]) * 60,
                         gold=participant["stats"]["goldEarned"],
                         vision_wards=participant["stats"]["visionWardsBoughtInGame"],
                         vision_score=participant["stats"]["visionScore"],
-                        steals=participant["stats"]["objectivesStolen"],
-                        lane=participant["stats"]["role"],
-                        role=participant["stats"]["role"],
+                        lane=lane,
+                        position=position,
+                        role=role,
+                        rank_solo=solo_rank,
+                        rank_flex=flex_rank,
                         quadrakills=participant["stats"]["quadraKills"],
                         pentakills=participant["stats"]["pentaKills"],
-                        total_time_dead=participant["stats"]["totalTimeSpentDead"],
                         turret_kills=participant["stats"]["turretKills"],
                         inhibitor_kills=participant["stats"]["inhibitorKills"]
                     )
                     player_stats.append(stats_for_player)
 
                     if participant["stats"]["firstBloodKill"]:
-                        first_blood_id = disc_id
+                        first_blood_id = part_info["player"]["summonerId"]
 
                     if player_disc_id is not None:
                         summ_data = {
@@ -310,7 +355,7 @@ class LoLGameStatsParser(GameStatsParser):
             enemy_baron_kills=enemy_baron_kills,
             enemy_dragon_kills=enemy_dragon_kills,
             enemy_herald_kills=enemy_herald_kills,
-            timeline_data=self.raw_data["timeline"]
+            timeline_data=None
         )
 
     def get_relevant_stats(self) -> GameStats:
@@ -348,12 +393,28 @@ class LoLGameStatsParser(GameStatsParser):
                         player_disc_id = disc_id
                         break
 
+                # Calculate total CS and KDA
                 total_cs = participant["neutralMinionsKilled"] + participant["totalMinionsKilled"]
                 kda =  (
                     participant["kills"] + participant["assists"]
                     if participant["deaths"] == 0
                     else (participant["kills"] + participant["assists"]) / participant["deaths"]
                 )
+
+                # Get player rank
+                solo_rank = None
+                flex_rank = None
+                for queue_info in self.raw_data.get("player_ranks", {}).get(player_disc_id, []):
+                    if queue_info["queueType"] in ("RANKED_SOLO_SR", "RANKED_FLEX_SR"):
+                        division = queue_info["tier"].lower()
+                        tier = queue_info["rank"]
+                        points = queue_info["leaguePoints"]
+                        rank = f"{division}_{tier}_{points}"
+
+                        if queue_info["queueType"] == "RANKED_SOLO_SR":
+                            solo_rank = rank
+                        else:
+                            flex_rank = rank
 
                 stats_for_player = LoLPlayerStats(
                     game_id=self.raw_data["gameId"],
@@ -373,7 +434,10 @@ class LoLGameStatsParser(GameStatsParser):
                     vision_score=participant["visionScore"],
                     steals=participant["objectivesStolen"],
                     lane=participant["teamPosition"],
-                    role=participant["role"],
+                    position=participant["role"],
+                    role=_ROLE_MAP[participant["teamPosition"]],
+                    rank_solo=solo_rank,
+                    rank_flex=flex_rank,
                     quadrakills=participant["quadraKills"],
                     pentakills=participant["pentaKills"],
                     total_time_dead=participant["totalTimeSpentDead"],
@@ -382,7 +446,7 @@ class LoLGameStatsParser(GameStatsParser):
                 )
 
                 if participant["firstBloodKill"]:
-                    first_blood_id = player_disc_id
+                    first_blood_id = participant["summonerId"]
 
                 player_stats.append(stats_for_player)
 

@@ -1,5 +1,6 @@
 import json
 import argparse
+from time import sleep
 from glob import glob
 from datetime import datetime
 
@@ -307,7 +308,7 @@ class TestFuncs:
             champ_name = self.riot_api.get_playable_name(champ_id)
             print(champ_name, count)
 
-    def test_reee(self):
+    def test_max_kda(self):
         sum_kdas = {}
         players_on_champ = {}
         games_on_champ = {}
@@ -331,6 +332,29 @@ class TestFuncs:
                 total_games = games_on_champ[champ_id]
     
         print(f"{self.riot_api.get_playable_name(max_kda_champ)}: {max_kda} ({total_games} games)")
+
+    def test_add_lol_ranks(self):
+        query = "SELECT disc_id, MAX(game_id) FROM participants GROUP BY disc_id"
+        with self.game_databases["lol"] as db:
+            latest_game_ids = db.execute_query(query, disc_id).fetchall()
+
+            query = "UPDATE participants SET rank_solo=?, rank_flex=? WHERE game_id=? AND disc_id=?"
+
+            player_ranks = {}
+            for disc_id, game_id in latest_game_ids:
+                user = self.game_databases["lol"].game_users[disc_id]
+
+                for summ_
+                summ_id = user.ingame_id[0]
+                rank_info = self.api_clients["lol"].get_player_rank(summ_id)
+                if rank_info is not None:
+                    player_ranks[disc_id] = rank_info
+
+                db.execute_query(query,  game_id, disc_id)
+                print(f"Saved rank for {user.ingame_name[0]}")
+
+                sleep(1.5)
+
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

@@ -1,4 +1,3 @@
-import asyncio
 import random
 
 import requests
@@ -6,7 +5,7 @@ from mhooge_flask.logging import logger
 
 from api import util as api_util
 from api.config import Config
-from api.game_data import get_stat_parser
+from api.game_data import get_stat_parser, get_formatted_stat_value
 from discbot.commands import util as commands_util
 
 config = Config()
@@ -128,6 +127,15 @@ async def handle_summary_msg(client, message, game, target_id):
         f"They have played **{num_played_ids}**/**{total_ids}** different {playable_name}.\n\n"
     )
 
+    if game == "lol":
+        rank_solo, rank_flex = database.get_current_rank(target_id)
+        if rank_solo is not None:
+            fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_solo)
+            response += f"Their current rank in Solo/Duo is **{fmt_rank}**.\n"
+        if rank_flex is not None:
+            fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_flex)
+            response += f"Their current rank in Flex is **{fmt_rank}**.\n\n"
+
     response += f"Their longest winning streak was **{longest_win_streak}** games.\n"
     response += f"Their longest loss streak was **{longest_loss_streak}** games.\n\n"
 
@@ -158,6 +166,19 @@ async def handle_summary_msg(client, message, game, target_id):
             f"They perform worst when playing with **{worst_person_name}** (won " +
             f"**{worst_person_wr:.1f}%** of **{worst_person_games}** games).\n\n"
         )
+
+    if game == "lol":
+        role_stats = database.get_role_winrate(target_id)
+
+        response += "Their winrate playing different roles:\n"
+
+        for winrate, games, role in role_stats:
+            role_name = get_formatted_stat_value(game, "role", role)
+            response += (
+                f"- **{role_name}**: won **{winrate:.1f}%** of **{games}** games\n"
+            )
+
+        response += "\n"
 
     # Get performance score for person.
     score, rank, num_scores = database.get_performance_score(target_id)()
