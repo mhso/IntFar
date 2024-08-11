@@ -41,7 +41,7 @@ def get_stats(game):
                     pretty_desc,
                     api_util.round_digits(best_or_worst_ever),
                     user_data[0],
-                    flask.url_for("static", filename=user_data[1].replace("app/static/", ""))
+                    flask.url_for("static", _external=True, filename=user_data[1].replace("app/static/", ""))
                 )
             )
         all_stats.append(stat_data)

@@ -25,6 +25,5 @@ log
 todo.txt
 dummy.txt
 resources/message.txt
-pdm.lock
 .pdm-python
 .pdm-config

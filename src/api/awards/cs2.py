@@ -107,6 +107,14 @@ class CS2AwardQualifiers(AwardQualifiers):
         ]
 
     @classmethod
+    def RANK_MENTIONS_FLAVOR_TEXTS(cls):
+        super().__doc__
+        return [
+            "rank_demotion",
+            "rank_promotion",
+        ]
+
+    @classmethod
     def COOL_STATS_FLAVOR_TEXTS(cls):
         super().__doc__
         return [
@@ -139,13 +147,6 @@ class CS2AwardQualifiers(AwardQualifiers):
             "timeline_comeback",
             "timeline_throw",
         ]
-
-    @classmethod
-    def GAME_SPECIFIC_FLAVORS(cls):
-        super().__doc__
-        flavors = dict(super().GAME_SPECIFIC_FLAVORS()) 
-        flavors["timeline"] = cls.TIMELINE_FLAVOR_TEXTS()
-        return flavors
 
     @classmethod
     def ALL_FLAVOR_TEXTS(cls):
@@ -262,6 +263,9 @@ class CS2AwardQualifiers(AwardQualifiers):
                 mentions[stats.disc_id].append((4, int((stats.deaths / total_rounds) * 100)))
 
         return mentions
+
+    def get_rank_mentions(self, prev_ranks: dict[int, str]) -> dict[int, tuple[int, int]]:
+        return {}
 
     def get_cool_stats(self):
         """

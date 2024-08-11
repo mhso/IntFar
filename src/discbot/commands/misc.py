@@ -5,7 +5,7 @@ from mhooge_flask.logging import logger
 
 from api import util as api_util
 from api.config import Config
-from api.game_data import get_stat_parser, get_formatted_stat_value
+from api.game_data import get_stat_parser, get_formatted_stat_names, get_formatted_stat_value
 from discbot.commands import util as commands_util
 
 config = Config()
@@ -127,13 +127,15 @@ async def handle_summary_msg(client, message, game, target_id):
         f"They have played **{num_played_ids}**/**{total_ids}** different {playable_name}.\n\n"
     )
 
+    fmt_stat_names = get_formatted_stat_names(game)
+
     if game == "lol":
         rank_solo, rank_flex = database.get_current_rank(target_id)
         fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_solo)
-        response += f"Their current rank in Solo/Duo is **{fmt_rank}**.\n"
+        response += f"Their current rank in {fmt_stat_names['rank_solo']} is **{fmt_rank}**.\n"
 
         fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_flex)
-        response += f"Their current rank in Flex is **{fmt_rank}**.\n\n"
+        response += f"Their current rank in {fmt_stat_names['rank_flex']} is **{fmt_rank}**.\n\n"
 
     response += f"Their longest winning streak was **{longest_win_streak}** games.\n"
     response += f"Their longest loss streak was **{longest_loss_streak}** games.\n\n"

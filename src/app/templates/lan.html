@@ -3,13 +3,13 @@
 <head>
     <title>LAN {{ lan_month }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-32.png') }}" sizes="32x32">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-48.png') }}" sizes="48x48">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap/bootstrap-grid.min.css') }}"/>
-    <script src="{{ url_for('static', filename='js/bootstrap/jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap/bootstrap.min.js') }}"></script>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/lan.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-32.png') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-48.png') }}" sizes="48x48">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/bootstrap/bootstrap-grid.min.css') }}"/>
+    <script src="{{ url_for('static', _external=True, filename='js/bootstrap/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', _external=True, filename='js/bootstrap/bootstrap.min.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/style.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/lan.css') }}">
 </head>
 <body>
     {% if games_played or active_game %}
@@ -22,49 +22,60 @@
 
         <div class="row">
             {% if games_played or active_game %}
-            <div class="col-lg-1"></div>
-            <div id="lan-left-column" class="col-lg-4">
-                <h2>General Stats</h2>
+            <div id="lan-now-playing-wrapper">
+                <h2>Now Playing 🎵</h2>
+                <div id="lan-now-playing">Nada</div>
+            </div>
+
+            <div id="lan-left-column" class="col-lg-5">
+                <h2>LAN Stats & Bingo</h2>
                 {% if games_played %}
                 <p id="lan-duration">We have been banging for: <span class="lan-emph">{{ duration_since_start }}</span></p>
-                <p id="lan-games-played">Games played: <span class="lan-emph">{{ games_played }}</span></p>
-                <p id="lan-games-won">Win/Loss: <span class="lan-emph">{{ games_won }} - {{ games_lost }}</span> (<span class="lan-emph">{{ pct_won }}%</span>)</p>
-                <p id="lan-game-results">Track record: {% for win in game_results %}{% if win == 1 %}<span class="lan-won lan-emph">W</span>{% else %}<span class="lan-lost lan-emph">L</span>{% endif %}{% endfor %}</p>
+                <p id="lan-game-results">
+                    Track record: {% for win in game_results %}{% if win == 1 %}<span class="lan-won lan-emph">W</span>{% else %}<span class="lan-lost lan-emph">L</span>{% endif %}{% endfor %}
+                    <span> ({{ games_won }} - {{ games_lost }})</span>
+                </p>
                 <p id="lan-longest-game">Longest game: <span class="lan-emph">{{ longest_game }}</span></p>
                 <p id="lan-intfars">Int-Fars awarded: <span class="lan-emph">{{ intfars }}</span></p>
                 <p id="lan-doinks">Doinks awarded: <span class="lan-emph">{{ doinks }}</span></p>
                 <p id="lan-champs">Champions played: <span class="lan-emph">{{ champs_played }}</span></p>
                 {% else %}
-                <h3>No games played yet. Go get em' bois!</h3>
+                <h3 style="margin-bottom: 1.5rem;">No games played yet. Go get em' bois!</h3>
                 {% endif %}
 
-                <div id="lan-tilt-meter-wrapper">
-                    <h2>Tilt-O-Meter</h2>
-                    <div id="lan-tilt-meter">
-                        {% if tilt_color %}
-                        <div id="lan-tilt-filled" style="width: {{ tilt_value }}%; background-color: {{ tilt_color }};"></div>
-                        {% endif %}
-                        <h3 id="lan-tilt-text">{% if tilt_color %}{{ tilt_value }}%{% else %}0%{% endif %}</h3>
-                    </div>
-                </div>
+                <div id="lan-bingo-wrapper" class="container-flex">
+                    {% for row in bingo_challenges %}
+                    <div class="row">
+                        {% for bingo_entry in row %}
+                        <div class="lan-bingo-entry{% if bingo_entry['bingo'] %} bingo-bingo{% elif bingo_entry['completed'] %} bingo-completed{% endif %}"{% if bingo_entry['progress'] %} data-progress="{{ bingo_entry['progress'] }}" data-total="{{ bingo_entry['total'] }}"{% endif %}>
+                            {%- if bingo_entry['completed_by'] %}
+                            <div class="lan-bingo-person"><img src="{{ bingo_entry['completed_by'] }}"></div>
+                            {% endif %}
 
-                {% if games_played %}
-                <div id="lan-latest-game-wrapper">
-                    <h2>Latest Game</h2>
-                    <p>Game {% if latest_win == 1 %}<span class="lan-won">won</span>{% else %}<span class="lan-lost">lost</span>{% endif %} <span id="lan-game-duration">{{ duration_since_game }}</span> ago.</p>
-                    {% if latest_intfar_name %}
-                    <p>
-                        <span class="lan-emph">{{ latest_intfar_name }}</span> got Int-Far for <span class="lan-emph">{{ latest_intfar_reason }}</span>
-                    </p>
-                    {% endif %}
-                    {% for doinks_name, doinks_reason in latest_doinks %}
-                    <p><span class="lan-emph">{{ doinks_name }}</span> got Doinks for <span class="lan-emph">{{ doinks_reason }}</span></p>
+                            <div class="lan-bingo-desc">
+                                {{ bingo_entry['name'] }}
+                            </div>
+
+                            {% if bingo_entry['new_progress'] %}
+                            <div class="lan-bingo-updated">
+                                <img src="{{ url_for('static', filename='img/bingo_progress.png', _external=True) }}"><img src="{{ url_for('static', filename='img/bingo_progress.png', _external=True) }}">
+                            </div>
+                            {% endif %}
+
+                            {%- if bingo_entry['total'] > 1 %}
+                            <div class="lan-bingo-desc-progress">{{ bingo_entry['progress'] }}/{%- if bingo_entry['id'] == 'damage_dealt' %}1M{% else %}{{ bingo_entry['total'] }}{% endif %}</div>
+                            {% endif %}
+                            {% if bingo_entry['total'] > 1 and not bingo_entry['completed'] %}
+                            <div class="lan-bingo-progress-bar"></div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
                     {% endfor %}
                 </div>
-                {% endif %}
             </div>
 
-            <div class="col-lg-6">
+            <div class="col-lg-7">
                 {% if active_game %}
                 <div id="lan-active-game-wrapper">
                     <h2 id="lan-live-game-header">Live Game <div id="live-indicator"></div></h2>
@@ -77,7 +88,7 @@
                         {% if is_our_side %}
                         <h3 class="lan-our-team">The Dream Team</h3>
                         {% else %}
-                        <h3 class="lan-enemy-team">Some Randoms</h3>
+                        <h3 class="lan-enemy-team">Some Random Scrubs</h3>
                         {% endif %}
                         {% endif %}
 
@@ -100,10 +111,16 @@
                     </div>
 
                     {% if blue_side %}
-                    <img id="lan-vs-img" src="{{ url_for('static', filename='img/versus.png') }}">
+                    <img id="lan-vs-img" src="{{ url_for('static', _external=True, filename='img/versus.png') }}">
                     {% endif %}
 
                     {% endfor %}
+
+                    <!-- Live event feed -->
+                    <div id="lan-live-game-feed-wrapper" data-fade="5">
+                        <div></div>
+                    </div>
+
                 </div>
                 {% else %}
                 <div id="lan-best-worst-wrapper">
@@ -126,43 +143,35 @@
                     </table>
                 </div>
 
-                <div id="lan-teamcomp-wrapper" class="row">
-                    <div class="col-lg-6">
-                        <h2>Team Comp Ideas</h2>
-                        <div id="lan-teamcomp-scroll">
-                            {% for comp_name, comp_champs in team_comps %}
-                            <p class="lan-emph">{{ comp_name }}</p>
-                            <div>z
-                            {% for champ_img in comp_champs %}
-                            <img class="lan-team-comp-champ" src="{{ champ_img }}">
-                            {% endfor %}
-                            </div>
-                            {% endfor %}
-                            {% for comp_name, comp_champs in team_comps %}
-                            {% if loop.index0 < 3 %}
-                            <p class="lan-emph">{{ comp_name }}</p>
-                            <div>
-                            {% for champ_img in comp_champs %}
-                            <img class="lan-team-comp-champ" src="{{ champ_img }}">
-                            {% endfor %}
-                            </div>
-                            {% endif %}
-                            {% endfor %}
-                        </div>
+                <div id="lan-tilt-meter-wrapper">
+                    <h2>Tilt-O-Meter</h2>
+                    <div id="lan-tilt-meter">
+                        {% if tilt_color %}
+                        <div id="lan-tilt-filled" style="width: {{ tilt_value }}%; background-color: {{ tilt_color }};"></div>
+                        {% endif %}
+                        <h3 id="lan-tilt-text">{% if tilt_color %}{{ tilt_value }}%{% else %}0%{% endif %}</h3>
                     </div>
-                    <div class="col-lg-6">
-                        <h2>Now Playing 🎵</h2>
-                        <div id="lan-now-playing">Nothing ATM</div>
-                    </div>
+                </div>
+
+                <div id="lan-latest-game-wrapper">
+                    <h2>Latest Game</h2>
+                    <p>Game {% if latest_win == 1 %}<span class="lan-won">won</span>{% else %}<span class="lan-lost">lost</span>{% endif %} <span id="lan-game-duration">{{ duration_since_game }}</span> ago.</p>
+                    {% if latest_intfar_name %}
+                    <p>
+                        <span class="lan-emph">{{ latest_intfar_name }}</span> got Int-Far for <span class="lan-emph">{{ latest_intfar_reason }}</span>
+                    </p>
+                    {% endif %}
+                    {% for doinks_name, doinks_reason in latest_doinks %}
+                    <p><span class="lan-emph">{{ doinks_name }}</span> got Doinks for <span class="lan-emph">{{ doinks_reason }}</span></p>
+                    {% endfor %}
                 </div>
                 {% endif %}
             </div>
-            <div class="col-lg-1"></div>
             {% else %}
             <div id="lan-no-games-wrapper" class="col-lg-12">
                 <h1>WAITING FOR<br>LAN TO BEGIN</h1>
                 <video autoplay muted loop>
-                    <source src="{{ url_for('static', filename='img/login_screens.mp4') }}" type="video/mp4">
+                    <source src="{{ url_for('static', _external=True, filename='img/login_screens.mp4') }}" type="video/mp4">
                 </video>
             </div>
             {% endif %}
@@ -170,10 +179,10 @@
     </div>
     {% if games_played and not active_game %}
     <video autoplay muted loop class="lan-catjam">
-        <source src="{{ url_for('static', filename='img/catjam.webm') }}", type="video/webm">
+        <source src="{{ url_for('static', _external=True, filename='img/catjam.webm') }}", type="video/webm">
     </video>
     {% endif %}
-    <script src="{{ url_for('static', filename='js/lan.js') }}"></script>
+    <script src="{{ url_for('static', _external=True, filename='js/lan.js') }}"></script>
     <script>
         monitor("{{ games_played }}", "{{ active_game }}", "{{ lan_over }}", "{{ lan_date }}");
     </script>

@@ -1,7 +1,9 @@
 from datetime import datetime
+import random
 from time import time
 
 import flask
+import numpy as np
 
 import app.util as app_util
 import api.util as api_util
@@ -116,11 +118,11 @@ def get_active_game_data(face_images, lan_info):
     champ_faces = get_champ_faces(game_data["users_in_game"], face_images)
 
     our_champs_imgs = [
-        (flask.url_for("static", filename=riot_api.get_champ_splash_path(game_data["users_in_game"][disc_id]["champ_id"]).replace("app/static/", "")),) + face_data
+        (flask.url_for("static", _external=True, filename=riot_api.get_champ_splash_path(game_data["users_in_game"][disc_id]["champ_id"]).replace("app/static/", "")),) + face_data
         for disc_id, face_data in zip(game_data["users_in_game"], champ_faces)
     ]
     enemy_champs_imgs = [
-        (flask.url_for("static", filename=riot_api.get_champ_splash_path(champ_id).replace("app/static/", "")),) + face_data
+        (flask.url_for("static", _external=True, filename=riot_api.get_champ_splash_path(champ_id).replace("app/static/", "")),) + face_data
         for champ_id, face_data in zip(game_data["enemy_champs"], champ_faces)
     ]
 
@@ -131,6 +133,70 @@ def get_active_game_data(face_images, lan_info):
     game_data["champ_splashes"] = champ_splashes
 
     return game_data
+
+def get_bingo_data(database, face_images={}):
+    bingo_challenges = lan_api.get_current_bingo_challenges(database)
+
+    bingo_data = []
+    curr_row = []
+    for data in bingo_challenges:
+        if data["completed_by"]:
+            data["completed_by"] = face_images.get(data["completed_by"])
+
+        curr_row.append(data)
+
+        if len(curr_row) == lan_api.BINGO_WIDTH:
+            bingo_data.append(curr_row)
+            curr_row = []
+
+    if lan_api.TESTING:
+        bingo_data[0][0].update(progress=1, new_progress=True, completed=True) # Big lead
+        bingo_data[0][3].update(progress=623_042) # Damage dealt
+        bingo_data[0][4].update(progress=5, completed=True) # Dive kills
+        bingo_data[1][0].update(progress=2, new_progress=True) # Big doinks
+        bingo_data[1][1].update(progress=1, new_progress=True) # Dragon souls
+        bingo_data[1][2].update(progress=1, completed=True) # Twenty min win
+        bingo_data[2][0].update(progress=1, completed=True) # Flawless ace
+        bingo_data[2][1].update(progress=1, completed=True, completed_by=face_images.get(331082926475182081)) # Fountain kill
+        bingo_data[2][2].update(progress=5, completed=True) # Invade kills
+        bingo_data[2][3].update(progress=1, completed=True, completed_by=face_images.get(115142485579137029)) # Jungle doinks
+        bingo_data[2][4].update(progress=10, new_progress=True, completed=True) # Killing sprees
+        bingo_data[3][0].update(progress=69, new_progress=True) # Kills
+        bingo_data[3][3].update(progress=10, completed=True) # Solo kills
+        bingo_data[4][3].update(progress=1, new_progress=True, completed=True) # Two barons
+        bingo_data[4][4].update(progress=1, completed=True) # Won games
+
+    completed_mask = np.zeros((lan_api.BINGO_WIDTH, lan_api.BINGO_WIDTH), np.uint8)
+    for y in range(len(bingo_data)):
+        for x in range(len(bingo_data[y])):
+            if bingo_data[y][x]["completed"]:
+                completed_mask[y, x] = 1
+
+    # Check if there is bingo on descending diagonal
+    diag_1 = np.identity(lan_api.BINGO_WIDTH)
+    if np.count_nonzero(diag_1 * completed_mask) == lan_api.BINGO_WIDTH:
+        for x, y in zip(*np.nonzero(diag_1)):
+            bingo_data[y][x]["bingo"] = True
+
+    # Check if there is bingo on ascending diagonal
+    diag_2 = np.fliplr(diag_1)
+    if np.count_nonzero(diag_2 * completed_mask) == lan_api.BINGO_WIDTH:
+        for x, y in zip(*np.nonzero(diag_1)):
+            bingo_data[y][x]["bingo"] = True
+
+    # Check if there is bingo on a row
+    for y in range(lan_api.BINGO_WIDTH):
+        if all(completed_mask[y, :]):
+            for data in bingo_data[y]:
+                data["bingo"] = True
+
+    # Check if there is bingo on a column
+    for x in range(lan_api.BINGO_WIDTH):
+        if all(completed_mask[:, x]):
+            for row in bingo_data:
+                row[x]["bingo"] = True
+
+    return bingo_data
 
 def get_data(lan_info):
     config = flask.current_app.config["APP_CONFIG"]
@@ -150,7 +216,7 @@ def get_data(lan_info):
     names = ["david", "martin", "mikkel", "mads", "anton"]
 
     face_images = {
-        disc_id: flask.url_for("static", filename=f"img/lan_{name}.png")
+        disc_id: flask.url_for("static", _external=True, filename=f"img/lan_{name}.png")
         for disc_id, name in zip(lan_info.participants, names)
     }
 
@@ -176,10 +242,9 @@ def get_data(lan_info):
 
         dt_start = datetime.fromtimestamp(first_game_timestamp)
         dt_now = datetime.now()
-        if dt_now.timestamp() > lan_info.end_time:
+        if dt_now.timestamp() > lan_info.end_time and not lan_api.TESTING:
             dt_now = datetime.fromtimestamp(lan_info.end_time)
-            if not lan_api.TESTING:
-                lan_over = True
+            lan_over = True
 
         duration_since_start = api_util.format_duration(dt_start, dt_now)
 
@@ -201,7 +266,6 @@ def get_data(lan_info):
         latest_timestamp, latest_win, latest_intfar_id, latest_intfar_reason = latest_game_data
 
         dt_start = datetime.fromtimestamp(latest_timestamp)
-        dt_now = datetime.now()
         duration_since_game = api_util.format_duration(dt_start, dt_now)
 
         # Int-Far from latest game.
@@ -304,7 +368,7 @@ def get_data(lan_info):
                         champ_id = riot_api.try_find_playable_id(stripped)
                         img_name = riot_api.get_champ_portrait_path(champ_id).replace("app/static/", "")
 
-                    portraits.append(flask.url_for("static", filename=img_name))
+                    portraits.append(flask.url_for("static", _external=True, filename=img_name))
 
                 team_comps.append((name, portraits))
 
@@ -329,14 +393,21 @@ def get_data(lan_info):
             "latest_doinks": latest_doinks,
             "tilt_value": tilt_value,
             "tilt_color": tilt_color,
-            "team_comps": team_comps
+            "team_comps": team_comps,
         }
         data.update(game_data)
     else:
         data["games_played"] = None
         data["lan_over"] = False
 
+    # LAN Bingo!
+    bingo_data = get_bingo_data(database, face_images)
+    data["bingo_challenges"] = bingo_data
+
     return data
+
+def _allowed_access(lan_info, user_id):
+    return lan_api.TESTING or (lan_info is not None and user_id is not None and user_id in lan_info.participants)
 
 @lan_page.route('/')
 def lan_view():
@@ -347,7 +418,7 @@ def lan_view():
     )
 
     return flask.redirect(
-        flask.url_for("lan.lan_view_for_date", date=latest_lan_date)
+        flask.url_for("lan.lan_view_for_date", _external=True, date=latest_lan_date)
     )
 
 @lan_page.route('/<date>')
@@ -355,7 +426,7 @@ def lan_view_for_date(date):
     lan_info = lan_api.LAN_PARTIES.get(date)
     logged_in_user = app_util.get_user_details()[0]
 
-    if lan_info is None or logged_in_user is None or logged_in_user not in lan_info.participants:
+    if not _allowed_access(lan_info, logged_in_user):
         return flask.abort(404) # User not logged in or not a part of the LAN.
 
     data = get_data(lan_info)
@@ -374,18 +445,163 @@ def live_data(date):
     lan_info = lan_api.LAN_PARTIES.get(date)
     logged_in_user = app_util.get_user_details()[0]
 
-    if lan_info is None or logged_in_user is None or logged_in_user not in lan_info.participants:
+    if not _allowed_access(lan_info, logged_in_user):
         return flask.abort(404) # User not logged in or not a part of the LAN.
 
-    data = get_data(lan_info)
+    all_data = get_data(lan_info)
 
-    return app_util.make_json_response(data, 200)
+    data_filter = flask.request.args.get("filter")
+    if data_filter is not None:
+        keys_to_get = data_filter.split(",")
 
-@lan_page.route("/live_league_data/<date>", methods=["GET"])
-def live_league_data(date):
+    if data_filter is None or ("bingo_challenges" in keys_to_get and "bingo_status" in keys_to_get):
+        database = flask.current_app.config["GAME_DATABASES"]["lol"]
+
+        bingo_status = 0
+        all_bingo = True
+        for bingo_row in all_data["bingo_challenges"]:
+            for bingo_data in bingo_row:
+                if not bingo_data["bingo"]:
+                    all_bingo = False
+                    continue
+
+                if bingo_data["completed"] and not bingo_data["notification_sent"]:
+                    database.set_bingo_challenge_seen(bingo_data["id"])
+                    bingo_status = 1
+
+        if all_bingo and bingo_status == 1:
+            bingo_status = 2 # Full board cleared!
+
+        all_data["bingo_status"] = bingo_status
+
+    if data_filter is not None:
+        data = {k: all_data[k] for k in keys_to_get} if data_filter is not None else data
+
+    return app_util.make_json_response(
+        {k: all_data[k] for k in keys_to_get} if data_filter is not None else data,
+        200
+    )
+
+_EVENTS_KILLED_SYNONYMS = ["whacked", "murdered", "clapped", "killed", "bonked"]
+_EVENTS_MULTIKILLS = ["sweet double kill", "spicy triple kill", "nasty quadrakill", "insane pentakill"]
+_EVENTS_STREAKS = ["on a killing spree", "on a rampage", "unstoppable", "dominating", "godlike", "legendary"]
+_EVENTS_DRAGON_NAMES = {
+    "Earth": "Mountain",
+    "Water": "Ocean",
+    "Air": "Cloud",
+    "Fire": "Infernal",
+    "Chemtech": "Chemtech",
+    "Hextech": "Hextech",
+}
+
+def _get_lol_event_description(event):
+    desc = None
+    icon = None
+
+    if not "Ally" in event:
+        category = "neutral"
+    elif event["Ally"]:
+        category = "ally"
+    else:
+        category = "enemy"
+
+    if event["EventName"] == "ChampionKill":
+        killed = random.choice(_EVENTS_KILLED_SYNONYMS)
+        desc = f"{event['KillerName']} {killed} {event['VictimName']}"
+
+        if event.get("CurrentStreak", 1) > 2:
+            streak = _EVENTS_STREAKS[min(event["CurrentStreak"], 8) - 3]
+            desc += f" and is {streak}!"
+            icon = "game_feed_spree.png"
+        else:
+            icon = "game_feed_kill.png"
+
+    elif event["EventName"] == "Multikill":
+        streak = _EVENTS_MULTIKILLS[event["KillStreak"] - 2]
+        desc += f"{event['KillerName']} got a {streak}!"
+        icon = "game_feed_multikill.png"
+
+    elif event["EventName"] == "Shutdown":
+        desc = f"{event['KillerName']} shut down {event['VictimName']}!"
+        icon = "game_feed_kill.png"
+
+    elif event["EventName"] == "Ace":
+        if category == "ally":
+            desc = "We aced the enemy team!"
+        else:
+            desc = "We got aced by the enemy team :("
+
+        icon = "game_feed_kill.png"
+
+    elif event["EventName"] == "FirstBlood":
+        desc = f"{event['Recipient']} got first blood!"
+        icon = "game_feed_kill.png"
+
+    elif event["EventName"] == "FirstBrick":
+        killer = "We" if category == "ally" else "Enemy team"
+        desc = f"{killer} destroyed the first tower!"
+        icon = "game_feed_turret.png"
+
+    elif event["EventName"] in ("TurretKilled", "InhibKilled"):
+        structure_name = "a turret" if event["EventName"] == "TurretKilled" else "an inhibitor"
+
+        if category == "ally":
+            desc = f"We destroyed {structure_name}"
+        else:
+            desc = f"Enemy team destroyed {structure_name}"
+
+        icon = "game_feed_turret.png"
+
+    elif event["EventName"] in ("BaronKill", "HeraldKill", "DragonKill"):
+        if event["Stolen"] == "True":
+            killed = "stole"
+        else:
+            killed = random.choice(_EVENTS_KILLED_SYNONYMS)
+
+        if event["EventName"] == "DragonKill":
+            monster_name = _EVENTS_DRAGON_NAMES.get(event["DragonType"], event["DragonType"])
+            if "Soul" in event:
+                monster_name += " Soul"
+                if killed != "stole":
+                    killed = "got"
+            else:
+                monster_name = f"the {monster_name} Dragon"
+
+            if monster_name == "Elder":
+                icon = "game_feed_elder.png"
+            else:
+                icon = "game_feed_dragon.png"
+
+        elif event["EventName"] == "BaronKill":
+            monster_name = "The Big Purple Worm"
+            icon = "game_feed_baron.png"
+
+        elif event["EventName"] == "HeraldKill":
+            monster_name = "Shelly"
+            icon = "game_feed_herald.png"
+
+        killer = "The brois" if category == "ally" else "Enemy team"
+
+        desc = f"{killer} {killed} {monster_name}!"
+
+    if icon is not None:
+        icon = flask.url_for("static", filename=f"img/{icon}", _external=True)
+    
+    return {"description": desc, "category": category, "icon": icon}
+
+@lan_page.route("/live_league_data", methods=["GET"])
+def live_league_data():
     lock = flask.current_app.config["LEAGUE_EVENTS_LOCK"]
     lock.acquire()
-    events = flask.current_app.config["LEAGUE_EVENTS"]
+
+    events = []
+    for event in flask.current_app.config["LEAGUE_EVENTS"]:
+        formatted = _get_lol_event_description(event)
+        if formatted["description"] is None:
+            continue
+
+        events.append(formatted)
+
     flask.current_app.config["LEAGUE_EVENTS"] = []
     data = {"events": events}
     lock.release()
@@ -423,14 +639,13 @@ def now_playing(date):
             lock.acquire()
             flask.current_app.config["LEAGUE_EVENTS"].extend(data["lol_events"])
             lock.release()
-            print("NEW EVENTS RECIEVED:", data["lol_events"], flush=True)
 
         return flask.make_response(("Success! Song playing updated.", 200))
-    
+
     # Return the currently playing song and artist (if any)
     data = flask.current_app.config["NOW_PLAYING"]
     if data is None:
-        response_data = {"song": "Nothing ATM", "artist": "nothing"}
+        response_data = {"song": "Nada", "artist": "nothing"}
         return app_util.make_json_response(response_data, 200)
 
     song, artist = data

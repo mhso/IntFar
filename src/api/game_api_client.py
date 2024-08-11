@@ -42,5 +42,5 @@ class GameAPIClient(ABC):
         ...
 
     @abstractmethod
-    def get_player_names_for_user(self, user: User) -> list[str]:
+    async def get_player_names_for_user(self, user: User) -> list[str]:
         ...

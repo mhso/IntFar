@@ -20,7 +20,7 @@
             <div id="endscreen-avatars-wrapper">
                 {% for avatar in winner_avatars %}
                 <div class="endscreen-avatars-entry">
-                    <img src="{{ url_for('static', filename='img/jeopardy/crown.png') }}" class="endscreen-crown">
+                    <img src="{{ url_for('static', _external=True, filename='img/jeopardy/crown.png') }}" class="endscreen-crown">
                     <img src="{{ avatar }}" class="endscreen-avatar">
                 </div>
                 {% endfor %}
@@ -48,18 +48,18 @@
             </table>
 
             <video id="endscreen-confetti-video" muted loop>
-                <source src="{{ url_for('static', filename='img/confetti.webm') }}", type="video/webm">
+                <source src="{{ url_for('static', _external=True, filename='img/confetti.webm') }}", type="video/webm">
             </video>
         </div>
 
         <!-- I LOVE LEAGUE OF LEGENDS! -->
         <audio id="endscreen-sound" class="volume-5">
-            <source src="{{ url_for('static', filename='sounds/league.mp3') }}" type="audio/mpeg">
+            <source src="{{ url_for('static', _external=True, filename='sounds/league.mp3') }}" type="audio/mpeg">
         </audio>
 
         <!-- Shooting Star celebratory music -->
         <audio id="endscreen-music">
-            <source src="{{ url_for('static', filename='data/shooting_star.mp3') }}" type="audio/mpeg">
+            <source src="{{ url_for('static', _external=True, filename='data/shooting_star.mp3') }}" type="audio/mpeg">
         </audio>
     
         <script>

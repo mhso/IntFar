@@ -10,8 +10,11 @@ from flask_socketio import SocketIO
 import app.util
 from app.routes import errors as route_errors
 from api.util import GUILD_IDS, SUPPORTED_GAMES
+from api.game_apis import get_api_client
 from api.game_api_client import GameAPIClient
+from api.game_databases import get_database_client
 from api.meta_database import MetaDatabase
+from api.bets import get_betting_handler
 from api.game_database import GameDatabase
 from api.betting import BettingHandler
 from api.config import Config
@@ -76,8 +79,8 @@ def run_app(
         Route("lists", "lists_page", "lol/lists"),
         Route("register_cs2", "register_cs2_page", "cs2/register"),
         Route("quiz", "quiz_page", "quiz"),
-        Route("jeopardy_presenter", "jeopardy_presenter_page", "jeopardy/presenter"),
         Route("jeopardy_contestant", "jeopardy_contestant_page", "jeopardy"),
+        Route("jeopardy_presenter", "jeopardy_presenter_page", "jeopardy/presenter"),
     ]
 
     # Dynamic routes that depend on which game is chosen
@@ -119,7 +122,8 @@ def run_app(
         max_content_length=1024 * 512, # 500 KB limit for uploaded sounds
         now_playing=None,
         jeopardy_data={"contestants": {}, "state": None},
-        jeopardy_lock=Lock(),
+        jeopardy_buzz_lock=Lock(),
+        jeopardy_join_lock=Lock(),
         bingo_events={},
         league_events=[],
         league_events_lock=Lock(),
@@ -139,3 +143,12 @@ def run_app(
         init.run_app(web_app, app_name, ports_file, SocketIOServerWrapper)
     except KeyboardInterrupt:
         logger.info("Stopping Flask web app...")
+
+if __name__ == "__main__":
+    config = Config()
+    meta_database = MetaDatabase(config)
+    game_databases = {game: get_database_client(game, config) for game in SUPPORTED_GAMES}
+    bet_handlers = {game: get_betting_handler(game, config, meta_database, game_databases[game]) for game in SUPPORTED_GAMES}
+    api_clients = {game: get_api_client(game, config) for game in SUPPORTED_GAMES}
+
+    run_app(config, meta_database, game_databases, bet_handlers, api_clients, None)

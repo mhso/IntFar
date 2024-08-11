@@ -107,7 +107,7 @@ def home():
 def delete():
     if "file" in flask.request.files:
         # Redirect to 'upload file' page
-        return flask.redirect(flask.url_for("soundboard.home"))
+        return flask.redirect(flask.url_for("soundboard.home", _external=True))
 
     config = flask.current_app.config["APP_CONFIG"]
     database = flask.current_app.config["DATABASE"]

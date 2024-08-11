@@ -21,11 +21,11 @@
                     {% for disc_id, name, avatar, doinks, unique in doinks_persons %}
                     <tr class="list-entry">
                         <td>
-                            <a href="{{ url_for(game + '.users.user', disc_id=disc_id) }}">
+                            <a href="{{ url_for(game + '.users.user', _external=True, disc_id=disc_id) }}">
                                 <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
                             </a>
                         </td>
-                        <td class="d-none d-sm-table-cell"><a href="{{ url_for(game + '.users.user', disc_id=disc_id) }}">{{ name }}</a></td>
+                        <td class="d-none d-sm-table-cell"><a href="{{ url_for(game + '.users.user', _external=True, disc_id=disc_id) }}">{{ name }}</a></td>
                         <td>{{ doinks }}</td>
                         <td>{{ unique }}</td>
                     </tr>

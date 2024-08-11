@@ -3,7 +3,7 @@
     {% include 'jeopardy/contestant_head.html' %}
     
     <body>
-        <div id="bg-image" style="background-image: url({{ url_for('static', filename='img/jeopardy/' + player_bg_img) }});"></div>
+        <div id="bg-image" style="background-image: url({{ url_for('static', _external=True, filename='img/jeopardy/' + player_bg_img) }});"></div>
 
         <div id="contestant-game-wrapper">
             <h1>Jeopardy!</h1>
@@ -60,7 +60,7 @@
 
                     {% else %}
                     <!-- Question screen -->
-                    <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if jeopardy_round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
+                    <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if jeopardy_round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', _external=True, filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
 
                     {% if daily_double %}
 
@@ -80,14 +80,14 @@
                     {% else %}
 
                     <div id="buzzer-wrapper" onclick="pressBuzzer('{{ active_player }}');">
-                        <img id="buzzer-active" src="{{ url_for('static', filename='img/jeopardy/buzzer_active.png') }}" class="d-none">
-                        <img id="buzzer-inactive" src="{{ url_for('static', filename='img/jeopardy/buzzer_inactive.png') }}">
-                        <img id="buzzer-pressed" src="{{ url_for('static', filename='img/jeopardy/buzzer_pressed.png') }}" class="d-none">
+                        <img id="buzzer-active" src="{{ url_for('static', _external=True, filename='img/jeopardy/buzzer_active.png') }}" class="d-none">
+                        <img id="buzzer-inactive" src="{{ url_for('static', _external=True, filename='img/jeopardy/buzzer_inactive.png') }}">
+                        <img id="buzzer-pressed" src="{{ url_for('static', _external=True, filename='img/jeopardy/buzzer_pressed.png') }}" class="d-none">
                     </div>
 
                     <div id="contestant-buzzer-status" class="d-none">
-                        <img id="buzzer-winner" src="{{ url_for('static', filename='img/check.png') }}" class="d-none">
-                        <img id="buzzer-loser" src="{{ url_for('static', filename='img/wrong.png') }}" class="d-none">
+                        <img id="buzzer-winner" src="{{ url_for('static', _external=True, filename='img/check.png') }}" class="d-none">
+                        <img id="buzzer-loser" src="{{ url_for('static', _external=True, filename='img/wrong.png') }}" class="d-none">
                     </div>
 
                     {% endif %}

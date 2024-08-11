@@ -4,14 +4,14 @@
     data-bet_id="{{ bet_id }}"{% if result and result != -1 and result != 1 %}data-ticket="{{ result }}"{% endif %}>
     {% if avatar %}
     <td class="bets-list-avatar">{% if loop.first %}
-        <a href="{{ url_for(game + '.users.user', disc_id=better_id) }}">
+        <a href="{{ url_for(game + '.users.user', _external=True, disc_id=better_id) }}">
             <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
         </a>
         {% endif %}
     </td>
     {% endif %}
     {% if name %}
-    <td class="d-none d-sm-table-cell bets-list-name">{% if loop.first %}<a href="{{ url_for(game + '.users.user', disc_id=better_id) }}">{{ name }}</a>{% endif%}</td>
+    <td class="d-none d-sm-table-cell bets-list-name">{% if loop.first %}<a href="{{ url_for(game + '.users.user', _external=True, disc_id=better_id) }}">{{ name }}</a>{% endif%}</td>
     {% endif %}
     {% if date %}
     <td class="bets-list-date">{% if loop.first %}{{ date }}{% endif %}</td>

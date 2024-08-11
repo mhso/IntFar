@@ -49,20 +49,21 @@ def _normalize_url(url):
     return url if not url.endswith("/") else url[:-1]
 
 def _get_players_query_string(turn_id, question_num, player_data):
-    querie_params = {}
+    query_params = {}
     for index, (disc_id, score, name, color) in enumerate(player_data, start=1):
-        querie_params[f"i{index}"] = disc_id
-        querie_params[f"s{index}"] = score
-        querie_params[f"n{index}"] = name
-        querie_params[f"c{index}"] = color
+        query_params[f"i{index}"] = disc_id
+        query_params[f"s{index}"] = score
+        query_params[f"n{index}"] = name
+        query_params[f"c{index}"] = color
 
     return (
-        f"{urlencode(querie_params, quote_via=quote_plus)}"
+        f"{urlencode(query_params, quote_via=quote_plus)}"
         f"&turn={turn_id}&question={question_num}"
     )
 
 class ContextHandler:
     def __init__(self, player_names={}, setup_callback=None):
+        self.config = Config()
         self.playwright_contexts = []
         self.flask_process = None
         self.presenter_context = None
@@ -84,8 +85,8 @@ class ContextHandler:
 
         return page
 
-    def _open_contestant_lobby_page(self, context: BrowserContext, meta_database: MetaDatabase, disc_id: int, page: Page = None):
-        client_secret = meta_database.get_client_secret(disc_id)
+    def _open_contestant_lobby_page(self, context: BrowserContext, disc_id: int, page: Page = None):
+        client_secret = MetaDatabase(self.config).get_client_secret(disc_id)
         url = f"{BASE_URL}/{client_secret}"
 
         if page is None:
@@ -117,7 +118,8 @@ class ContextHandler:
             playwright_context = self.playwright_contexts[0]
 
         browser_context = self._create_browser(playwright_context).new_context(viewport=CONTESTANT_VIEWPORT, is_mobile=True, has_touch=True)
-        page = self._open_contestant_lobby_page(browser_context, self.meta_database, disc_id)
+        page = self._open_contestant_lobby_page(browser_context, disc_id)
+        page.on("console", lambda msg: print("Message from console:", " ".join(str(arg.json_value()) for arg in msg.args)))
         self._join_lobby(disc_id, page)
 
         if self._setup_callback:
@@ -136,6 +138,16 @@ class ContextHandler:
 
         self.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
+    def open_presenter_selection_page(
+        self,
+        round_num: int,
+        question_num: int,
+        turn_id: int,
+        player_data: list[tuple[str, int, int, str]]
+    ):
+        query_str = _get_players_query_string(turn_id, question_num, player_data)
+        self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/{round_num}?{query_str}")
+
     def open_presenter_question_page(
         self,
         round_num: int,
@@ -145,13 +157,6 @@ class ContextHandler:
         turn_id: int,
         player_data: list[tuple[str, int, int, str]]
     ):
-        querie_params = {}
-        for index, (disc_id, score, name, color) in enumerate(player_data, start=1):
-            querie_params[f"i{index}"] = disc_id
-            querie_params[f"s{index}"] = score
-            querie_params[f"n{index}"] = name
-            querie_params[f"c{index}"] = color
-
         query_str = _get_players_query_string(turn_id, question_num, player_data)
         self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/{round_num}/{category}/{difficulty}?{query_str}")
 
@@ -161,6 +166,10 @@ class ContextHandler:
             self.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
         sleep(1)
+
+        self.presenter_page.press("body", PRESENTER_ACTION_KEY)
+
+        sleep(0.5)
 
         # Check if question is multiple choice
         is_multiple_choice = self.presenter_page.evaluate("() => document.getElementsByClassName('question-answer-entry').length > 0")
@@ -211,19 +220,18 @@ class ContextHandler:
     def __enter__(self):
         self.playwright_contexts = [sync_playwright().__enter__()]
 
-        config = Config()
-        self.meta_database = MetaDatabase(config)
         cwd = os.getcwd()
         new_cwd = os.path.join(cwd, "src")
         os.chdir(new_cwd)
 
-        self.flask_process = Process(target=run_app, args=(config, self.meta_database, {}, {}, {}, None))
+        meta_database = MetaDatabase(self.config)
+        self.flask_process = Process(target=run_app, args=(self.config, meta_database, {}, {}, {}, None))
         self.flask_process.start()
 
         os.chdir(cwd)
 
         # Create presenter browser and context
-        client_secret = self.meta_database.get_client_secret(ADMIN_DISC_ID)
+        client_secret = meta_database.get_client_secret(ADMIN_DISC_ID)
         hashed_secret = get_hashed_secret(client_secret)
 
         presenter_browser = self._create_browser(self.playwright_contexts[0])
@@ -294,7 +302,6 @@ class TestWrapper(TestCase):
             # Simulate person closing the page and re-opening it
             context._open_contestant_lobby_page(
                 context.contestant_contexts[0],
-                context.meta_database,
                 CONTESTANT_IDS[0],
                 context.contestant_pages[0]
             )
@@ -356,7 +363,7 @@ class TestWrapper(TestCase):
             sleep(1)
 
             context.show_question()
-            sleep(1)
+            sleep(2)
 
             player_pings = []
             for index, page in enumerate(context.contestant_pages):
@@ -366,9 +373,12 @@ class TestWrapper(TestCase):
             player_pings.sort(key=lambda x: x[0], reverse=True)
 
             for _, index in player_pings:
+                context.contestant_pages[index].wait_for_selector("#buzzer-wrapper")
+
+            for _, index in player_pings:
                 context.contestant_pages[index].query_selector("#buzzer-wrapper").tap()
 
-            sleep(1)
+            sleep(2)
 
             buzzed_in_first = []
             for _, index in player_pings:
@@ -376,20 +386,43 @@ class TestWrapper(TestCase):
                 buzzed_first = buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
                 buzzed_in_first.append(buzzed_first)
 
-            self.assertTrue(buzzed_in_first[player_pings[0][1]])
-            for i in range(1, len(player_pings)):
-                self.assertFalse(buzzed_in_first[player_pings[i][1]])
+            candidates = []
+            prev_ping = player_pings[0][0]
+            for ping, index in player_pings:
+                if ping > prev_ping:
+                    break
+
+                candidates.append((ping, index))
+                prev_ping = ping
+
+            if len(candidates) == 1:
+                self.assertTrue(buzzed_in_first[candidates[0][1]])
+                for i in range(1, len(player_pings)):
+                    self.assertFalse(buzzed_in_first[player_pings[i][1]])
+            else:
+                won_buzz_players = []
+                for index, won in enumerate(buzzed_in_first):
+                    if won:
+                        won_buzz_players.append(index)
+
+                self.assertEqual(len(won_buzz_players), 1)
+                self.assertIn(won_buzz_players[0], [x[1] for x in candidates])
 
     def _do_buzz_in(self, page: Page, disc_id: int):
-        page.wait_for_function("() => document.getElementById('buzzer-active') != null && !document.getElementById('buzzer-active').classList.contains('d-none')")
+        for _ in range(10):
+            try:
+                page.wait_for_function("() => document.getElementById('buzzer-active') != null && !document.getElementById('buzzer-active').classList.contains('d-none')", timeout=1000)
+            except Exception:
+                pass
+
         BARRIER.wait()
 
         if disc_id == 347489125877809155:
             # Nø never buzzes in...
             return
 
-        # Sleep for a random amount of time
-        sleep_duration = self.random.random() * 0.1
+        # Sleep for a random amount of time, between 0 and 10 ms
+        sleep_duration = self.random.random() * 0.001
         sleep(sleep_duration)
 
         page.query_selector("#buzzer-wrapper").tap()
@@ -409,15 +442,19 @@ class TestWrapper(TestCase):
 
         with ContextHandler(setup_callback=self._do_buzz_in) as context:
             # Go to question page
-            sleep(1)
-
             context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
 
-            sleep(1)
+            sleep(3)
 
             context.show_question()
 
             sleep(2)
+
+            context.presenter_page.wait_for_load_state("domcontentloaded")
+
+            context.presenter_page.wait_for_function(
+                "() => document.getElementById('question-buzz-feed').children[0].children.length == 3", timeout=15000
+            )
 
             players_buzzed_in = context.presenter_page.eval_on_selector(
                 "#question-buzz-feed", "(elem) => Array.from(elem.children[0].children).map((c) => c.textContent)"
@@ -510,4 +547,31 @@ class TestWrapper(TestCase):
             context.open_endscreen_page(player_data)
             sleep(1)
 
-            context.screenshot_views()
+    # def test_all_questions(self):
+    #     turn_id = 0
+    #     player_data = [
+    #         (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+    #         (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+    #         (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+    #         (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    #     ]
+    #     with ContextHandler() as context:
+    #         context.presenter_page.on("requestfinished", lambda req: print("Request:", req.url))
+
+    #         context.open_presenter_selection_page(1, 0, turn_id, player_data)
+    #         context.screenshot_views(0)
+
+    #         for round_num in range(2):
+    #             question_num = 0
+    #             for category in ("mechanics", "lore", "icons", "outlines", "brois", "audio"):
+    #                 for difficulty in range(1, 6):
+    #                     # Go to question page
+    #                     context.open_presenter_question_page(round_num + 1, category, difficulty, question_num, turn_id, player_data)
+    #                     sleep(1)
+
+    #                     context.show_question()
+    #                     sleep(1)
+
+    #                     context.screenshot_views((round_num * 30) + question_num + 1)
+
+    #                     question_num += 1

@@ -110,12 +110,12 @@
                     {% for disc_id, name, tokens, avatar in all_token_balances %}
                     <tr class="list-entry tokens-list-entry">
                         <td>
-                            <a href="{{ url_for(game + '.users.user', disc_id=disc_id) }}">
+                            <a href="{{ url_for(game + '.users.user', _external=True, disc_id=disc_id) }}">
                                 <img src="{{ avatar }}" class="discord-avatar">
                             </a>
                         </td>
                         <td class="d-none d-sm-table-cell">
-                            <a href="{{ url_for(game + '.users.user', disc_id=disc_id) }}">
+                            <a href="{{ url_for(game + '.users.user', _external=True, disc_id=disc_id) }}">
                                 {{ name }}
                             </a>
                         </td>
@@ -148,7 +148,7 @@
     </div>
 </body>
 
-<script src="{{ url_for('static', filename='js/betting.js') }}"></script>
+<script src="{{ url_for('static', _external=True, filename='js/betting.js') }}"></script>
 <script>
 {%if logged_in_user %}setLoggedInUser("{{ logged_in_user }}");{% endif %}
 </script>

@@ -28,9 +28,9 @@
                     <tr class="list-entry">
                         <td>{{ stat_desc }}</td>
                         <td>{{ stat_value }}</td>
-                        <td class="d-none d-sm-table-cell"><a href="{{ url_for(game + '.users.user', disc_id=disc_id) }}">{{ name }}</a></td>
+                        <td class="d-none d-sm-table-cell"><a href="{{ url_for(game + '.users.user', _external=True, disc_id=disc_id) }}">{{ name }}</a></td>
                         <td>
-                            <a href="{{ url_for(game + '.users.user', disc_id=disc_id) }}">
+                            <a href="{{ url_for(game + '.users.user', _external=True, disc_id=disc_id) }}">
                                 <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
                             </a>
                         </td>

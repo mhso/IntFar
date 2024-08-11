@@ -2,19 +2,19 @@
 <head>
     <title>LoL Quiz - Scoreboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-32.png') }}" sizes="32x32">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-48.png') }}" sizes="48x48">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap/bootstrap-grid.min.css') }}"/>
-    <script src="{{ url_for('static', filename='js/bootstrap/jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap/bootstrap.min.js') }}"></script>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/quiz.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-32.png') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-48.png') }}" sizes="48x48">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/bootstrap/bootstrap-grid.min.css') }}"/>
+    <script src="{{ url_for('static', _external=True, filename='js/bootstrap/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', _external=True, filename='js/bootstrap/bootstrap.min.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/style.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/quiz.css') }}">
 </head>
 <body>
     <div id="bg-image"></div>
     <div id="scoreboard-wrapper" class="container-flex">
         <h1 style="margin-bottom: 0;">Den Store</h1>
-        <img id="quiz-lol-logo" src="{{ url_for('static', filename='img/lol_logo.webp') }}">
+        <img id="quiz-lol-logo" src="{{ url_for('static', _external=True, filename='img/lol_logo.webp') }}">
         <h1 style="margin-top: -15px;">Quiz</h1>
 
         <div class="quiz-divider"></div>
@@ -48,16 +48,16 @@
         {% else %}
         <h1 id="score-winner"><span id="score-team-{% if score_blue > score_red %}blue{% else %}red{% endif %}">{{ winner }}</span> wonnered!</h1>
         <audio id="score-winner-sound">
-            <source src="{{ url_for('static', filename='sounds/kvinder.mp3') }}", type="audio/mpeg">
+            <source src="{{ url_for('static', _external=True, filename='sounds/kvinder.mp3') }}", type="audio/mpeg">
         </audio>
         <video id="score-confetti-video" muted loop>
-            <source src="{{ url_for('static', filename='img/confetti.webm') }}", type="video/webm">
+            <source src="{{ url_for('static', _external=True, filename='img/confetti.webm') }}", type="video/webm">
         </video>
         {% endif %}
         {% endif %}
     </div>
 
-    <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
+    <script src="{{ url_for('static', _external=True, filename='js/quiz.js') }}"></script>
     {% if round == 1 %}
     <script>
         window.onkeydown = function(e) {

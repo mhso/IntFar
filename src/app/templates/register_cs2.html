@@ -22,7 +22,7 @@
             <p><strong>One more step!</strong> Accept the Steam friend request from Int-Far</p>
             <p>Then he can creep on you and point out all your mistakes!</p>
             {% endif %}
-            <a href="{{ url_for('cs2.index.index') }}">
+            <a href="{{ url_for('cs2.index.index', _external=True) }}">
                 <button class="standard-btn" style="margin-top: 20px;">CS2 Home</button>
             </a>
         </div>
@@ -46,7 +46,7 @@
                             <li>Go to 'Settings' > 'Account Details'</li>
                             <li>
                                 <span class="cs2-register-emph">Steam ID</span> is shown at the top left
-                                <img src="{{ url_for('static', filename='img/cs2_help_steamid.png') }}" class="cs2-register-help-img">
+                                <img src="{{ url_for('static', _external=True, filename='img/cs2_help_steamid.png') }}" class="cs2-register-help-img">
                             </li>
                             <li>Paste this in the field above
                         </ol>
@@ -68,7 +68,7 @@
                             <li>Under 'Access to Your Match History' click <span class="cs2-register-emph">Create Authentication Code</span></li>
                             <li>
                                 Paste the two codes shown here into the respective fields above
-                                <img src="{{ url_for('static', filename='img/cs2_help_match_code.png') }}" class="cs2-register-help-img">
+                                <img src="{{ url_for('static', _external=True, filename='img/cs2_help_match_code.png') }}" class="cs2-register-help-img">
                             </li>
                         </ol>
                     </div>
@@ -79,7 +79,7 @@
             </div>
             <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
         </div>
-        <script src="{{ url_for('static', filename='js/cs2_register.js') }}"></script>
+        <script src="{{ url_for('static', _external=True, filename='js/cs2_register.js') }}"></script>
         {% endif %}
     </div>
 </body>

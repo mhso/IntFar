@@ -14,7 +14,7 @@ def get_doinks_awards(game, database):
         "func", "get_discord_avatar", None
     )
     avatars = {
-        disc_id: flask.url_for("static", filename=avatars[disc_id].replace("app/static/", ""))
+        disc_id: flask.url_for("static", _external=True, filename=avatars[disc_id].replace("app/static/", ""))
         for disc_id in avatars
     }
     nicknames = discord_request(

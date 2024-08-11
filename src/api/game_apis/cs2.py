@@ -17,7 +17,9 @@ from steam.enums.emsg import EMsg
 from steam.enums.common import EResult
 from csgo import sharecode
 from google.protobuf.json_format import MessageToJson
-from awpy import DemoParser
+#from awpy.parsers import DemoParser
+from demoparser2 import DemoParser
+
 
 from api.config import Config
 from api.game_api_client import GameAPIClient
@@ -57,8 +59,9 @@ class SteamAPIClient(GameAPIClient):
             8388616: "anubis",
             268435464: "overpass"
         }
-        self.get_latest_data()
         self.cs2_app_id = 730
+
+        self.get_latest_data()
 
         self.steam_client = SteamClient()
         self.cs_client = CSGOClient(self.steam_client)
@@ -78,15 +81,15 @@ class SteamAPIClient(GameAPIClient):
         return len(self.map_names)
 
     def get_latest_data(self):
-        url = "https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive/Maps"
+        url = "https://developer.valvesoftware.com/wiki/Counter-Strike_2/Maps"
 
         try:
             response = requests.get(url)
             html = BeautifulSoup(response.text, "html.parser")
 
-            former_header = html.find(id="Former_Maps")
+            former_header = html.find(id="Current_Maps")
 
-            maps_table = former_header.find_previous("table")
+            maps_table = former_header.find_next("table")
             table_rows = maps_table.find_all("tr")
 
             for row in table_rows[3:]:
@@ -105,7 +108,7 @@ class SteamAPIClient(GameAPIClient):
         except requests.RequestException:
             logger.exception(f"Exception when downloading CS2 maps from {url}")
 
-    def _download_demo_file(self, filename: str, url: str):
+    def download_demo_file(self, filename: str, url: str):
         try:
             data = requests.get(url, stream=True)
 
@@ -136,7 +139,7 @@ class SteamAPIClient(GameAPIClient):
 
         try:
             # Download and save the demo file to disk
-            demo_file = self._download_demo_file(demo_file, demo_url)
+            demo_file = self.download_demo_file(demo_file, demo_url)
 
             if demo_file is None:
                 demo_game_data = {"demo_parse_status": "missing"}
@@ -175,10 +178,7 @@ class SteamAPIClient(GameAPIClient):
 
         return demo_game_data
 
-    def get_game_details(self, match_token: str) -> dict:
-        """
-        Get details about a finished game from the given match_token.
-        """
+    def get_basic_match_info(self, match_token: str) -> dict:
         code_dict = sharecode.decode(match_token)
         self.cs_client.request_full_match_info(
             code_dict["matchid"],
@@ -186,10 +186,14 @@ class SteamAPIClient(GameAPIClient):
             code_dict["token"],
         )
         resp, = self.cs_client.wait_event("full_match_info")
-        game_info = json.loads(MessageToJson(resp))
+        return json.loads(MessageToJson(resp))
+
+    def get_game_details(self, match_token: str) -> dict:
+        """
+        Get details about a finished game from the given match_token.
+        """
+        game_info = self.get_basic_match_info(match_token)
         round_stats = game_info["matches"][0]["roundstatsall"]
-        with open(f"data_{match_token}.json", "w", encoding="utf-8") as fp:
-            json.dump(game_info, fp)
 
         if "map" in round_stats[-1]:
             demo_url = round_stats[-1]["map"]
@@ -197,6 +201,9 @@ class SteamAPIClient(GameAPIClient):
             game_info.update(self.parse_demo(demo_url))
         else:
             game_info["demo_parse_status"] = "unsupported"
+
+        if game_info["demo_parse_status"] != "parsed":
+            logger.bind(event="cs2_demo_error", sharecode=match_token).warning("Demo could not be parsed! Only basic data saved.")
 
         game_info["matchID"] = match_token
 
@@ -285,7 +292,7 @@ class SteamAPIClient(GameAPIClient):
     def get_player_name(self, steam_id):
         return self.get_steam_display_name(steam_id)
 
-    async def get_player_name_for_user(self, user: User) -> list[str]:
+    async def get_player_names_for_user(self, user: User) -> list[str]:
         names = []
         for steam_id in user.player_id:
             player_name = self.get_steam_display_name(steam_id)

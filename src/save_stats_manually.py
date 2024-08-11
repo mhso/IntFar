@@ -46,6 +46,9 @@ class TestMock(DiscordClient):
     def set_sharecode_mock(self, disc_id, steam_id, sharecode):
         pass
 
+    def save_stats_mock(self, parsed_game_stats):
+        return [], []
+
     def get_users_in_cs2_game(self, game_info):
         users_in_game = {}
         all_users = self.game_databases["cs2"].game_users
@@ -99,12 +102,6 @@ class TestMock(DiscordClient):
         if self.play_sound:
             await super().play_event_sounds(game, intfar, doinks, guild_id)
 
-    def save_stats(self, parsed_game_stats: GameStats):
-        if self.task in ("all", "stats") and not self.dry_run:
-            return super().save_stats(parsed_game_stats)
-
-        return [], []
-
     async def on_ready(self):
         await super(TestMock, self).on_ready()
 
@@ -142,7 +139,11 @@ class TestMock(DiscordClient):
                 ranks = await self.get_ranks(game_monitor.users_in_game[guild_id])
                 game_info["player_ranks"] = ranks
 
-            await self.on_game_over(self.game, game_info, guild_id, status)
+            if self.task not in ("all", "stats") or self.dry_run:
+                game_monitor.save_stats = self.save_stats_mock
+
+            post_game_stats = game_monitor.handle_game_over(game_info, status, guild_id)
+            await self.on_game_over(post_game_stats)
 
             if not self.dry_run:
                 self.game_databases[self.game].remove_missed_game(game_id)

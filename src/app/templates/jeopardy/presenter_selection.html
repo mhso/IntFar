@@ -46,7 +46,7 @@
 
             <!-- Jeopardy theme music -->
             <audio id="selection-jeopardy-theme">
-                <source src="{{ url_for('static', filename='img/jeopardy/jeopardy_theme.mp3') }}" type="audio/mpeg">
+                <source src="{{ url_for('static', _external=True, filename='img/jeopardy/jeopardy_theme.mp3') }}" type="audio/mpeg">
             </audio>
             {% endif %}
 

@@ -57,7 +57,8 @@ class MetaDatabase(SQLiteDatabase):
         query = "SELECT disc_id FROM users WHERE secret=?"
 
         with self:
-            return self.execute_query(query, secret).fetchone()[0]
+            result = self.execute_query(query, secret).fetchone()
+            return result[0] if result is not None else None
 
     def set_default_game(self, disc_id, game):
         with self:

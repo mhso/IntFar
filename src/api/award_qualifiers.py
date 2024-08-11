@@ -87,6 +87,12 @@ class AwardQualifiers(ABC):
 
     @classmethod
     @abstractmethod
+    def TIMELINE_FLAVOR_TEXTS(cls) -> list[str]:
+        """
+        Get a list of filenames for flavor texts related to timeline stuff.
+        """
+
+    @classmethod
     def GAME_SPECIFIC_FLAVORS(cls) -> list[str]:
         """
         Get a list of game specific flavor texts that subclasses of this class
@@ -98,10 +104,10 @@ class AwardQualifiers(ABC):
             "honorable": cls.HONORABLE_MENTIONS_FLAVOR_TEXTS(),
             "rank": cls.RANK_MENTIONS_FLAVOR_TEXTS(),
             "stats": cls.COOL_STATS_FLAVOR_TEXTS(),
+            "timeline": cls.TIMELINE_FLAVOR_TEXTS()
         }
 
     @classmethod
-    @abstractmethod
     def ALL_FLAVOR_TEXTS(cls) -> list[str]:
         """
         Get a list of filenames for all flavor texts for the game
@@ -221,7 +227,7 @@ class AwardQualifiers(ABC):
         ...
 
     @abstractmethod
-    def get_intfar(self) -> tuple[int, list[tuple], list[int], str]:
+    def get_intfar(self) -> tuple[int, list[tuple], bool, str]:
         ... 
 
     def get_intfar_candidates(self, intfar_details: list[tuple[str, list[PlayerStats]]]) -> tuple[dict[int, list[tuple[str, PlayerStats]]], int, int]:

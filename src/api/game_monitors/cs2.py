@@ -1,23 +1,18 @@
 import asyncio
-from typing import Coroutine
 from time import time
 
 from mhooge_flask.logging import logger
 
-from api.config import Config
-from api.game_database import GameDatabase
 from api.user import User
 from api.game_monitor import GameMonitor
-from api.game_apis.cs2 import SteamAPIClient
 
 class CS2GameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_DUPLICATE = 5
     POSTGAME_STATUS_SHORT_MATCH = 6
     POSTGAME_STATUS_SURRENDER = 7
-
-    def __init__(self, game: str, config: Config, database: GameDatabase, game_over_callback: Coroutine, steam_api: SteamAPIClient):
-        super().__init__(game, config, database, game_over_callback, steam_api)
+    POSTGAME_STATUS_DEMO_MISSING = 8
+    POSTGAME_STATUS_DEMO_UNSUPORTED = 9
 
     @property
     def min_game_minutes(self):
@@ -92,7 +87,7 @@ class CS2GameMonitor(GameMonitor):
             else:
                 steam_name = user_dict[disc_id].player_name[0]
 
-            user = User.clone(self.database.game_users[disc_id])
+            user = User.clone(self.game_database.game_users[disc_id])
             user.player_id = [steam_id]
             user.player_name = [steam_name]
             users_in_current_game[disc_id] = user
@@ -126,7 +121,7 @@ class CS2GameMonitor(GameMonitor):
         last_round = game_info["matches"][0]["roundstatsall"][-1]
         max_rounds = max(last_round["teamScores"])
 
-        if self.database.game_exists(game_info["matchID"]):
+        if self.game_database.game_exists(game_info["matchID"]):
             logger.warning(
                 "We triggered end of game stuff again... Strange!"
             )
@@ -142,6 +137,14 @@ class CS2GameMonitor(GameMonitor):
         if last_round["matchDuration"] < self.min_game_minutes * 60:
             # Game was too short to count. Probably an early surrender.
             return self.POSTGAME_STATUS_SURRENDER
+        
+        if game_info["demo_parse_status"] == "missing":
+            # Demo was not found on Valve's servers
+            return self.POSTGAME_STATUS_DEMO_MISSING
+        
+        if game_info["demo_parse_status"] == "unsupported":
+            # Demos are not supported in CS2 yet
+            return self.POSTGAME_STATUS_DEMO_UNSUPORTED
 
         return self.POSTGAME_STATUS_OK
 
@@ -150,7 +153,7 @@ class CS2GameMonitor(GameMonitor):
         users_missing = {
             disc_id: self.users_in_game[guild_id][disc_id]
             for disc_id in self.users_in_game[guild_id]
-            if self.users_in_game[guild_id][disc_id].latest_match_token[0] == self.database.game_users[disc_id].latest_match_token[0]
+            if self.users_in_game[guild_id][disc_id].latest_match_token[0] == self.game_database.game_users[disc_id].latest_match_token[0]
         }
 
         # Get new CS sharecode, if we didn't already get it when searching for active games
@@ -174,3 +177,13 @@ class CS2GameMonitor(GameMonitor):
             status_code = await self.get_finished_game_status(game_info, guild_id)
 
         return game_info, status_code
+
+    def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
+        post_game_data = super().handle_game_over(game_info, status_code, guild_id)
+
+        if post_game_data.status_code not in (self.POSTGAME_STATUS_ERROR, self.POSTGAME_STATUS_MISSING):
+            for disc_id in self.users_in_game[guild_id]:
+                steam_id = self.users_in_game[guild_id][disc_id].player_id[0]
+                self.game_database.set_new_cs2_sharecode(disc_id, steam_id, game_info["matchID"])
+
+        return post_game_data

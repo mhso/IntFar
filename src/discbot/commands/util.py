@@ -42,18 +42,18 @@ def valid_command(message, cmd, args):
 
     return True, False
 
-def get_closest_matching_command(message, cmd):
+def get_closest_matching_command(command, guild_id):
     closest_match = None
     closest_match_distance = 8
-    for command in COMMANDS:
-        if message.guild.id not in COMMANDS[command].guilds:
+    for cmd in COMMANDS:
+        if guild_id not in COMMANDS[cmd].guilds:
             continue
 
         distance = Levenshtein.distance(command, cmd)
         if distance < closest_match_distance:
             closest_match = command
             closest_match_distance = distance
-    
+
     return closest_match
 
 def extract_target_name(split, start_index, end_index=None, default="me"):

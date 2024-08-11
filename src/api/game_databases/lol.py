@@ -1,6 +1,8 @@
+from datetime import datetime
 from api.game_database import GameDatabase
 from api.config import Config
 from sqlite3 import IntegrityError
+from api.game_data.lol import get_rank_value
 
 class LoLGameDatabase(GameDatabase):
     def __init__(self, game: str, config: Config):
@@ -138,18 +140,18 @@ class LoLGameDatabase(GameDatabase):
 
         return self.query(query, *parameters, format_func="one")
 
-    def get_average_stat(self, stat, disc_id=None, played_id=None, min_games=10):
-        params = []
-        player_condition = ""
+    def get_average_stat(self, stat, disc_id=None, played_id=None, role=None, min_games=10, time_after=None, time_before=None):
         champ_condition = ""
+        role_condition = ""
+        player_condition, params = self.get_delimeter(time_after, time_before, None, "played.disc_id", disc_id, "AND")
 
         if played_id is not None:
-            params = [played_id] * 2
-            champ_condition = "WHERE p.champ_id=?"
+            params = ([played_id] * 2) + params
+            champ_condition = "WHERE p.champ_id = ?"
 
-        if disc_id is not None:
-            params.append(disc_id)
-            player_condition = "AND played.disc_id=?"
+        if role is not None:
+            params = ([role] * 2) + params
+            role_condition = f"{'AND' if played_id else 'WHERE'} p.role <> ?"
 
         if stat == "first_blood":
             query = f"""
@@ -168,19 +170,22 @@ class LoLGameDatabase(GameDatabase):
                         ON u.player_id = p.player_id
                         AND u.disc_id = g.first_blood
                     {champ_condition}
+                    {role_condition}
                     GROUP BY g.first_blood
                 ) first_bloods
                 INNER JOIN
                 (
                     SELECT
                         u.disc_id,
-                        CAST(COUNT(DISTINCT g.game_id) as REAL) AS c
+                        CAST(COUNT(DISTINCT g.game_id) as REAL) AS c,
+                        g.timestamp
                     FROM games AS g
                     LEFT JOIN participants AS p
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
                     {champ_condition}
+                    {role_condition}
                     GROUP BY u.disc_id
                 ) played
                     ON played.disc_id = first_bloods.first_blood
@@ -207,18 +212,21 @@ class LoLGameDatabase(GameDatabase):
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
                     {champ_condition}
+                    {role_condition}
                     GROUP BY u.disc_id
                 ) stat_values
                 INNER JOIN (
                     SELECT
                         u.disc_id,
-                        CAST(COUNT(DISTINCT g.game_id) as real) AS c
+                        CAST(COUNT(DISTINCT g.game_id) as real) AS c,
+                        g.timestamp
                     FROM games AS g
                     LEFT JOIN participants AS p
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
                     {champ_condition}
+                    {role_condition}
                     GROUP BY u.disc_id
                 ) played
                 ON played.disc_id = stat_values.disc_id
@@ -226,7 +234,7 @@ class LoLGameDatabase(GameDatabase):
                 ON u.disc_id = played.disc_id
                 WHERE u.active = 1
                     AND played.c >= {min_games}
-                {player_condition}
+                    {player_condition}
                 GROUP BY played.disc_id
                 ORDER BY avg_val DESC
             """
@@ -380,7 +388,16 @@ class LoLGameDatabase(GameDatabase):
             params = [disc_id, champ_id] * 2
             return self.execute_query(query, *params).fetchone()
 
-    def get_min_or_max_winrate_played(self, disc_id, best, included_champs=None, return_top_n=1, min_games=10):
+    def get_min_or_max_winrate_played(
+        self,
+        disc_id,
+        best,
+        included_champs=None,
+        return_top_n=1,
+        min_games=10,
+        time_after=None,
+        time_before=None
+    ):
         sort_order = "DESC" if best else "ASC"
         if included_champs is not None:
             champs_condition = (
@@ -390,6 +407,8 @@ class LoLGameDatabase(GameDatabase):
             )
         else:
             champs_condition = ""
+
+        delim_str, params = self.get_delimeter(time_after, time_before, prefix="AND")
 
         query = f"""
             SELECT
@@ -419,7 +438,8 @@ class LoLGameDatabase(GameDatabase):
                (
                 SELECT
                     CAST(COUNT(DISTINCT g.game_id) as real) AS c,
-                    p.champ_id
+                    p.champ_id,
+                    g.timestamp
                 FROM games AS g
                 LEFT JOIN participants AS p
                     ON g.game_id = p.game_id
@@ -433,6 +453,7 @@ class LoLGameDatabase(GameDatabase):
                     wins.champ_id = played.champ_id
                     AND played.c > {min_games}
                     {champs_condition}
+                    {delim_str}
             ) sub
             ORDER BY
                 sub.wr {sort_order},
@@ -441,7 +462,7 @@ class LoLGameDatabase(GameDatabase):
         """
 
         with self:
-            params = [disc_id] * 2
+            params.extend([disc_id] * 2)
             result = self.execute_query(query, *params).fetchall()
 
             if return_top_n == 1:
@@ -453,7 +474,8 @@ class LoLGameDatabase(GameDatabase):
 
             return result if result[0] is not None else (None, None, None)
 
-    def get_role_winrate(self, disc_id):
+    def get_role_winrate(self, disc_id, time_after=None, time_before=None):
+        delim_str, params = self.get_delimeter(time_after, time_before, prefix="AND")
         query = f"""
             SELECT
                 sub.wr,
@@ -482,7 +504,8 @@ class LoLGameDatabase(GameDatabase):
                INNER JOIN (
                     SELECT
                         CAST(COUNT(DISTINCT g.game_id) AS REAL) AS c,
-                        p.role
+                        p.role,
+                        g.timestamp
                     FROM games AS g
                     LEFT JOIN participants AS p
                         ON g.game_id = p.game_id
@@ -493,33 +516,108 @@ class LoLGameDatabase(GameDatabase):
                     ORDER BY p.role
                 ) played
                 ON wins.role = played.role
+                {delim_str}
             ) sub
             ORDER BY sub.wr DESC
         """
 
         with self:
-            params = [disc_id] * 2
+            params.extend([disc_id] * 2)
             result = self.execute_query(query, *params).fetchall()
-            return result if result[0] is not None else (None, None, None)
+            return result or (None, None, None)
 
-    def get_current_rank(self, disc_id) -> tuple[str, str]:
+    def get_player_ranks(self, disc_id, time_after=None, time_before=None, order="ASC"):
         main_player_id = self.game_users[disc_id].player_id[0]
-        query = """
+        delim_str, params = self.get_delimeter(time_after, time_before, None, "p.player_id", main_player_id)
+
+        query = f"""
             SELECT
-                rank_solo,
-                rank_flex
-            FROM participants
-            WHERE player_id = ?
-            ORDER BY game_id DESC
+                p.rank_solo,
+                p.rank_flex
+            FROM games AS g
+            INNER JOIN participants AS p
+                ON p.game_id = g.game_id
+            {delim_str}
+            ORDER BY g.timestamp {order}
+        """
+
+        return self.query(query, *params, format_func="all")
+
+    def get_current_rank(self, disc_id, time_after=None, time_before=None) -> tuple[str, str]:
+        main_player_id = self.game_users[disc_id].player_id[0]
+        query = f"""
+            {self.get_player_ranks(disc_id, time_after, time_before, "DESC").query}
             LIMIT 1
         """
 
         with self:
-            return self.execute_query(query, main_player_id).fetchone()
+            return self.execute_query(query, main_player_id).fetchone() or (None, None)
 
-    def get_split_summary_data(self, disc_id):
+    def get_highest_rank(self, disc_id, time_after=None, time_before=None) -> tuple[str, str]:
+        with self:
+            ranks = self.get_player_ranks(disc_id, time_after, time_before)()
+        
+            solo_highest_val = 0
+            solo_highest = "Unranked"
+            flex_highest_val = 0
+            flex_highest = "Unranked"
+            for rank_solo, rank_flex in ranks:
+                solo_value = get_rank_value(rank_solo)
+                if solo_value > solo_highest_val:
+                    solo_highest_val = solo_value
+                    solo_highest = rank_solo
+
+                flex_value = get_rank_value(rank_flex)
+                if flex_value > flex_highest_val:
+                    flex_highest_val = flex_value
+                    flex_highest = rank_flex
+
+            return solo_highest, flex_highest
+
+
+    def get_split_start(self, offset=0):
+        timestamp_before = datetime.now().timestamp() - offset
+        query = """
+            SELECT MAX(g.timestamp)
+            FROM games AS g
+            INNER JOIN (
+                SELECT
+                    g.game_id,
+                    p.rank_flex AS curr_rank,
+                    LAG(p.rank_flex, 1) OVER (PARTITION BY p.player_id ORDER BY g.timestamp DESC) prev_rank
+                FROM games AS g
+                INNER JOIN participants AS p
+                ON p.game_id = g.game_id
+                ORDER BY g.timestamp DESC
+            ) sub
+            ON sub.game_id = g.game_id
+            WHERE
+                sub.prev_rank IS NULL
+                AND sub.curr_rank IS NOT NULL
+                AND g.timestamp < ?
         """
-        What to summarize:
+
+        with self:
+            return self.execute_query(query, timestamp_before).fetchone()[0]
+
+    def get_split_message_status(self, disc_id):
+        main_player_id = self.game_users[disc_id].player_id[0]
+        query = "SELECT timestamp FROM split_messages WHERE player_id = ?"
+
+        with self:
+            result = self.execute_query(query, main_player_id).fetchone()
+            return result[0] if result is not None else None
+
+    def set_split_message_sent(self, disc_id, timestamp):
+        main_player_id = self.game_users[disc_id].player_id[0]
+        query = "INSERT INTO split_messages VALUES (?, ?)"
+    
+        with self:
+            self.execute_query(query, main_player_id, timestamp)
+
+    def get_split_summary_data(self, disc_id, stats):
+        """
+        Summarizes the following stats:
         - Avg stats, compare each to prev split
         - Int-Fars, doinks, compare to prev split
         - Games played, compare to prev split
@@ -528,6 +626,65 @@ class LoLGameDatabase(GameDatabase):
         - Highest rank
         - New champs played
         """
+        offset_1 = 30 * 24 * 60 * 60
+        offset_2 = 190 * 24 * 60 * 60
+
+        curr_split_start = self.get_split_start(offset_1)
+        prev_split_start = self.get_split_start(offset_2)
+        no_previous = curr_split_start == prev_split_start
+
+        # Get average stats for prev split and this split
+        avg_stats_before = []
+        avg_stats_now = []
+        for stat in stats:
+            avg_prev_split = None if no_previous else self.get_average_stat(stat, disc_id, time_after=prev_split_start, time_before=curr_split_start)()
+            avg_curr_split = self.get_average_stat(stat, disc_id, time_after=curr_split_start)()
+
+            avg_stats_before.append((stat, avg_prev_split))
+            avg_stats_now.append((stat, avg_curr_split))
+
+        # Get Int-Fars & doinks for prev split and this split
+        intfars_before = None if no_previous else self.get_intfar_count(disc_id, prev_split_start, curr_split_start)
+        intfars_after = self.get_intfar_count(disc_id, curr_split_start)
+
+        doinks_before = None if no_previous else self.get_doinks_count(disc_id, prev_split_start, curr_split_start)
+        doinks_after = self.get_doinks_count(disc_id, curr_split_start)
+
+        # Get games played prev split and this split
+        games_played_before = None if no_previous else self.get_games_count(disc_id, prev_split_start, curr_split_start)
+        games_played_after = self.get_games_count(disc_id, curr_split_start)
+
+        # Get best and worst performing champ this split
+        best_wr_info = self.get_min_or_max_winrate_played(disc_id, True, min_games=5)
+        worst_wr_info = self.get_min_or_max_winrate_played(disc_id, False, min_games=5)
+
+        # Get role performance
+        role_winrates = self.get_role_winrate(disc_id, curr_split_start)
+
+        # Get highest rank
+        solo_highest, flex_highest = self.get_highest_rank(disc_id, curr_split_start)
+
+        # Get new champs played prev split and this split
+        played_before = None if no_previous else len(self.get_played_ids(disc_id, prev_split_start, curr_split_start))
+        played_after = len(self.get_played_ids(disc_id, curr_split_start))
+
+        return {
+            "avg_stats_before": avg_stats_before,
+            "avg_stats_now": avg_stats_now,
+            "intfars_before": intfars_before,
+            "intfars_after": intfars_after,
+            "doinks_before": doinks_before,
+            "doinks_after": doinks_after,
+            "games_before": games_played_before,
+            "games_after": games_played_after,
+            "best_wr_champ": best_wr_info,
+            "worst_wr_champ": worst_wr_info,
+            "role_winrates": role_winrates,
+            "solo_highest": solo_highest,
+            "flex_highest": flex_highest,
+            "played_before": played_before,
+            "played_after": played_after
+        }
 
     def create_list(self, disc_id, name):
         query = "INSERT INTO champ_lists(name, owner_id) VALUES (?, ?)"
@@ -645,3 +802,95 @@ class LoLGameDatabase(GameDatabase):
 
         with self:
             self.execute_query(query, *item_ids)
+
+    def insert_bingo_challenge(self, challenge_id, challenge_name, total):
+        query = "INSERT INTO lan_bingo (id, name, total) VALUES (?, ?, ?)"
+
+        with self:
+            self.execute_query(query, challenge_id, challenge_name, total)
+
+    def update_bingo_challenge(self, challenge_id, progress=0, new_progress=0, completed=0, completed_by=None):
+        query = """
+            UPDATE lan_bingo
+            SET
+                progress = ?,
+                new_progress = ?,
+                completed = ?,
+                completed_by = ?
+            WHERE id = ?
+        """
+
+        with self:
+            self.execute_query(
+                query,
+                progress,
+                new_progress,
+                completed,
+                completed_by,
+                challenge_id,
+            )
+
+    def set_bingo_challenge_seen(self, challenge_id):
+        query = """
+            UPDATE lan_bingo
+            SET notification_sent = 1
+            WHERE id = ?
+        """
+
+        with self:
+            self.execute_query(query, challenge_id)
+
+    def get_new_bingo_challenges(self, amount):
+        query_select = f"""
+            SELECT
+                sub.*
+            FROM (
+                SELECT
+                    id,
+                    name,
+                    progress,
+                    total,
+                    0,
+                    NULL,
+                    NULL
+                FROM lan_bingo
+                WHERE completed = 0
+                ORDER BY random()
+                LIMIT {amount}
+            ) sub
+            ORDER BY sub.id
+        """
+
+        with self:
+            challenges = self.execute_query(query_select).fetchall()
+
+            if challenges == []:
+                return []
+
+            challenge_ids = ",".join(challenge[0] for challenge in challenges)
+            query_update = f"""
+                UPDATE lan_bingo
+                SET active = 1
+                WHERE id IN ({challenge_ids})
+            """
+
+            self.execute_query(query_update)
+
+    def get_active_bingo_challenges(self):
+        query_select = f"""
+            SELECT
+                id,
+                name,
+                progress,
+                new_progress,
+                total,
+                completed,
+                completed_by,
+                notification_sent
+            FROM lan_bingo
+            WHERE active = 1
+            ORDER BY id
+        """
+
+        with self:
+            return self.execute_query(query_select).fetchall()

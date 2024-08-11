@@ -22,11 +22,11 @@ class RiotAPIClient(GameAPIClient):
         super().__init__(game, config)
         self.champ_names = {}
         self.champ_ids = {}
-        self.champ_portraits_path = "app/static/img/champions/portraits"
-        self.champ_splash_path = "app/static/img/champions/splashes"
-        self.champ_abilities_path = "app/static/img/champions/abilities"
-        self.item_icons_path = "app/static/img/items"
-        self.champ_data_path = "app/static/champ_data"
+        self.champ_portraits_path = f"{config.static_folder}/img/champions/portraits"
+        self.champ_splash_path = f"{config.static_folder}/img/champions/splashes"
+        self.champ_abilities_path = f"{config.static_folder}/img/champions/abilities"
+        self.item_icons_path = f"{config.static_folder}/img/items"
+        self.champ_data_path = f"{config.static_folder}/champ_data"
         self.latest_patch = None
 
         self.get_latest_data()
@@ -60,7 +60,6 @@ class RiotAPIClient(GameAPIClient):
         if not exists(self.items_file):
             self.get_latest_items_file()
 
-        self.champ_splash_path = "app/static/img/champions/splashes"
         self.initialize_champ_dicts()
         self.get_champion_portraits()
         self.get_champion_splashes()
@@ -292,8 +291,8 @@ class RiotAPIClient(GameAPIClient):
         return response.json()
 
     def get_player_name(self, puuid):
-        endpoint = " /riot/account/v1/accounts/by-puuid/{0}"
-        response = self.make_request(endpoint, API_PLATFORM, puuid)
+        endpoint = "/riot/account/v1/accounts/by-puuid/{0}"
+        response = self.make_request(endpoint, API_REGION, puuid)
         if response.status_code != 200:
             return None
 

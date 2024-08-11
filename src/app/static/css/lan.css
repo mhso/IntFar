@@ -23,6 +23,10 @@ body {
     position: relative;
 }
 
+#lan-wrapper {
+    padding: 0 40px;
+}
+
 #bg-image {
     position: absolute;
     z-index: -1;
@@ -38,6 +42,7 @@ body {
 
 h1, h2 {
     letter-spacing: 1px;
+    text-shadow: -3px 2px 2px rgba(0, 0, 0, 0.75);
 }
 
 h1 {
@@ -86,10 +91,6 @@ h2 {
 
 .lan-performance-wrapper p {
     margin-bottom: 0.75rem;
-}
-
-#lan-best-worst-wrapper {
-    border-bottom: 2px solid white;
 }
 
 #lan-perform-first-row {
@@ -178,6 +179,85 @@ h2 {
     color: #d98b53;
 }
 
+#lan-live-game-feed-wrapper {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    transition: opacity 1s;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 99;
+    background-color: #00000079;
+}
+
+#lan-live-game-feed-wrapper > div {
+    position: absolute;
+    text-align: center;
+    overflow: auto;
+    scrollbar-width: none;
+    width: 70%;
+    height: 80%;
+    top: 10%;
+    left: 15%;
+}
+
+@keyframes addToFeed {
+    0% {
+        opacity: 0;
+        transform: translateX(150%);
+    }
+    5% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(0%);
+        opacity: 1;
+    }
+}
+
+.lan-game-feed-entry {
+    position: relative;
+    width: 100%;
+    font-size: 3rem;
+    margin-bottom: 1.5rem;
+    background-color: #0b0a0a;
+    border-radius: 25px;
+    border: 2px solid white;
+    padding: 10px 20px;
+
+    font-family: Consolas;
+
+    animation-duration: 1s;
+    animation-fill-mode: forwards;
+}
+
+.lan-game-feed-entry.ally {
+    color: rgb(0, 145, 232);
+}
+
+.lan-game-feed-entry.enemy {
+    color: rgb(195, 20, 20);
+}
+
+.lan-game-feed-entry.neutral {
+    color: white;
+}
+
+.lan-game-feed-entry-desc {
+    width: 95%;
+    text-align: left;
+}
+
+.lan-game-feed-entry-icon {
+    position: absolute;
+    right: 14px;
+    top: 18px;
+    width: 4%;
+}
+
 .lan-emph {
     font-weight: 600;
 }
@@ -190,12 +270,41 @@ h2 {
     color: rgb(202, 23, 23);
 }
 
+#lan-now-playing-wrapper {
+    font-size: 30px;
+    text-align: left;
+    position: fixed;
+    left: -30px;
+    top: -30px;
+    display: inline-block;
+    background-color: #000;
+    padding: 25px 20px 15px 45px;
+    border-bottom: 2px solid white;
+    border-right: 2px solid white;
+    border-radius: 30px;
+    width: auto;
+    max-width: 620px;
+    height: 150px;
+    overflow: hidden;
+}
+
+#lan-now-playing-wrapper > h2 {
+    text-align: left;
+    width: 300px;
+}
+
 #lan-tilt-meter-wrapper {
     position: relative;
-    margin-top: 40px;
-    margin-bottom: 40px;
-    width: 100%;
+    margin-top: 30px;
+    margin-bottom: 30px;
     height: 120px;
+    width: 75%;
+    margin: 0 auto;
+}
+
+#lan-latest-game-wrapper {
+    width: 75%;
+    margin: 0 auto;
 }
 
 #lan-tilt-meter {
@@ -250,8 +359,110 @@ h2 {
     margin-right: 5px;
 }
 
-#lan-now-playing {
-    font-size: 30px;
+#lan-bingo-wrapper {
+    border: 2px solid white;
+    padding: 0 5px;
+    text-align: center;
+    height: 575px;
+    width: 96%;
+}
+
+#lan-bingo-wrapper > .row {
+    position: relative;
+    height: 20%;
+}
+
+.lan-bingo-entry {
+    position: relative;
+    background-color: #012647;
+    border: 1px solid white;
+    width: 20%;
+    padding: 8px;
+}
+
+.lan-bingo-entry.bingo-completed {
+    background: radial-gradient(circle at center, rgb(17, 120, 17), #194006);
+}
+
+.lan-bingo-entry.bingo-bingo {
+    background: radial-gradient(circle at center, #a89d05, #514b0e);
+}
+
+.lan-bingo-desc {
+    font-size: 18px;
+    font-weight: 800;
+    position: relative;
+    z-index: 2;
+    word-wrap: break-word;
+    line-height: 1.3;
+    text-shadow: -3px 2px 2px rgba(0, 0, 0, 0.75);
+}
+
+.lan-bingo-desc-progress {
+    font-weight: 100;
+    color: #ff8f4b;
+    position: absolute;
+    z-index: 2;
+    bottom: 5px;
+    width: 100%;
+    margin: 0 auto;
+    left: 0;
+}
+
+@keyframes progress {
+    0% {
+        transform: translateY(0%);
+    }
+    100% {
+        transform: translateY(-100%);
+    }
+}
+
+.lan-bingo-updated {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    height: 29px;
+    overflow: hidden;
+}
+
+.lan-bingo-updated > img {
+    display: block;
+    animation-name: progress;
+    animation-duration: 3s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+    height: 44px;
+    padding-bottom: 15px;
+}
+
+.lan-bingo-progress-bar {
+    width: 100%;
+    bottom: 0;
+    left: 0;
+    z-index: 0;
+    background: linear-gradient(to top, rgb(18, 90, 18), rgb(4, 129, 4));
+    border-top: 1px solid #005400;
+    position: absolute;
+}
+
+.lan-bingo-person {
+    position: absolute;
+    width: 100%;
+    z-index: 1;
+    opacity: 0.5;
+    padding-top: 5%;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+.lan-bingo-person > img {
+    position: relative;
+    width: 90%;
+    height: auto;
 }
 
 #lan-no-games-wrapper > video {
@@ -294,5 +505,5 @@ h2 {
     bottom: 0;
     right: 0;
     clip-path: polygon(30% 0%, 30% 100%, 100% 100%, 100% 0);
-    width: 650px;
+    width: 538px;
 }

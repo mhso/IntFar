@@ -1,4 +1,4 @@
-const socket = io();
+const socket = io({"transports": ["polling"]});
 var pingActive = true;
 
 function setRandomColor() {
@@ -56,6 +56,7 @@ function giveFinalJeopardyAnswer(userId) {
 }
 
 function pressBuzzer(userId) {
+    console.log("Pressing buzzer:", userId);
     let activeBuzzer = document.getElementById("buzzer-active");
     if (activeBuzzer.classList.contains("d-none")) {
         return;
@@ -157,6 +158,8 @@ function monitorGame(turnId) {
     socket.on("ping_calculated", function(ping) {
         pingElem.textContent = ping + " ms";
         let pingNum = Number.parseFloat(ping);
+
+        console.log("Ping received:", pingNum);
 
         if (pingNum < 50) {
             pingElem.className = "contestant-low-ping";

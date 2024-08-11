@@ -32,7 +32,7 @@
         </div>
 
         <h1 id="about-scroll-down">Scroll on down to learn more...</h1>
-        <img id="about-arrow-down" src="{{ url_for('static', filename='img/arrow_down.png') }}">
+        <img id="about-arrow-down" src="{{ url_for('static', _external=True, filename='img/arrow_down.png') }}">
 
         <div class="about-card about-scroll-fade">
             <p><span class="paragraph-begin">Int-Far</span> is an interactive Discord bot that tracks various games being played in Discord servers.</p>
@@ -70,6 +70,6 @@
     </div>
 </body>
 
-<script src="{{ url_for('static', filename='js/about.js') }}"></script>
+<script src="{{ url_for('static', _external=True, filename='js/about.js') }}"></script>
 
 </html>

@@ -40,26 +40,7 @@ MONTH_NAMES = [
 
 JEOPARDY_ITERATION = 3
 _suffix = ["st", "nd", "rd", "th"]
-JEOPADY_EDITION = f"{JEOPARDY_ITERATION}{_suffix[min(len(_suffix) - 1, JEOPARDY_ITERATION)]} Edition"
-
-class TimeZone(tzinfo):
-    """
-    Class for representing the time zone of Copenhagen (UTC+1).
-    """
-    def tzname(self, dt):
-        return "Europe/Copenhagen"
-
-    def utcoffset(self, dt):
-        return self.dst(dt) + timedelta(0, 0, 0, 0, 0, 1, 0)
-
-    def dst(self, dt):
-        if dt.month < 10 or dt.month > 3:
-            return timedelta(0, 0, 0, 0, 0, 0, 0)
-        if dt.month == 10 and dt.day < 25:
-            return timedelta(0, 0, 0, 0, 0, 1, 0)
-        if dt.month == 3 and dt.day > 28:
-            return timedelta(0, 0, 0, 0, 0, 0, 0)
-        return timedelta(0, 0, 0, 0, 0, 1, 0)
+JEOPADY_EDITION = f"{JEOPARDY_ITERATION}{_suffix[min(len(_suffix) - 1, JEOPARDY_ITERATION - 1)]} Edition"
 
 def load_flavor_texts(config: Config, filename, game=None):
     path = f"{config.resources_folder}/flavor_texts"

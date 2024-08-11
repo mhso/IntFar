@@ -10,7 +10,7 @@ def get_bets(database, bet_handler, only_active):
     names = app_util.discord_request("func", "get_discord_nick", None)
     avatars = app_util.discord_request("func", "get_discord_avatar", None)
     avatars = {
-        disc_id: flask.url_for("static", filename=avatars[disc_id].replace("app/static/", ""))
+        disc_id: flask.url_for("static", _external=True, filename=avatars[disc_id].replace("app/static/", ""))
         for disc_id in avatars
     }
     all_bets = database.get_bets(only_active)
@@ -61,7 +61,7 @@ def home():
     all_token_balances = []
     for balance, disc_id in all_balances:
         name = all_names[disc_id]
-        avatar = flask.url_for("static", filename=all_avatars[disc_id].replace("app/static/", ""))
+        avatar = flask.url_for("static", _external=True, filename=all_avatars[disc_id].replace("app/static/", ""))
         formatted_balance = api_util.format_tokens_amount(balance)
         all_token_balances.append((disc_id, name, formatted_balance, avatar))
 

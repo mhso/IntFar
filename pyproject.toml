@@ -6,7 +6,6 @@ authors = [
     {name = "Mikkel Sørensen", email = "m_hooge@hotmail.com"},
 ]
 dependencies = [
-    "awpy>=1.2.3",
     "beautifulsoup4==4.12.2",
     "discord-py==2.3.2",
     "flask==2.3.2",
@@ -25,8 +24,12 @@ dependencies = [
     "file:///${PROJECT_ROOT}/../scripts/mhooge_flask#egg=mhooge-flask",
     "file:///${PROJECT_ROOT}/../scripts/streamscape#egg=streamscape",
     "flask-socketio>=5.3.6",
+    "polars==0.20.31",
+    "awpy>=2.0.0b1",
+    "freezegun>=1.5.1",
+    "opencv-python>=4.10.0.84",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.10,<3.12"
 readme = "README.md"
 license = {text = "MIT"}
 
@@ -42,4 +45,4 @@ pythonpath = [
     "src"
 ]
 testpaths = ["tests"]
-filterWarnings = ["ignore:DeprecationWarning"]
+filterwarnings = ["ignore::DeprecationWarning"]

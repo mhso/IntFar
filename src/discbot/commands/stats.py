@@ -35,7 +35,7 @@ async def handle_average_msg(client, message, stat, game, playable_id=None, disc
         playable_name = client.api_clients[game].get_playable_name(playable_id)
 
     minimum_games = 10 if playable_id is None else 5
-    values = client.game_databases[game].get_average_stat(stat, disc_id, playable_id, minimum_games)()
+    values = client.game_databases[game].get_average_stat(stat, disc_id, playable_id, min_games=minimum_games)()
 
     for_all = disc_id is None
     readable_stat = stat.replace("_", " ")
@@ -339,7 +339,7 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
             stat: get_formatted_stat_value(
                 game,
                 stat,
-                database.get_average_stat(stat, target_id, champ_id, 1)()[0][1]
+                database.get_average_stat(stat, target_id, champ_id, min_games=1)()[0][1]
             )
             for stat in stats_to_get
         }
@@ -411,5 +411,26 @@ async def handle_champion_msg(client, message, champ_id, game, target_id):
 
     await message.channel.send(response)
 
-async def handle_rank_msg(client, message, queue, game, target_id=None):
-    pass
+async def handle_rank_msg(client, message, queue, game, target_id):
+    nickname = client.get_discord_nick(target_id, message.guild.id)
+    rank_info = client.game_databases[game].get_current_rank(target_id)
+    fmt_stat_names = get_formatted_stat_names(game)
+
+    if game == "lol":
+        queues = ["solo", "flex"]
+        queue_names = [fmt_stat_names["rank_solo"], fmt_stat_names["rank_flex"]]
+    elif game == "cs2":
+        queues = ["premier"]
+        queue_names = [fmt_stat_names["rank_premier"]]
+
+    if queue not in queues:
+        response = f"Invalid rank type, should be one of {', '.join(queues)}."
+        await message.channel.send(response)
+        return
+
+    rank = get_formatted_stat_value(game, f"rank_{queue}", rank_info[queues.index(queue)])
+    name = queue_names[queues.index(queue)]
+
+    response = f"{nickname} is currently **{rank}** in **{name}**"
+
+    await message.channel.send(response)

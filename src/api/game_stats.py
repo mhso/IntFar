@@ -53,7 +53,7 @@ class PlayerStats(ABC):
     @classmethod
     def formatted_stat_names(cls) -> dict[str, str]:
         formatted = {}
-        for stat in PlayerStats.stat_quantity_desc():
+        for stat in PlayerStats.stats_to_save():
             if stat in ("kda", "kp"):
                 fmt_stat = stat.upper()
             else:
@@ -187,6 +187,22 @@ class GameStatsParser(ABC):
         and return a list of GameStats objects with the game data.
         """
         ...
+
+@dataclass
+class PostGameStats:
+    game: str
+    status_code: int
+    guild_id: int
+    parsed_game_stats: GameStats = None
+    intfar_data: tuple[int, list[tuple], bool, str] = None
+    intfar_streak_data: tuple[int, int] = None
+    doinks_data: tuple[dict[int, list[tuple]], dict[int, str]] = None
+    ranks_data: dict[int, tuple[int, int]] = None
+    winstreak_data: tuple[dict[int, list[int]], dict[int, list[int]]] = None
+    timeline_data: list[tuple] = None
+    cool_stats_data: dict[int, list[tuple[int, int | str, int]]] = None
+    beaten_records_data: tuple[list[tuple[str, int, int, int, int]], list[tuple[str, int, int, int, int]]] = None
+    lifetime_data: dict[int, tuple[int, int]] = None
 
 def get_outlier(
     player_stats_list: list[PlayerStats],

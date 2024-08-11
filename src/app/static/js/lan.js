@@ -13,7 +13,8 @@ function refreshPage() {
 function getLiveData(lanDate) {
     let baseUrl = getBaseURL();
     $.ajax(baseUrl + "/intfar/lan/live_data/" + lanDate, {
-        method: "GET"
+        method: "GET",
+        data: {filter: "active_game,games_played"}
     }).then((data) => {
         if (data.games_played != null && data.active_game == null && isActiveGame) {
             console.log("Finished game!"); // Game finished. Refresh page.
@@ -27,7 +28,7 @@ function getLiveData(lanDate) {
             refreshPage();
         }
     }, (error) => {
-        console.log("DATA ERROR!!! " + error);
+        
     });
 }
 
@@ -48,7 +49,68 @@ function getSongPlaying(lanDate) {
             document.getElementById("lan-now-playing").textContent = song_str
         }
     }, (error) => {
-        console.log("SONG ERROR!!! " + error);
+        
+    });
+}
+
+function showLiveGameFeed(feedWrapper) {
+    feedWrapper.style.opacity = 1;
+}
+
+function hideLiveGameFeed(feedWrapper) {
+    feedWrapper.style.opacity = 0;
+}
+
+function getLiveLeagueData(feedWrapper) {
+    let baseUrl = getBaseURL();
+    $.ajax(baseUrl + "/intfar/lan/live_league_data", {
+        method: "GET"
+    }).then((data) => {
+        if (data["events"].length > 0) {
+            showLiveGameFeed(feedWrapper);
+            feedWrapper.dataset["fade"] = "5";
+        }
+        else {
+            let value = Number.parseInt(feedWrapper.dataset["fade"]);
+            if (value > 0) {
+                feedWrapper.dataset["fade"] = (value - 1).toString();
+            }
+        }
+
+        if (feedWrapper.dataset["fade"] == "0") {
+            hideLiveGameFeed(feedWrapper);
+        }
+
+        data["events"].forEach((event, index) => {
+            let wrapperElem = document.createElement("div");
+            wrapperElem.classList.add("lan-game-feed-entry");
+            wrapperElem.classList.add(event["category"]);
+
+            let descElem = document.createElement("div");
+            descElem.className = "lan-game-feed-entry-desc";
+            descElem.textContent = event["description"];
+            wrapperElem.appendChild(descElem);
+
+            let iconElem = document.createElement("img");
+            iconElem.className = "lan-game-feed-entry-icon";
+            if (event["icon"] != null) {
+                iconElem.src = event["icon"];
+            }
+            else {
+                iconElem.style.eopacity = 0;
+            }
+            wrapperElem.appendChild(iconElem);
+
+            wrapperElem.style.opacity = 0;
+            setTimeout(function() {
+                wrapperElem.style.animationName = "addToFeed"
+            }, 0.5 + (250 * index));
+
+            feedWrapper.children[0].appendChild(wrapperElem);
+            feedWrapper.children[0].scrollTo({left: 0, top: feedWrapper.children[0].scrollHeight, behavior: "smooth"});
+        });
+    }, (error) => {
+        
     });
 }
 
@@ -56,8 +118,12 @@ function parseDuration(duration) {
     let split = duration.split(",");
 
     let obj = {
-        years: 0, months: 0, days: 0,
-        hours: 0, minutes: 0, seconds: 0
+        years: 0,
+        months: 0,
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        seconds: 0
     };
     for (let i = 0; i < split.length; i++) {
         let unit = split[i].trim();
@@ -149,33 +215,12 @@ function incrementDuration(durationElem) {
 
 function count() {
     let timeSinceStartElem = document.getElementById("lan-duration").getElementsByTagName("span").item(0);
-    let timeSinceGameElem = document.getElementById("lan-game-duration");
 
     setInterval(function() {
         if (isLanActive) {
             incrementDuration(timeSinceStartElem);
         }
-        incrementDuration(timeSinceGameElem);
     }, 1000);
-}
-
-function autoScroll() {
-    let scrollElem = document.getElementById("lan-teamcomp-scroll");
-    let allChildren = scrollElem.children;
-    
-    let totalHeight = 0;
-    for (let i = 0; i < allChildren.length; i++) {
-        totalHeight += allChildren.item(0).offsetHeight;
-    }
-
-    let delay = 40;
-    let thresholdOffset = 216;
-    setInterval(function() {
-        scrollElem.scrollBy(0, 1);
-        if (scrollElem.scrollTop >= totalHeight + thresholdOffset) {
-            scrollElem.scrollTo(0, 0);
-        }
-    }, delay);
 }
 
 function monitor(gamesPlayed, activeGame, lanOver, lanDate) {
@@ -186,28 +231,73 @@ function monitor(gamesPlayed, activeGame, lanOver, lanDate) {
     console.log("Active games on load: " + isActiveGame)
     console.log("LAN active on load: " + isLanActive)
 
-    let dataDelay = 15 * 1000
+    let lanDataDelay = 15 * 1000
     let songDelay = 5 * 1000
+    let lolDataDelay = 2 * 1000
+
+    let feedWrapper = document.getElementById("lan-live-game-feed-wrapper");
+    let lolDataInterval = setInterval(function() {
+        getLiveLeagueData(feedWrapper);
+    }, lolDataDelay);
+
     let songInterval = setInterval(function() {
         getSongPlaying(lanDate)
     }, songDelay);
 
-    let intervalId = setInterval(function() {
+    let lanDataInterval = setInterval(function() {
         if (!isLanActive) {
-            clearInterval(intervalId);
+            clearInterval(lanDataInterval);
             clearInterval(songInterval);
+            clearInterval(lolDataInterval);
         }
         else {
             getLiveData(lanDate);
             getSongPlaying(lanDate)
         }
-    }, dataDelay);
+    }, lanDataDelay);
     if (anyGamesPlayed) {
         if (isLanActive) {
             count();
         }
-        if (!isActiveGame) {
-            autoScroll();
-        }
     }
 }
+
+document.addEventListener("DOMContentLoaded", function() {
+    let entries = document.getElementsByClassName("lan-bingo-entry");
+    for (let i = 0; i < entries.length; i++) {
+        let entry = entries.item(i);
+        let entryHeight = entry.getBoundingClientRect().height;
+        let padding = 5 + (entryHeight * 0.05);
+
+        // Center description
+        let descElem = entry.getElementsByClassName("lan-bingo-desc").item(0);
+        let y = (entryHeight / 2 - descElem.getBoundingClientRect().height / 2) - padding;
+
+        descElem.style.top = y + "px";
+    
+        // Fill up progress meter
+        if ("progress" in entry.dataset) {
+            let progress = Number.parseFloat(entry.dataset["progress"]);
+            let total = Number.parseFloat(entry.dataset["total"]);
+            
+            let progressElem = entry.getElementsByClassName("lan-bingo-progress-bar").item(0);
+            if (progressElem != null) {
+                let ratio = progress / total;
+                progressElem.style.height = ((ratio * entryHeight) - 2) + "px";
+            }
+        }
+
+        let personElem = entry.getElementsByClassName("lan-bingo-person");
+        if (personElem.length != 0) {
+            let imageElem = personElem.item(0).getElementsByTagName("img").item(0);
+            let intervalId = setInterval(function() {
+                let imgHeight = imageElem.getBoundingClientRect().height;
+                if (imgHeight > 0) {
+                    clearInterval(intervalId);
+                    let shift = ((imgHeight - entryHeight) * 0.5) + 10;
+                    imageElem.style.top = -shift + "px";
+                }
+            }, 10);
+        }
+    }
+});

@@ -1,13 +1,11 @@
-from typing import Coroutine
+from time import time
 import asyncio
 
 from mhooge_flask.logging import logger
 
+from api import lan
 from api.game_monitor import GameMonitor
-from api.game_database import GameDatabase
 from api.user import User
-from api.game_apis.lol import RiotAPIClient
-from api.config import Config
 from api.game_data.lol import get_player_stats
 
 class LoLGameMonitor(GameMonitor):
@@ -15,9 +13,6 @@ class LoLGameMonitor(GameMonitor):
     POSTGAME_STATUS_URF = 5
     POSTGAME_STATUS_INVALID_MAP = 6
     POSTGAME_STATUS_REMAKE = 7
-
-    def __init__(self, game: str, config: Config, database: GameDatabase, game_over_callback: Coroutine, api_client: RiotAPIClient):
-        super().__init__(game, config, database, game_over_callback, api_client)
 
     def get_users_in_game(self, user_dict: dict[int, User], game_data: dict):
         users_in_game = {}
@@ -98,7 +93,7 @@ class LoLGameMonitor(GameMonitor):
         )
 
     async def get_finished_game_status(self, game_info: dict, guild_id: int):
-        if self.database.game_exists(game_info["gameId"]):
+        if self.game_database.game_exists(game_info["gameId"]):
             logger.warning(
                 "We triggered end of game stuff again... Strange!"
             )
@@ -178,3 +173,11 @@ class LoLGameMonitor(GameMonitor):
         game_info["player_ranks"] = player_ranks
 
         return game_info, status_code
+
+    def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
+        post_game_data = super().handle_game_over(game_info, status_code, guild_id)
+
+        if post_game_data is not None and lan.is_lan_ongoing(time(), guild_id):
+            lan.update_bingo_progress(self.game_database, post_game_data)
+
+        return post_game_data

@@ -26,7 +26,7 @@ def get_intfar_relations_data(disc_id, database):
         "func", "get_discord_avatar", [x[0] for x in relations_data]
     )
     avatars = [
-        flask.url_for("static", filename=avatar.replace("app/static/", ""))
+        flask.url_for("static", _external=True, filename=avatar.replace("app/static/", ""))
         for avatar in avatars
     ]
     nicknames = discord_request(
@@ -89,7 +89,7 @@ def get_doinks_relations_data(disc_id, database):
         "func", "get_discord_avatar", [x[0] for x in relations_data]
     )
     avatars = [
-        flask.url_for("static", filename=avatar.replace("app/static/", ""))
+        flask.url_for("static", _external=True, filename=avatar.replace("app/static/", ""))
         for avatar in avatars
     ]
     nicknames = discord_request(
@@ -331,7 +331,7 @@ def user(disc_id):
     nickname = discord_data[0]
     avatar = discord_data[1]
     if avatar is not None:
-        avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
+        avatar = flask.url_for("static", _external=True, filename=avatar.replace("app/static/", ""))
 
     with game_database:
         intfar_data = get_intfar_data(game, disc_id, game_database)

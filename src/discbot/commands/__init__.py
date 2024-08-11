@@ -20,9 +20,10 @@ class CommandParsingError(Exception):
     pass
 
 class TargetParam:
-    def __init__(self, name, default="me", end_index=None):
+    def __init__(self, name, default="me", return_val: str = "disc_id", end_index=None):
         self.name = name
         self.default = default
+        self.return_val = return_val
         self.end_index = end_index
 
     def extract_target_name(self, cmd_input, start_index, end_index):

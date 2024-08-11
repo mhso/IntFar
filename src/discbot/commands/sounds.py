@@ -84,7 +84,7 @@ async def handle_play_sound_msg(client, message, sound):
 
     if success and client.audio_handler.is_valid_sound(sound):
         client.meta_database.add_sound_hit(sound, datetime.now())
-    else:
+    elif status is not None:
         await message.channel.send(client.insert_emotes(status))
 
 async def handle_seek_sound_msg(client, message, time_str):

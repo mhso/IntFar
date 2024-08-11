@@ -74,7 +74,7 @@ class TestWrapper(TestRunner):
             filtered_stats, intfar, intfar_reason, doinks, guild_id
         )
 
-        best_records, worst_records = database.record_stats(
+        best_records, worst_records = database.save_stats(
             intfar, intfar_reason, doinks,
             game_id, filtered_stats,
             users_in_game, guild_id

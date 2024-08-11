@@ -1,6 +1,6 @@
 from datetime import datetime
 from api import config, meta_database
-from api.util import TimeZone, MONTH_NAMES
+from api.util import MONTH_NAMES
 
 class MonthlyIntfar:
     """
@@ -8,8 +8,7 @@ class MonthlyIntfar:
     """
 
     def __init__(self, hour_of_announce):
-        self.cph_timezone = TimeZone()
-        current_time = datetime.now(self.cph_timezone)
+        current_time = datetime.now()
         current_month = current_time.month
         next_month = 1 if current_month == 12 else current_month + 1
         next_year = current_time.year if next_month != 1 else current_time.year + 1
@@ -24,7 +23,7 @@ class MonthlyIntfar:
         )
         year_to_announce = current_time.year if month_to_announce == current_month else next_year
         self.time_at_announcement = current_time.replace(
-            year_to_announce, month_to_announce, 1, hour_of_announce, 0, 0, 0, self.cph_timezone
+            year_to_announce, month_to_announce, 1, hour_of_announce, 0, 0, 0
         )
 
         # Games for which we shouldn't announce IFOTM (yet)
@@ -32,9 +31,9 @@ class MonthlyIntfar:
 
     def should_announce(self):
         """
-        Get seconds left until announcement time (first of the month at 14:00).
+        Get seconds left until announcement time (first of the month at 12:00).
         """
-        return self.time_at_announcement < datetime.now(self.cph_timezone)
+        return self.time_at_announcement < datetime.now()
 
     def get_pct_desc(self, games, intfars, pct):
         return f"**{pct:.2f}%** ({intfars}/{games})"

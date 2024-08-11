@@ -6,7 +6,7 @@
         <div id="contestant-lobby-wrapper">
             <h1>Velkommen til Jeopardy!</h1>
 
-            <form action="{{ url_for('jeopardy_contestant.join_lobby') }}" method="post">
+            <form action="{{ url_for('jeopardy_contestant.join_lobby', _external=True) }}" method="post">
                 <img id="contestant-lobby-avatar" src="{{ avatar }}">
                 <input id="contestant-lobby-name" name="name" required value="{{ player_name }}" maxlength="10" placeholder="Dit Navn">
                 <input id="contestant-lobby-color" name="color" type="color">

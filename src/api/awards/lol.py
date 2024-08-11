@@ -156,13 +156,6 @@ class LoLAwardQualifiers(AwardQualifiers):
         ]
 
     @classmethod
-    def GAME_SPECIFIC_FLAVORS(cls):
-        super().__doc__
-        flavors = dict(super().GAME_SPECIFIC_FLAVORS()) 
-        flavors["timeline"] = cls.TIMELINE_FLAVOR_TEXTS()
-        return flavors
-
-    @classmethod
     def ALL_FLAVOR_TEXTS(cls):
         """
         Get a list of filenames for all flavor texts for LoL.
@@ -373,61 +366,6 @@ class LoLAwardQualifiers(AwardQualifiers):
 
         return cool_stats
 
-    def _get_line_coeficient(self, p_1, p_2, x, y):
-        slope = (p_2[1] - p_1[1]) / (p_2[0] - p_1[0])
-        intercept = (slope * p_1[0] - p_1[1]) * -1
-
-        return slope * x + intercept - y
-
-    def _is_event_on_our_side(self, x, y):
-        if x < y: # Top side
-            redside_p1 = (2420, 13000)
-            redside_p2 = (9026, 8101)
-            blueside_p1 = (1273, 12141)
-            blueside_p2 = (7861, 7398)
-        else: # Bottom side
-            redside_p1 = (9026, 8101)
-            redside_p2 = (15865, 3546)
-            blueside_p1 = (7861, 7398)
-            blueside_p2 = (15077, 1922)
-
-        blue_side = self.parsed_game_stats.team_id == 100
-
-        if blue_side: # Blue side
-            p_1 = blueside_p1
-            p_2 = blueside_p2
-        else: # Red side
-            p_1 = redside_p1
-            p_2 = redside_p2
-
-        coef = self._get_line_coeficient(p_1, p_2, x, y)
-
-        if blue_side:
-            return coef > 0
-
-        return coef < 0
-
-    def _is_event_in_fountain(self, x, y):
-        blueside_p1 = (2920, 7680)
-        blueside_p2 = (6720, 4160)
-        redside_p1 = (34240, 33600)
-        redside_p2 = (38120, 30920)
-
-        blue_side = self.parsed_game_stats.team_id == 100
-        if blue_side:
-            p_1 = blueside_p1
-            p_2 = blueside_p2
-        else:
-            p_1 = redside_p1
-            p_2 = redside_p2
-
-        coef = self._get_line_coeficient(p_1, p_2, x, y)
-
-        if blue_side:
-            return coef > 0
-
-        return coef < 0
-
     def get_cool_timeline_events(self):
         """
         Returns a list of cool/embarrasing events that happened during the course of the game.
@@ -437,152 +375,30 @@ class LoLAwardQualifiers(AwardQualifiers):
             - Someone had more than 4000 gold at one point
             - Someone stole a pentakill from someone else
         """
-        timeline_data = self.parsed_game_stats.get_filtered_timeline_stats(self.parsed_game_stats.timeline_data)
-
-        # Dictionary that maps from participantId to disc_id
-        participant_dict = {
-            entry["participantId"]: timeline_data["puuid_map"].get(entry["puuid"])
-            for entry in timeline_data["participants"]
-        }
-
         timeline_events = []
-
-        biggest_gold_lead = 0
-        biggest_gold_deficit = 0
-        too_much_gold = {}
         game_win = self.parsed_game_stats.win == 1
-        any_quadrakills = any(
-            player_stats.quadrakills > 0
-            for player_stats in self.parsed_game_stats.filtered_player_stats
-        )
-        curr_multikill = {}
-        stolen_penta_victims = {}
-        stolen_penta_scrubs = {}
-        people_forgetting_items = []
-        invade_kills = 0
-        anti_invade_kills = 0
-        invade_victims = 0
-        anti_invade_victims = 0
 
-        # Calculate stats from timeline frames.
-        for frame_data in timeline_data["frames"]:
-            # Tally up our and ememy teams total gold during the game.
-            our_total_gold = 0
-            enemy_total_gold = 0
-
-            for participant_id in frame_data["participantFrames"]:
-                participant_data = frame_data["participantFrames"][participant_id]
-                disc_id = participant_dict.get(int(participant_id))
-                total_gold = participant_data["totalGold"]
-                curr_gold = participant_data["currentGold"]
-                our_team = (int(participant_id) > 5) ^ timeline_data["ourTeamLower"]
-
-                # Add players gold to total for their team.
-                if our_team:
-                    our_total_gold += total_gold
-                else:
-                    enemy_total_gold += total_gold
-
-                if disc_id is None:
-                    continue
-
-                if (
-                    curr_gold > self.config.timeline_min_curr_gold
-                    and total_gold < self.config.timeline_min_total_gold
-                ):
-                    # Player has enough current gold to warrant a mention.
-                    # If this amount of gold is more than their previous max, save it.
-                    curr_value_for_player = too_much_gold.get(disc_id, 0)
-                    too_much_gold[disc_id] = max(curr_gold, curr_value_for_player)
-
-            gold_diff = our_total_gold - enemy_total_gold
-            if gold_diff < 0: # Record max gold deficit during the game.
-                biggest_gold_deficit = max(abs(gold_diff), biggest_gold_deficit) 
-            else: # Record max gold lead during the game.
-                biggest_gold_lead = max(gold_diff, biggest_gold_lead)
-
-            if any_quadrakills:
-                for disc_id in curr_multikill:
-                    if frame_data["timestamp"] - curr_multikill[disc_id]["timestamp"] > 10_000: # 10 secs
-                        curr_multikill[disc_id]["streak"] = 0
-
-                # Keep track of multikills for each player
-                for event in frame_data.get("events", []):
-                    if event["type"] != "CHAMPION_KILL":
-                        continue
-
-                    disc_id = participant_dict.get(int(event["killerId"]))
-                    if disc_id is None:
-                        continue
-
-                    if disc_id not in curr_multikill:
-                        curr_multikill[disc_id] = {"streak": 0, "timestamp": 0}
-
-                    curr_multikill[disc_id]["streak"] += 1
-                    curr_multikill[disc_id]["timestamp"] = event["timestamp"]
-
-                # Check if someone stole a penta from someone else
-                people_with_quadras = list(filter(lambda x: x[1]["streak"] == 4, curr_multikill.items()))
-
-                if people_with_quadras != []:
-                    person_with_quadra, streak_dict = people_with_quadras[0]
-                    for disc_id in curr_multikill:
-                        if disc_id != person_with_quadra and curr_multikill[disc_id]["timestamp"] > streak_dict["timestamp"]:
-                            stolen_penta_scrubs[disc_id] = stolen_penta_scrubs.get(disc_id, 0) + 1
-                            victim_list = stolen_penta_victims.get(disc_id, [])
-                            victim_list.append(person_with_quadra)
-                            stolen_penta_victims[disc_id] = victim_list
-
-            if 10_000 < frame_data["timestamp"] < 70_000:
-                # Check whether someone left the fountain without buying items
-                people_buying_items = set()
-                for event in frame_data.get("events", []):
-                    if event["type"] == "ITEM_PURCHASED":
-                        people_buying_items.add(event["participantId"])
-
-                people_with_no_items = set(int(participant_id) for participant_id in frame_data["participantFrames"]) - people_buying_items
-    
-                for participant_id in people_with_no_items:
-                    part_frame = frame_data["participantFrames"][str(participant_id)]
-                    x = part_frame["position"]["x"]
-                    y = part_frame["position"]["y"]
-                    if not self._is_event_in_fountain(x, y) and (disc_id := participant_dict.get(participant_id)) is not None:
-                        people_forgetting_items.append(disc_id)
-
-            if frame_data["timestamp"] < 130_000:
-                # Check whether we invaded at the start of the game
-                # and either got kills or got killed
-                for event in frame_data.get("events", []):
-                    if event["type"] != "CHAMPION_KILL":
-                        continue
-
-                    our_kill = (int(event["victimId"]) <= 5) ^ timeline_data["ourTeamLower"]
-                    x = event["position"]["x"]
-                    y = event["position"]["y"]
-
-                    if self._is_event_on_our_side(x, y):
-                        if our_kill:
-                            logger.bind(event="lol_invade_pos").info(f"Our kill on our side at {x}, {y}")
-                            anti_invade_kills += 1
-                        else:
-                            logger.bind(event="lol_invade_pos").info(f"Their kill on our side at {x}, {y}")
-                            anti_invade_victims += 1
-                    else:
-                        if our_kill:
-                            logger.bind(event="lol_invade_pos").info(f"Our kill on their side at {x}, {y}")
-                            invade_kills += 1
-                        else:
-                            logger.bind(event="lol_invade_pos").info(f"Their kill on their side at {x}, {y}")
-                            invade_victims += 1
-
+        # Max gold lead and deficit
+        biggest_gold_lead = self.parsed_game_stats.timeline_data["biggest_gold_lead"]
+        biggest_gold_deficit = self.parsed_game_stats.timeline_data["biggest_gold_deficit"]
         if biggest_gold_deficit > self.config.timeline_min_deficit and game_win: # Epic comeback!
             timeline_events.append((0, biggest_gold_deficit, None))
         elif biggest_gold_lead > self.config.timeline_min_lead and not game_win: # Huge throw...
             timeline_events.append((1, biggest_gold_lead, None))
 
-        for disc_id in too_much_gold:
-            timeline_events.append((2, too_much_gold[disc_id], disc_id))
+        # Max current gold for player
+        max_curr_gold = self.parsed_game_stats.timeline_data["max_current_gold"]
+        player_total_gold = self.parsed_game_stats.timeline_data["player_total_gold"]
+        for disc_id in max_curr_gold:
+            if (
+                max_curr_gold[disc_id] > self.config.timeline_min_curr_gold
+                and player_total_gold[disc_id] < self.config.timeline_min_total_gold
+            ):
+                timeline_events.append((2, max_curr_gold[disc_id], disc_id))
 
+        # Stolen pentakills
+        stolen_penta_scrubs = self.parsed_game_stats.timeline_data["stolen_penta_scrubs"]
+        stolen_penta_victims = self.parsed_game_stats.timeline_data["stolen_penta_victims"]
         for disc_id in stolen_penta_scrubs:
             pentakills = "pentakill" if stolen_penta_scrubs[disc_id] == 1 else "pentakills"
             victim_summ_names = []
@@ -597,8 +413,16 @@ class LoLAwardQualifiers(AwardQualifiers):
     
             timeline_events.append((3, desc, disc_id))
 
+        # People forgetting to buy items at the start of the game
+        people_forgetting_items = self.parsed_game_stats.timeline_data["people_forgetting_items"]
         for disc_id in people_forgetting_items:
             timeline_events.append((4, None, disc_id))
+
+        # Invade kills and deaths
+        invade_kills = self.parsed_game_stats.timeline_data["invade_kills"]
+        anti_invade_kills = self.parsed_game_stats.timeline_data["anti_invade_kills"]
+        invade_victims = self.parsed_game_stats.timeline_data["invade_victims"]
+        anti_invade_victims = self.parsed_game_stats.timeline_data["anti_invade_victims"]
 
         invade_most_relevant = invade_kills + invade_victims > anti_invade_kills + anti_invade_victims
 

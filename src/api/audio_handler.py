@@ -2,12 +2,13 @@ import asyncio
 import math
 from datetime import datetime
 
+import Levenshtein
 from discord import PCMVolumeTransformer
 from discord.player import FFmpegPCMAudio
 
 from streamscape import Streamscape
 from streamscape.sites import SITES
-from streamscape.errors import StreamCreationError
+from streamscape.errors import StreamCreationError, InvalidSiteError, InvalidURLError
 from streamscape.stream import AudioStream
 from mhooge_flask.logging import logger
 
@@ -49,11 +50,17 @@ class ClosableFFmpegPCMAudio(FFmpegPCMAudio):
     """
     def __init__(self, source, *, executable = 'ffmpeg', pipe = False, stderr = None, before_options = None, options = None):
         self.error = None
-        super().__init__(source, executable=executable, pipe=pipe, stderr=stderr, before_options=before_options, options=options)
+        super().__init__(
+            source,
+            executable=executable,
+            pipe=pipe,
+            stderr=stderr,
+            before_options=before_options,
+            options=options
+        )
 
     def _pipe_writer(self, source):
         def close_callback(err_msg=None):
-            print("KILLING STREAM THROUGH CALLBACK!")
             self.error = err_msg
             self._kill_process()
 
@@ -63,7 +70,6 @@ class ClosableFFmpegPCMAudio(FFmpegPCMAudio):
             # arbitrarily large read size
             data = source.read(-1)
             if not data and self._process.returncode is not None:
-                print("PIPE PROCESS DED:", self._process.returncode)
                 return
             try:
                 if self._stdin is not None:
@@ -251,20 +257,32 @@ class AudioHandler:
                     pass
 
             # Check if 'sound' is a URL to a valid website
-            is_valid_url, url = self.stream_handler.validate_url(sound)
-            if is_valid_url:
-                validated_sounds.append((url, message, "url"))
+            try:
+                url = self.stream_handler.validate_url(sound)
 
-            else:
-                valid_sites = ", ".join(f"{site}.com" for site in SITES)
-                err_msg = (
-                    f"Can't play sound `{sound}`. " +
-                    f"Either provide a link to one of `{valid_sites}` or the name of a sound.\n"
-                    "Use `!sounds` for a list of available sounds.\n"
-                    "Use `!search` to search for a video on YouTube."
-                )
+            except InvalidSiteError:
+                err_msg = f"Connection timed out when trying to connect to `{sound}`, try again later."
                 if len(sounds) == 1:
                     return False, err_msg
+
+            except InvalidURLError:
+                if len(sounds) == 1:
+                    # Check if given sound closely matches an actual sound
+                    sound_match = self.get_closing_matching_sound(sound)
+                    if sound_match is not None:
+                        err_msg = f"Can't play sound `{sound}`, did you mean `{sound_match}`?"
+                    else:
+                        valid_sites = ", ".join(f"{site}.com" for site in SITES)
+                        err_msg = (
+                            f"Can't play sound `{sound}`. " +
+                            f"Either provide a link to one of `{valid_sites}` or the name of a sound.\n"
+                            "Use `!sounds` for a list of available sounds.\n"
+                            "Use `!search` to search for a video on YouTube."
+                        )
+
+                    return False, err_msg
+
+            validated_sounds.append((url, message, "url"))
 
         if voice_state is None: # Check if user is in a voice channel.
             err_msg = (
@@ -280,10 +298,10 @@ class AudioHandler:
                     if self.voice_streams.get(guild_id) is not None:
                         response = f"Adding sound to the queue..."
                     else:
-                        hosts = ["youtube", "soundcloud"]
+                        hosts = ["YouTube", "Soundcloud", "Suno"]
                         hostname = None
                         for host in hosts:
-                            if host in sound:
+                            if host.lower() in sound:
                                 hostname = host
                                 break
 
@@ -454,6 +472,17 @@ class AudioHandler:
 
     def is_valid_sound(self, sound):
         return self.meta_database.is_valid_sound(sound)
+
+    def get_closing_matching_sound(self, sound_like):
+        closest_match = None
+        closest_match_distance = 8
+        for sound in self.get_sounds():
+            distance = Levenshtein.distance(sound_like, sound[0])
+            if distance < closest_match_distance:
+                closest_match = sound[0]
+                closest_match_distance = distance
+
+        return closest_match
 
     def get_youtube_suggestions(self, search_term, message):
         success, suggestions = self.youtube_api.query(search_term)

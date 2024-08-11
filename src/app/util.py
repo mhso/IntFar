@@ -225,7 +225,7 @@ def get_user_details():
         logged_in_name = discord_data[0]
         avatar = discord_data[1]
         if avatar is not None:
-            logged_in_avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
+            logged_in_avatar = flask.url_for("static", _external=True, filename=avatar.replace("app/static/", ""))
 
         flask.current_app.config["LOGGED_IN_USERS"][logged_in_user] = (logged_in_name, logged_in_avatar)
 

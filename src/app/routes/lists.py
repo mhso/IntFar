@@ -13,7 +13,7 @@ def home(error_msg=None, status=200):
     list_data = []
     for list_id, owner_id, list_name, list_count in lists:
         user_data = discord_request("func", ["get_discord_nick", "get_discord_avatar"],  owner_id)
-        avatar = flask.url_for("static", filename=user_data[1].replace("app/static/", ""))
+        avatar = flask.url_for("static", _external=True, filename=user_data[1].replace("app/static/", ""))
         count_fmt = str(list_count) + (" champion" if list_count == 1 else " champions")
         list_data.append((list_id, list_name, owner_id, user_data[0], avatar, count_fmt))
 
@@ -34,7 +34,7 @@ def create():
     if not success:
         return home(f"List could not be created: {response}.", 400)
 
-    return flask.redirect(flask.url_for("lists.home"))
+    return flask.redirect(flask.url_for("lists.home", _external=True))
 
 def order_list_items(items): # Sort items alphabetically.
     items.sort(key=lambda x: x[1])
@@ -63,6 +63,7 @@ def list_view(list_id, error_msg=None, status=200):
             item_id, riot_api.get_champ_name(champ_id),
             flask.url_for(
                 "static",
+                _external=True,
                 filename=riot_api.get_champ_portrait_path(champ_id).replace("app/static/", "")
             )
         ) for item_id, champ_id in list_items
@@ -138,7 +139,7 @@ def add_item(list_id):
     if not success:
         return list_view(list_id, f"Could not add champion to list: {response}", 400)
 
-    return flask.redirect(flask.url_for("lists.list_view", list_id=list_id))
+    return flask.redirect(flask.url_for("lists.list_view", _external=True, list_id=list_id))
 
 @lists_page.route("/<item_id>/delete_item", methods=["POST"])
 def delete_item(item_id):

@@ -1,11 +1,13 @@
+import bz2
+import inspect
 import json
 import argparse
-from time import sleep
 from glob import glob
 from datetime import datetime
+import os
 
 from dateutil.relativedelta import relativedelta
-from api.lan import LAN_PARTIES
+from api.lan import LAN_PARTIES, insert_bingo_challenges
 
 from app.routes.soundboard import normalize_sound_volume
 from api import award_qualifiers, config, util
@@ -18,6 +20,7 @@ from api.game_apis.lol import RiotAPIClient
 from api.game_apis.cs2 import SteamAPIClient
 from discbot.commands.util import ADMIN_DISC_ID
 from discbot.discord_bot import DiscordClient
+from api.data_schema import generate_schema
 
 class TestFuncs:
     def __init__(self, config, meta_database: MetaDatabase, game_databases: dict[str, GameDatabase], riot_api):
@@ -218,7 +221,7 @@ class TestFuncs:
 
     def test_cs_parse(self):
         self.config.steam_2fa_code = input("Steam 2FA Code: ")
-        sharecode = "CSGO-rCDRM-HfoZB-UrbG2-xkiNo-us68F"
+        sharecode = "CSGO-arbVk-zLoYq-qwbCh-dekfW-MvNUD"
         api_client = SteamAPIClient("cs2", self.config)
 
         game_stats = api_client.get_game_details(sharecode)
@@ -331,38 +334,62 @@ class TestFuncs:
     
         print(f"{self.riot_api.get_playable_name(max_kda_champ)}: {max_kda} ({total_games} games)")
 
-    def test_add_lol_ranks(self):
-        query_select = "SELECT MAX(game_id) FROM participants WHERE player_id = ?"
-        query_update = "UPDATE participants SET rank_solo=?, rank_flex=? WHERE game_id=? AND player_id=?"
-        with self.game_databases["lol"] as db:
-            for disc_id in db.game_users.keys():
+    def test_download_missing_demos(self):
+        url = "http://replay388.valve.net/730/003689856650815996193_1093172339.dem.bz2"
+        file = self.config.resources_folder + "/data/test_demo"
+        steam_api = SteamAPIClient("cs2", self.config)
 
-                for summ_id, summ_name in zip(db.game_users[disc_id].player_id, db.game_users[disc_id].player_name):
-                    latest_game_id = db.execute_query(query_select, summ_id).fetchone()
-                    if latest_game_id is None:
-                        continue
+        filename = steam_api.download_demo_file(file, url)
+        with open(filename + ".dem.bz2", "rb") as fp:
+            all_bytes = fp.read()
 
-                    rank_info = self.riot_api.get_player_rank(summ_id)
+        # Decompress the gz2 compressed demo file
+        decompressed = bz2.decompress(all_bytes)
+        with open(filename + ".dem", "wb") as fp:
+            fp.write(decompressed)
 
-                    solo_rank = None
-                    flex_rank = None
-                    for queue_info in rank_info:
-                        if queue_info["queueType"] in ("RANKED_SOLO_SR", "RANKED_FLEX_SR"):
-                            division = queue_info["tier"].lower()
-                            tier = queue_info["rank"]
-                            points = queue_info["leaguePoints"]
-                            rank = f"{division}_{tier}_{points}"
+        os.remove(filename + ".dem.bz2")
 
-                            if queue_info["queueType"] == "RANKED_SOLO_SR":
-                                solo_rank = rank
-                            else:
-                                flex_rank = rank
+        print(f"Downloaded demo to {filename}.dem")
 
-                    db.execute_query(query_update, solo_rank, flex_rank, latest_game_id[0], summ_id)
-                    print(f"Saved ranks for {summ_name}: {solo_rank}, {flex_rank}")
+    def awpy2(self):
+        from awpy.demo import Demo
 
-                    sleep(1.5)
+        file = self.config.resources_folder + "/data/cs2/CSGO-arbVk-zLoYq-qwbCh-dekfW-MvNUD.dem"
 
+        demo = Demo(file)
+        print(demo.rounds)
+
+    def demoparser2(self):
+        from demoparser2 import DemoParser
+        file = self.config.resources_folder + "/data/cs2/CSGO-2COpV-NpZRW-tehjm-Bd3QK-cwa3K.dem"
+
+        parser = DemoParser(file)
+        event_df = parser.parse_event("player_death", player=["X", "Y"], other=["total_rounds_played"])
+        ticks_df = parser.parse_ticks(["X", "Y"])
+
+        print(event_df.head())
+
+    def test_generate_schema(self):
+        game = "lol"
+        in_file = f"{self.config.resources_folder}/data/game_6950463351.json"
+        filename = "game_data.json"
+        with open(in_file, "r", encoding="utf-8") as fp:
+            data = json.load(fp)
+            generate_schema(data, filename, game, self.config)
+
+    def test_synthetic_data(self):
+        from api.game_data.lol import LoLGameStats
+        argspec = inspect.getfullargspec(LoLGameStats.__init__)
+
+        args = argspec[0]
+        annotations = argspec[-1]
+        mandatory_args = args[1:-len(argspec[3])]
+        for arg in mandatory_args:
+            print(f"{arg}: {annotations[arg].__name__}")
+
+    def insert_bingo_challenges(self):
+        insert_bingo_challenges(self.game_databases["lol"])
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
@@ -374,14 +401,13 @@ if __name__ == "__main__":
 
     TEST_RUNNER = TestFuncs(CONFIG, META_DATABASE, GAME_DATABASES, RIOT_API)
     FUNCS = [
-        func.replace("test_", "")
-        for func in TEST_RUNNER.__dir__() if func.startswith("test_")
+        func
+        for func in TEST_RUNNER.__dir__()
+        if not func.startswith("_") and callable(getattr(TEST_RUNNER, func))
     ]
 
     PARSER.add_argument("func", choices=FUNCS)
 
     ARGS = PARSER.parse_args()
 
-    FUNC_TO_RUN = TEST_RUNNER.__getattribute__(f"test_{ARGS.func}")
-
-    FUNC_TO_RUN()
+    getattr(TEST_RUNNER, ARGS.func)()

@@ -13,6 +13,19 @@ _ROLE_MAP = {
     "BOTTOM": "adc"
 }
 
+_RANKS = [
+    "iron",
+    "bronze",
+    "silver",
+    "gold",
+    "platinum",
+    "emerald",
+    "diamond",
+    "master",
+    "grandmaster",
+    "challenger"
+]
+
 @dataclass
 class LoLPlayerStats(PlayerStats):
     champ_id: int = None
@@ -35,6 +48,7 @@ class LoLPlayerStats(PlayerStats):
     total_time_dead: int = None
     turret_kills: int = None
     inhibitor_kills: int = None
+    challenges: dict = None
 
     @classmethod
     def stats_to_save(cls):
@@ -71,7 +85,7 @@ class LoLPlayerStats(PlayerStats):
     @classmethod
     def formatted_stat_names(cls):
         formatted = dict(super().formatted_stat_names())
-        for stat in cls.stat_quantity_desc():
+        for stat in cls.stats_to_save():
             if stat in formatted or stat == "champ_id":
                 continue
 
@@ -79,6 +93,10 @@ class LoLPlayerStats(PlayerStats):
                 fmt_stat = stat.upper()
             elif stat == "cs_per_min":
                 fmt_stat = "CS Per Min"
+            elif stat == "rank_solo":
+                fmt_stat = "Solo/Duo"
+            elif stat == "rank_flex":
+                fmt_stat = "Flex"
             else:
                 fmt_stat = " ".join(map(lambda s: s.capitalize(), stat.split("_")))
 
@@ -117,11 +135,71 @@ class LoLGameStats(GameStats):
     enemy_herald_kills: int = None
     timeline_data: dict = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.timeline_data is not None:
+            self.timeline_data = self.get_filtered_timeline_stats()
+
     @classmethod
     def stats_to_save(cls):
         return super().stats_to_save() + ["first_blood"]
 
-    def get_filtered_timeline_stats(self, timeline_data: dict):
+    def _get_line_coeficient(self, p_1, p_2, x, y):
+        slope = (p_2[1] - p_1[1]) / (p_2[0] - p_1[0])
+        intercept = (slope * p_1[0] - p_1[1]) * -1
+
+        return slope * x + intercept - y
+
+    def _is_event_in_fountain(self, x, y):
+        blueside_p1 = (2920, 7680)
+        blueside_p2 = (6720, 4160)
+        redside_p1 = (34240, 33600)
+        redside_p2 = (38120, 30920)
+
+        blue_side = self.team_id == 100
+        if blue_side:
+            p_1 = blueside_p1
+            p_2 = blueside_p2
+        else:
+            p_1 = redside_p1
+            p_2 = redside_p2
+
+        coef = self._get_line_coeficient(p_1, p_2, x, y)
+
+        if blue_side:
+            return coef > 0
+
+        return coef < 0
+
+    def _is_event_on_our_side(self, x, y):
+        if x < y: # Top side
+            redside_p1 = (2420, 13000)
+            redside_p2 = (9026, 8101)
+            blueside_p1 = (1273, 12141)
+            blueside_p2 = (7861, 7398)
+        else: # Bottom side
+            redside_p1 = (9026, 8101)
+            redside_p2 = (15865, 3546)
+            blueside_p1 = (7861, 7398)
+            blueside_p2 = (15077, 1922)
+
+        blue_side = self.team_id == 100
+
+        if blue_side: # Blue side
+            p_1 = blueside_p1
+            p_2 = blueside_p2
+        else: # Red side
+            p_1 = redside_p1
+            p_2 = redside_p2
+
+        coef = self._get_line_coeficient(p_1, p_2, x, y)
+
+        if blue_side:
+            return coef > 0
+
+        return coef < 0
+
+    def get_filtered_timeline_stats(self):
         """
         Get interesting timeline related data. This pertains to data that
         changes during the game, such as maximum gold deficit/lead of a team
@@ -132,16 +210,156 @@ class LoLGameStats(GameStats):
         our_team_lower = True
 
         for stats in self.filtered_player_stats:
-            for participant_data in timeline_data["participants"]:
+            for participant_data in self.timeline_data["participants"]:
                 if participant_data["puuid"] == stats.puuid:
                     our_team_lower = participant_data["participantId"] <= 5
                     puuid_map[stats.puuid] = stats.disc_id
                     break
 
-        timeline_data["puuid_map"] = puuid_map
-        timeline_data["ourTeamLower"] = our_team_lower
+        self.timeline_data["puuid_map"] = puuid_map
+        self.timeline_data["ourTeamLower"] = our_team_lower
 
-        return timeline_data
+        participant_dict = {
+            entry["participantId"]: self.timeline_data["puuid_map"].get(entry["puuid"])
+            for entry in self.timeline_data["participants"]
+        }
+
+        biggest_gold_lead = 0
+        biggest_gold_deficit = 0
+        max_current_gold = {}
+        player_total_gold = {}
+        any_quadrakills = any(
+            player_stats.quadrakills > 0
+            for player_stats in self.filtered_player_stats
+        )
+        curr_multikill = {}
+        stolen_penta_victims = {}
+        stolen_penta_scrubs = {}
+        people_forgetting_items = []
+        invade_kills = 0
+        anti_invade_kills = 0
+        invade_victims = 0
+        anti_invade_victims = 0
+
+        # Calculate stats from timeline frames.
+        for frame_data in self.timeline_data["frames"]:
+            # Tally up our and ememy teams total gold during the game.
+            our_total_gold = 0
+            enemy_total_gold = 0
+
+            for participant_id in frame_data["participantFrames"]:
+                participant_data = frame_data["participantFrames"][participant_id]
+                disc_id = participant_dict.get(int(participant_id))
+                total_gold = participant_data["totalGold"]
+                curr_gold = participant_data["currentGold"]
+                our_team = (int(participant_id) > 5) ^ self.timeline_data["ourTeamLower"]
+
+                # Add players gold to total for their team.
+                if our_team:
+                    our_total_gold += total_gold
+                else:
+                    enemy_total_gold += total_gold
+
+                if disc_id is None:
+                    continue
+
+                # Save the current max gold for the player
+                curr_value_for_player = max_current_gold.get(disc_id, 0)
+                max_current_gold[disc_id] = max(curr_gold, curr_value_for_player)
+                player_total_gold[disc_id] = total_gold
+
+            gold_diff = our_total_gold - enemy_total_gold
+            if gold_diff < 0: # Record max gold deficit during the game.
+                biggest_gold_deficit = max(abs(gold_diff), biggest_gold_deficit) 
+            else: # Record max gold lead during the game.
+                biggest_gold_lead = max(gold_diff, biggest_gold_lead)
+
+            if any_quadrakills:
+                for disc_id in curr_multikill:
+                    if frame_data["timestamp"] - curr_multikill[disc_id]["timestamp"] > 10_000: # 10 secs
+                        curr_multikill[disc_id]["streak"] = 0
+
+                # Keep track of multikills for each player
+                for event in frame_data.get("events", []):
+                    if event["type"] != "CHAMPION_KILL":
+                        continue
+
+                    disc_id = participant_dict.get(int(event["killerId"]))
+                    if disc_id is None:
+                        continue
+
+                    if disc_id not in curr_multikill:
+                        curr_multikill[disc_id] = {"streak": 0, "timestamp": 0}
+
+                    curr_multikill[disc_id]["streak"] += 1
+                    curr_multikill[disc_id]["timestamp"] = event["timestamp"]
+
+                # Check if someone stole a penta from someone else
+                people_with_quadras = list(filter(lambda x: x[1]["streak"] == 4, curr_multikill.items()))
+
+                if people_with_quadras != []:
+                    person_with_quadra, streak_dict = people_with_quadras[0]
+                    for disc_id in curr_multikill:
+                        if disc_id != person_with_quadra and curr_multikill[disc_id]["timestamp"] > streak_dict["timestamp"]:
+                            stolen_penta_scrubs[disc_id] = stolen_penta_scrubs.get(disc_id, 0) + 1
+                            victim_list = stolen_penta_victims.get(disc_id, [])
+                            victim_list.append(person_with_quadra)
+                            stolen_penta_victims[disc_id] = victim_list
+
+            if 10_000 < frame_data["timestamp"] < 70_000:
+                # Check whether someone left the fountain without buying items
+                people_buying_items = set()
+                for event in frame_data.get("events", []):
+                    if event["type"] == "ITEM_PURCHASED":
+                        people_buying_items.add(event["participantId"])
+
+                people_with_no_items = set(int(participant_id) for participant_id in frame_data["participantFrames"]) - people_buying_items
+    
+                for participant_id in people_with_no_items:
+                    part_frame = frame_data["participantFrames"][str(participant_id)]
+                    x = part_frame["position"]["x"]
+                    y = part_frame["position"]["y"]
+                    if not self._is_event_in_fountain(x, y) and (disc_id := participant_dict.get(participant_id)) is not None:
+                        people_forgetting_items.append(disc_id)
+
+            if frame_data["timestamp"] < 130_000:
+                # Check whether we invaded at the start of the game
+                # and either got kills or got killed
+                for event in frame_data.get("events", []):
+                    if event["type"] != "CHAMPION_KILL":
+                        continue
+
+                    our_kill = (int(event["victimId"]) <= 5) ^ self.timeline_data["ourTeamLower"]
+                    x = event["position"]["x"]
+                    y = event["position"]["y"]
+
+                    if self._is_event_on_our_side(x, y):
+                        if our_kill:
+                            anti_invade_kills += 1
+                        else:
+                            anti_invade_victims += 1
+                    else:
+                        if our_kill:
+                            invade_kills += 1
+                        else:
+                            invade_victims += 1
+
+        # Save all the events to self.timeline_data
+        self.timeline_data.update(
+            biggest_gold_lead=biggest_gold_lead,
+            biggest_gold_deficit=biggest_gold_deficit,
+            max_current_gold=max_current_gold,
+            player_total_gold=player_total_gold,
+            stolen_penta_victims=stolen_penta_victims,
+            stolen_penta_scrubs=stolen_penta_scrubs,
+            people_forgetting_items=people_forgetting_items,
+            invade_kills=invade_kills,
+            anti_invade_kills=anti_invade_kills,
+            invade_victims=invade_victims,
+            anti_invade_victims=anti_invade_victims
+        )
+
+        return self.timeline_data
 
     def get_finished_game_summary(self, disc_id: int):
         """
@@ -249,19 +467,7 @@ class LoLGameStatsParser(GameStatsParser):
                     )
 
                     # Get player rank
-                    solo_rank = None
-                    flex_rank = None
-                    for queue_info in self.raw_data.get("player_ranks", {}).get(player_disc_id, []):
-                        if queue_info["queueType"] in ("RANKED_SOLO_SR", "RANKED_FLEX_SR"):
-                            division = queue_info["tier"].lower()
-                            tier = queue_info["rank"]
-                            points = queue_info["leaguePoints"]
-                            rank = f"{division}_{tier}_{points}"
-
-                            if queue_info["queueType"] == "RANKED_SOLO_SR":
-                                solo_rank = rank
-                            else:
-                                flex_rank = rank
+                    solo_rank, flex_rank = parse_player_rank(self.raw_data.get("player_ranks", {}).get(player_disc_id, []))
 
                     lane = participant["timeline"]["lane"]
                     position = participant["timeline"]["role"]
@@ -357,7 +563,6 @@ class LoLGameStatsParser(GameStatsParser):
             enemy_baron_kills=enemy_baron_kills,
             enemy_dragon_kills=enemy_dragon_kills,
             enemy_herald_kills=enemy_herald_kills,
-            timeline_data=None
         )
 
     def get_relevant_stats(self) -> GameStats:
@@ -404,19 +609,7 @@ class LoLGameStatsParser(GameStatsParser):
                 )
 
                 # Get player rank
-                solo_rank = None
-                flex_rank = None
-                for queue_info in self.raw_data.get("player_ranks", {}).get(player_disc_id, []):
-                    if queue_info["queueType"] in ("RANKED_SOLO_SR", "RANKED_FLEX_SR"):
-                        division = queue_info["tier"].lower()
-                        tier = queue_info["rank"]
-                        points = queue_info["leaguePoints"]
-                        rank = f"{division}_{tier}_{points}"
-
-                        if queue_info["queueType"] == "RANKED_SOLO_SR":
-                            solo_rank = rank
-                        else:
-                            flex_rank = rank
+                solo_rank, flex_rank = parse_player_rank(self.raw_data.get("player_ranks", {}).get(player_disc_id, []))
 
                 stats_for_player = LoLPlayerStats(
                     game_id=self.raw_data["gameId"],
@@ -445,7 +638,8 @@ class LoLGameStatsParser(GameStatsParser):
                     pentakills=participant["pentaKills"],
                     total_time_dead=participant["totalTimeSpentDead"],
                     turret_kills=participant["turretKills"],
-                    inhibitor_kills=participant["inhibitorKills"]
+                    inhibitor_kills=participant["inhibitorKills"],
+                    challenges=participant["challenges"]
                 )
 
                 if participant["firstBloodKill"]:
@@ -537,7 +731,7 @@ class LoLGameStatsParser(GameStatsParser):
                 champ_played = self.api_client.get_champ_name(champ_id)
                 if champ_played is None:
                     champ_played = "Unknown Champ (Rito pls)"
-                
+
                 champions[participant["summonerId"]] = (active_name, champ_played)
 
         game_start = self.raw_data["gameStartTime"] / 1000
@@ -585,3 +779,29 @@ def get_player_stats(data, summ_ids):
                 return participant_data
 
     return None
+
+def parse_player_rank(rank_data):
+    # Get player rank
+    solo_rank = None
+    flex_rank = None
+    for queue_info in rank_data:
+        if queue_info["queueType"] in ("RANKED_SOLO_SR", "RANKED_FLEX_SR"):
+            division = queue_info["tier"].lower()
+            tier = queue_info["rank"]
+            points = queue_info["leaguePoints"]
+            rank = f"{division}_{tier}_{points}"
+
+            if queue_info["queueType"] == "RANKED_SOLO_SR":
+                solo_rank = rank
+            else:
+                flex_rank = rank
+
+    return solo_rank, flex_rank
+
+def get_rank_value(rank: str):
+    if rank is None:
+        return 0
+
+    division, tier, points = rank.split("_")
+    numerals = ["I", "II", "III", "IV", "V"]
+    return (_RANKS.index(division) * 100) + (numerals.index(tier.upper()) * 10) + int(points)

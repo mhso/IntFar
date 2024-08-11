@@ -3,14 +3,14 @@
     {% include 'jeopardy/presenter_head.html' %}
     
     <body>
-        <div id="bg-image" style="background-image: url({{ url_for('static', filename='img/jeopardy/' + bg_image) }});"></div>
+        <div id="bg-image" style="background-image: url({{ url_for('static', _external=True, filename='img/jeopardy/' + bg_image) }});"></div>
 
         <div id="question-wrapper">
             <!-- Logo -->
             {% include 'jeopardy/logo.html' %}
 
             <!-- Category header -->
-            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if jeopardy_round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
+            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if jeopardy_round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', _external=True, filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
 
             {% if daily_double %}
             {% set max_wager = [player_data[player_turn]["score"], 500 * jeopardy_round] | max %}
@@ -27,9 +27,9 @@
             <!-- Question images -->
             {% if "image" in question %}
             <div id="question-question-image-wrapper">
-                <img id="question-question-image" src="{{ url_for('static', filename='img/jeopardy/' + question['image'] ) }}"{% if "height" in question %} style="height: {{ question['height'] }}px"{% endif %}>
+                <img id="question-question-image"{% if "border" in question %} class="image-border"{% endif %} src="{{ url_for('static', _external=True, filename='img/jeopardy/' + question['image'] ) }}" style="height: {{ question['height'] }}px; {% if "border" in question %}border-color: {{ question['border'] }};{% endif %}">
                 {% if "answer_image" in question %}
-                <img id="question-answer-image" src="{{ url_for('static', filename='img/jeopardy/' + question['answer_image'] ) }}" style="height: {{ question['height'] }}px;">
+                <img id="question-answer-image"{% if "border" in question %} class="image-border"{% endif %} src="{{ url_for('static', _external=True, filename='img/jeopardy/' + question['answer_image'] ) }}" style="height: {{ question['height'] }}px; {% if "border" in question %}border-color: {{ question['border'] }};{% endif %}">
                 {% endif %}
             </div>
             {% endif %}
@@ -43,7 +43,7 @@
             {% endif %}
             <div id="question-question-image-wrapper">
                 <video id="question-question-video" style="height: {{ question['height'] }}px;"{% if 'volume' in question %} class="volume-{{ question['volume'] }}"{% endif %}>
-                    <source src="{{ url_for('static', filename='img/jeopardy/' + question['video']) }}" type="video/{{ video_type }}">
+                    <source src="{{ url_for('static', _external=True, filename='img/jeopardy/' + question['video']) }}" type="video/{{ video_type }}">
                 </video>
             </div>
             {% endif %}
@@ -90,12 +90,12 @@
 
             <!-- Correct answer -->
             <div id="question-answer-correct" class="d-none">
-                <div id="question-correct-reason">Korrekt!{% if "explanation" in question %} ({{ question["explanation"] }}){% endif %} <img class="question-result-avatar" src="{{ url_for('static', filename='img/happy_nono.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', filename='img/gbp_coin.png') }}"></div>
+                <div id="question-correct-reason">Korrekt!{% if "explanation" in question %} ({{ question["explanation"] }}){% endif %} <img class="question-result-avatar" src="{{ url_for('static', _external=True, filename='img/happy_nono.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', _external=True, filename='img/gbp_coin.png') }}"></div>
             </div>
 
             <!-- Wrong answer -->
             <div id="question-answer-wrong" class="d-none">
-                <div id="question-wrong-reason"><span id="question-wrong-reason-text"></span> <img class="question-result-avatar" src="{{ url_for('static', filename='img/nat_fine.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', filename='img/gbp_coin.png') }}"></div>
+                <div id="question-wrong-reason"><span id="question-wrong-reason-text"></span> <img class="question-result-avatar" src="{{ url_for('static', _external=True, filename='img/nat_fine.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', _external=True, filename='img/gbp_coin.png') }}"></div>
                 <p id="question-actual-answer" class="d-none">Rigtige svar var <span class="question-emph">'{{ question["answer"] }}'{% if "explanation" in question %} ({{ question["explanation"] }}){% endif %}</span></p>
             </div>
         </div>
@@ -106,22 +106,29 @@
 
     <!-- Buzzer sound -->
     <audio id="question-buzzer-sound">
-        <source src="{{ url_for('static', filename='sounds/buzzer.mp3') }}" type="audio/mpeg">
+        <source src="{{ url_for('static', _external=True, filename='sounds/buzzer.mp3') }}" type="audio/mpeg">
     </audio>
+
+    <!-- Buzz-in sounds for contestants -->
+    {% for disc_id in buzz_sounds %}
+    <audio id="question-buzzer-{{ disc_id }}">
+        <source src="{{ url_for('static', _external=True, filename='img/jeopardy/' + buzz_sounds[disc_id] + '.mp3') }}" type="audio/mpeg">
+    </audio>
+    {% endfor %}
 
     <!-- Correct/wrong answers sounds -->
     {% if jeopardy_round < 3 %}
     <audio id="question-sound-correct">
-        <source src="{{ url_for('static', filename='sounds/' + correct_sound + '.mp3') }}" type="audio/mpeg">
+        <source src="{{ url_for('static', _external=True, filename='sounds/' + correct_sound + '.mp3') }}" type="audio/mpeg">
     </audio>
     {% for sound_file in wrong_sounds %}
     <audio class="question-sound-wrong">
-        <source src="{{ url_for('static', filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
+        <source src="{{ url_for('static', _external=True, filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
     </audio>
     {% endfor %}
     {% else %}
     <audio id="question-finale-suspense" class="volume-7">
-        <source src="{{ url_for('static', filename='img/jeopardy/suspense.mp3') }}" type="audio/mpeg">
+        <source src="{{ url_for('static', _external=True, filename='img/jeopardy/suspense.mp3') }}" type="audio/mpeg">
     </audio>
     {% endif %}
 

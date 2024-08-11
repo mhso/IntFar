@@ -5,7 +5,7 @@ from sqlite3 import Cursor
 from mhooge_flask.database import SQLiteDatabase, DBException, Query
 from mhooge_flask.logging import logger
 
-from api.util import SUPPORTED_GAMES, TimeZone
+from api.util import SUPPORTED_GAMES
 from api.game_data import get_stat_quantity_descriptions
 from api.game_stats import GameStats, get_outlier_stat
 from api.config import Config
@@ -161,7 +161,7 @@ class GameDatabase(SQLiteDatabase):
             self.execute_query(query_1, game_id, commit=False)
             self.execute_query(query_2, game_id)
 
-    def get_delimeter(self, time_after, time_before, guild_id, other_key=None, other_param=None, prefix=None):
+    def get_delimeter(self, time_after, time_before=None, guild_id=None, other_key=None, other_param=None, prefix=None):
         prefix = prefix if prefix is not None else "WHERE"
         delimiter = "" if other_param is None else f" {prefix} {other_key} = ?"
         params = [] if other_param is None else [other_param]
@@ -199,15 +199,17 @@ class GameDatabase(SQLiteDatabase):
                 u.disc_id,
                 p.doinks
             FROM (
-               SELECT MAX(timestamp) AS t
+               SELECT
+                    game_id,
+                    MAX(timestamp) AS t
                FROM games{delim_str}
-            ) sub_1
+            ) latest
             INNER JOIN games AS g
-            ON g.timestamp = sub_1.t
-            INNER participants AS p
-            ON p.game_id = g.game_id
+                ON g.game_id = latest.game_id
+            INNER JOIN participants AS p
+                ON p.game_id = g.game_id
             INNER JOIN users AS u
-            ON u.player_id = p.player_id
+                ON u.player_id = p.player_id
             WHERE p.doinks IS NOT NULL
         """
         with self:
@@ -607,7 +609,7 @@ class GameDatabase(SQLiteDatabase):
             return self.execute_query(query, *params).fetchone()
 
     def get_intfar_count(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
-        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "disc_id", disc_id, "AND")
+        delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "u.disc_id", disc_id, "AND")
 
         query_intfars = f"""
             SELECT SUM(sub.intfars)
@@ -617,12 +619,13 @@ class GameDatabase(SQLiteDatabase):
                     SELECT DISTINCT
                         g.game_id,
                         intfar_id
-                    FROM games AS g
-                    LEFT JOIN users AS u
-                    ON u.disc_id=intfar_id
-                  WHERE
+                FROM games AS g
+                LEFT JOIN users AS u
+                ON u.disc_id=intfar_id
+                WHERE
                     intfar_id IS NOT NULL
-                    AND u.active = 1{delim_str}
+                    AND u.active = 1
+                    {delim_str}
                 ) sub_2
                 GROUP BY sub_2.intfar_id
             ) sub
@@ -793,10 +796,11 @@ class GameDatabase(SQLiteDatabase):
             )
 
     def get_monthly_delimiter(self):
-        tz_cph = TimeZone()
-        curr_time = datetime.now(tz_cph)
+        curr_time = datetime.now()
+
         current_month = curr_time.month
-        if curr_time.day > 1 or curr_time.hour > self.config.hour_of_ifotm_announce:
+
+        if curr_time.day > 1 or curr_time.hour > self.config.hour_of_ifotm_announce + 1:
             # Get Int-Far stats for current month.
             start_of_month = curr_time.replace(day=1, hour=0, minute=0, second=0)
             min_timestamp = int(start_of_month.timestamp())
@@ -812,7 +816,6 @@ class GameDatabase(SQLiteDatabase):
                 0,
                 0,
                 0,
-                tz_cph
             )
             min_timestamp = int(prev_time.timestamp())
 
@@ -1413,7 +1416,7 @@ class GameDatabase(SQLiteDatabase):
 
         return min_stat_id, min_stat, max_stat_id, max_stat, best_ever, best_ever_id, worst_ever, worst_ever_id
 
-    def record_stats(self, parsed_game_stats: GameStats) -> tuple[list[tuple], list[tuple]]:
+    def save_stats(self, parsed_game_stats: GameStats) -> tuple[list[tuple], list[tuple]]:
         """
         Save all the stats in the given GameStats object to the database.
         Also determines whether any stat "records" have been beaten (i.e. whether
@@ -1575,7 +1578,7 @@ class GameDatabase(SQLiteDatabase):
                 {stats_to_select}
             FROM participants AS p
             INNER JOIN games AS g
-            ON g.game_id = p.game_id
+                ON g.game_id = p.game_id
             INNER JOIN users AS u
                 ON u.player_id = p.player_id
             WHERE u.active = 1
@@ -1871,6 +1874,23 @@ class GameDatabase(SQLiteDatabase):
 
         with self:
             return self.execute_query(query).fetchall()
+
+    def get_most_games_in_a_day(self):
+        query = """
+            SELECT timestamp
+            FROM games AS g
+            ORDER BY timestamp ASC
+        """
+
+        with self:
+            grouped_by_day = {}
+            for timestamp in self.execute_query(query):
+                dt = datetime.fromtimestamp(timestamp[0])
+                day = dt.strftime("%Y-%m-%d")
+                grouped_by_day[day] = grouped_by_day.get(day, 0) + 1
+
+            data_as_list = sorted(grouped_by_day.items(), key=lambda x: x[1], reverse=True)
+            return data_as_list[0:10]
 
     def clear_tables(self):
         with self:

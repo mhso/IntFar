@@ -12,13 +12,13 @@
             <h2>All Sounds</h2>
 
             <div id="sounds-sort-wrapper">
-                <img id="sounds-sort-ascending" class="sounds-sort-order-button" src="{{ url_for('static', filename='img/arrow_down_2.png') }}">
-                <img id="sounds-sort-descending" class="sounds-sort-order-button" src="{{ url_for('static', filename='img/arrow_up_2.png') }}">
+                <img id="sounds-sort-ascending" class="sounds-sort-order-button" src="{{ url_for('static', _external=True, filename='img/arrow_down_2.png') }}">
+                <img id="sounds-sort-descending" class="sounds-sort-order-button" src="{{ url_for('static', _external=True, filename='img/arrow_up_2.png') }}">
                 <button class="sounds-sort-button" onclick="sortSounds('alphabetical', this)">
-                    <img src="{{ url_for('static', filename='img/alphabetical.png') }}">
+                    <img src="{{ url_for('static', _external=True, filename='img/alphabetical.png') }}">
                 </button>
                 <button class="sounds-sort-button sounds-highlighted-sort-btn" onclick="sortSounds('chronological', this)">
-                    <img src="{{ url_for('static', filename='img/chronological.png') }}">
+                    <img src="{{ url_for('static', _external=True, filename='img/chronological.png') }}">
                 </button>
             </div>
 
@@ -28,10 +28,10 @@
                     <h3>{{ sound_file }}</h3>
                     {% if logged_in_user %}
                     <audio controls>
-                        <source src="{{ url_for('static', filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
+                        <source src="{{ url_for('static', _external=True, filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
                     </audio>
                     {% if logged_in_user == owner_id or logged_in_user == admin_id %}
-                    <form method="POST" enctype="multipart/form-data" action="{{ url_for('soundboard.delete') }}">
+                    <form method="POST" enctype="multipart/form-data" action="{{ url_for('soundboard.delete', _external=True) }}">
                         <input type="hidden" name="filename" value="{{ sound_file }}">
                         <input class="audio-delete-btn" type="submit" value="Delete">
                     </form>
@@ -62,7 +62,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/soundboard.js') }}">
+    <script src="{{ url_for('static', _external=True, filename='js/soundboard.js') }}">
 
     </script>
 </body>

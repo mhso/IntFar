@@ -6,6 +6,7 @@ class Config:
         file_split = __file__.replace("\\", "/").split("/")
         self.src_folder = "/".join(file_split[:-2])
         self.resources_folder = "/".join(file_split[:-3]) + "/resources"
+        self.static_folder = "app/static"
 
         auth = json.load(open(f"{self.resources_folder}/auth.json"))
 

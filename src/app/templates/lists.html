@@ -20,17 +20,17 @@
                     {% if lists %}
                     {% for list_id, list_name, owner_id, owner_name, owner_avatar, count in lists %}
                     <div class="list-entry-wrapper {% if owner_id == logged_in_user %} owned-list{% endif %}"
-                        onclick="goToList('{{ url_for('lists.list_view', list_id=list_id) }}', event)">
+                        onclick="goToList('{{ url_for('lists.list_view', _external=True, list_id=list_id) }}', event)">
                         <div class="list-entry-name">{{ list_name }}</div>
                         <div class="list-entry-author">
                             <span style="margin-right: 5px">By</span>
                             <img class="discord-avatar" src="{{ owner_avatar }}" alt="{{ owner_name }}'s Avatar">
-                            <a class="list-entry-author-name undecorated-link" href="{{ url_for(game + '.users.user', disc_id=owner_id) }}">{{ owner_name }}</a>
+                            <a class="list-entry-author-name undecorated-link" href="{{ url_for(game + '.users.user', _external=True, disc_id=owner_id) }}">{{ owner_name }}</a>
                         </div>
                         <div class="list-entry-count">Contains {{ count }}</div>
                         {% if owner_id == logged_in_user %}
                         <button class="delete-list-btn lists-delete-btn" onclick="deleteList({{ list_id }}, this)">
-                            <img src="{{ url_for('static', filename='img/trash.png') }}">
+                            <img src="{{ url_for('static', _external=True, filename='img/trash.png') }}">
                         </button>
                         {% endif %}
                     </div>
@@ -40,7 +40,7 @@
 
                 <button class="show-form-btn" onclick="toggleView('create-list-wrapper', true);">Create List</button>
                 <div id="create-list-wrapper">
-                    <form id="create-list-form" method="POST" enctype="multipart/form-data" action="{{ url_for('lists.create') }}">
+                    <form id="create-list-form" method="POST" enctype="multipart/form-data" action="{{ url_for('lists.create', _external=True) }}">
                         <input class="form-elem-name" type="text" name="name" placeholder="List Name" required>
                         <br>
                         <input class="form-btn form-submit" type="submit" value="Create">
@@ -54,6 +54,6 @@
             <div class="col-lg-1"></div>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='js/lists.js') }}"></script>
+    <script src="{{ url_for('static', _external=True, filename='js/lists.js') }}"></script>
 </body>
 </html>

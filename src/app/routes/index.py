@@ -229,7 +229,7 @@ def index():
 
     if avatars:
         avatars = {
-            disc_id: flask.url_for("static", filename=avatars[disc_id].replace("app/static/", ""))
+            disc_id: flask.url_for("static", _external=True, filename=avatars[disc_id].replace("app/static/", ""))
             for disc_id in avatars
         }
     nicknames = app_util.discord_request("func", "get_discord_nick", None)

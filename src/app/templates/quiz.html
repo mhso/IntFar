@@ -9,20 +9,20 @@
     <title>LoL Quiz</title>
     {% endif %}
     <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-32.png') }}" sizes="32x32">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-48.png') }}" sizes="48x48">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap/bootstrap-grid.min.css') }}"/>
-    <script src="{{ url_for('static', filename='js/bootstrap/jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap/bootstrap.min.js') }}"></script>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/quiz.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-32.png') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-48.png') }}" sizes="48x48">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/bootstrap/bootstrap-grid.min.css') }}"/>
+    <script src="{{ url_for('static', _external=True, filename='js/bootstrap/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', _external=True, filename='js/bootstrap/bootstrap.min.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/style.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/quiz.css') }}">
 </head>
 <body>
     <div id="bg-image"></div>
     {% set show_menu = not question and not round %}
     <div id="quiz-wrapper" class="container-flex">
         <h1 style="margin-bottom: 0;{% if show_menu %}margin-top: 250px;{% endif %}">Den Store</h1>
-        <img id="quiz-lol-logo" src="{{ url_for('static', filename='img/lol_logo.webp') }}">
+        <img id="quiz-lol-logo" src="{{ url_for('static', _external=True, filename='img/lol_logo.webp') }}">
         <h1 style="margin-top: -15px;">Quiz</h1>
 
         <div class="quiz-divider"></div>
@@ -51,12 +51,12 @@
         </div>
         <div id="quiz-answer-correct" class="d-none">
             <h2 id="quiz-correct-reason">Korrekt!</h2>
-            <img class="quiz-result-avatar" src="{{ url_for('static', filename='img/happy_nono.png') }}">
+            <img class="quiz-result-avatar" src="{{ url_for('static', _external=True, filename='img/happy_nono.png') }}">
             <p>{% if answer_text %}({{ answer_text }}){% endif %}</p>
         </div>
         <div id="quiz-answer-wrong" class="d-none">
             <h2 id="quiz-wrong-reason">Forkert</h2>
-            <img class="quiz-result-avatar" src="{{ url_for('static', filename='img/nat_fine.png') }}">
+            <img class="quiz-result-avatar" src="{{ url_for('static', _external=True, filename='img/nat_fine.png') }}">
             <p>Rigtige svar var:</p>
             <p><span class="quiz-emph">{{ answer }}</span>{% if answer_text %} ({{ answer_text }}){% endif %}</p>
         </div>
@@ -85,14 +85,14 @@
             </div>
             <button onclick="resetUsedQuestions(this);">Reset Spørgsmål</button>
 
-            <img id="quiz-menu-alistar" src="{{ url_for('static', filename='img/alistar_dance.gif') }}">
-            <img id="quiz-menu-teemo" src="{{ url_for('static', filename='img/teemo_dance.gif') }}">
-            <img id="quiz-menu-ivern" src="{{ url_for('static', filename='img/ivern_dance.gif') }}">
-            <img id="quiz-menu-quinn" src="{{ url_for('static', filename='img/quinn_thonk.gif') }}">
+            <img id="quiz-menu-alistar" src="{{ url_for('static', _external=True, filename='img/alistar_dance.gif') }}">
+            <img id="quiz-menu-teemo" src="{{ url_for('static', _external=True, filename='img/teemo_dance.gif') }}">
+            <img id="quiz-menu-ivern" src="{{ url_for('static', _external=True, filename='img/ivern_dance.gif') }}">
+            <img id="quiz-menu-quinn" src="{{ url_for('static', _external=True, filename='img/quinn_thonk.gif') }}">
         </div>
         {% endif %}
     </div>
-    <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
+    <script src="{{ url_for('static', _external=True, filename='js/quiz.js') }}"></script>
     <script>
         window.onkeydown = function(e) {
             if (e.key == "NumLock") {
@@ -113,14 +113,14 @@
     </script>
     {% if round == 2 %}
     <audio id="quiz-buzzer-sound">
-        <source src="{{ url_for('static', filename='sounds/buzzer.mp3') }}" type="audio/mpeg">
+        <source src="{{ url_for('static', _external=True, filename='sounds/buzzer.mp3') }}" type="audio/mpeg">
     </audio>
     {% endif %}
     {% for sound_list in sounds %}
     {% set correct_sound = loop.first %}
     {% for sound_file in sound_list %}
     <audio class="quiz-sound-{% if correct_sound %}correct{% else %}wrong{% endif %}">
-        <source src="{{ url_for('static', filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
+        <source src="{{ url_for('static', _external=True, filename='sounds/' + sound_file + '.mp3') }}" type="audio/mpeg">
     </audio>
     {% endfor %}
     {% endfor %}

@@ -6,7 +6,7 @@ const TIME_FOR_FINAL_ANSWER = 40;
 const TIME_BEFORE_FIRST_TIP = 4;
 const TIME_BEFORE_EXTRA_TIPS = 4;
 const PRESENTER_ACTION_KEY = "NumLock"
-const socket = io();
+const socket = io({"transports": ["polling"]});
 
 var countdownInterval = null;
 var activeRound;
@@ -453,6 +453,9 @@ function playerBuzzedFirst(playerId) {
     answeringPlayer = playerId;
     activePlayers[playerId] = false;
     document.getElementById("question-buzzer-sound").play();
+    setTimeout(function() {
+        document.getElementById("question-buzzer-" + playerIds[playerId]).play();
+    }, 600);
 
     // Pause video if one is playing
     pauseVideo();
@@ -673,6 +676,7 @@ function goToQuestion(div, category, tier, isDouble) {
 
     if (isDouble) {
         div.getElementsByTagName("span").item(0).textContent = "Daily Double!";
+        div.style.animationName = "dailyDouble";
     }
 
     let bbox = div.getBoundingClientRect();
@@ -838,6 +842,10 @@ function resetUsedQuestions(button) {
 
 function addPlayerDiv(id, index, name, avatar, color) {
     let wrapper = document.getElementById("menu-contestants");
+    let placeholder = document.getElementById("menu-no-contestants-placeholder");
+    if (placeholder != null) {
+        wrapper.removeChild(placeholder);
+    }
 
     let div = document.createElement("div");
     div.dataset["disc_id"] = id;

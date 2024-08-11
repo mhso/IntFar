@@ -10,40 +10,9 @@ jeopardy_contestant_page = flask.Blueprint("jeopardy_contestant", __name__, temp
 @jeopardy_contestant_page.route("/")
 def home():
     if "user_data" in flask.request.cookies:
-        return flask.redirect(flask.url_for(".game_view"))
+        return flask.redirect(flask.url_for(".game_view", _external=True))
 
     return flask.abort(404)
-
-@jeopardy_contestant_page.route("/<client_secret>")
-def lobby(client_secret):
-    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
-    database = flask.current_app.config["DATABASE"]
-
-    if client_secret is None or client_secret == "None":
-        return flask.abort(404)
-
-    state = jeopardy_data["state"]
-    disc_id = database.get_user_from_secret(client_secret)
-
-    if disc_id is None or int(disc_id) not in PLAYER_NAMES:
-        return flask.abort(404)
-
-    avatar = app_util.discord_request("func", "get_discord_avatar", disc_id)
-    if avatar:
-        avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
-
-    if state is None:
-        return app_util.make_template_context("jeopardy/contestant_nogame.html")
-
-    if "user_data" in flask.request.cookies:
-        return flask.redirect(flask.url_for(".game_view"))
-
-    return app_util.make_template_context(
-        "jeopardy/contestant_lobby.html",
-        user_id=str(disc_id),
-        player_name=PLAYER_NAMES[disc_id],
-        avatar=avatar,
-    )
 
 @jeopardy_contestant_page.route("/join", methods=["POST"])
 def join_lobby():
@@ -73,14 +42,14 @@ def join_lobby():
     avatar = app_util.discord_request("func", "get_discord_avatar", disc_id)
 
     if avatar:
-        avatar = flask.url_for("static", filename=avatar.replace("app/static/", ""))
+        avatar = flask.url_for("static", _external=True, filename=avatar.replace("app/static/", ""))
     else:
-        avatar = flask.url_for("static", filename="img/questionmark.png")
+        avatar = flask.url_for("static", _external=True, filename="img/questionmark.png")
 
     turn_id = PLAYER_INDEXES.index(disc_id)
     contestant = Contestant(disc_id, turn_id, name, avatar, color)
 
-    response = flask.redirect(flask.url_for(".game_view"))
+    response = flask.redirect(flask.url_for(".game_view", _external=True))
     max_age = 60 * 60 * 6 # 6 hours
     response.set_cookie("user_data", contestant.to_json(), max_age=max_age)
 
@@ -89,7 +58,7 @@ def join_lobby():
 @jeopardy_contestant_page.route("/game")
 def game_view():
     if "user_data" not in flask.request.cookies:
-        return flask.redirect(flask.url_for(".lobby", client_secret=None))
+        return flask.redirect(flask.url_for(".lobby", _external=True, client_secret="None"))
 
     contestant = Contestant.from_json(flask.request.cookies["user_data"])
     state = flask.current_app.config["JEOPARDY_DATA"]["state"]
@@ -120,6 +89,37 @@ def game_view():
         ping=contestant.ping,
         player_bg_img=PLAYER_BACKGROUNDS[contestant.disc_id],
         **state_dict
+    )
+
+@jeopardy_contestant_page.route("/<client_secret>")
+def lobby(client_secret):
+    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
+    database = flask.current_app.config["DATABASE"]
+
+    if client_secret is None or client_secret == "None":
+        return flask.abort(404)
+
+    state = jeopardy_data["state"]
+    disc_id = database.get_user_from_secret(client_secret)
+
+    if disc_id is None or int(disc_id) not in PLAYER_NAMES:
+        return flask.abort(404)
+
+    avatar = app_util.discord_request("func", "get_discord_avatar", disc_id)
+    if avatar:
+        avatar = flask.url_for("static", _external=True, filename=avatar.replace("app/static/", ""))
+
+    if state is None:
+        return app_util.make_template_context("jeopardy/contestant_nogame.html")
+
+    if "user_data" in flask.request.cookies:
+        return flask.redirect(flask.url_for(".game_view", _external=True))
+
+    return app_util.make_template_context(
+        "jeopardy/contestant_lobby.html",
+        user_id=str(disc_id),
+        player_name=PLAYER_NAMES[disc_id],
+        avatar=avatar,
     )
 
 @app_util.socket_io.event

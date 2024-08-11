@@ -13,29 +13,11 @@ GAME = "lol"
 
 class TestWrapper(TestCase):
     def setUp(self):
-        self.config = Config()
-        self.config.database_folder += "/test"
-
-        self._remove_databases()
-
         meta_database = MetaDatabase(self.config)
         game_databases = {game: get_database_client(game, self.config) for game in SUPPORTED_GAMES}
 
         self.meta_database = meta_database
         self.game_databases = game_databases
-
-    def tearDown(self):
-        self._remove_databases()
-
-    def _remove_databases(self):
-        meta_database_path = f"{self.config.database_folder}/meta.db"
-        if os.path.exists(meta_database_path):
-            os.remove(meta_database_path)
-
-        for game in SUPPORTED_GAMES:
-            game_database_path = f"{self.config.database_folder}/{game}.db"
-            if os.path.exists(game_database_path):
-                os.remove(game_database_path)
 
     def _assert_no_exception(self, func, message, *args, **kwargs):
         try:
@@ -134,10 +116,9 @@ class TestWrapper(TestCase):
             database: GameDatabase = self.game_databases[game]
             test_game_id = test_game_ids[game]
 
-            self._assert_no_exception(database.game_exists, "Game exists.", test_game_id)
             self.assertTrue(database.game_exists(test_game_id), "Game exists before delete.")
 
-            self._assert_no_exception(database.delete_game, "Delete game.", test_game_id)
+            database.delete_game("Delete game.", test_game_id)
             self.assertFalse(database.game_exists(test_game_id), "Game doesn't exist after delete.")
 
             self._assert_no_exception(database.get_latest_game, "Get latest game.")

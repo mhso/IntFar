@@ -75,21 +75,27 @@ h3 {
 }
 
 #menu-wrapper > h2 {
-    font-family: Impact;
+    font-family: 'Lucida Sans';
+    font-style: italic;
     color: white;
     filter: drop-shadow(5px 5px 5px black);
-    margin-top: 2rem;
+    border-bottom: 2px solid white;
+    margin: 0 auto;
+    width: 500px;
+    padding-bottom: 30px;
+    margin-bottom: 30px;
 }
 
 #menu-wrapper > h3 {
-    font-size: 2rem;
-    margin-bottom: 2rem;
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    margin-top: 2.5rem;
+    font-weight: 800;
 }
 
 #menu-wrapper > #logo-wrapper {
     margin-top: 80px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid white;
+    padding-bottom: 10px;
 }
 
 #menu-buttons {
@@ -172,6 +178,7 @@ h3 {
     text-align: center;
     font-size: 24px;
     margin-top: 10px;
+    color: #00dbff;
 }
 
 #menu-join-command {
@@ -184,6 +191,11 @@ h3 {
     width: 200px;
     font-size: 20px;
     margin: 0 auto;
+}
+
+#menu-no-contestants-placeholder {
+    font-size: 20px;
+    font-style: italic;
 }
 
 .menu-contestant-entry {
@@ -263,6 +275,45 @@ h3 {
     line-height: 92px;
 }
 
+@keyframes dailyDouble {
+    0% {
+        border-color: rgb(15, 12, 118);
+    }
+    8% {
+        border-color: purple;
+    }
+    16% {
+        border-color: pink;
+    }
+    24% {
+        border-color: red;
+    }
+    32% {
+        border-color: orange;
+    }
+    40% {
+        border-color: yellow;
+    }
+    48% {
+        border-color: yellowgreen;
+    }
+    56% {
+        border-color: rgb(18, 184, 18);
+    }
+    64% {
+        border-color: rgb(23, 103, 23);
+    }
+    72% {
+        border-color: rgb(19, 191, 213);
+    }
+    80% {
+        border-color: rgb(57, 110, 255);
+    }
+    88% {
+        border-color: rgb(0, 40, 151);
+    }
+}
+
 .selection-question-box {
     position: relative;
     color: rgb(203, 163, 84);
@@ -274,6 +325,11 @@ h3 {
     border-radius: 10px;
     cursor: pointer;
     border: 2px solid black;
+
+    animation-duration: 3s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
 }
 
 .selection-question-box.inactive {
@@ -608,6 +664,11 @@ h3 {
     opacity: 0;
     transition: opacity 1.5s;
     margin: 0 auto;
+}
+
+#question-question-image.image-border, #question-answer-image.image-border {
+    border: 2px solid white;
+    border-radius: 10px;
 }
 
 #question-answer-image {
