@@ -181,7 +181,7 @@ def get_bingo_data(database, face_images={}):
     # Check if there is bingo on ascending diagonal
     diag_2 = np.fliplr(diag_1)
     if np.count_nonzero(diag_2 * completed_mask) == lan_api.BINGO_WIDTH:
-        for x, y in zip(*np.nonzero(diag_1)):
+        for x, y in zip(*np.nonzero(diag_2)):
             bingo_data[y][x]["bingo"] = True
 
     # Check if there is bingo on a row
@@ -402,6 +402,11 @@ def get_data(lan_info):
 
     # LAN Bingo!
     bingo_data = get_bingo_data(database, face_images)
+    for bingo_row in bingo_data:
+        for bingo_challenge in bingo_row:
+            if bingo_challenge["new_progress"]:
+                database.reset_bingo_new_progress(bingo_challenge["id"])
+
     data["bingo_challenges"] = bingo_data
 
     return data
@@ -412,13 +417,8 @@ def _allowed_access(lan_info, user_id):
 @lan_page.route('/')
 def lan_view():
     # Display view for latest LAN party.
-    latest_lan_date = max(
-        lan_api.LAN_PARTIES,
-        key=lambda date: lan_api.LAN_PARTIES[date].end_time,
-    )
-
     return flask.redirect(
-        flask.url_for("lan.lan_view_for_date", _external=True, date=latest_lan_date)
+        flask.url_for("lan.lan_view_for_date", _external=True, date=lan_api.LATEST_LAN_PARTY)
     )
 
 @lan_page.route('/<date>')
@@ -518,12 +518,16 @@ def _get_lol_event_description(event):
 
     elif event["EventName"] == "Multikill":
         streak = _EVENTS_MULTIKILLS[event["KillStreak"] - 2]
-        desc += f"{event['KillerName']} got a {streak}!"
+        desc = f"{event['KillerName']} got a {streak}!"
         icon = "game_feed_multikill.png"
 
     elif event["EventName"] == "Shutdown":
         desc = f"{event['KillerName']} shut down {event['VictimName']}!"
         icon = "game_feed_kill.png"
+
+    elif event["EventName"] == "Execute":
+        desc = f"{event['VictimName']} just got executed, yikes"
+        icon = "game_feed_execute.png"
 
     elif event["EventName"] == "Ace":
         if category == "ally":

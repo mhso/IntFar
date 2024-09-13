@@ -6,7 +6,7 @@ from api.game_api_client import GameAPIClient
 
 from mhooge_flask.logging import logger
 
-def register_for_lol(
+async def register_for_lol(
     meta_database: MetaDatabase,
     game_database: GameDatabase,
     api_client: RiotAPIClient,
@@ -21,7 +21,7 @@ def register_for_lol(
     if game_database.discord_id_from_ingame_info(player_name=summ_name_joined):
         return 0, "User with that summoner name is already registered."
 
-    elif (summ_info := api_client.get_summoner_data(summ_name_joined.replace(" ", "%20"))) is None:
+    elif (summ_info := await api_client.get_summoner_data(summ_name_joined.replace(" ", "%20"))) is None:
         return 0, "Invalid summoner name."
 
     # Add user to Int-Far base users if they are new
@@ -37,7 +37,7 @@ def register_for_lol(
 
     return status_code, status
 
-def register_for_cs2(
+async def register_for_cs2(
     meta_database: MetaDatabase,
     game_database: GameDatabase,
     api_client: SteamAPIClient,
@@ -58,7 +58,7 @@ def register_for_cs2(
     if game_database.discord_id_from_ingame_info(player_id=steam_id) is not None:
         return 0, "User with that Steam ID is already registered."
 
-    steam_name = api_client.get_steam_display_name(steam_id)
+    steam_name = await api_client.get_player_name(steam_id)
     if steam_name is None:
         return 0, "Invalid Steam ID."
 
@@ -75,7 +75,7 @@ def register_for_cs2(
 
     if status_code in (1, 2):
         # Send friend request on Steam from Int-Far to the newly registered player
-        friend_status = api_client.send_friend_request(steam_id)
+        friend_status = await api_client.send_friend_request(steam_id)
         logger.info(f"Sent Steam friend request with status {friend_status}")
 
         if friend_status == 2: # Int-Far was already friends with the person
@@ -92,11 +92,11 @@ _REGISTER_METHODS = {
     "cs2": register_for_cs2
 }
 
-def register_for_game(
+async def register_for_game(
     meta_database: MetaDatabase,
     game_database: GameDatabase,
     api_client: GameAPIClient,
     disc_id: int,
     *game_params
 ) -> tuple[int, str]:
-    return _REGISTER_METHODS[api_client.game](meta_database, game_database, api_client, disc_id, *game_params)
+    return await _REGISTER_METHODS[api_client.game](meta_database, game_database, api_client, disc_id, *game_params)

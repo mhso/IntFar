@@ -1,4 +1,4 @@
-import bz2
+import asyncio
 import inspect
 import json
 import argparse
@@ -177,31 +177,9 @@ class TestFuncs:
         print(games_count_me)
         print(games_count_all)
 
-    async def play_sound(self, sound, client):
-        user = client.get_member_safe(267401734513491969, 512363920044982272)
-        await client.audio_handler.play_sound(user.voice, sound)
-
-    def test_pyppeteer_stream(self):
-        url = "https://www.youtube.com/watch?v=esdTLuEtwNM"
-        client = DiscordClient(CONFIG, META_DATABASE, None, RIOT_API)
-        client.add_event_listener("ready", self.play_sound, url, client)
-        client.run(CONFIG.discord_token)
-
     def test_monthly_intfar(self):
         stats = self.game_databases["lol"].get_intfar_stats(267401734513491969, True)
         print(stats)
-
-    def test_steam_api(self):
-        self.config.steam_2fa_code = input("Steam 2FA Code: ")
-
-        api_client = SteamAPIClient(self.config)
-        match_token = "CSGO-6Pntd-wC8iV-ELKBc-bUcdG-pJGrL"
-
-        game_data = api_client.get_game_details(match_token)
-        with open("csgo_testdata.json", "w", encoding="utf-8") as fp:
-            json.dump(game_data, fp)
-
-        api_client.close()
 
     def test_steam_stuff(self):
         api_client = SteamAPIClient("csgo", self.config)
@@ -212,16 +190,15 @@ class TestFuncs:
         api_client = SteamAPIClient("csgo", self.config)
         print(api_client.map_names)
 
-    def test_cs_sharecode(self):
+    async def cs_sharecode(self):
         api_client = SteamAPIClient("cs2", self.config)
         user = self.game_databases["cs2"].game_users[267401734513491969]
         print(user.latest_match_token[0])
-        next_code = api_client.get_next_sharecode(user.player_id[0], user.match_auth_code[0], user.latest_match_token[0])
+        next_code = await api_client.get_next_sharecode(user.player_id[0], user.match_auth_code[0], user.latest_match_token[0])
         print(next_code)
 
     def test_cs_parse(self):
-        self.config.steam_2fa_code = input("Steam 2FA Code: ")
-        sharecode = "CSGO-arbVk-zLoYq-qwbCh-dekfW-MvNUD"
+        sharecode = "CSGO-JPzyG-faFGY-jHDaM-5YQjz-2B3xK"
         api_client = SteamAPIClient("cs2", self.config)
 
         game_stats = api_client.get_game_details(sharecode)
@@ -232,7 +209,8 @@ class TestFuncs:
         data = parser.parse_data()
 
     def test_get_stats(self):
-        print(stats_from_database("lol", self.game_databases["lol"], self.riot_api, 803987403932172359, 6952019611))
+        api_client = SteamAPIClient("cs2", self.config)
+        print(stats_from_database("cs2", self.game_databases["cs2"], api_client, 619073595561213953, "CSGO-JPzyG-faFGY-jHDaM-5YQjz-2B3xK"))
 
     def test_quadra_steal(self):
         game_id = "6700149519"
@@ -334,23 +312,14 @@ class TestFuncs:
     
         print(f"{self.riot_api.get_playable_name(max_kda_champ)}: {max_kda} ({total_games} games)")
 
-    def test_download_missing_demos(self):
-        url = "http://replay388.valve.net/730/003689856650815996193_1093172339.dem.bz2"
-        file = self.config.resources_folder + "/data/test_demo"
-        steam_api = SteamAPIClient("cs2", self.config)
-
-        filename = steam_api.download_demo_file(file, url)
-        with open(filename + ".dem.bz2", "rb") as fp:
-            all_bytes = fp.read()
-
-        # Decompress the gz2 compressed demo file
-        decompressed = bz2.decompress(all_bytes)
-        with open(filename + ".dem", "wb") as fp:
-            fp.write(decompressed)
-
-        os.remove(filename + ".dem.bz2")
-
-        print(f"Downloaded demo to {filename}.dem")
+    def awpy(self):
+        from awpy import DemoParser
+        match_id = "CSGO-XsTaM-tk7SW-hGPGu-mR4y3-Cq5uC"
+        demo_dem_file = f"{self.config.resources_folder}/data/cs2/{match_id}.dem"
+        parser = DemoParser(demofile=demo_dem_file, debug=True)
+        demo_game_data = parser.parse()
+        os.remove(f"{match_id}.json")
+        print(demo_game_data)
 
     def awpy2(self):
         from awpy.demo import Demo
@@ -410,4 +379,14 @@ if __name__ == "__main__":
 
     ARGS = PARSER.parse_args()
 
-    getattr(TEST_RUNNER, ARGS.func)()
+    func = getattr(TEST_RUNNER, ARGS.func)
+
+    if asyncio.iscoroutinefunction(func):
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+
+        loop.run_until_complete(func())
+    else:
+        func()

@@ -1,3 +1,5 @@
+from httpx import AsyncClient
+
 from abc import ABC, abstractmethod
 
 from api.config import Config
@@ -8,21 +10,23 @@ class GameAPIClient(ABC):
         self.game = game
         self.config = config
 
+        self.httpx_client = AsyncClient()
+
     @property
     @abstractmethod
     def playable_count(self):
         ...
 
     @abstractmethod
-    def get_active_game(self, user_id) -> dict:
+    async def get_active_game(self, user_id) -> dict:
         ...
 
     @abstractmethod
-    def get_active_game_for_user(self, user: User) -> tuple[dict, str]:
+    async def get_active_game_for_user(self, user: User) -> tuple[dict, str]:
         ...
 
     @abstractmethod
-    def get_game_details(self, match_id) -> dict:
+    async def get_game_details(self, match_id) -> dict:
         ...
 
     @abstractmethod
@@ -38,7 +42,7 @@ class GameAPIClient(ABC):
         ...
 
     @abstractmethod
-    def get_player_name(self, player_id) -> str:
+    async def get_player_name(self, player_id) -> str:
         ...
 
     @abstractmethod

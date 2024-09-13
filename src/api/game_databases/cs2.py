@@ -189,7 +189,7 @@ class CS2GameDatabase(GameDatabase):
         """
 
         with self:
-            return self.execute_query(query, disc_id).fetchone()
+            return self.query(query, disc_id, format_func="one")
 
     def get_played_with_most_intfars(self, disc_id):
         doinks_query = self.get_played_intfar_count(disc_id).query
@@ -343,3 +343,34 @@ class CS2GameDatabase(GameDatabase):
 
         with self:
             return self.execute_query(query, disc_id).fetchone()
+
+    def get_overtime_winrate(self, disc_id):
+        query = """
+            SELECT
+                CAST(games.c AS integer),
+                CAST((wins.c / games.c * 100) AS integer)
+            FROM (
+                SELECT CAST(COUNT(*) AS real) AS c
+                FROM games AS g
+                INNER JOIN participants AS p
+                    ON p.game_id = g.game_id
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
+                WHERE u.disc_id = ?
+                    AND g.rounds_us + g.rounds_them > 24
+            ) games,
+            (
+                SELECT CAST(COUNT(*) AS real) AS c
+                FROM games AS g
+                INNER JOIN participants AS p
+                    ON p.game_id = g.game_id
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
+                WHERE u.disc_id = ?
+                    AND g.rounds_us + g.rounds_them > 24
+                    AND g.win = 1
+            ) wins
+        """
+
+        with self:
+            return self.execute_query(query, disc_id, disc_id).fetchone()

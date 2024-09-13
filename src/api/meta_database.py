@@ -1,4 +1,6 @@
 from datetime import datetime
+import pickle
+
 from dateutil.relativedelta import relativedelta
 from mhooge_flask.database import SQLiteDatabase
 
@@ -465,32 +467,41 @@ class MetaDatabase(SQLiteDatabase):
 
     def get_command_result(self, cmd_id, target):
         with self:
-            query = "SELECT result FROM command_queue WHERE id=? AND target=?"
+            query = "SELECT result, IIF(result IS NULL, 0, 1) FROM command_queue WHERE id=? AND target=?"
             result = self.execute_query(query, cmd_id, target).fetchone()
 
-            if result is not None and result[0] is not None:
+            done = result is not None and result[1] == 1
+
+            if done:
+                result = pickle.loads(result[0])
                 query_delete = "DELETE FROM command_queue WHERE id=? AND target=?"
                 self.execute_query(query_delete, cmd_id, target)
+            else:
+                result = None
 
-            return None if result is None else result[0]
+            return result, done
 
     def set_command_result(self, cmd_id, target, result):
         with self:
             query = "UPDATE command_queue SET result=? WHERE id=? AND target=?"
-            self.execute_query(query, result, cmd_id, target)
+            self.execute_query(query, pickle.dumps(result), cmd_id, target)
 
     def get_queued_commands(self, target):
         with self:
             query = "SELECT id, command, arguments FROM command_queue WHERE target=? AND result IS NULL"
+            commands = [
+                (command_id, command, pickle.loads(args))
+                for command_id, command, args in self.execute_query(query, target)
+            ]
 
-            return self.execute_query(query, target).fetchall()
+            return commands
 
     def enqueue_command(self, cmd_id, target, command, *arguments):
         with self:
             query = "INSERT INTO command_queue(id, target, command, arguments) VALUES (?, ?, ?, ?)"
-            argument_str = ",".join(str(arg) for arg in arguments)
+            serialized_args = pickle.dumps(list(arguments))
 
-            self.execute_query(query, cmd_id, target, command, argument_str)
+            self.execute_query(query, cmd_id, target, command, serialized_args)
 
     def clear_command_queue(self):
         with self:

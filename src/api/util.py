@@ -1,13 +1,17 @@
-from datetime import tzinfo, timedelta, datetime
+import asyncio
+from datetime import datetime
 from glob import glob
+from threading import Thread
 from dateutil.relativedelta import relativedelta
 import importlib
 import os
 import json
 import secrets
+import math
 
 from api.config import Config
 
+import Levenshtein
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
@@ -269,3 +273,34 @@ def create_predictions_timeline_image(config: Config):
         )
 
     return image
+
+def get_closest_match(search_str: str, possible_matches: list[str], max_score: int=8) -> str | None:
+    """
+    Find the element in `possible_matches` that closest matches `search_str`.
+    This is calculated using Levenshtein distance.
+    """
+    closest_match = None
+    closest_match_distance = max_score or math.inf
+    for possible_match in possible_matches:
+        if possible_match.startswith(search_str) or possible_match.endswith(search_str): # type: ignore
+            return possible_match
+
+        distance = Levenshtein.distance(search_str, possible_match)
+        if distance < closest_match_distance:
+            closest_match = possible_match
+            closest_match_distance = distance
+
+    return closest_match
+
+def _run_task_in_thread(func, result, *args):
+    result.append(func(*args))
+
+async def run_async_in_thread(func, *args, sleep_time=0.1):
+    result = []
+    thread = Thread(target=_run_task_in_thread, args=(func, result, *args))
+    thread.start()
+
+    while result == []:
+        await asyncio.sleep(sleep_time)
+
+    return result.pop()

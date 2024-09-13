@@ -801,7 +801,6 @@ class DiscordClient(discord.Client):
         # Check if any users from the game are in a voice channel
         for game_disc_id in self.game_monitors[game].users_in_game[guild_id]:
             for voice_disc_id in users_in_voice[guild_id][game]:
-                logger.info(f"game_disc_id={game_disc_id}({type(game_disc_id)}),voice_disc_id={voice_disc_id}({type(voice_disc_id)})")
                 if game_disc_id == int(voice_disc_id):
                     # Get voice state for member in voice chat
                     member = self.get_member_safe(game_disc_id, guild_id)
@@ -810,8 +809,6 @@ class DiscordClient(discord.Client):
 
                     voice_state = member.voice
                     break
-
-        logger.info(f"Voice stats is None: {voice_state is None}")
 
         if voice_state is not None:
             # One or more users from the game is in a voice channel
@@ -1526,7 +1523,7 @@ class DiscordClient(discord.Client):
         for disc_id in database.game_users.keys():
             curr_rank_solo, curr_rank_flex = database.get_current_rank(disc_id)
             summ_id = database.game_users[disc_id].player_id[0]
-            rank_data = self.api_clients["lol"].get_player_rank(summ_id, now - offset_secs)
+            rank_data = await self.api_clients["lol"].get_player_rank(summ_id, now - offset_secs)
             new_rank_solo, new_rank_flex = parse_player_rank(rank_data)
 
             if all(rank is None for rank in (curr_rank_solo, curr_rank_flex, new_rank_solo, new_rank_flex)):
@@ -1581,6 +1578,7 @@ class DiscordClient(discord.Client):
         while not ifotm_monitor.should_announce():
             new_day = datetime.now().day
             if new_day != curr_day:
+                logger.bind(event="ifotm_announce_date").info(f"IFOTM annouce date on day {new_day}")
                 try:
                     # Download latest information from Riot API.
                     self.api_clients["lol"].get_latest_data()
@@ -1905,10 +1903,16 @@ class DiscordClient(discord.Client):
                     )
                 elif show_usage:
                     await handle_usage_msg(self, message, command)
-                elif (closest_match := commands_util.get_closest_matching_command(command, message.guild.id)) is not None:
-                    await message.channel.send(
-                        f"Invalid command `!{command}`, did you mean `!{closest_match}`?"
-                    )
+                else:
+                    possible_commands = [
+                        cmd for cmd in commands_util.COMMANDS
+                        if message.guild.id in commands_util.COMMANDS[cmd].guilds
+                    ]
+
+                    if (closest_match := api_util.get_closest_match(command, possible_commands)) is not None:
+                        await message.channel.send(
+                            f"Invalid command `!{command}`, did you mean `!{closest_match}`?"
+                        )
                 return
 
             # The following lines are spam protection.

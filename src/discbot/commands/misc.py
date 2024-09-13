@@ -136,14 +136,17 @@ async def handle_summary_msg(client, message, game, target_id):
 
         fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_flex)
         response += f"Their current rank in {fmt_stat_names['rank_flex']} is **{fmt_rank}**.\n\n"
+    elif game == "cs2":
+        ot_games, ot_winrate = database.get_overtime_winrate(target_id)
+        response += f"Their winrate in overtime is **{ot_winrate}%** in **{ot_games}** games.\n"
 
     response += f"Their longest winning streak was **{longest_win_streak}** games.\n"
     response += f"Their longest loss streak was **{longest_loss_streak}** games.\n\n"
 
     # If person has not played a minimum of 5 games with any champions/on any map, skip winrate stats.
     if best_playable_wr is not None and worst_playable_wr is not None and best_playable_id != worst_playable_id:
-        best_playable_name = client.api_clients[game].get_champ_name(best_playable_id)
-        worst_playable_name = client.api_clients[game].get_champ_name(worst_playable_id)
+        best_playable_name = client.api_clients[game].get_playable_name(best_playable_id)
+        worst_playable_name = client.api_clients[game].get_playable_name(worst_playable_id)
         response += (
             f"They perform best on **{best_playable_name}** (won " +
             f"**{best_playable_wr:.1f}%** of **{best_playable_games}** games).\n" +

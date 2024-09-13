@@ -12,7 +12,7 @@ from api.util import JEOPADY_EDITION, MONTH_NAMES
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
-TRACK_UNUSED = False
+TRACK_UNUSED = True
 DO_DAILY_DOUBLE = True
 
 QUESTIONS_PER_ROUND = 30
@@ -22,7 +22,7 @@ ROUND_NAMES = [
     "Final Jeopardy!"
 ]
 
-FINALE_CATEGORY = "bois"
+FINALE_CATEGORY = "history"
 
 QUESTIONS_FILE = "app/static/data/jeopardy_questions.json"
 USED_QUESTIONS_FILE = "app/static/data/jeopardy_used.json"
@@ -220,8 +220,6 @@ def reset_questions():
     logged_in_user = app_util.get_user_details()[0]
     if logged_in_user != ADMIN_DISC_ID and flask.current_app.config["APP_ENV"] != "dev":
         return flask.abort(404)
-
-    USED_QUESTIONS_FILE = "app/static/jeopardy_used.json"
 
     with open(USED_QUESTIONS_FILE, encoding="utf-8") as fp:
         used_questions = json.load(fp)

@@ -167,14 +167,14 @@ async def handle_remove_champ(client, message, list_id, champ_ids):
 
 async def handle_random_nochest(client, message, target_id=None):
     summ_data = client.game_databases[_GAME].game_user_data_from_discord_id(target_id)
-    champion_mastery_data = client.api_clients[_GAME].get_champion_mastery(summ_data.puuid[0])
+    champion_mastery_data = await client.api_clients[_GAME].get_champion_mastery(summ_data.puuid[0])
 
     # Filter champs with no chest granted.
     no_chest_champs = []
     for mastery_data in champion_mastery_data:
         if not mastery_data["chestGranted"]:
-            champion_id = mastery_data["championId"]
-            no_chest_champs.append(client.api_clients[_GAME].get_champ_name(champion_id))
+            champ_id = mastery_data["championId"]
+            no_chest_champs.append(client.api_clients[_GAME].get_champ_name(champ_id))
 
     if len(no_chest_champs) == 0: # Chests have been earned on every champ.
         response = "You have already earned a chest on every champ {emote_woahpikachu}"
@@ -192,7 +192,7 @@ async def handle_best_nochest(client, message, target_id=None):
     for the given player where no chest has yet been obtained.
     """
     summ_data = client.game_databases[_GAME].game_user_data_from_discord_id(target_id)
-    champion_mastery_data = client.api_clients[_GAME].get_champion_mastery(summ_data.puuid[0])
+    champion_mastery_data = await client.api_clients[_GAME].get_champion_mastery(summ_data.puuid[0])
 
     # Filter champs with no chest granted.
     no_chest_champs = []

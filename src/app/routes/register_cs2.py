@@ -6,7 +6,7 @@ from app.util import make_template_context, get_user_details, make_text_response
 register_cs2_page = flask.Blueprint("register_cs2", __name__, template_folder="templates")
 
 @register_cs2_page.route('/', methods=["GET", "POST"])
-def home():
+async def home():
     disc_id = get_user_details()[0]
     game_database = flask.current_app.config["GAME_DATABASES"]["cs2"]
     meta_database = flask.current_app.config["GAME_DATABASES"]["cs2"]
@@ -47,7 +47,7 @@ def home():
         match_token = data["match_token"]
         match_auth_code = data["match_auth_code"]
 
-        status_code, status_msg = register_for_game(
+        status_code, status_msg = await register_for_game(
             meta_database,
             game_database,
             api_client,

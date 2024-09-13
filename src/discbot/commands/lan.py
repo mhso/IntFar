@@ -215,7 +215,7 @@ async def handle_lan_doinks_msg(client, message, target_id=None):
     await send_tally_messages(client, message, messages, "Doinks", target_id is None)
 
 async def handle_jeopardy_join_msg(client, message):
-    if not lan_api.is_lan_ongoing(datetime.now(), message.guild.id):
+    if not lan_api.is_lan_ongoing(datetime.now().timestamp(), message.guild.id):
         return
 
     client_secret = client.meta_database.get_client_secret(message.author.id)

@@ -80,27 +80,21 @@ def kill_all_processes(processes):
 
 @restartable
 def main():
-    parser = ArgumentParser()
-    parser.add_argument("--steam_2fa_code", type=str, default=None)
+    config = Config()
 
-    args = parser.parse_args()
-
-    conf = Config()
-    conf.steam_2fa_code = args.steam_2fa_code
-
-    env_desc = "DEVELOPMENT" if conf.env == "dev" else "PRODUCTION"
+    env_desc = "DEVELOPMENT" if config.env == "dev" else "PRODUCTION"
 
     logger.info(f"+++++ Running in {env_desc} mode +++++")
 
-    if conf.env == "production":
+    if config.env == "production":
         load_opus("/usr/local/lib/libopus.so")
 
     logger.info("Initializing databases...")
     sync_manager = Manager()
 
-    game_databases = {game: get_database_client(game, conf) for game in SUPPORTED_GAMES}
+    game_databases = {game: get_database_client(game, config) for game in SUPPORTED_GAMES}
 
-    meta_database = MetaDatabase(conf)
+    meta_database = MetaDatabase(config)
     meta_database.clear_command_queue()
 
     # Convert database user dicts to synchronized proxies so they're synced across processes
@@ -109,15 +103,15 @@ def main():
         game_database.game_users = sync_manager.dict(game_database.game_users)
 
     logger.info("Initializing game API clients...")
-    proxy_manager = ProxyManager(SteamAPIClient, "cs2", meta_database, conf)
+    proxy_manager = ProxyManager(SteamAPIClient, "cs2", meta_database, config)
 
     api_clients = {
-        "lol": RiotAPIClient("lol", conf),
+        "lol": RiotAPIClient("lol", config),
         "cs2": proxy_manager.create_proxy()
     }
 
     betting_handlers = {
-        game: get_betting_handler(game, conf, meta_database, game_databases[game])
+        game: get_betting_handler(game, config, meta_database, game_databases[game])
         for game in SUPPORTED_GAMES
     }
 
@@ -126,11 +120,11 @@ def main():
     #ai_process, our_end_ai = start_ai_process(conf)
 
     logger.info("Starting Flask web app...")
-    flask_args = [conf, meta_database, game_databases, betting_handlers, api_clients]
+    flask_args = [config, meta_database, game_databases, betting_handlers, api_clients]
     flask_process, bot_end_flask = start_flask_process(*flask_args)
 
     logger.info("Starting Discord Client...")
-    discord_args = [conf, meta_database, game_databases, betting_handlers, api_clients, None, bot_end_flask]
+    discord_args = [config, meta_database, game_databases, betting_handlers, api_clients, None, bot_end_flask]
     bot_process, _ = start_discord_process(*discord_args)
 
     processes = [flask_process, bot_process, proxy_manager]

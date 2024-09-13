@@ -90,7 +90,7 @@ class TestMock(DiscordClient):
         player_ranks = {}
         for disc_id in users_in_game:
             summ_id = users_in_game[disc_id].player_id[0]
-            rank_info = self.api_clients["lol"].get_player_rank(summ_id)
+            rank_info = await self.api_clients["lol"].get_player_rank(summ_id)
             if rank_info is not None:
                 player_ranks[disc_id] = rank_info
 
@@ -121,7 +121,7 @@ class TestMock(DiscordClient):
                 self.game_databases["cs2"].set_new_cs2_sharecode = self.set_sharecode_mock
 
             try:
-                game_info = self.api_clients[self.game].get_game_details(self.game_id)
+                game_info = await self.api_clients[self.game].get_game_details(self.game_id)
                 if game_info is None:
                     raise ValueError("Game info is None!")
             except Exception:
@@ -133,7 +133,7 @@ class TestMock(DiscordClient):
             elif self.game == "lol":
                 game_monitor.users_in_game[guild_id] = self.get_users_in_lol_game(game_info)
 
-            status = await game_monitor.get_finished_game_status(game_info, guild_id)
+            status = game_monitor.get_finished_game_status(game_info, guild_id)
 
             if status == game_monitor.POSTGAME_STATUS_OK and self.game == "lol":
                 ranks = await self.get_ranks(game_monitor.users_in_game[guild_id])
@@ -163,7 +163,6 @@ parser.add_argument("--guild", type=str, choices=GUILDS)
 parser.add_argument("--task", type=str, choices=("all", "bets", "stats", "train", "announce"))
 parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
 parser.add_argument("--forget_sharecode", "-fs", action="store_true")
-parser.add_argument("--steam_2fa_code", type=str)
 parser.add_argument("--users", type=int, nargs="+")
 parser.add_argument("--dry_run", action="store_true")
 parser.add_argument("-s", "--silent", action="store_true")
@@ -180,7 +179,6 @@ if not args.game in SUPPORTED_GAMES:
     exit(0)
 
 conf = Config()
-conf.steam_2fa_code = args.steam_2fa_code
 
 logger.info("Initializing database...")
 

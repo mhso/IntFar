@@ -61,7 +61,12 @@ function hideLiveGameFeed(feedWrapper) {
     feedWrapper.style.opacity = 0;
 }
 
-function getLiveLeagueData(feedWrapper) {
+function getLiveLeagueData() {
+    let feedWrapper = document.getElementById("lan-live-game-feed-wrapper");
+    if (feedWrapper == null) {
+        return;
+    }
+
     let baseUrl = getBaseURL();
     $.ajax(baseUrl + "/intfar/lan/live_league_data", {
         method: "GET"
@@ -117,50 +122,50 @@ function getLiveLeagueData(feedWrapper) {
 function parseDuration(duration) {
     let split = duration.split(",");
 
-    let obj = {
-        years: 0,
-        months: 0,
-        days: 0,
-        hours: 0,
-        minutes: 0,
-        seconds: 0
-    };
+    let years = 0;
+    let months = 0;
+    let days = 0;
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
+
     for (let i = 0; i < split.length; i++) {
         let unit = split[i].trim();
         if (unit.includes("years")) {
             let split2 = unit.split(" ")
-            obj.years = Number.parseInt(split2[0]);
+            years = Number.parseInt(split2[0]);
         }
         else if (unit.includes("months")) {
             let split2 = unit.split(" ")
-            obj.months = Number.parseInt(split2[0]);
+            months = Number.parseInt(split2[0]);
         }
         else if (unit.includes("days")) {
             let split2 = unit.split(" ")
-            obj.days = Number.parseInt(split2[0]);
+            days = Number.parseInt(split2[0]);
         }
         else if (unit.includes("h")) {
-            obj.hours = Number.parseInt(unit.substring(0, unit.length-1));
+            hours = Number.parseInt(unit.substring(0, unit.length-1));
         }
         else if (unit.includes("m")) {
-            obj.minutes = Number.parseInt(unit.substring(0, unit.length-1));
+            minutes = Number.parseInt(unit.substring(0, unit.length-1));
         }
         else if (unit.includes("s")) {
-            obj.seconds = Number.parseInt(unit.substring(0, unit.length-1));
+            seconds = Number.parseInt(unit.substring(0, unit.length-1));
         }
         else if (unit.includes("&")) {
             let split2 = unit.split("&");
             let splitMins = split2[0].trim().split(" ")
-            obj.minutes = Number.parseInt(splitMins[0]);
+            minutes = Number.parseInt(splitMins[0]);
             let splitSecs = split2[1].trim().split(" ")
-            obj.seconds = Number.parseInt(splitSecs[0]);
+            seconds = Number.parseInt(splitSecs[0]);
         }
         else if (unit.includes("seconds")) {
             let split2 = unit.split(" ")
-            obj.seconds = Number.parseInt(split2[0]);
+            seconds = Number.parseInt(split2[0]);
         }
     }
-    return obj;
+    
+    return hours * 3600 + minutes * 60 + seconds;
 }
 
 function zeroPad(number) {
@@ -171,12 +176,12 @@ function zeroPad(number) {
 }
 
 function setNewDuration(durationElem, durationDate) {
-    let years = durationDate.getYear();
-    let months = durationDate.getMonth();
-    let days = durationDate.getDate();
-    let hours = durationDate.getHours();
-    let minutes = durationDate.getMinutes();
-    let seconds = durationDate.getSeconds();
+    let years = durationDate.getUTCFullYear();
+    let months = durationDate.getUTCMonth();
+    let days = durationDate.getUTCDate();
+    let hours = durationDate.getUTCHours();
+    let minutes = durationDate.getUTCMinutes();
+    let seconds = durationDate.getUTCSeconds();
 
     let str = "";
     if (minutes == 0) {
@@ -202,13 +207,8 @@ function setNewDuration(durationElem, durationDate) {
 }
 
 function incrementDuration(durationElem) {
-    let duration = parseDuration(durationElem.textContent);
-
-    let date = new Date(
-        duration.years, duration.months, duration.days,
-        duration.hours, duration.minutes, duration.seconds
-    );
-    let newTime = date.getTime() + 1000;
+    let duration = parseDuration(durationElem.textContent) * 1000;
+    let newTime = (new Date()).getTime() + duration + 1000;
     let newDate = new Date(newTime);
     setNewDuration(durationElem, newDate);
 }
@@ -235,9 +235,8 @@ function monitor(gamesPlayed, activeGame, lanOver, lanDate) {
     let songDelay = 5 * 1000
     let lolDataDelay = 2 * 1000
 
-    let feedWrapper = document.getElementById("lan-live-game-feed-wrapper");
     let lolDataInterval = setInterval(function() {
-        getLiveLeagueData(feedWrapper);
+        getLiveLeagueData();
     }, lolDataDelay);
 
     let songInterval = setInterval(function() {
@@ -255,11 +254,6 @@ function monitor(gamesPlayed, activeGame, lanOver, lanDate) {
             getSongPlaying(lanDate)
         }
     }, lanDataDelay);
-    if (anyGamesPlayed) {
-        if (isLanActive) {
-            count();
-        }
-    }
 }
 
 document.addEventListener("DOMContentLoaded", function() {

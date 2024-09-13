@@ -1,4 +1,4 @@
-import requests
+import httpx
 from urllib.parse import quote_plus
 
 NUM_SEARCH_RESULTS = 5
@@ -10,7 +10,7 @@ class YouTubeAPIClient:
 
     def query(self, term):
         api_endpoint = _API_SEARCH.replace("[key]", self.config.youtube_key).replace("[query]", quote_plus(term))
-        response = requests.get(api_endpoint)
+        response = httpx.get(api_endpoint)
 
         if response.status_code != 200:
             return False, "Something went wrong when trying to get search suggestions from YouTube :("

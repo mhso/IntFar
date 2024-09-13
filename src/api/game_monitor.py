@@ -1,6 +1,6 @@
 import asyncio
 from time import time
-import requests
+import httpx
 from abc import ABC, abstractmethod
 from typing import Coroutine
 from datetime import datetime
@@ -77,7 +77,7 @@ class GameMonitor(ABC):
         ...
 
     @abstractmethod
-    async def get_finished_game_status(self, game_info: dict, guild_id: int) -> int:
+    def get_finished_game_status(self, game_info: dict, guild_id: int) -> int:
         ...
 
     async def check_game_status(self, guild_id: int, guild_name: str) -> int:
@@ -147,6 +147,7 @@ class GameMonitor(ABC):
         except Exception:
             bound_logger = logger.bind(event="game_status_error", game=self.game, guild_id=guild_id)
             bound_logger.exception(f"Error when getting status for {self.game}")
+            game_status = self.GAME_STATUS_NOCHANGE
 
         if game_status == self.GAME_STATUS_ACTIVE: # Game has started.
             # Send update to Int-Far website that a game has started.
@@ -170,6 +171,28 @@ class GameMonitor(ABC):
 
         elif game_status == self.GAME_STATUS_NOCHANGE: # Sleep for a bit and check game status again.
             await self.poll_for_game_start(guild_id, guild_name)
+
+    async def try_get_finished_game_info(self, game_id, retries=5, start_sleep=30, sleep_delta=10):
+        """
+        Try to get game details from game API client. If this fails, retry the specified
+        amount of times, sleeping inbetween.
+        """
+        game_info = await self.api_client.get_game_details(game_id)
+
+        retry = 0
+        retries = 5
+        time_to_sleep = start_sleep
+        while game_info is None and retry < retries:
+            logger.warning(
+                f"Game info is None! Retrying in {time_to_sleep} secs..."
+            )
+
+            await asyncio.sleep(time_to_sleep)
+            time_to_sleep += sleep_delta
+            game_info = await self.api_client.get_game_details(game_id)
+            retry += 1
+
+        return game_info
 
     def get_intfar_data(self, awards_handler: AwardQualifiers):
         intfar_data = awards_handler.get_intfar()
@@ -262,7 +285,7 @@ class GameMonitor(ABC):
 
         # Update users in game based on parsed data
         self.users_in_game[guild_id] = {
-            player_data["disc_id"]: player_data
+            player_data["disc_id"]: User(**player_data)
             for player_data in parsed_game_stats.players_in_game
         }
 
@@ -419,6 +442,6 @@ class GameMonitor(ABC):
 
     def _send_game_update(self, endpoint, game, data):
         try:
-            return requests.post(f"https://mhooge.com:5000/intfar/{game}/{endpoint}", data=data)
-        except requests.exceptions.RequestException:
+            return httpx.post(f"https://mhooge.com:5000/intfar/{game}/{endpoint}", data=data)
+        except httpx.RequestError:
             logger.bind(endpoint=endpoint, data=data).exception(f"Error ignored in send_game_update for {self.game}")

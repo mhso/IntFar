@@ -7,7 +7,7 @@ import discbot.commands.util as commands_util
 
 async def handle_register_msg(client, message, game, username, *extra_args):
     disc_id = message.author.id
-    status_code, status_msg = register_for_game(
+    status_code, status_msg = await register_for_game(
         client.meta_database,
         client.game_databases[game],
         client.api_clients[game],

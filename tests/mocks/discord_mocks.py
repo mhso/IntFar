@@ -7,7 +7,7 @@ class MockMessage:
     pass
 
 class MockChannel:
-    def __init__(self) -> None:
+    def __init__(self):
         self.messages_sent = []
 
     async def send(self, message: str):

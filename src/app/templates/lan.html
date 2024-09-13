@@ -65,7 +65,7 @@
                             {%- if bingo_entry['total'] > 1 %}
                             <div class="lan-bingo-desc-progress">{{ bingo_entry['progress'] }}/{%- if bingo_entry['id'] == 'damage_dealt' %}1M{% else %}{{ bingo_entry['total'] }}{% endif %}</div>
                             {% endif %}
-                            {% if bingo_entry['total'] > 1 and not bingo_entry['completed'] %}
+                            {% if bingo_entry['total'] > 1 and not bingo_entry['completed'] and not bingo_entry['bingo'] %}
                             <div class="lan-bingo-progress-bar"></div>
                             {% endif %}
                         </div>

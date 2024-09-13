@@ -30,7 +30,7 @@ class CS2GameMonitor(GameMonitor):
 
             curr_code = user_data.latest_match_token[0]
             while curr_code is not None:
-                curr_code = self.api_client.get_next_sharecode(
+                curr_code = await self.api_client.get_next_sharecode(
                     user_data.player_id[0],
                     user_data.match_auth_code[0],
                     curr_code
@@ -70,7 +70,7 @@ class CS2GameMonitor(GameMonitor):
 
         active_users = []
         for steam_id in steam_id_map:
-            is_user_active = self.api_client.is_person_ingame(steam_id)     
+            is_user_active = await self.api_client.is_person_ingame(steam_id)     
             if is_user_active:
                 active_users.append(steam_id)
 
@@ -83,7 +83,7 @@ class CS2GameMonitor(GameMonitor):
         for steam_id in active_users:
             disc_id = steam_id_map[steam_id]
             if self.active_game.get(guild_id) is None: # First time we see this active game
-                steam_name = self.api_client.get_steam_display_name(steam_id)
+                steam_name = await self.api_client.get_player_name(steam_id)
             else:
                 steam_name = user_dict[disc_id].player_name[0]
 
@@ -116,7 +116,7 @@ class CS2GameMonitor(GameMonitor):
             None
         )
 
-    async def get_finished_game_status(self, game_info: dict, guild_id: int):
+    def get_finished_game_status(self, game_info: dict, guild_id: int):
         # Define a value that determines whether the played game was (most likely) a CS2 match
         last_round = game_info["matches"][0]["roundstatsall"][-1]
         max_rounds = max(last_round["teamScores"])
@@ -170,11 +170,16 @@ class CS2GameMonitor(GameMonitor):
             status_code = self.POSTGAME_STATUS_MISSING
 
         else:
-            game_info = self.api_client.get_game_details(next_code)
+            game_info = await self.try_get_finished_game_info(next_code)
             if game_info is None:
-                raise ValueError("Could not get game_info for some reason!")
+                logger.bind(game_id=next_code, guild_id=guild_id).error(
+                    "Game info is STILL None after 5 retries! Saving to missing games..."
+                )
+                game_info = {"gameId": next_code}
+                status_code = self.POSTGAME_STATUS_MISSING
 
-            status_code = await self.get_finished_game_status(game_info, guild_id)
+            else:
+                status_code = self.get_finished_game_status(game_info, guild_id)
 
         return game_info, status_code
 

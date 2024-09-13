@@ -106,6 +106,9 @@ class LoLPlayerStats(PlayerStats):
 
     @classmethod
     def get_formatted_stat_value(cls, stat, value) -> str:
+        if value is None:
+            return "Unknown"
+
         if isinstance(value, float) and stat in ("damage", "gold"):
             return str(int(value))
 
@@ -408,9 +411,9 @@ class LoLGameStatsParser(GameStatsParser):
                 user_game_info = self.all_users[disc_id]
                 summ_info = {
                     "disc_id": disc_id,
-                    "summ_name": user_game_info.player_name[0],
-                    "summ_id": user_game_info.player_id[0],
-                    "champion_id": player_stats[disc_id],
+                    "player_name": [user_game_info.player_name[0]],
+                    "player_id": [user_game_info.player_id[0]],
+                    "champ_id": player_stats[disc_id],
                 }
                 players_in_game.append(summ_info)
 
@@ -510,9 +513,9 @@ class LoLGameStatsParser(GameStatsParser):
                     if player_disc_id is not None:
                         summ_data = {
                             "disc_id": disc_id,
-                            "summ_name": part_info["player"]["summonerName"],
-                            "summ_id": part_info["player"]["summonerId"],
-                            "champion_id": participant["championId"]
+                            "player_name": [part_info["player"]["summonerName"]],
+                            "player_id": [part_info["player"]["summonerId"]],
+                            "champ_id": participant["championId"]
                         }
                         active_users.append(summ_data)
 
@@ -650,9 +653,9 @@ class LoLGameStatsParser(GameStatsParser):
                 if player_disc_id is not None:
                     summ_data = {
                         "disc_id": player_disc_id,
-                        "summ_name": participant["summonerName"],
-                        "summ_id": participant["summonerId"],
-                        "champion_id": participant["championId"]
+                        "player_name": [participant["summonerName"]],
+                        "player_id": [participant["summonerId"]],
+                        "champ_id": [participant["championId"]]
                     }
                     active_users.append(summ_data)
 

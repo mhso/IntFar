@@ -5,7 +5,7 @@ from api.game_data import get_stat_quantity_descriptions
 from api.game_data.lol import LoLGameStats
 from api.game_databases.lol import LoLGameDatabase
 
-TESTING = True
+TESTING = False
 
 class LANInfo:
     def __init__(self, start_time, end_time, participants, guild_id):
@@ -78,7 +78,7 @@ if not TESTING:
         ),
         "august_24": LANInfo(
             datetime(2024, 8, 17, 10, 0, 0).timestamp(),
-            datetime(2024, 8, 17, 10, 0, 0).timestamp(),
+            datetime(2024, 8, 18, 10, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",
@@ -90,13 +90,11 @@ if not TESTING:
         ),
     }
 
-    LATEST_LAN_PARTY = "august_24"
-
 else: # Use old data for testing.
     LAN_PARTIES = {
-        "april_24": LANInfo(
-            datetime(2024, 4, 27, 10, 0, 0).timestamp(),
-            datetime(2024, 4, 28, 10, 0, 0).timestamp(),
+        "august_24": LANInfo(
+            datetime(2024, 8, 17, 10, 0, 0).timestamp(),
+            datetime(2024, 8, 18, 10, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",
@@ -107,7 +105,8 @@ else: # Use old data for testing.
             803987403932172359 # Core Nibs
         )
     }
-    LATEST_LAN_PARTY = "april_24"
+
+LATEST_LAN_PARTY = max(lan_info.start_time for lan_info in LAN_PARTIES.values())
 
 def is_lan_ongoing(timestamp: int, guild_id=None):
     lan_data = list(filter(
@@ -277,7 +276,7 @@ class BingoSolver:
                 if (
                     event["type"] == "ELITE_MONSTER_KILL"
                     and event["monsterType"] == "BARON_NASHOR"
-                    and event["teamId"] == self.parsed_data.team_id
+                    and event.get("teamId", None) == self.parsed_data.team_id
                     and event["timestamp"] / 1000 / 60 < 21
                 ):
                     self.progress = 1
@@ -288,7 +287,7 @@ class BingoSolver:
             for event in frame_data.get("events", []):
                 if (
                     event["type"] == "ELITE_MONSTER_KILL"
-                    and event["teamId"] == self.parsed_data.team_id
+                    and event.get("teamId") == self.parsed_data.team_id
                     and event["monsterType"] == "ELDER_DRAGON"
                 ):
                     self.progress = 1

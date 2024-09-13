@@ -92,7 +92,7 @@ class LoLGameMonitor(GameMonitor):
             None
         )
 
-    async def get_finished_game_status(self, game_info: dict, guild_id: int):
+    def get_finished_game_status(self, game_info: dict, guild_id: int):
         if self.game_database.game_exists(game_info["gameId"]):
             logger.warning(
                 "We triggered end of game stuff again... Strange!"
@@ -127,20 +127,7 @@ class LoLGameMonitor(GameMonitor):
 
         game_info = None
         if not custom_game:
-            game_info = self.api_client.get_game_details(game_id, tries=2)
-
-            retry = 0
-            retries = 5
-            time_to_sleep = 30
-            while game_info is None and retry < retries:
-                logger.warning(
-                    f"Game info is None! Retrying in {time_to_sleep} secs..."
-                )
-
-                await asyncio.sleep(time_to_sleep)
-                time_to_sleep += 10
-                game_info = self.api_client.get_game_details(game_id)
-                retry += 1
+            game_info = await self.try_get_finished_game_info(game_id)
 
         if custom_game: # Do nothing.
             logger.info(f"Game was a custom game: {game_id}")
@@ -149,13 +136,13 @@ class LoLGameMonitor(GameMonitor):
         elif game_info is None: # Game info is still None after 3 retries.
             # Log error
             logger.bind(game_id=game_id, guild_id=guild_id).error(
-                "Game info is STILL None after 3 retries! Saving to missing games..."
+                "Game info is STILL None after 5 retries! Saving to missing games..."
             )
             game_info = {"gameId": game_id}
             status_code = self.POSTGAME_STATUS_MISSING
 
         else:
-            status_code = await self.get_finished_game_status(game_info, guild_id)
+            status_code = self.get_finished_game_status(game_info, guild_id)
 
         # Get rank of each player in the game, if status is OK
         player_ranks = {}
@@ -164,7 +151,7 @@ class LoLGameMonitor(GameMonitor):
 
             for disc_id in self.users_in_game[guild_id]:
                 summ_id = self.users_in_game[guild_id][disc_id].player_id[0]
-                rank_info = self.api_client.get_player_rank(summ_id)
+                rank_info = await self.api_client.get_player_rank(summ_id)
                 if rank_info is not None:
                     player_ranks[disc_id] = rank_info
 

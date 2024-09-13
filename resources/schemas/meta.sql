@@ -40,8 +40,8 @@ CREATE TABLE [command_queue] (
     [id] INTEGER NOT NULL,
     [target] NVARCHAR(64) NOT NULL,
     [command] NVARCHAR(64) NOT NULL,
-    [arguments] NVARCHAR(128) NOT NULL,
-    [result] NVARCHAR(128) NULL
+    [arguments] BLOB NOT NULL,
+    [result] BLOB NULL
 );
 CREATE TABLE [default_game] (
     [disc_id] INTEGER PRIMARY KEY,

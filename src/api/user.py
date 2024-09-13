@@ -26,3 +26,12 @@ class User(dict):
     @staticmethod
     def clone(user):
         return User(**user)
+
+    def __setstate__(self, state):
+        self.___dict__ = state
+
+        for param in state:
+            setattr(self, param, state[param])
+
+    def __getstate__(self):
+        return self.__dict__

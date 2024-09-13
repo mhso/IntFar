@@ -405,7 +405,7 @@ class LoLAwardQualifiers(AwardQualifiers):
             for victim_id in stolen_penta_victims[disc_id]:
                 for summ_info in self.parsed_game_stats.players_in_game:
                     if summ_info["disc_id"] == victim_id:
-                        victim_summ_names.append(summ_info["summ_name"])
+                        victim_summ_names.append(summ_info["player_name"][0])
                         break
 
             victims = " and ".join(victim_summ_names)

@@ -266,8 +266,8 @@ async def handle_match_history_msg(client, message, game, target_id=None):
         # of the stat names to pad all stat entries to the same width
         formatted_stats = []
         formatted_values = []
-        for stat in player_stats.__dict__:
-            if stat not in formatted_stat_names:
+        for stat in formatted_stat_names:
+            if stat in ("game_id", "player_id", "doinks"):
                 continue
 
             fmt_stat = formatted_stat_names[stat]

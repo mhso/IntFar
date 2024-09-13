@@ -452,7 +452,7 @@ def initialize_commands():
     # match history command
     match_history_name = "match_history"
     match_history_desc = (
-        "See the match history of you (or someone) else for the given game."
+        "See the match history of you (or someone else) for the given game."
     )
     register_command(
         match_history_name,
@@ -1123,6 +1123,16 @@ def initialize_commands():
         handle_default_game_msg,
         access_level="all",
         optional_params=[GameParam("game", allow_default=False)]
+    )
+
+    jeopardy_join_name = "jeopardy"
+    jeopardy_join_desc = "Join jeopardy"
+    register_command(
+        jeopardy_join_name,
+        jeopardy_join_desc,
+        handle_jeopardy_join_msg,
+        access_level="all",
+        guilds=[GUILD_MAP["core"]]
     )
 
     # ===== CUTE COMMANDS =====

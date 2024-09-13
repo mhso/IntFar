@@ -1,6 +1,7 @@
 import inspect
 import subprocess
 import json
+import asyncio
 from time import sleep
 from multiprocessing import Pipe
 from multiprocessing.connection import wait
@@ -18,34 +19,23 @@ class Proxy(object):
 
         self._set_attributes()
 
-    @property
-    def logged_on_once(self):
-        return self._call_proxy("logged_on_once")
-
-    @property
-    def game(self):
-        return self._call_proxy("game")
-
-    @property
-    def config(self):
-        return self._call_proxy("config")
-
-    @property
-    def map_names(self):
-        return self._call_proxy("map_names")
-
-    @property
-    def playable_count(self):
-        return self._call_proxy("playable_count")
-
     def _set_attributes(self):
         for attr in dir(self.target_cls):
             if not attr.startswith("__"):
-                if inspect.isfunction(getattr(self.target_cls, attr)):
-                    def call(*args, x=attr):
+                if asyncio.iscoroutinefunction(getattr(self.target_cls, attr)):
+                    async def call(*args, x=attr):
                         return self.__getattribute__("_call_proxy")(x, *args)
 
                     setattr(self, attr, call)
+
+                elif inspect.isfunction(getattr(self.target_cls, attr)):
+                    def call(*args, x=attr):
+                        return self.__getattribute__("_call_proxy")(x, *args)
+    
+                    setattr(self, attr, call)
+
+    def __getattr__(self, name):
+        return self._call_proxy(name)
 
     def __getstate__(self):
         return {"conn": self.conn, "target_cls": self.target_cls}
@@ -66,11 +56,10 @@ class ProxyManager(object):
         self.target_cls = target_cls
         self.target_name = self.target_cls.__name__
 
-        subfolder = "bin" if config.env == "production" else "Scripts"
         executable = "/bin/bash" if config.env == "production" else "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
 
         self.steam_process = subprocess.Popen(
-            f". ../.venv/{subfolder}/activate; python run_steam.py {game} {config.steam_2fa_code}",
+            f"pdm run run_steam.py {game}",
             executable=executable,
             shell=True,
             text=True
@@ -94,10 +83,6 @@ class ProxyManager(object):
                         self.kill()
                         break
 
-                    if command == "close":
-                        proxy.send("exiting...")
-                        break
-
                     if self.steam_process.poll() is not None:
                         # Steam process isn't running, no point in sending commands
                         proxy.send(None)
@@ -105,37 +90,22 @@ class ProxyManager(object):
 
                     result = None
                     self.database.enqueue_command(command_id, self.target_name, command, *args)
+
+                    if command == "close":
+                        proxy.send("exiting...")
+                        break
+
                     wait_time = 0
                     while wait_time < timeout:
-                        result = self.database.get_command_result(command_id, self.target_name)
+                        result, done = self.database.get_command_result(command_id, self.target_name)
 
-                        if result is not None:
+                        if done:
                             break
 
                         wait_time += time_to_sleep
                         sleep(time_to_sleep)
 
-                    if result is None:
-                        result = "null:None"
-
-                    dtype, *values = result.split(":")
-                    if dtype == "null":
-                        proxy.send(None)
-                    else:
-                        value_str = ":".join(values)
-                        if dtype == "json":
-                            value_str = json.loads(value_str)
-                        elif dtype == "int":
-                            value_str = int(value_str)
-                        elif dtype == "float":
-                            value_str = float(value_str)
-                        elif dtype == "bool":
-                            value_str = value_str == "True"
-                        else:
-                            value_str = str(value_str)
-
-                        proxy.send(value_str)
-
+                    proxy.send(result)
                     command_id += 1
             except OSError:
                 break

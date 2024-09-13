@@ -25,7 +25,7 @@ class GameDatabase(SQLiteDatabase):
     def game_user_params(self):
         return []
 
-    def get_all_registered_users(self):
+    def get_all_registered_users(self) -> dict[int, User]:
         with self:
             all_params = ["disc_id", "player_name", "player_id"] + list(self.game_user_params) + ["main", "active"]
             params_str = ", ".join(all_params)
@@ -44,10 +44,13 @@ class GameDatabase(SQLiteDatabase):
                     games_user_info[disc_id] = {}
 
                 for index, param_name in enumerate(all_params):
-                    if param_name not in games_user_info[disc_id]:
-                        games_user_info[disc_id][param_name] = []
+                    if param_name not in ("disc_id", "main", "active"):
+                        if param_name not in games_user_info[disc_id]:
+                            games_user_info[disc_id][param_name] = []
 
-                    games_user_info[disc_id][param_name].append(row[index])
+                        games_user_info[disc_id][param_name].append(row[index])
+                    else:
+                        games_user_info[disc_id][param_name] = row[index]
 
         return {disc_id: User(**games_user_info[disc_id]) for disc_id in games_user_info if "player_name" in games_user_info[disc_id]}
 

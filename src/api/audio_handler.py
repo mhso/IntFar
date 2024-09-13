@@ -2,7 +2,6 @@ import asyncio
 import math
 from datetime import datetime
 
-import Levenshtein
 from discord import PCMVolumeTransformer
 from discord.player import FFmpegPCMAudio
 
@@ -15,6 +14,7 @@ from mhooge_flask.logging import logger
 from api.config import Config
 from api.meta_database import MetaDatabase
 from api.youtube_api import YouTubeAPIClient, NUM_SEARCH_RESULTS
+from api.util import get_closest_match
 from discbot.commands.util import ADMIN_DISC_ID
 
 SOUNDS_PATH = "app/static/sounds/"
@@ -268,7 +268,7 @@ class AudioHandler:
             except InvalidURLError:
                 if len(sounds) == 1:
                     # Check if given sound closely matches an actual sound
-                    sound_match = self.get_closing_matching_sound(sound)
+                    sound_match = get_closest_match(sound, [t[0] for t in self.get_sounds()])
                     if sound_match is not None:
                         err_msg = f"Can't play sound `{sound}`, did you mean `{sound_match}`?"
                     else:
@@ -472,17 +472,6 @@ class AudioHandler:
 
     def is_valid_sound(self, sound):
         return self.meta_database.is_valid_sound(sound)
-
-    def get_closing_matching_sound(self, sound_like):
-        closest_match = None
-        closest_match_distance = 8
-        for sound in self.get_sounds():
-            distance = Levenshtein.distance(sound_like, sound[0])
-            if distance < closest_match_distance:
-                closest_match = sound[0]
-                closest_match_distance = distance
-
-        return closest_match
 
     def get_youtube_suggestions(self, search_term, message):
         success, suggestions = self.youtube_api.query(search_term)

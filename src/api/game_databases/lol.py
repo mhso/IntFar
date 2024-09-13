@@ -830,6 +830,12 @@ class LoLGameDatabase(GameDatabase):
                 challenge_id,
             )
 
+    def reset_bingo_new_progress(self, challenge_id):
+        query = "UPDATE lan_bingo SET new_progress = 0 WHERE id = ?"
+
+        with self:
+            self.execute_query(query, challenge_id)
+
     def set_bingo_challenge_seen(self, challenge_id):
         query = """
             UPDATE lan_bingo

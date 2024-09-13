@@ -6,7 +6,7 @@ import json
 import asyncio
 
 from mhooge_flask.logging import logger
-import requests
+import httpx
 
 from api.game_api_client import GameAPIClient
 from api.user import User
@@ -82,9 +82,9 @@ class RiotAPIClient(GameAPIClient):
     def get_latest_patch(self):
         url = "https://ddragon.leagueoflegends.com/api/versions.json"
         try:
-            response_json = requests.get(url).json()
+            response_json = httpx.get(url).json()
             return response_json[0]
-        except requests.exceptions.RequestException:
+        except httpx.RequestError:
             logger.exception("Exception when getting newest game version from Riot API!")
             return None
 
@@ -95,12 +95,12 @@ class RiotAPIClient(GameAPIClient):
         old_files = glob(f"{self.config.resources_folder}/champions-*.json")
 
         try:
-            response_json = requests.get(url).json()
+            response_json = httpx.get(url).json()
             f_out = open(self.champions_file, "w", encoding="utf-8")
             json.dump(response_json, f_out)
             for old_file in old_files:
                 remove(old_file)
-        except requests.exceptions.RequestException:
+        except httpx.RequestError:
             logger.exception("Exception when getting newest champion.json file from Riot API.")
 
     def get_latest_items_file(self):
@@ -110,12 +110,12 @@ class RiotAPIClient(GameAPIClient):
         old_files = glob(f"{self.config.resources_folder}/items-*.json")
 
         try:
-            response_json = requests.get(url).json()
+            response_json = httpx.get(url).json()
             f_out = open(self.items_file, "w", encoding="utf-8")
             json.dump(response_json, f_out)
             for old_file in old_files:
                 remove(old_file)
-        except requests.exceptions.RequestException:
+        except httpx.RequestError:
             logger.exception("Exception when getting newest item.json file from Riot API.")
 
     def get_champion_portraits(self):
@@ -134,12 +134,12 @@ class RiotAPIClient(GameAPIClient):
             logger.info(f"Downloading champion portrait for '{champ_name}'")
 
             try:
-                data = requests.get(url, stream=True)
+                data = httpx.get(url)
                 with open(filename, "wb") as fp_out:
-                    for chunk in data.iter_content(chunk_size=128):
+                    for chunk in data.iter_bytes(chunk_size=128):
                         fp_out.write(chunk)
 
-            except requests.exceptions.RequestException:
+            except httpx.RequestError:
                 logger.exception(f"Exception when getting champion portrait for {champ_name} from Riot API.")
 
             sleep(0.5)
@@ -160,12 +160,12 @@ class RiotAPIClient(GameAPIClient):
             logger.info(f"Downloading champion splash for '{champ_name}'")
 
             try:
-                data = requests.get(url, stream=True)
+                data = httpx.get(url)
                 with open(filename, "wb") as fp_out:
-                    for chunk in data.iter_content(chunk_size=128):
+                    for chunk in data.iter_bytes(chunk_size=128):
                         fp_out.write(chunk)
 
-            except requests.exceptions.RequestException:
+            except httpx.RequestError:
                 logger.exception(f"Exception when getting champion splash for {champ_name} from Riot API.")
 
             sleep(0.5)
@@ -200,12 +200,12 @@ class RiotAPIClient(GameAPIClient):
                 url = f"{base_url}/{image_name}"
 
                 try:
-                    data = requests.get(url, stream=True)
+                    data = httpx.get(url)
                     with open(filename, "wb") as fp:
-                        for chunk in data.iter_content(chunk_size=128):
+                        for chunk in data.iter_bytes(chunk_size=128):
                             fp.write(chunk)
 
-                except requests.exceptions.RequestException:
+                except httpx.RequestError:
                     logger.exception(f"Exception when getting ability icon for {ability['name']} for {champ_name} from Riot API.")
 
                 sleep(0.5)
@@ -227,12 +227,12 @@ class RiotAPIClient(GameAPIClient):
             logger.info(f"Downloading champion data for '{champ_name}'")
 
             try:
-                data = requests.get(url, stream=True)
+                data = httpx.get(url)
                 with open(filename, "wb") as fp_out:
-                    for chunk in data.iter_content(chunk_size=128):
+                    for chunk in data.iter_bytes(chunk_size=128):
                         fp_out.write(chunk)
 
-            except requests.exceptions.RequestException:
+            except httpx.RequestError:
                 logger.exception(f"Exception when getting champion data for {champ_name} from Riot API.")
 
             sleep(0.5)
@@ -252,17 +252,17 @@ class RiotAPIClient(GameAPIClient):
             logger.info(f"Downloading item icon for '{item_data['data'][item_id]['name']}'")
 
             try:
-                data = requests.get(url, stream=True)
+                data = httpx.get(url)
                 with open(filename, "wb") as fp_out:
-                    for chunk in data.iter_content(chunk_size=128):
+                    for chunk in data.iter_bytes(chunk_size=128):
                         fp_out.write(chunk)
 
-            except requests.exceptions.RequestException:
+            except httpx.RequestError:
                 logger.exception(f"Exception when getting item icon for {item_id} from Riot API.")
 
             sleep(0.5)
 
-    def make_request(self, endpoint, api_route, *params, ignore_errors=[]):
+    async def make_request(self, endpoint, api_route, *params, ignore_errors=[]):
         req_string = endpoint
         for index, param in enumerate(params):
             req_string = req_string.replace("{" + str(index) + "}", str(param))
@@ -270,7 +270,7 @@ class RiotAPIClient(GameAPIClient):
         full_url = api_route + req_string
 
         token_header = {"X-Riot-Token": self.config.riot_key}
-        response = requests.get(full_url, headers=token_header)
+        response = await self.httpx_client.get(full_url, headers=token_header)
 
         if response.status_code != 200 and response.status_code not in ignore_errors:
             logger.bind(
@@ -282,17 +282,17 @@ class RiotAPIClient(GameAPIClient):
 
         return response
 
-    def get_summoner_data(self, summ_name):
+    async def get_summoner_data(self, summ_name):
         endpoint = "/lol/summoner/v4/summoners/by-name/{0}"
-        response = self.make_request(endpoint, API_PLATFORM, summ_name)
+        response = await self.make_request(endpoint, API_PLATFORM, summ_name)
         if response.status_code != 200:
             return None
 
         return response.json()
 
-    def get_player_name(self, puuid):
+    async def get_player_name(self, puuid):
         endpoint = "/riot/account/v1/accounts/by-puuid/{0}"
-        response = self.make_request(endpoint, API_REGION, puuid)
+        response = await self.make_request(endpoint, API_REGION, puuid)
         if response.status_code != 200:
             return None
 
@@ -301,28 +301,28 @@ class RiotAPIClient(GameAPIClient):
     async def get_player_names_for_user(self, user: User) -> list[str]:
         names = []
         for puuid in user.puuid:
-            player_name = self.get_player_name(puuid)
+            player_name = await self.get_player_name(puuid)
             names.append(player_name)
 
             await asyncio.sleep(1)
 
         return names
 
-    def get_active_game(self, puuid):
+    async def get_active_game(self, puuid):
         endpoint = "/lol/spectator/v5/active-games/by-summoner/{0}"
         try:
-            response = self.make_request(endpoint, API_PLATFORM, puuid, ignore_errors=[404])
+            response = await self.make_request(endpoint, API_PLATFORM, puuid, ignore_errors=[404])
             if response.status_code != 200:
                 return None
 
-        except (requests.ConnectionError, requests.RequestException):
+        except (httpx.ConnectError, httpx.RequestError):
             return None
 
         return response.json()
 
     async def get_active_game_for_user(self, user: User):
         for summ_id, puuid in zip(user.player_id, user.puuid):
-            game_info = self.get_active_game(puuid)
+            game_info = await self.get_active_game(puuid)
 
             if game_info is not None:
                 return game_info, summ_id
@@ -331,43 +331,39 @@ class RiotAPIClient(GameAPIClient):
 
         return None, None
 
-    def get_game_timeline(self, game_id, tries=0):
+    async def get_game_timeline(self, game_id, tries=0):
         endpoint = "/lol/match/v5/matches/{0}/timeline"
 
-        response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
+        response = await self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
         if response.status_code != 200:
             if tries > 0:
                 sleep(30)
-                return self.get_game_timeline(game_id, tries-1)
-            else:
-                return None
+                return await self.get_game_timeline(game_id, tries-1)
+
+            return None
 
         return response.json()["info"]
     
-    def get_player_rank(self, summ_id):
+    async def get_player_rank(self, summ_id):
         endpoint = "/lol/league/v4/entries/by-summoner/{0}"
 
-        response = self.make_request(endpoint, API_PLATFORM, summ_id)
+        response = await self.make_request(endpoint, API_PLATFORM, summ_id)
         if response.status_code != 200:
             return None
 
         return response.json()
 
-    def get_game_details(self, game_id, tries=0):
+    async def get_game_details(self, game_id):
         api_v4_cutoff = 5448295599
         if int(game_id) > api_v4_cutoff:
             endpoint = "/lol/match/v5/matches/{0}"
-            response = self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
+            response = await self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
 
         else:
             endpoint = "/lol/match/v4/matches/{0}"
-            response = self.make_request(endpoint, API_PLATFORM, game_id)
+            response = await self.make_request(endpoint, API_PLATFORM, game_id)
 
             return response.json()
-
-        if response.status_code != 200 and tries > 0:
-            sleep(15)
-            return self.get_game_details(game_id, tries-1)
 
         if response.status_code != 200:
             return None
@@ -376,17 +372,17 @@ class RiotAPIClient(GameAPIClient):
         duration = data["gameDuration"]
         data["gameDuration"] = duration if "gameEndTimestamp" in data else duration / 1000 
 
-        sleep(2)
+        await asyncio.sleep(2)
 
         # Get timeline data
-        timeline_data = self.get_game_timeline(game_id)
+        timeline_data = await self.get_game_timeline(game_id)
         data["timeline"] = timeline_data
 
         return data
 
-    def get_champion_mastery(self, puuid):
+    async def get_champion_mastery(self, puuid):
         endpoint = "/lol/champion-mastery/v4/champion-masteries/by-puuid/{0}"
-        response = self.make_request(endpoint, API_PLATFORM, puuid)
+        response = await self.make_request(endpoint, API_PLATFORM, puuid)
 
         if response.status_code != 200:
             return None
