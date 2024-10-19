@@ -1,9 +1,8 @@
 from run_flask import run_app as run_flask_app
-from discbot.discord_bot import run_client as run_discord_client
+from run_discord_bot import run_client as run_discord_client
 
 from time import sleep
 from multiprocessing import Process, Pipe, Manager
-from argparse import ArgumentParser
 
 from discord.opus import load_opus
 from mhooge_flask.logging import logger
@@ -66,18 +65,6 @@ def kill_all_processes(processes):
         sleep(0.25)
         exit(1)
 
-
-# def start_ai_process(config):
-#     ai_end, bot_end_ai = Pipe()
-#     ai_process = Process(
-#         name="AI Model",
-#         target=model.run_loop,
-#         args=(config, ai_end)
-#     )
-#     ai_process.start()
-
-#     return ai_process, bot_end_ai
-
 @restartable
 def main():
     config = Config()
@@ -107,7 +94,7 @@ def main():
 
     api_clients = {
         "lol": RiotAPIClient("lol", config),
-        "cs2": proxy_manager.create_proxy()
+        "cs2": proxy_manager.create_proxy(func_timeouts={"get_game_details": 200})
     }
 
     betting_handlers = {
@@ -117,7 +104,6 @@ def main():
 
     # Start process with machine learning model
     # that trains in the background after each game.
-    #ai_process, our_end_ai = start_ai_process(conf)
 
     logger.info("Starting Flask web app...")
     flask_args = [config, meta_database, game_databases, betting_handlers, api_clients]
@@ -136,15 +122,12 @@ def main():
                 logger.info("Restarting Flask process.")
 
                 flask_process, bot_end_flask = start_flask_process(*flask_args)
-                #ai_process.kill()
 
-                #ai_process, our_end_ai = start_ai_process(conf)
                 bot_process.kill()
                 bot_process, _ = start_discord_process(*discord_args)
 
             if flask_process.exitcode == 2 or bot_process.exitcode == 2:
                 # We have issued a restart command on Discord or the website to restart the program.
-                #ai_process.kill()
                 sync_manager.shutdown()
 
                 # Wait for all subprocesses to exit.
@@ -158,7 +141,7 @@ def main():
             logger.info("Stopping bot...")
             if bot_process.is_alive():
                 bot_process.kill()
-            #ai_process.kill()
+
             flask_process.kill()
             break
 

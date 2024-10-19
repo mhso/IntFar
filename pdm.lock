@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:3976eedc975b42e6584e308b7cdb35b997305f1894a470d49dafbfe6a44fd87a"
+content_hash = "sha256:207fef9f0b69e4d2250d09366019918c6464b0b3572675e6cb4cd7bcba87259d"
 
 [[metadata.targets]]
 requires_python = ">=3.11,<3.12"
@@ -1897,6 +1897,7 @@ files = [
 [[package]]
 name = "steam"
 version = "1.4.4"
+path = "../../steam"
 summary = "Module for interacting with various Steam features"
 groups = ["default"]
 marker = "python_version >= \"3.11\" and python_version < \"3.12\""
@@ -1906,11 +1907,9 @@ dependencies = [
     "pycryptodomex>=3.7.0",
     "requests>=2.9.1",
     "six>=1.10",
+    "urllib3<2",
     "vdf>=3.3",
     "win-inet-pton; python_version == \"2.7\" and sys_platform == \"win32\"",
-]
-files = [
-    {file = "steam-1.4.4.tar.gz", hash = "sha256:2b5bd6911c0d4a7312f441b8d162b9d8d47c8bebb8efc6c8867393b0323fa52e"},
 ]
 
 [[package]]

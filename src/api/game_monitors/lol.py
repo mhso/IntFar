@@ -93,14 +93,10 @@ class LoLGameMonitor(GameMonitor):
         )
 
     def get_finished_game_status(self, game_info: dict, guild_id: int):
-        if self.game_database.game_exists(game_info["gameId"]):
-            logger.warning(
-                "We triggered end of game stuff again... Strange!"
-            )
-            return self.POSTGAME_STATUS_DUPLICATE
+        status = super().get_finished_game_status(game_info, guild_id)
 
-        if len(self.users_in_game.get(guild_id, [])) == 1:
-            return self.POSTGAME_STATUS_SOLO
+        if status is not None:
+            return status
 
         if self.api_client.is_urf(game_info["gameMode"]):
             # Gamemode was URF.
@@ -114,20 +110,17 @@ class LoLGameMonitor(GameMonitor):
             # Game was too short to count. Probably a remake.
             return self.POSTGAME_STATUS_REMAKE
 
-        self.active_game[guild_id]["queue_id"] = game_info["queueId"]
         return self.POSTGAME_STATUS_OK
 
-    async def get_finished_game_info(self, guild_id):
+    async def get_finished_game_info(self, guild_id: int):
         game_id = self.active_game[guild_id]["id"]
-
-        logger.bind(event="game_over", game="lol").info(f"GAME OVER! Active game: {game_id}")
 
         # Check if game was a custom game, if so don't save stats.
         custom_game = self.active_game[guild_id].get("game_type", "") == "CUSTOM_GAME"
 
         game_info = None
         if not custom_game:
-            game_info = await self.try_get_finished_game_info(game_id)
+            game_info, status_code = await self.try_get_finished_game_info(game_id, guild_id)
 
         if custom_game: # Do nothing.
             logger.info(f"Game was a custom game: {game_id}")
@@ -142,7 +135,7 @@ class LoLGameMonitor(GameMonitor):
             status_code = self.POSTGAME_STATUS_MISSING
 
         else:
-            status_code = self.get_finished_game_status(game_info, guild_id)
+            self.active_game[guild_id]["queue_id"] = game_info["queueId"]
 
         # Get rank of each player in the game, if status is OK
         player_ranks = {}

@@ -3,7 +3,7 @@ PRAGMA journal_mode = 'wal';
 CREATE TABLE [users] (
     [disc_id] INTEGER NOT NULL,
     [player_name] NVARCHAR(64) NOT NULL,
-    [player_id] INTEGER NOT NULL,
+    [player_id] NVARCHAR(64) NOT NULL,
     [match_auth_code] INTEGER NOT NULL,
     [latest_match_token] NVARCHAR(64) NOT NULL,
     [main] INTEGER(1),

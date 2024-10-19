@@ -20,6 +20,10 @@ class CS2GameDatabase(GameDatabase):
                     self.game_users[disc_id].latest_match_token[index] = sharecode
                     break
 
+    def get_latest_sharecode(self, player_id):
+        with self:
+            return self.execute_query("SELECT latest_match_token FROM users WHERE player_id=?", player_id).fetchone()[0]
+
     def get_played_count(self, disc_id, playable_id):
         query = """
             SELECT COUNT(*)
@@ -200,7 +204,7 @@ class CS2GameDatabase(GameDatabase):
         """
 
         with self:
-            return self.execute_query(query, disc_id).fetchone()
+            return self.query(query, disc_id, format_func="one")
 
     def get_played_ids(self, disc_id=None, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id, "u.disc_id", disc_id)

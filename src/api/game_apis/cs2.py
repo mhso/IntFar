@@ -141,7 +141,7 @@ class SteamAPIClient(GameAPIClient):
                 return None
 
             with open(f"{filename}.dem.bz2", "wb") as fp:
-                for chunk in data.iter_bytes(chunk_size=128):
+                async for chunk in data.aiter_bytes(chunk_size=128):
                     fp.write(chunk)
 
         except httpx.RequestError:
@@ -149,6 +149,17 @@ class SteamAPIClient(GameAPIClient):
             return None
 
         return filename
+
+    def _parse_in_thread(self, demo_file: str, demo_bytes: bytes):
+        # Decompress the gz2 compressed demo file
+        decompressed = bz2.decompress(demo_bytes)
+        with open(demo_file, "wb") as fp:
+            fp.write(decompressed)
+
+        # Parse the demo using awpy
+        parser = DemoParser(demofile=demo_file)
+
+        return parser.parse()
 
     async def parse_demo(self, demo_url: str):
         """
@@ -159,10 +170,10 @@ class SteamAPIClient(GameAPIClient):
         demo_bz2_file = f"{demo_file}.dem.bz2"
         demo_dem_file = f"{demo_file}.dem"
         demo_json_file = f"{demo_file}.json"
-        parser = None
 
         try:
             # Download and save the demo file to disk
+            logger.info("Downloading CS2 demo...")
             demo_file = await self.download_demo_file(demo_file, demo_url)
 
             if demo_file is None:
@@ -172,14 +183,8 @@ class SteamAPIClient(GameAPIClient):
                 with open(demo_bz2_file, "rb") as fp:
                     all_bytes = fp.read()
 
-                # Decompress the gz2 compressed demo file
-                decompressed = await run_async_in_thread(bz2.compress, all_bytes)
-                with open(demo_dem_file, "wb") as fp:
-                    fp.write(decompressed)
-
-                # Parse the demo using awpy
-                parser = DemoParser(demofile=demo_dem_file)
-                demo_game_data = await run_async_in_thread(parser.parse)
+                logger.info("Parsing CS2 demo...")
+                demo_game_data = await run_async_in_thread(self._parse_in_thread, demo_dem_file, all_bytes)
                 demo_game_data["demo_parse_status"] = "parsed"
 
         except OSError: # Demo file was corrupt
@@ -187,10 +192,7 @@ class SteamAPIClient(GameAPIClient):
             demo_game_data = {"demo_parse_status": "malformed"}
 
         except Exception: # Probably parsing error
-            if parser and parser.parse_error:
-                logger.bind(demo_url=demo_url).error("Demo parsing error from awpy.")
-            else:
-                logger.bind(demo_url=demo_url).exception("Generic error when parsing demo.")
+            logger.bind(demo_url=demo_url).exception("Generic error when parsing demo.")
 
             demo_game_data = {"demo_parse_status": "error"}
 
@@ -224,21 +226,18 @@ class SteamAPIClient(GameAPIClient):
         game_info = await self.get_basic_match_info(match_sharecode)
         round_stats = game_info["matches"][0]["roundstatsall"]
 
-        if "map" in round_stats[-1]:
-            demo_url = round_stats[-1]["map"]
+        demo_url = round_stats[-1]["map"]
 
-            game_info.update(await self.parse_demo(demo_url))
-        else:
-            game_info["demo_parse_status"] = "unsupported"
+        game_info.update(await self.parse_demo(demo_url))
 
-        if game_info["demo_parse_status"] != "parsed":
+        if game_info["demo_parse_status"] == "error":
             return None
 
-        game_info["matchID"] = match_sharecode
+        game_info["gameId"] = match_sharecode
 
         return game_info
 
-    async def get_active_game(self, steam_id) -> dict:
+    async def get_active_game(self, steam_id: str) -> dict:
         self.cs_client.request_watch_info_friends([self.get_account_id(steam_id)])
         resp = await self.wait_event_async(self.cs_client, "watch_info", 10, False)
 
@@ -258,11 +257,11 @@ class SteamAPIClient(GameAPIClient):
 
         return None, None
 
-    async def get_next_sharecode(self, steam_id, auth_code, match_token):
+    async def get_next_sharecode(self, steam_id: str, auth_code: str, match_token: str):
         url = _ENDPOINT_NEXT_MATCH.replace(
             "[key]", self.config.steam_key
         ).replace(
-            "[steam_id]", str(steam_id)
+            "[steam_id]", steam_id
         ).replace(
             "[steam_id_key]", auth_code
         ).replace(
@@ -284,34 +283,28 @@ class SteamAPIClient(GameAPIClient):
 
         json_response = response.json()
 
-        logger.bind(
-            url=url,
-            response=response.text,
-            status_code=response.status_code 
-        ).info("Next sharecode valid response")
-
         if response.status_code == 202 and json_response["result"]["nextcode"] == "n/a":
             return None
 
         return json_response["result"]["nextcode"]
 
-    def get_account_id(self, steam_id):
-        return SteamID(int(steam_id)).account_id
+    def get_account_id(self, steam_id: str):
+        return SteamID(steam_id).account_id
 
-    def get_map_name(self, map_id):
+    def get_map_name(self, map_id: str):
         return self.map_names.get(map_id)
 
-    def get_map_id(self, game_type):
+    def get_map_id(self, game_type: int):
         return self.game_types.get(int(game_type))
 
-    def get_playable_name(self, map_id):
+    def get_playable_name(self, map_id: str):
         return self.get_map_name(map_id)
 
-    async def get_player_name(self, steam_id):
+    async def get_player_name(self, steam_id: str):
         url = _ENDPOINT_PLAYER_SUMMARY.replace(
             "[key]", self.config.steam_key
         ).replace(
-            "[steam_id]", str(steam_id)
+            "[steam_id]", steam_id
         )
 
         response = await self.httpx_client.get(url)
@@ -319,7 +312,7 @@ class SteamAPIClient(GameAPIClient):
             return None
 
         for player in response.json().get("response", {}).get("players", []):
-            if player["steamid"] == str(steam_id):
+            if player["steamid"] == steam_id:
                 return player["personaname"]
 
         return None
@@ -334,14 +327,14 @@ class SteamAPIClient(GameAPIClient):
 
         return names
 
-    async def is_person_ingame(self, steam_id):
+    async def is_person_ingame(self, steam_id: str):
         """
         Returns a boolean indicating whether the user with the given Steam ID is in a game of CS.
         """
         url = _ENDPOINT_PLAYER_SUMMARY.replace(
             "[key]", self.config.steam_key
         ).replace(
-            "[steam_id]", str(steam_id)
+            "[steam_id]", steam_id
         )
 
         try:
@@ -353,7 +346,7 @@ class SteamAPIClient(GameAPIClient):
             return False
 
         for player in response.json().get("response", {}).get("players", []):
-            if player["steamid"] == str(steam_id):
+            if player["steamid"] == steam_id:
                 return int(player.get("gameid", "0")) == self.cs2_app_id
 
         return False
@@ -387,7 +380,7 @@ class SteamAPIClient(GameAPIClient):
 
         return candidates[0] if len(candidates) == 1 else None
 
-    async def send_friend_request(self, steam_id):
+    async def send_friend_request(self, steam_id: str):
         try:
             self.steam_client.send(MsgProto(EMsg.ClientAddFriend), {"steamid_to_add": int(steam_id)})
             resp_msg = await self.wait_event_async(self.steam_client, EMsg.ClientAddFriendResponse, 5, False)
@@ -412,10 +405,10 @@ class SteamAPIClient(GameAPIClient):
 
     def _handle_steam_start(self):
         self.cs_client.launch()
-
+        self.steam_client.run_forever()
         self.logged_on_once = True
 
-        self.steam_client.run_forever()
+        logger.info("Steam and CS2 client started.")
 
     def _handle_steam_error(self, error):
         logger.bind(steam_error=error).error("Steam Client error")
@@ -425,6 +418,7 @@ class SteamAPIClient(GameAPIClient):
             self.steam_client.relogin()
 
     def _handle_steam_disconnect(self):
+        logger.warning("Steam disconnected!")
         if self.logged_on_once:
             self.steam_client.reconnect(maxdelay=30)
 
@@ -436,11 +430,28 @@ class SteamAPIClient(GameAPIClient):
         return p.communicate()[0]
 
     def login(self):
-        self.steam_client.login(
-            self.config.steam_username,
-            self.config.steam_password,
-            two_factor_code=self.get_2fa_codes()
-        )
+        attempts = 3
+        success = False
+        for _ in range(attempts):
+            status_code = self.steam_client.login(
+                self.config.steam_username,
+                self.config.steam_password,
+                two_factor_code=self.get_2fa_codes()
+            )
+
+            if status_code == EResult.OK:
+                success = True
+
+            if status_code not in (EResult.TryAnotherCM, EResult.TwoFactorCodeMismatch):
+                break
+
+            logger.warning("Could not login to Steam client! Retrying...")
+            sleep(10)
+
+        if not success:
+            logger.error(
+                f"Could not login to Steam client after {attempts} attempts! Error code: {status_code.value} ({status_code.name})"
+            )
 
     def is_logged_in(self):
         return self.steam_client.logged_on

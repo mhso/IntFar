@@ -1,10 +1,6 @@
-from src.discbot.discord_bot import DiscordClient
-
-class MockDiscordClient(DiscordClient):
-    pass
-
-class MockMessage:
-    pass
+class MockDiscordClient:
+    async def insert_emotes(self):
+        pass
 
 class MockChannel:
     def __init__(self):
@@ -12,3 +8,7 @@ class MockChannel:
 
     async def send(self, message: str):
         self.messages_sent.append(message)
+
+class MockMessage:
+    def __init__(self, channel: MockChannel):
+        self.channel = channel

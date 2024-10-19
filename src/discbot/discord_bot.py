@@ -223,14 +223,7 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         :param status_code: Integer that describes the status of the finished game
         """        
-        if post_game_stats.status_code == game_monitor.POSTGAME_STATUS_SHORT_MATCH:
-            # Game was too short, most likely an early surrender
-            response = (
-                "That game was a short match or was surrendered early, no stats are saved {emote_suk_a_hotdok}"
-            )
-            await self.channels_to_write[post_game_stats.guild_id].send(self.insert_emotes(response))
-
-        elif post_game_stats.status_code == game_monitor.POSTGAME_STATUS_SURRENDER:
+        if post_game_stats.status_code == game_monitor.POSTGAME_STATUS_SURRENDER:
             # Game was too short, most likely an early surrender
             response = (
                 f"That game lasted less than {game_monitor.min_game_minutes} minutes "
@@ -242,7 +235,7 @@ class DiscordClient(discord.Client):
         elif post_game_stats.status_code in (
             game_monitor.POSTGAME_STATUS_OK,
             game_monitor.POSTGAME_STATUS_DEMO_MISSING,
-            game_monitor.POSTGAME_STATUS_DEMO_UNSUPORTED
+            game_monitor.POSTGAME_STATUS_DEMO_MALFORMED
         ):
             demo_response = None
             if post_game_stats.status_code == game_monitor.POSTGAME_STATUS_DEMO_MISSING:
@@ -250,9 +243,9 @@ class DiscordClient(discord.Client):
                     "Demo file was not found on Valve's servers! Nothing we can do :( "
                     "Only basic data like kills, deaths, assists, etc. will be saved."
                 )
-            elif post_game_stats.status_code == game_monitor.POSTGAME_STATUS_DEMO_UNSUPORTED:
+            elif post_game_stats.status_code == game_monitor.POSTGAME_STATUS_DEMO_MALFORMED:
                 demo_response = (
-                    "Valve does not support demos for CS2 yet, nothing we can do :( "
+                    "Demo file was corrupt. This happens sometimes (Valve, pls fix). "
                     "Only basic data like kills, deaths, assists, etc. will be saved."
                 )
 
@@ -279,87 +272,96 @@ class DiscordClient(discord.Client):
             f"Good day for a **{api_util.SUPPORTED_GAMES[post_game_stats.game]}** game " + "{emote_happy_nono}"
         )
 
-        # Get message about Int-Far or honorable mentions
-        intfar_id, intfar_data, ties, ties_msg = post_game_stats.intfar_data
-        intfar_streak, prev_intfar = post_game_stats.intfar_streak_data
+        if post_game_stats.intfar_data is not None:
+            # Get message about Int-Far or honorable mentions
+            intfar_id, intfar_data, ties, ties_msg = post_game_stats.intfar_data
+            intfar_streak, prev_intfar = post_game_stats.intfar_streak_data
 
-        if post_game_stats.intfar_data[0] is not None:
-            if ties:
-                logger.info("There are Int-Far ties.")
-                logger.info(ties_msg)
+            if post_game_stats.intfar_data[0] is not None:
+                if ties:
+                    logger.info("There are Int-Far ties.")
+                    logger.info(ties_msg)
 
-            intfar_response = self.get_intfar_message(
-                awards_handler,
-                intfar_id,
-                intfar_data,
-                ties,
-                ties_msg,
-                intfar_streak,
-                prev_intfar
-            )
-        else:
-            logger.info("No Int-Far that game.")
-            intfar_response = self.get_honorable_mentions_msg(awards_handler, intfar_streak, prev_intfar)
+                intfar_response = self.get_intfar_message(
+                    awards_handler,
+                    intfar_id,
+                    intfar_data,
+                    ties,
+                    ties_msg,
+                    intfar_streak,
+                    prev_intfar
+                )
+            else:
+                logger.info("No Int-Far that game.")
+                intfar_response = self.get_honorable_mentions_msg(awards_handler, intfar_streak, prev_intfar)
 
-        response += "\n" + intfar_response
+            response += "\n" + intfar_response
 
-        # Get message about big doinks awarded
-        doinks_mentions, doinks = post_game_stats.doinks_data
-        doinks_response = self.get_big_doinks_msg(awards_handler, doinks_mentions)
-        if doinks_response is not None:
-            response += "\n" + self.insert_emotes(doinks_response)
+        if post_game_stats.doinks_data is not None:
+            # Get message about big doinks awarded
+            doinks_mentions, doinks = post_game_stats.doinks_data
+            doinks_response = self.get_big_doinks_msg(awards_handler, doinks_mentions)
+            if doinks_response is not None:
+                response += "\n" + self.insert_emotes(doinks_response)
 
-        # Get message about rank promotion/demotion
-        rank_mentions = post_game_stats.ranks_data
-        ranks_reponse = self.get_rank_mentions_msg(awards_handler, rank_mentions)
-        if ranks_reponse is not None:
-            response += "\n" + self.insert_emotes(ranks_reponse)
+        if post_game_stats.ranks_data is not None:
+            # Get message about rank promotion/demotion
+            ranks_reponse = self.get_rank_mentions_msg(awards_handler, post_game_stats.ranks_data)
+            if ranks_reponse is not None:
+                response += "\n" + self.insert_emotes(ranks_reponse)
 
-        # Get message about about win or loss streaks
-        active_streaks, broken_streaks = post_game_stats.winstreak_data
-        game_streak_response = self.get_win_loss_streak_message(awards_handler, active_streaks, broken_streaks)
-        if game_streak_response is not None:
-            response += "\n" + game_streak_response
+        if post_game_stats.winstreak_data is not None:
+            # Get message about about win or loss streaks
+            active_streaks, broken_streaks = post_game_stats.winstreak_data
+            game_streak_response = self.get_win_loss_streak_message(awards_handler, active_streaks, broken_streaks)
+            if game_streak_response is not None:
+                response += "\n" + game_streak_response
 
         await self.channels_to_write[post_game_stats.guild_id].send(response)
 
         await asyncio.sleep(1)
 
-        # Resolve any active bets made on the game.
-        response, max_tokens_id, new_max_tokens_id = self.resolve_bets(post_game_stats.parsed_game_stats)
+        response = None
 
-        if max_tokens_id != new_max_tokens_id: # Assign new 'goodest_boi' title.
-            await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
+        if post_game_stats.intfar_data is not None:
+            # Resolve any active bets made on the game.
+            response, max_tokens_id, new_max_tokens_id = self.resolve_bets(post_game_stats.parsed_game_stats)
 
-        # Get message about timeline data events for the game
-        timeline_mentions = post_game_stats.timeline_data
-        timeline_response = self.get_timeline_msg(awards_handler, timeline_mentions)
-        if timeline_response is not None:
-            response = timeline_response + "\n" + response
+            if max_tokens_id != new_max_tokens_id: # Assign new 'goodest_boi' title.
+                await self.assign_top_tokens_role(max_tokens_id, new_max_tokens_id)
 
-        # Get message for other cool stats about players
-        cool_stats_mentions = post_game_stats.cool_stats_data
-        cool_stats_response = self.get_cool_stats_msg(awards_handler, cool_stats_mentions)
-        if cool_stats_response is not None:
-            response = cool_stats_response + "\n" + response
+        if post_game_stats.timeline_data is not None:
+            # Get message about timeline data events for the game
+            timeline_response = self.get_timeline_msg(awards_handler, post_game_stats.timeline_data)
+            if timeline_response is not None:
+                response = timeline_response + "\n" + response
 
-        # Get message for beaten records
-        best_records, worst_records = post_game_stats.beaten_records_data
-        if best_records != [] or worst_records != []:
-            records_response = self.get_beaten_records_msg(
-                post_game_stats.parsed_game_stats, best_records, worst_records
-            )
-            response = records_response + "\n" + response
+        if post_game_stats.cool_stats_data is not None:
+            # Get message for other cool stats about players
+            cool_stats_response = self.get_cool_stats_msg(awards_handler, post_game_stats.cool_stats_data)
+            if cool_stats_response is not None:
+                response = cool_stats_response + "\n" + response
 
-        # Get message about lifetime achievements
-        lifetime_mentions = post_game_stats.lifetime_data
-        lifetime_stats = self.get_lifetime_stats_msg(awards_handler, lifetime_mentions)
-        if lifetime_stats is not None:
-            response = lifetime_stats + "\n" + response
+        if post_game_stats.beaten_records_data is not None:
+            # Get message for beaten records
+            best_records, worst_records = post_game_stats.beaten_records_data
+            if best_records != [] or worst_records != []:
+                records_response = self.get_beaten_records_msg(
+                    post_game_stats.parsed_game_stats, best_records, worst_records
+                )
+                response = records_response + "\n" + response
 
-        await self.channels_to_write[post_game_stats.guild_id].send(response)
+        if post_game_stats.lifetime_data is not None:
+            # Get message about lifetime achievements
+            lifetime_stats = self.get_lifetime_stats_msg(awards_handler, post_game_stats.lifetime_data)
+            if lifetime_stats is not None:
+                response = lifetime_stats + "\n" + response
 
-        await self.play_event_sounds(post_game_stats.game, intfar_id, doinks, post_game_stats.guild_id)
+        if response is not None:
+            await self.channels_to_write[post_game_stats.guild_id].send(response)
+
+        if post_game_stats.intfar_data is not None and post_game_stats.doinks_data is not None:
+            await self.play_event_sounds(post_game_stats.game, intfar_id, doinks, post_game_stats.guild_id)
 
     def get_game_start(self, game, guild_id):
         return self.game_monitors[game].active_game.get(guild_id, {}).get("start", None)
@@ -570,6 +572,14 @@ class DiscordClient(discord.Client):
         listeners = self.event_listeners.get(event, [])
         listeners.append((callback, args))
         self.event_listeners[event] = listeners
+
+    async def emit_event(self, event, *extra_args):
+        for (callback, args) in self.event_listeners.get(event, []):
+            evaluated = callback(*args, *extra_args)
+            if asyncio.iscoroutine(evaluated):
+                return await evaluated
+            
+            return evaluated
 
     def try_get_user_data(self, name, guild_id):
         if name.startswith("<@"): # Mention string
@@ -1737,10 +1747,7 @@ class DiscordClient(discord.Client):
                 self.channels_to_write[guild.id] = guild.text_channels[0]
 
         # Call any potential listeners on the 'ready' event
-        for (callback, args) in self.event_listeners.get("ready", []):
-            evaluated = callback(*args)
-            if asyncio.iscoroutine(evaluated):
-                await evaluated
+        self.emit_event("ready")
 
         asyncio.create_task(self.polling_loop())
 
@@ -1894,8 +1901,9 @@ class DiscordClient(discord.Client):
         if msg.startswith("!"): # Message is a command.
             split = msg.split(None)
             command = split[0][1:].lower()
+            args = split[1:]
 
-            valid_cmd, show_usage = commands_util.valid_command(message, command, split[1:])
+            valid_cmd, show_usage, handler = self.emit_event("command", self, message, command)
             if not valid_cmd:
                 if command == "usage":
                     await message.channel.send(
@@ -1946,8 +1954,7 @@ class DiscordClient(discord.Client):
 
             self.last_command_time[command] = time()
 
-            command_handler = commands.get_handler(command)
-            await command_handler.handle_command(self, message, split[1:])
+            await handler(args)
 
     async def send_message_unprompted(self, message, guild_id):
         try:
@@ -1969,16 +1976,3 @@ class DiscordClient(discord.Client):
         await super().close()
 
         self.api_clients["cs2"].close()
-
-def run_client(config, meta_database, game_databases, betting_handlers, api_clients, ai_pipe, flask_pipe, main_pipe):
-    client = DiscordClient(
-        config,
-        meta_database,
-        game_databases,
-        betting_handlers,
-        api_clients,
-        ai_pipe=ai_pipe,
-        flask_pipe=flask_pipe,
-        main_pipe=main_pipe,
-    )
-    client.run(config.discord_token)

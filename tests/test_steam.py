@@ -14,7 +14,9 @@ def send_from_proc(proxy, conn):
     tries = 10
     success = 0
     for _ in range(tries):
+        print("before", flush=True)
         logged_in = proxy.is_logged_in()
+        print("after", logged_in, flush=True)
         if logged_in:
             success += 1
 
@@ -78,7 +80,8 @@ def test_stress(steam_proxy: SteamAPIClient):
         count += sleep_time
         sleep(sleep_time)
 
-        for response in wait([conn_1_1, conn_2_1], timeout=0.01):
+        for conn in wait([conn_1_1, conn_2_1], timeout=0.01):
+            response = conn.recv()
             assert response == 10, "Correct count of succesful commands"
             responses_recieved += 1
             if responses_recieved == 2:

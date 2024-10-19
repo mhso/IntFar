@@ -1,8 +1,9 @@
 from datetime import datetime
 
 import api.util as api_util
+from discbot.commands.base import *
 
-def format_item_list(items, headers):
+def format_item_list(items: List[Tuple[str, int, int]], headers: Tuple[str]) -> List[str]:
     strings = []
     max_len_1 = 0
     max_len_2 = 0
@@ -55,68 +56,105 @@ def format_item_list(items, headers):
 
     return list_fmt
 
-async def handle_shop_msg(client, message):
-    if not client.shop_handler.shop_is_open():
-        response = "Shop is closed! It may open again later, who knows."
-        await message.channel.send(response)
-        return
+class ShopCommand(Command):
+    NAME = "shop"
+    DESCRIPTION = (
+        "Get a list of totally real items that you " +
+        "can buy with your hard-earned betting tokens!"
+    )
 
-    items = client.meta_database.get_items_in_shop()
+    async def handle(self):
+        if not self.client.shop_handler.shop_is_open():
+            response = "Shop is closed! It may open again later, who knows."
+            await self.message.channel.send(response)
+            return
 
-    dt_now = datetime.now()
-    time_to_closing = api_util.format_duration(dt_now, client.shop_handler.shop_closing_dt)
+        items = self.client.meta_database.get_items_in_shop()
 
-    response = f"Shop closes in {time_to_closing}!\n"
-    response += "Items in the shop:\n```"
-    response += format_item_list(items, ("Item Name", "Price", "Quantity"))
-    response += "```"
+        dt_now = datetime.now()
+        time_to_closing = api_util.format_duration(dt_now, self.client.shop_handler.shop_closing_dt)
 
-    await message.channel.send(response)
-
-async def handle_buy_msg(client, message, quantity, item):
-    if not client.shop_handler.shop_is_open():
-        response = "Shop is closed! Buying stuff is not possible."
-        await message.channel.send(response)
-        return
-
-    response = client.shop_handler.buy_item(
-        message.author.id, item, quantity
-    )[1]
-
-    await message.channel.send(response)
-
-async def handle_sell_msg(client, message, quantity, item, price):
-    if not client.shop_handler.shop_is_open():
-        response = "Shop is closed! Selling stuff is not possible."
-        await message.channel.send(response)
-        return
-
-    response = client.shop_handler.sell_item(
-        message.author.id, item, price, quantity
-    )[1]
-
-    await message.channel.send(response)
-
-async def handle_cancel_sell_msg(client, message, quantity, item, price):
-    if not client.shop_handler.shop_is_open():
-        response = "Shop is closed! Cancelling a listing is not possible."
-        await message.channel.send(response)
-        return
-
-    response = client.shop_handler.cancel_listing(
-        message.author.id, item, price, quantity
-    )[1]
-
-    await message.channel.send(response)
-
-async def handle_inventory_msg(client, message, target_id):
-    items = client.meta_database.get_items_for_user(target_id)
-    target_name = client.get_discord_nick(target_id, message.guild.id)
-    if items == []:
-        response = f"{target_name} currently owns no items."
-    else:
-        response = f"Items owned by {target_name}:\n```"
-        response += format_item_list(items, ("Item Name", "Quantity"))
+        response = f"Shop closes in {time_to_closing}!\n"
+        response += "Items in the shop:\n```"
+        response += format_item_list(items, ("Item Name", "Price", "Quantity"))
         response += "```"
 
-    await message.channel.send(response)
+        await self.message.channel.send(response)
+
+class BuyCommand(Command):
+    NAME = "buy"
+    DESCRIPTION = (
+        "Buy one or more copies of an item from the shop at a " +
+        "given price (or cheapest if no price is given)."
+    )
+    ACCESS_LEVEL = "self"
+    MANDATORY_PARAMS = [CommandParam("quantity"), CommandParam("item")]
+
+    async def handle(self, quantity: int, item: str):
+        if not self.client.shop_handler.shop_is_open():
+            response = "Shop is closed! Buying stuff is not possible."
+            await self.message.channel.send(response)
+            return
+
+        response = self.client.shop_handler.buy_item(
+            self.message.author.id, item, quantity
+        )[1]
+
+        await self.message.channel.send(response)
+
+class SellCommand(Command):
+    NAME = "sell"
+    DESCRIPTION = "Add a listing in the shop for one or more copies of an item that you own."
+    ACCESS_LEVEL = "all"
+    MANDATORY_PARAMS = [CommandParam("quantity"), CommandParam("item"), CommandParam("price")]
+
+    async def handle(self, quantity: int, item: str, price: int):
+        if not self.client.shop_handler.shop_is_open():
+            response = "Shop is closed! Selling stuff is not possible."
+            await self.message.channel.send(response)
+            return
+
+        response = self.client.shop_handler.sell_item(
+            self.message.author.id, item, price, quantity
+        )[1]
+
+        await self.message.channel.send(response)
+
+class CancelSellCommand(Command):
+    NAME = "cancel_sell"
+    DESCRIPTION = (
+        "Cancel a listing in the shop that you made for " +
+        "the given number of items at the given price"
+    )
+    ACCESS_LEVEL = "self"
+    MANDATORY_PARAMS = [CommandParam("quantity"), CommandParam("item"), CommandParam("price")]
+
+    async def handle(self, quantity: int, item: str, price: int):
+        if not self.client.shop_handler.shop_is_open():
+            response = "Shop is closed! Cancelling a listing is not possible."
+            await self.message.channel.send(response)
+            return
+
+        response = self.client.shop_handler.cancel_listing(
+            self.message.author.id, item, price, quantity
+        )[1]
+
+        await self.message.channel.send(response)
+
+class InventoryCommand(Command):
+    NAME = "inventory"
+    DESCRIPTION = "List all the items that your or someone else owns."
+    ACCESS_LEVEL = "self"
+    OPTIONAL_PARAMS = [TargetParam("person")]
+
+    async def handle(self, target_id: int):
+        items = self.client.meta_database.get_items_for_user(target_id)
+        target_name = self.client.get_discord_nick(target_id, self.message.guild.id)
+        if items == []:
+            response = f"{target_name} currently owns no items."
+        else:
+            response = f"Items owned by {target_name}:\n```"
+            response += format_item_list(items, ("Item Name", "Quantity"))
+            response += "```"
+
+        await self.message.channel.send(response)

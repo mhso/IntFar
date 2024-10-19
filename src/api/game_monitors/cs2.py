@@ -9,10 +9,9 @@ from api.game_monitor import GameMonitor
 class CS2GameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_DUPLICATE = 5
-    POSTGAME_STATUS_SHORT_MATCH = 6
-    POSTGAME_STATUS_SURRENDER = 7
-    POSTGAME_STATUS_DEMO_MISSING = 8
-    POSTGAME_STATUS_DEMO_UNSUPORTED = 9
+    POSTGAME_STATUS_SURRENDER = 6
+    POSTGAME_STATUS_DEMO_MISSING = 7
+    POSTGAME_STATUS_DEMO_MALFORMED = 8
 
     @property
     def min_game_minutes(self):
@@ -66,12 +65,11 @@ class CS2GameMonitor(GameMonitor):
         steam_id_map = {}
         for disc_id in user_dict:
             for steam_id in user_dict[disc_id].player_id:
-                steam_id_map[int(steam_id)] = disc_id
+                steam_id_map[str(steam_id)] = disc_id
 
         active_users = []
-        for steam_id in steam_id_map:
-            is_user_active = await self.api_client.is_person_ingame(steam_id)     
-            if is_user_active:
+        for steam_id in steam_id_map:  
+            if await self.api_client.is_person_ingame(steam_id):
                 active_users.append(steam_id)
 
         users_in_current_game = {}
@@ -88,18 +86,19 @@ class CS2GameMonitor(GameMonitor):
                 steam_name = user_dict[disc_id].player_name[0]
 
             user = User.clone(self.game_database.game_users[disc_id])
-            user.player_id = [steam_id]
-            user.player_name = [steam_name]
+            user["player_id"] = [steam_id]
+            user["player_name"] = [steam_name]
+            user["latest_match_token"] = [self.game_database.get_latest_sharecode(steam_id)]
             users_in_current_game[disc_id] = user
 
         if self.active_game.get(guild_id) is not None:
             # Check if game is over
-            next_code = await self._get_next_sharecode(user_dict)
+            next_code = await self._get_next_sharecode(users_in_current_game)
 
             if next_code is not None:
                 # New sharecodes recieved for all players. Game is over!
                 for disc_id in users_in_current_game:
-                    users_in_current_game[disc_id].latest_match_token[0] = next_code
+                    self.users_in_game[guild_id][disc_id].latest_match_token[0] = next_code
 
                 return None, users_in_current_game, None
 
@@ -109,7 +108,7 @@ class CS2GameMonitor(GameMonitor):
                 "start": 0,
                 "map_id": "Unknown",
                 "map_name": "Unknown",
-                "game_type": "Competitive",
+                "game_type": "Premier",
                 "game_mode": "CS2",
             },
             users_in_current_game,
@@ -117,34 +116,23 @@ class CS2GameMonitor(GameMonitor):
         )
 
     def get_finished_game_status(self, game_info: dict, guild_id: int):
-        # Define a value that determines whether the played game was (most likely) a CS2 match
+        status = super().get_finished_game_status(game_info, guild_id)
+
+        if status is not None:
+            return status
+
         last_round = game_info["matches"][0]["roundstatsall"][-1]
-        max_rounds = max(last_round["teamScores"])
-
-        if self.game_database.game_exists(game_info["matchID"]):
-            logger.warning(
-                "We triggered end of game stuff again... Strange!"
-            )
-            return self.POSTGAME_STATUS_DUPLICATE
-
-        if len(self.users_in_game.get(guild_id, [])) == 1:
-            return self.POSTGAME_STATUS_SOLO
-
-        if max_rounds < 10:
-            # Game was a short match
-            return self.POSTGAME_STATUS_SHORT_MATCH
 
         if last_round["matchDuration"] < self.min_game_minutes * 60:
             # Game was too short to count. Probably an early surrender.
             return self.POSTGAME_STATUS_SURRENDER
-        
+
         if game_info["demo_parse_status"] == "missing":
             # Demo was not found on Valve's servers
             return self.POSTGAME_STATUS_DEMO_MISSING
-        
-        if game_info["demo_parse_status"] == "unsupported":
-            # Demos are not supported in CS2 yet
-            return self.POSTGAME_STATUS_DEMO_UNSUPORTED
+
+        if game_info["demo_parse_status"] == "malformed":
+            return self.POSTGAME_STATUS_DEMO_MALFORMED
 
         return self.POSTGAME_STATUS_OK
 
@@ -170,7 +158,7 @@ class CS2GameMonitor(GameMonitor):
             status_code = self.POSTGAME_STATUS_MISSING
 
         else:
-            game_info = await self.try_get_finished_game_info(next_code)
+            game_info, status_code = await self.try_get_finished_game_info(next_code, guild_id)
             if game_info is None:
                 logger.bind(game_id=next_code, guild_id=guild_id).error(
                     "Game info is STILL None after 5 retries! Saving to missing games..."
@@ -178,17 +166,23 @@ class CS2GameMonitor(GameMonitor):
                 game_info = {"gameId": next_code}
                 status_code = self.POSTGAME_STATUS_MISSING
 
-            else:
-                status_code = self.get_finished_game_status(game_info, guild_id)
-
         return game_info, status_code
 
     def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
         post_game_data = super().handle_game_over(game_info, status_code, guild_id)
 
         if post_game_data.status_code not in (self.POSTGAME_STATUS_ERROR, self.POSTGAME_STATUS_MISSING):
+            if post_game_data.status_code != self.POSTGAME_STATUS_OK:
+                # Parse only basic stats if CS2 demo is missing or malformed
+                post_game_data.parsed_game_stats = self.parse_stats(game_info, guild_id)
+                self.save_stats(post_game_data.parsed_game_stats)
+
+                post_game_data.winstreak_data = self.get_winstreak_data(post_game_data.parsed_game_stats)
+
             for disc_id in self.users_in_game[guild_id]:
                 steam_id = self.users_in_game[guild_id][disc_id].player_id[0]
-                self.game_database.set_new_cs2_sharecode(disc_id, steam_id, game_info["matchID"])
+    
+                self.users_in_game[guild_id][disc_id]["latest_match_token"] = [game_info["gameId"]]
+                self.game_database.set_new_cs2_sharecode(disc_id, steam_id, game_info["gameId"])
 
         return post_game_data

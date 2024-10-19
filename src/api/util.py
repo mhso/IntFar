@@ -292,15 +292,22 @@ def get_closest_match(search_str: str, possible_matches: list[str], max_score: i
 
     return closest_match
 
-def _run_task_in_thread(func, result, *args):
-    result.append(func(*args))
+def _run_task_in_thread(func, result, exception, *args):
+    try:
+        result.append(func(*args))
+    except Exception as exc:
+        exception.append(exc)
 
 async def run_async_in_thread(func, *args, sleep_time=0.1):
     result = []
-    thread = Thread(target=_run_task_in_thread, args=(func, result, *args))
+    exception = []
+    thread = Thread(target=_run_task_in_thread, args=(func, result, exception, *args))
     thread.start()
 
-    while result == []:
+    while result == [] and exception == []:
         await asyncio.sleep(sleep_time)
+
+    if exception != []:
+        raise exception.pop()
 
     return result.pop()

@@ -76,10 +76,6 @@ class GameMonitor(ABC):
     async def get_finished_game_info(self, guild_id: int) -> tuple[dict, int]:
         ...
 
-    @abstractmethod
-    def get_finished_game_status(self, game_info: dict, guild_id: int) -> int:
-        ...
-
     async def check_game_status(self, guild_id: int, guild_name: str) -> int:
         """
         Check whether people that are active in voice channels are currently in a game.
@@ -172,27 +168,55 @@ class GameMonitor(ABC):
         elif game_status == self.GAME_STATUS_NOCHANGE: # Sleep for a bit and check game status again.
             await self.poll_for_game_start(guild_id, guild_name)
 
-    async def try_get_finished_game_info(self, game_id, retries=5, start_sleep=30, sleep_delta=10):
+    def get_finished_game_status(self, game_info: dict, guild_id: int):
+        if self.game_database.game_exists(game_info["gameId"]):
+            logger.warning(
+                "We triggered end of game stuff again... Strange!"
+            )
+            return self.POSTGAME_STATUS_DUPLICATE
+
+        if len(self.users_in_game.get(guild_id, [])) == 1:
+            return self.POSTGAME_STATUS_SOLO
+        
+        return None
+
+    async def _get_finished_game_and_status(self, game_id: str, guild_id: int):
+        game_info = await self.api_client.get_game_details(game_id)
+
+        if game_info is None:
+            return None, self.POSTGAME_STATUS_ERROR
+
+        status = self.get_finished_game_status(game_info, guild_id)
+
+        return game_info, status
+
+    async def try_get_finished_game_info(self, game_id: str, guild_id: int, retries=5, start_sleep=30, sleep_delta=10):
         """
         Try to get game details from game API client. If this fails, retry the specified
         amount of times, sleeping inbetween.
         """
-        game_info = await self.api_client.get_game_details(game_id)
+        game_info, status = await self._get_finished_game_and_status(game_id, guild_id)
+        if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO):
+            return None, status
 
         retry = 0
         retries = 5
         time_to_sleep = start_sleep
-        while game_info is None and retry < retries:
+        while (game_info is None or status != self.POSTGAME_STATUS_OK) and retry < retries:
             logger.warning(
                 f"Game info is None! Retrying in {time_to_sleep} secs..."
             )
 
             await asyncio.sleep(time_to_sleep)
             time_to_sleep += sleep_delta
-            game_info = await self.api_client.get_game_details(game_id)
+
+            game_info, status = await self._get_finished_game_and_status(game_id, guild_id)
+            if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO):
+                return None, status
+
             retry += 1
 
-        return game_info
+        return game_info, status
 
     def get_intfar_data(self, awards_handler: AwardQualifiers):
         intfar_data = awards_handler.get_intfar()
@@ -229,13 +253,13 @@ class GameMonitor(ABC):
         }
         return awards_handler.get_rank_mentions(prev_ranks)
 
-    def get_winstreak_data(self, awards_handler: AwardQualifiers):
+    def get_winstreak_data(self, parsed_game_stats: GameStats):
         active_streaks = {}
         broken_streaks = {}
-        game_result = awards_handler.parsed_game_stats.win
+        game_result = parsed_game_stats.win
         opposite = -game_result
 
-        for stats in awards_handler.parsed_game_stats.filtered_player_stats:
+        for stats in parsed_game_stats.filtered_player_stats:
             disc_id = stats.disc_id
 
             current_streak = self.game_database.get_current_win_or_loss_streak(disc_id, game_result)
@@ -271,17 +295,21 @@ class GameMonitor(ABC):
 
         return best_records, worst_records
 
-    def get_lifetime_stats_data(self, awards_handler: AwardQualifiers):
-        return awards_handler.get_lifetime_stats(self.game_database)
-
-    def get_post_game_data(self, game_info: dict, status_code: int, guild_id: int) -> PostGameStats | None:
+    def parse_stats(self, game_info: dict, guild_id: int):
         try: # Get formatted stats that are relevant for the players in the game.
             stat_parser = get_stat_parser(self.game, game_info, self.api_client, self.game_database.game_users, guild_id)
-            parsed_game_stats = stat_parser.parse_data()
+            return stat_parser.parse_data()
         except ValueError:
             # Game data was not formatted correctly for some reason (Rito/Volvo pls).
             logger.bind(event="parse_stats_error", game_id=game_info["gameId"]).exception("Error when parsing game data!")
             return None
+
+    def get_lifetime_stats_data(self, awards_handler: AwardQualifiers):
+        return awards_handler.get_lifetime_stats(self.game_database)
+
+    def get_post_game_data(self, game_info: dict, status_code: int, guild_id: int) -> PostGameStats | None:
+        # Get formatted stats that are relevant for the players in the game.
+        parsed_game_stats = self.parse_stats(game_info, guild_id)
 
         # Update users in game based on parsed data
         self.users_in_game[guild_id] = {
@@ -304,7 +332,7 @@ class GameMonitor(ABC):
         ranks_mentions = self.get_ranks_data(awards_handler)
 
         # Winstreak data
-        winstreak_data = self.get_winstreak_data(awards_handler)
+        winstreak_data = self.get_winstreak_data(parsed_game_stats)
 
         # Timeline data
         timeline_mentions = self.get_cool_timeline_data(awards_handler)
@@ -354,7 +382,7 @@ class GameMonitor(ABC):
     def handle_game_over(self, game_info: dict, status_code: int, guild_id: int) -> PostGameStats | None:
         """
         Called when a game is over. Combines all the necessary post game data
-        into one object that is returned and passed to any listeners via. a callback.
+        into one object that is returned and passed to any listeners via a callback.
         """
         if status_code in (self.POSTGAME_STATUS_ERROR, self.POSTGAME_STATUS_MISSING):
             self.game_database.save_missed_game(game_info["gameId"], guild_id, int(time()))
@@ -398,6 +426,8 @@ class GameMonitor(ABC):
         if game_status == self.GAME_STATUS_ENDED: # Game is over.
             try:
                 game_id = self.active_game.get(guild_id, {}).get("id")
+                logger.bind(event="game_over", game=self.game).info(f"GAME OVER! Active game: {game_id}")
+
                 game_info, status_code = await self.get_finished_game_info(guild_id)
 
             except Exception:

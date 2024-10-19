@@ -1,21 +1,24 @@
 import inspect
 import subprocess
-import json
 import asyncio
 from time import sleep
 from multiprocessing import Pipe
 from multiprocessing.connection import wait
 from threading import Thread, Event
+from typing import Dict, Type
 
 from mhooge_flask.logging import logger
 
 from api.config import Config
 from api.meta_database import MetaDatabase
 
+_DEFAULT_TIMEOUT = 60
+
 class Proxy(object):
-    def __init__(self, conn, target_cls):
+    def __init__(self, conn, target_cls: Type[object], func_timeouts: Dict[str, int]):
         self.conn = conn
         self.target_cls = target_cls
+        self.func_timeouts = func_timeouts
 
         self._set_attributes()
 
@@ -23,14 +26,14 @@ class Proxy(object):
         for attr in dir(self.target_cls):
             if not attr.startswith("__"):
                 if asyncio.iscoroutinefunction(getattr(self.target_cls, attr)):
-                    async def call(*args, x=attr):
-                        return self.__getattribute__("_call_proxy")(x, *args)
+                    async def call(*args, _x=attr):
+                        return await self.__getattribute__("_acall_proxy")(_x, *args)
 
                     setattr(self, attr, call)
 
                 elif inspect.isfunction(getattr(self.target_cls, attr)):
-                    def call(*args, x=attr):
-                        return self.__getattribute__("_call_proxy")(x, *args)
+                    def call(*args, _x=attr):
+                        return self.__getattribute__("_call_proxy")(_x, *args)
     
                     setattr(self, attr, call)
 
@@ -45,7 +48,17 @@ class Proxy(object):
         self._set_attributes()
 
     def _call_proxy(self, command, *args):
-        self.conn.send((command, *args))
+        timeout = self.func_timeouts.get(command, _DEFAULT_TIMEOUT)
+        self.conn.send((command, timeout, *args))
+        return self.conn.recv()
+
+    async def _acall_proxy(self, command, *args):
+        timeout = self.func_timeouts.get(command, _DEFAULT_TIMEOUT)
+        self.conn.send((command, timeout, *args))
+
+        while not self.conn.poll():
+            await asyncio.sleep(0.01)
+
         return self.conn.recv()
 
 class ProxyManager(object):
@@ -71,14 +84,13 @@ class ProxyManager(object):
 
     def _listen(self):
         command_id = 0
-        timeout = 60
         time_to_sleep = 0.5
 
         while not self._stop_event.is_set():
             try:
                 for proxy in wait(self.proxies, timeout=0.01):
                     try:
-                        command, *args = proxy.recv()
+                        command, timeout, *args = proxy.recv()
                     except (OSError, BrokenPipeError):
                         self.kill()
                         break
@@ -110,11 +122,11 @@ class ProxyManager(object):
             except OSError:
                 break
 
-    def create_proxy(self):
+    def create_proxy(self, func_timeouts={}):
         conn_1, conn_2 = Pipe(True)
         self.proxies.append(conn_1)
 
-        proxy = Proxy(conn_2, self.target_cls)
+        proxy = Proxy(conn_2, self.target_cls, func_timeouts)
 
         return proxy
 

@@ -34,6 +34,8 @@ RANKS = [
     "The Global Elite"
 ]
 
+ROUNDS_PER_HALF = 12
+
 def other_side(side: Literal["CT", "T"]) -> Literal["T", "CT"]:
     """Takes a cs2 side as input and returns the opposite side in the same formatting
 
@@ -612,9 +614,9 @@ class CS2GameStatsParser(GameStatsParser):
             # Parse stats from demo if demo was valid/recent.
             # First determine if we started on t side
             started_t = False
-            t_side_players = [player["steamID"] for player in self.raw_data["gameRounds"][0]["tSide"]["players"]]
+            t_side_players = [str(player["steamID"]) for player in self.raw_data["gameRounds"][0]["tSide"]["players"]]
             for steam_id in t_side_players:
-                if any(int(steam_id) in self.all_users[disc_id].player_id for disc_id in self.all_users.keys()):
+                if any(steam_id in self.all_users[disc_id].player_id for disc_id in self.all_users.keys()):
                     started_t = True
                     break
 
@@ -623,7 +625,7 @@ class CS2GameStatsParser(GameStatsParser):
             # Filter out players not on our team
             player_stats = {}
             for steam_id in both_teams_stats:
-                if (int(steam_id) in t_side_players) ^ (not started_t):
+                if (steam_id in t_side_players) ^ (not started_t):
                     player_stats[steam_id] = both_teams_stats[steam_id]
 
             for rank_entry in self.raw_data["matchmakingRanks"]:
@@ -635,11 +637,11 @@ class CS2GameStatsParser(GameStatsParser):
             players_in_game = []
             for steam_id in player_stats:
                 for disc_id in self.all_users.keys():
-                    if int(steam_id) in self.all_users[disc_id].player_id:
+                    if steam_id in self.all_users[disc_id].player_id:
                         user_game_data = {
                             "disc_id": disc_id,
                             "player_name": [player_stats[steam_id]["playerName"]],
-                            "player_id": [int(steam_id)],
+                            "player_id": [steam_id],
                         }
                         player_stats[steam_id]["disc_id"] = disc_id
                         players_in_game.append(user_game_data)
@@ -654,7 +656,7 @@ class CS2GameStatsParser(GameStatsParser):
             rounds_them = rounds_t if started_t else rounds_ct
 
             total_rounds = rounds_us + rounds_them
-            if total_rounds < 12 or total_rounds > 24:
+            if total_rounds < ROUNDS_PER_HALF or total_rounds > ROUNDS_PER_HALF * 2:
                 # Swap scores if game finished before halftime or in overtime
                 rounds_us, rounds_them = rounds_them, rounds_us
 
@@ -662,7 +664,7 @@ class CS2GameStatsParser(GameStatsParser):
             if rounds_us == rounds_them:
                 win_score = 0
 
-            account_id_map = {self.api_client.get_account_id(int(steam_id)): steam_id for steam_id in player_stats}
+            account_id_map = {self.api_client.get_account_id(steam_id): steam_id for steam_id in player_stats}
 
             map_id = self.raw_data["mapName"].split("_")[-1]
             if not map_id:
@@ -687,7 +689,7 @@ class CS2GameStatsParser(GameStatsParser):
             started_t = False
             for disc_id in self.all_users.keys():
                 for steam_id, steam_name in zip(self.all_users[disc_id].player_id, self.all_users[disc_id].player_name):
-                    account_id = self.api_client.get_account_id(int(steam_id))
+                    account_id = self.api_client.get_account_id(steam_id)
                     try:
                         index = round_stats[max_player_round]["reservation"]["accountIds"].index(account_id)
                         started_t = index > 4
@@ -695,7 +697,7 @@ class CS2GameStatsParser(GameStatsParser):
                         user_game_data = {
                             "disc_id": disc_id,
                             "player_name": [steam_name],
-                            "player_id": [int(steam_id)],
+                            "player_id": [steam_id],
                         }
                         players_in_game.append(user_game_data)
                         break
@@ -768,12 +770,12 @@ class CS2GameStatsParser(GameStatsParser):
         # Get the biggest lead and deficit throughout the course of the game
         biggest_lead = 0
         biggest_deficit = 0
-        for round_data in round_stats:
-            rounds_ct = round_data["teamScores"][0]
-            rounds_t = round_data["teamScores"][1]
+        for index, round_data in enumerate(round_stats, start=1):
+            rounds_1 = round_data["teamScores"][0]
+            rounds_2 = round_data["teamScores"][1]
 
-            rounds_us_then = rounds_t if started_t else rounds_ct
-            rounds_them_then = rounds_ct if started_t else rounds_t
+            rounds_us_then = rounds_2 if started_t else rounds_1
+            rounds_them_then = rounds_1 if started_t else rounds_2
 
             lead = rounds_us_then - rounds_them_then
             deficit = rounds_them_then - rounds_us_then
@@ -806,7 +808,7 @@ class CS2GameStatsParser(GameStatsParser):
                 rank = RANKS.index(player_data["rank"])
 
             parsed_player_stats = CS2PlayerStats(
-                game_id=self.raw_data["matchID"],
+                game_id=self.raw_data["gameId"],
                 disc_id=player_data.get("disc_id"),
                 player_id=steam_or_account_id,
                 kills=player_data["kills"],
@@ -849,7 +851,7 @@ class CS2GameStatsParser(GameStatsParser):
 
         return CS2GameStats(
             game=self.game,
-            game_id=self.raw_data["matchID"],
+            game_id=self.raw_data["gameId"],
             timestamp=timestamp,
             duration=duration,
             win=win_score,

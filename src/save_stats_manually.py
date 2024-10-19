@@ -64,7 +64,7 @@ class TestMock(DiscordClient):
 
         for disc_id in all_users.keys():
             for steam_id in all_users[disc_id].player_id:
-                account_id = self.api_clients[self.game].get_account_id(int(steam_id))
+                account_id = self.api_clients[self.game].get_account_id(steam_id)
                 if account_id in round_stats[max_player_round]["reservation"]["accountIds"]:
                     users_in_game[disc_id] = all_users[disc_id]
                     break

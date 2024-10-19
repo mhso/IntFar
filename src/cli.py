@@ -181,10 +181,10 @@ class TestFuncs:
         stats = self.game_databases["lol"].get_intfar_stats(267401734513491969, True)
         print(stats)
 
-    def test_steam_stuff(self):
-        api_client = SteamAPIClient("csgo", self.config)
+    async def test_steam_stuff(self):
+        api_client = SteamAPIClient("cs2", self.config)
         #steam_ids = [76561198014212213, 76561197970416015]
-        print(api_client.is_person_ingame(76561197970416015))
+        print(await api_client.get_player_name("76561197970416015"))
 
     def test_cs_maps(self):
         api_client = SteamAPIClient("csgo", self.config)
@@ -314,7 +314,7 @@ class TestFuncs:
 
     def awpy(self):
         from awpy import DemoParser
-        match_id = "CSGO-XsTaM-tk7SW-hGPGu-mR4y3-Cq5uC"
+        match_id = "CSGO-syuCM-w45kr-Hce9x-JM7TZ-FFzQN"
         demo_dem_file = f"{self.config.resources_folder}/data/cs2/{match_id}.dem"
         parser = DemoParser(demofile=demo_dem_file, debug=True)
         demo_game_data = parser.parse()

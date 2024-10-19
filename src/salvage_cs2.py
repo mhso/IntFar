@@ -64,7 +64,7 @@ async def parse_missing_demos(config, database, steam_api, sharecode):
         print(f"Parsing {file}...")
 
         game_data = await steam_api.get_basic_match_info(curr_sharecode)
-        game_data["matchID"] = sharecode
+        game_data["gameId"] = sharecode
 
         parser = DemoParser(demofile=file)
         game_data.update(parser.parse())

@@ -27,6 +27,10 @@ class User(dict):
     def clone(user):
         return User(**user)
 
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        setattr(self, key, value)
+
     def __setstate__(self, state):
         self.___dict__ = state
 
