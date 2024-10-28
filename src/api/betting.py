@@ -230,8 +230,7 @@ class BettingHandler(ABC):
             start = "If" if target_id is None else "Since"
             response += f"{start} you bet on this event happening to a *specific* person "
             response += "(not just *anyone*), then the return will be further multiplied "
-            response += "by how many people are in the game (2x return if 2 people are in "
-            response += "the game, 3x return if 3 people, etc)."
+            response += "by how many people are in the game."
 
         return response
 
@@ -382,7 +381,7 @@ class BettingHandler(ABC):
 
             for amount, _, _, base_return, bet_desc in bet_data:
                 response += f"\n- `{bet_desc}` for **{format_tokens_amount(amount)}** {tokens_name} "
-                response += f"(**{base_return}x** return)."
+                response += f"(**{base_return}x** return)"
             response += f"\nThis bet uses the following ticket ID: **{ticket}**. "
             response += "You will need this ticket to cancel the bet.\n"
         else:
@@ -489,8 +488,12 @@ class BettingHandler(ABC):
 
             return (False, err_msg)
 
-        if self.game_database.get_bet_id(disc_id, guild_id, event_id, bet_target, ticket) is not None:
-            err_msg = self._get_bet_error_msg(bet_desc, "Such a bet has already been made!")
+        if (
+            ticket is None
+            and self.game_database.get_bet_id(disc_id, guild_id, event_id, bet_target) is not None
+        ):
+            game_name = SUPPORTED_GAMES[self.game]
+            err_msg = self._get_bet_error_msg(bet_desc, f"Such a bet has already been made for {game_name}!")
             return (False, err_msg)
 
         if running_cost + amount > balance:
@@ -541,6 +544,7 @@ class BettingHandler(ABC):
         any_target = False
         bet_id = None
         used_events = set()
+        all_duplicates = True
 
         try:
             balance = self.meta_database.get_token_balance(disc_id)
@@ -549,8 +553,16 @@ class BettingHandler(ABC):
             # Run through betting amounts, events, target discord IDs, and target names
             for bet_amount, event, target, target_name in zip(amounts, events, targets, target_names):
                 valid, data_or_error = self.check_bet_validity(
-                    disc_id, guild_id, bet_amount, game_timestamp, event,
-                    balance, running_cost, target, target_name, ticket
+                    disc_id,
+                    guild_id,
+                    bet_amount,
+                    game_timestamp,
+                    event,
+                    balance,
+                    running_cost,
+                    target,
+                    target_name,
+                    ticket
                 )
 
                 if not valid:
@@ -558,6 +570,13 @@ class BettingHandler(ABC):
 
                 # Unpack parsed amounts, betting event ID, current game duration, and betting description
                 amount, event_id, game_duration, bet_desc = data_or_error
+
+                # Check if a previously identical multibet has been made
+                if (
+                    all_duplicates 
+                    and self.game_database.get_bet_id(disc_id, guild_id, event_id, target) is None
+                ):
+                    all_duplicates = False
 
                 # Ensure that no events and targets are bet on more than once
                 if (event_id, target) in used_events:
@@ -576,6 +595,10 @@ class BettingHandler(ABC):
                 return_readable = round_digits(base_return)
 
                 bet_data.append((amount, event_id, target, return_readable, bet_desc))
+
+            if all_duplicates:
+                err_msg = f"An identical multi-bet has already been made for {SUPPORTED_GAMES[self.game]}!"
+                return (False, err_msg, None)
 
             # Run through the parsed bet data and generate a string describing
             # the bet and the potential reward it could give
@@ -644,8 +667,8 @@ class BettingHandler(ABC):
         # Describe why a multiplier was given for targetting a specific person
         if any_target:
             reward_equation += (
-                "[players_in_game] is a multiplier. " +
-                f"Because you bet on a specific person, you will get more {tokens_name} if " +
+                "[players_in_game] is a multiplier. "
+                f"Because you bet on a specific person, you will get more {tokens_name} if "
                 "more players are in the game."
             )
 
@@ -753,11 +776,14 @@ class BettingHandler(ABC):
             if ticket is None:
                 bet_desc = self.get_dynamic_bet_desc(event_id, target_name)
                 response = (
-                    f"Bet on `{bet_desc}` for {format_tokens_amount(amount_refunded)} " +
-                    f"{tokens_name} successfully cancelled.\n"
+                    f"Bet on `{bet_desc}` in a {SUPPORTED_GAMES[self.game]} game for "
+                    f"**{format_tokens_amount(amount_refunded)}** {tokens_name} successfully cancelled.\n"
                 )
             else:
-                response = f"Multi-bet with ticket ID **{ticket}** successfully cancelled.\n"
+                response = (
+                    f"Multi-bet for {SUPPORTED_GAMES[self.game]} with "
+                    f"ticket ID **{ticket}** successfully cancelled.\n"
+                )
             response += f"Your {tokens_name} balance is now `{format_tokens_amount(new_balance)}`."
             return (True, response)
         except DBException:

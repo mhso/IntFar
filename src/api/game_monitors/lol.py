@@ -126,8 +126,8 @@ class LoLGameMonitor(GameMonitor):
             logger.info(f"Game was a custom game: {game_id}")
             status_code = self.POSTGAME_STATUS_CUSTOM_GAME
 
-        elif game_info is None: # Game info is still None after 3 retries.
-            # Log error
+        elif game_info is None and status_code not in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO):
+             # Game info is still None after 3 retries, log error
             logger.bind(game_id=game_id, guild_id=guild_id).error(
                 "Game info is STILL None after 5 retries! Saving to missing games..."
             )

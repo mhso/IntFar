@@ -1,3 +1,3 @@
-going balls to the wall, getting {value} entry frags!
-paving the way for the team, winning {value} opening duels!
-holding W and Mouse 1 each round, getting {value} entries!
+going balls to the wall, getting **{value}** entry frags!
+paving the way for the team, winning **{value}** opening duels!
+holding W and Mouse 1 each round, getting **{value}** entries!

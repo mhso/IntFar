@@ -1,3 +1,3 @@
-knowing all the nade lineups, doing {value} damage with utility!
-playing catch with the enemy team, doing {value} damage with nades!
-doing Kobe proud, doing {value} damage with nades!
+knowing all the nade lineups, doing **{value}** damage with utility!
+playing catch with the enemy team, doing **{value}** damage with nades!
+doing Kobe proud, doing **{value}** damage with nades!

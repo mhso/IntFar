@@ -52,8 +52,12 @@ class CS2GameMonitor(GameMonitor):
 
     async def get_active_game_info(self, guild_id):
         if not self.api_client.is_logged_in():
-            # Steam is not logged on, don't try to track games
-            return None, {}, self.GAME_STATUS_NOCHANGE
+            # Steam is not logged on, try to relog once, but then give up
+            logger.info("Steam is not logged in, trying to relog...")
+            self.api_client.login()
+            if not self.api_client.is_logged_in():
+                logger.warning("Could not login to Steam!")
+                return None, {}, self.GAME_STATUS_NOCHANGE
 
         # Create a bunch of maps for different ID representations
         user_dict = (
@@ -159,7 +163,7 @@ class CS2GameMonitor(GameMonitor):
 
         else:
             game_info, status_code = await self.try_get_finished_game_info(next_code, guild_id)
-            if game_info is None:
+            if game_info is None and status_code not in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO):
                 logger.bind(game_id=next_code, guild_id=guild_id).error(
                     "Game info is STILL None after 5 retries! Saving to missing games..."
                 )
@@ -171,7 +175,11 @@ class CS2GameMonitor(GameMonitor):
     def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
         post_game_data = super().handle_game_over(game_info, status_code, guild_id)
 
-        if post_game_data.status_code not in (self.POSTGAME_STATUS_ERROR, self.POSTGAME_STATUS_MISSING):
+        if post_game_data.status_code not in (
+            self.POSTGAME_STATUS_ERROR,
+            self.POSTGAME_STATUS_MISSING,
+            self.POSTGAME_STATUS_DUPLICATE
+        ):
             if post_game_data.status_code != self.POSTGAME_STATUS_OK:
                 # Parse only basic stats if CS2 demo is missing or malformed
                 post_game_data.parsed_game_stats = self.parse_stats(game_info, guild_id)

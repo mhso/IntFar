@@ -143,7 +143,7 @@ class CreateListCommand(Command):
         await self.message.channel.send(self.client.insert_emotes(response))
 
 class AddOrRemoveCommand(Command):
-    def parse_args(self, args: List[str]):
+    async def parse_args(self, args: List[str]):
         list_name = args[0]
 
         list_id = self.client.game_databases[_GAME].get_list_by_name(list_name)[0]

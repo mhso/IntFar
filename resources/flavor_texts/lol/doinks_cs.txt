@@ -1,3 +1,3 @@
-roleplaying Doinb with an insane {value} cs per min!
-trying out for LEC with insane last-hitting, getting {value} cs per min!
-stealing all the cs from his unfortunate teammates, getting {value} cs per min!
+roleplaying Doinb with an insane **{value}** cs per min!
+trying out for LEC with insane last-hitting, getting **{value}** cs per min!
+stealing all the cs from his unfortunate teammates, getting **{value}** cs per min!

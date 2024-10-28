@@ -569,7 +569,6 @@ class CS2PlayerStats(PlayerStats):
 
 @dataclass
 class CS2GameStats(GameStats):
-    map_id: str = None
     map_name: str = None
     started_t: bool = None
     rounds_us: int = None
@@ -770,15 +769,12 @@ class CS2GameStatsParser(GameStatsParser):
         # Get the biggest lead and deficit throughout the course of the game
         biggest_lead = 0
         biggest_deficit = 0
-        for index, round_data in enumerate(round_stats, start=1):
+        for round_data in round_stats:
             rounds_1 = round_data["teamScores"][0]
             rounds_2 = round_data["teamScores"][1]
 
-            rounds_us_then = rounds_2 if started_t else rounds_1
-            rounds_them_then = rounds_1 if started_t else rounds_2
-
-            lead = rounds_us_then - rounds_them_then
-            deficit = rounds_them_then - rounds_us_then
+            lead = rounds_1 - rounds_2
+            deficit = rounds_2 - rounds_1
 
             if lead > biggest_lead:
                 biggest_lead = lead

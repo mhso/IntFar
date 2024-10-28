@@ -783,6 +783,7 @@ class GameDatabase(SQLiteDatabase):
             persons_count = {2: 0, 3: 0, 4: 0, 5: 0}
             for persons in persons_counts:
                 persons_count[persons[0]] += 1
+
             twos_ratio = int((persons_count[2] / game_data[0]) * 100)
             threes_ratio = int((persons_count[3] / game_data[0]) * 100)
             fours_ratio = int((persons_count[4] / game_data[0]) * 100)

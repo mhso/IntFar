@@ -4,7 +4,7 @@ from discord import Message
 from discbot.commands import util as commands_util
 from discbot.discord_bot import DiscordClient
 from api.meta_database import DEFAULT_GAME
-from api.util import GUILD_IDS, MY_GUILD_ID, SUPPORTED_GAMES
+from api.util import SUPPORTED_GAMES
 
 from mhooge_flask.logging import logger
 from mhooge_flask.database import DBException
@@ -150,7 +150,11 @@ class Command:
 
             elif isinstance(param, GameParam):
                 if index >= len(args):
-                    game_value = user.default_game if param.allow_default else None
+                    if param.allow_default:
+                        game_value = user.default_game or DEFAULT_GAME
+                    else:
+                        game_value = None
+
                     parsed_args.append(game_value)
                     continue
 
@@ -164,7 +168,11 @@ class Command:
                         )
                         return None
 
-                    game_value = user.default_game if param.allow_default else None
+                    if param.allow_default:
+                        game_value = user.default_game or DEFAULT_GAME
+                    else:
+                        game_value = None
+
                     parsed_args.append(game_value)
                     continue
 
@@ -177,7 +185,7 @@ class Command:
 
         return parsed_args
 
-    async def __acall__(self, args):
+    async def __call__(self, args):
         try:
             user = self.client.meta_database.all_users.get(self.message.author.id)
 
@@ -280,11 +288,6 @@ def get_handler(cmd: str, client: DiscordClient, message: Message) -> Command:
 
     handler = commands_util.COMMANDS[cmd_name]
 
-    if not handler.GUILD_IDS:
-        handler.GUILD_IDS = GUILD_IDS
-
-    handler.GUILD_IDS += MY_GUILD_ID
-
     return handler(client, message)
 
 def is_command_valid(message: Message, cmd: str, args: List[str]) -> Tuple[bool, bool]:
@@ -322,15 +325,17 @@ def is_command_valid(message: Message, cmd: str, args: List[str]) -> Tuple[bool,
 
     return True, False
 
-def handle_command(client: DiscordClient, message: Message, command: str):
+def handle_command(client: DiscordClient, message: Message, command: str, args: List[str]):
     """
     Check if a command, with the given arguments, appears valid
     and return the appropriate handler if so.
     """
-    valid_command, show_usage = is_command_valid(message, command)
+    valid_command, show_usage = is_command_valid(message, command, args)
     if valid_command:
         handler = get_handler(command, client, message)
+    elif show_usage:
+        handler = get_handler("usage", client, message)
     else:
         handler = None
 
-    return valid_command, show_usage, handler
+    return handler

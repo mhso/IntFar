@@ -148,6 +148,12 @@ class TestMock(DiscordClient):
             if not self.dry_run:
                 self.game_databases[self.game].remove_missed_game(game_id)
 
+        if self.game == "cs2":
+            disc_id = list(game_monitor.users_in_game[guild_id].keys())[0]
+            user = self.game_databases["cs2"].game_users[disc_id]
+            next_code = await self.api_clients["cs2"].get_next_sharecode(user.player_id[0], user.match_auth_code[0], user.latest_match_token[0])
+            print("Next sharecode is:", next_code)
+
         await self.close()
         exit(0)
 

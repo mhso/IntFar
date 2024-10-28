@@ -91,6 +91,7 @@ class GameStats(ABC):
     guild_id: int
     players_in_game: list[dict]
     all_player_stats: list[PlayerStats]
+    map_id: int = None
     intfar_id: int = None
     intfar_reason: str = None
     filtered_player_stats: list[PlayerStats] = field(default=None, init=False)

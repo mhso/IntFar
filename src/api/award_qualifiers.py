@@ -114,6 +114,7 @@ class AwardQualifiers(ABC):
         that subclasses this class.
         """
         return [
+            "game_over",
             "intfar",
             "no_intfar",
             "lifetime_events",
@@ -125,10 +126,13 @@ class AwardQualifiers(ABC):
             "ifotm"
         ]
 
-    def get_flavor_text(self, flavor: str, outer_index, inner_index=None, **params_to_replace) -> str:
+    def get_flavor_text(self, flavor: str, outer_index="random", inner_index=None, **params_to_replace) -> str:
         if inner_index is not None:
             flavor = self.GAME_SPECIFIC_FLAVORS()[flavor][outer_index]
             outer_index = inner_index
+
+        if flavor not in self.flavor_texts:
+            return None
 
         flavor_choices = self.flavor_texts[flavor]
 
@@ -147,6 +151,10 @@ class AwardQualifiers(ABC):
         # Replace various placeholder strings with actual values
         if "{game}" in flavor_text: # Replace game name if it is present in the text
             flavor_text = flavor_text.replace("{game}", SUPPORTED_GAMES[self.game])
+
+        if "{map}" in flavor_text: # Replace map name if present
+            map_name = self.api_client.get_map_name(self.parsed_game_stats.map_id)
+            flavor_text = flavor_text.replace("{map}", map_name)
 
         if "{quantifier}" in flavor_text:
             quantifier = "s" if params_to_replace["value"] != 1 else ""

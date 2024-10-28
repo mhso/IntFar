@@ -168,12 +168,12 @@ class CS2AwardQualifiers(AwardQualifiers):
         by playing exceptionally well.
         Criteria for getting doinks in CS2:
             - Having a KDA of 2.5 or more
-            - Getting 30 kills or more
+            - Getting 25 kills or more
             - Having a headshot percentage of 60% or more
             - Having an ADR of 120 or more
-            - Doing 300 or more damage with utility
-            - Getting 8 or more MVPs
-            - Getting 10 or more entry frags
+            - Doing 250 or more damage with utility
+            - Getting 6 or more MVPs
+            - Getting 8 or more entry frags
             - Getting one or more aces
             - Clutching one or more 1v4s
             - Clutching one or more 1v5s
@@ -187,7 +187,7 @@ class CS2AwardQualifiers(AwardQualifiers):
             if stats.kda >= 2.5:
                 mention_list.append((0, round_digits(stats.kda)))
 
-            if stats.kills >= 30:
+            if stats.kills >= 25:
                 mention_list.append((1, stats.kills))
 
             if stats.headshot_pct >= 60 and stats.kills >= 10:
@@ -196,13 +196,13 @@ class CS2AwardQualifiers(AwardQualifiers):
             if stats.adr is not None and stats.adr >= 120:
                 mention_list.append((3, stats.adr))
 
-            if stats.utility_damage is not None and stats.utility_damage >= 300:
+            if stats.utility_damage is not None and stats.utility_damage >= 250:
                 mention_list.append((4, stats.utility_damage))
 
-            if stats.mvps >= 8:
+            if stats.mvps >= 6:
                 mention_list.append((5, stats.mvps))
 
-            if stats.entries is not None and stats.entries >= 10:
+            if stats.entries is not None and stats.entries >= 8:
                 mention_list.append((6, stats.entries))
 
             if stats.aces is not None and stats.aces > 0:

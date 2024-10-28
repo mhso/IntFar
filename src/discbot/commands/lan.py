@@ -30,7 +30,7 @@ class LANCommand(BaseLANCommand):
     NAME = "lan"
     DESCRIPTION = "Show information about how the current LAN is going."
     ACCESS_LEVEL = "all"
-    GUILDS = [GUILD_MAP["core"]]
+    GUILDS = [api_util.GUILD_MAP["core"]]
 
     async def handle(self):
         lan_party = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY]
@@ -95,7 +95,7 @@ class LANPerformanceCommand(BaseLANCommand):
     DESCRIPTION = "Show the performance of you (or someone else) at the current LAN."
     ACCESS_LEVEL = "all"
     OPTIONAL_PARAMS = [TargetParam("person")]
-    GUILDS = [GUILD_MAP["core"]]
+    GUILDS = [api_util.GUILD_MAP["core"]]
 
     async def handle(self, target_id: int):
         lan_party = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY]
@@ -149,7 +149,7 @@ class LANIntfarCommand(BaseLANCommand):
     TARGET_ALL = True
     ACCESS_LEVEL = "all"
     OPTIONAL_PARAMS = [TargetParam("person")]
-    GUILDS = [GUILD_MAP["core"]]
+    GUILDS = [api_util.GUILD_MAP["core"]]
 
     def _format_intfar(self, disc_id: int, expanded: bool):
         database = self.client.game_databases[_GAME]
@@ -204,7 +204,7 @@ class LANDoinksCommand(BaseLANCommand):
     TARGET_ALL = True
     ACCESS_LEVEL = "all"
     OPTIONAL_PARAMS = [TargetParam("person")]
-    GUILDS = [GUILD_MAP["core"]]
+    GUILDS = [api_util.GUILD_MAP["core"]]
 
     def _format_doinks(self, disc_id: int, expanded: bool):
         database = self.client.game_databases[_GAME]
@@ -255,8 +255,8 @@ class JeopardyJoinCommand(BaseLANCommand):
     NAME = "jeopardy"
     DESCRIPTION = "Join Jeopardy."
     ACCESS_LEVEL = "all"
-    GUILDS = [GUILD_MAP["core"]]
-    
+    GUILDS = [api_util.GUILD_MAP["core"]]
+
     async def handle(self):
         author_id = self.message.author.id
 

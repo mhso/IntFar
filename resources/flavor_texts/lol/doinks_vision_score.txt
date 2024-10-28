@@ -1,3 +1,3 @@
-providing insane map control with a vision score of {value}!
-hating surprises, getting a vision score of {value}!
-lighting up the fog of war with a vision score of {value}!
+providing insane map control with a vision score of **{value}**!
+hating surprises, getting a vision score of **{value}**!
+lighting up the fog of war with a vision score of **{value}**!

@@ -410,8 +410,10 @@ class SteamAPIClient(GameAPIClient):
 
         logger.info("Steam and CS2 client started.")
 
-    def _handle_steam_error(self, error):
-        logger.bind(steam_error=error).error("Steam Client error")
+    def _handle_steam_error(self, status_code):
+        logger.bind(status_code=status_code.value).error(
+            f"Steam Client error! Error code: {status_code.value} ({status_code.name})"
+        )
 
     def _handle_channel_secured(self):
         if self.logged_on_once and self.steam_client.relogin_available:

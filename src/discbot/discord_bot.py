@@ -14,8 +14,6 @@ from streamscape import Streamscape
 
 from discbot.montly_intfar import MonthlyIntfar
 from discbot.app_listener import listen_for_request
-from discbot import commands
-from discbot.commands.meta import handle_usage_msg
 from discbot.commands.split import handle_end_of_split_msg
 from api.award_qualifiers import AwardQualifiers
 from api.awards import get_awards_handler
@@ -268,9 +266,7 @@ class DiscordClient(discord.Client):
             post_game_stats.parsed_game_stats
         )
  
-        response = self.insert_emotes(
-            f"Good day for a **{api_util.SUPPORTED_GAMES[post_game_stats.game]}** game " + "{emote_happy_nono}"
-        )
+        response = self.insert_emotes(awards_handler.get_flavor_text("game_over"))
 
         if post_game_stats.intfar_data is not None:
             # Get message about Int-Far or honorable mentions
@@ -523,7 +519,7 @@ class DiscordClient(discord.Client):
 
         return None
 
-    def get_emoji_by_name(self, emoji_name):
+    def get_emoji_by_name(self, emoji_name: str):
         """
         Return the ID of the emoji matching the given name.
         """
@@ -574,12 +570,15 @@ class DiscordClient(discord.Client):
         self.event_listeners[event] = listeners
 
     async def emit_event(self, event, *extra_args):
+        results = []
         for (callback, args) in self.event_listeners.get(event, []):
             evaluated = callback(*args, *extra_args)
             if asyncio.iscoroutine(evaluated):
-                return await evaluated
-            
-            return evaluated
+                results.append(await evaluated)
+
+            results.append(evaluated)
+
+        return results
 
     def try_get_user_data(self, name, guild_id):
         if name.startswith("<@"): # Mention string
@@ -1472,7 +1471,7 @@ class DiscordClient(discord.Client):
 
         logger.bind(event="ifotm", data=intfar_data).info("IFOTM player data")
 
-        if intfar_data == [] or game in monthly_monitor.disabled_games:
+        if intfar_data == []:
             # No one has played enough games to quality for IFOTM this month
             # or game isn't one for which we announce IFOTM
             logger.bind(event="ifotm_skipped").info(f"Skipping announcing IFOTM for {month_name}...")
@@ -1747,7 +1746,7 @@ class DiscordClient(discord.Client):
                 self.channels_to_write[guild.id] = guild.text_channels[0]
 
         # Call any potential listeners on the 'ready' event
-        self.emit_event("ready")
+        await self.emit_event("ready")
 
         asyncio.create_task(self.polling_loop())
 
@@ -1868,7 +1867,7 @@ class DiscordClient(discord.Client):
                 member = self.get_member_safe(user_id, react_event.guild_id)
                 await self.audio_handler.audio_control_pressed(react_event.emoji, member, channel)
 
-    async def send_dm(self, text, disc_id):
+    async def send_dm(self, text: str, disc_id: int) -> bool:
         """
         Send a private message to the user with the given Discord ID.
         """
@@ -1898,63 +1897,64 @@ class DiscordClient(discord.Client):
             return
 
         msg = message.content.strip()
-        if msg.startswith("!"): # Message is a command.
-            split = msg.split(None)
-            command = split[0][1:].lower()
-            args = split[1:]
+        if not msg.startswith("!"):
+            return
 
-            valid_cmd, show_usage, handler = self.emit_event("command", self, message, command)
-            if not valid_cmd:
-                if command == "usage":
-                    await message.channel.send(
-                        f"Write `!usage [command]` to see how to use a specific command."
-                    )
-                elif show_usage:
-                    await handle_usage_msg(self, message, command)
-                else:
-                    possible_commands = [
-                        cmd for cmd in commands_util.COMMANDS
-                        if message.guild.id in commands_util.COMMANDS[cmd].guilds
-                    ]
+        split = msg.split(None)
+        command = split[0][1:].lower()
+        args = split[1:]
 
-                    if (closest_match := api_util.get_closest_match(command, possible_commands)) is not None:
-                        await message.channel.send(
-                            f"Invalid command `!{command}`, did you mean `!{closest_match}`?"
-                        )
-                return
-
-            # The following lines are spam protection.
-            time_from_last_msg = time() - self.last_message_time.get(message.author.id, 0)
-            self.last_message_time[message.author.id] = time()
-            curr_timeout = self.user_timeout_length.get(message.author.id, 0)
-            if time_from_last_msg < curr_timeout: # User has already received a penalty for spam.
-                if curr_timeout < 10:
-                    curr_timeout *= 2 # Increase penalty...
-                    if curr_timeout > 10: # ... Up to 10 secs. max.
-                        curr_timeout = 10
-                    self.user_timeout_length[message.author.id] = curr_timeout
-                return
-
-            if time_from_last_msg < self.config.message_timeout:
-                # Some guy is sending messages too fast!
-                self.user_timeout_length[message.author.id] = self.config.message_timeout
-                await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
-                return
-
-            self.user_timeout_length[message.author.id] = 0 # Reset user timeout length.
-
-            timeout_length = self.command_timeout_lengths.get(command, 1)
-            time_since_last_command = time() - self.last_command_time.get(command, 0)
-            if time_since_last_command < timeout_length:
-                time_left = timeout_length - time_since_last_command
+        handler = (await self.emit_event("command", self, message, command, args))[0]
+        if handler is None:
+            if command == "usage":
                 await message.channel.send(
-                    f"Hold your horses! This command is on cooldown for {time_left:.1f} seconds."
+                    f"Write `!usage [command]` to see how to use a specific command."
                 )
-                return
+            else:
+                possible_commands = [
+                    cmd for cmd in commands_util.COMMANDS
+                    if message.guild.id in commands_util.COMMANDS[cmd].GUILDS
+                ]
 
-            self.last_command_time[command] = time()
+                if (closest_match := api_util.get_closest_match(command, possible_commands)) is not None:
+                    await message.channel.send(
+                        f"Invalid command `!{command}`, did you mean `!{closest_match}`?"
+                    )
+            return
+        
 
-            await handler(args)
+        # The following lines are spam protection.
+        time_from_last_msg = time() - self.last_message_time.get(message.author.id, 0)
+        self.last_message_time[message.author.id] = time()
+        curr_timeout = self.user_timeout_length.get(message.author.id, 0)
+        if time_from_last_msg < curr_timeout: # User has already received a penalty for spam.
+            if curr_timeout < 10:
+                curr_timeout *= 2 # Increase penalty...
+                if curr_timeout > 10: # ... Up to 10 secs. max.
+                    curr_timeout = 10
+                self.user_timeout_length[message.author.id] = curr_timeout
+            return
+
+        if time_from_last_msg < self.config.message_timeout:
+            # Some guy is sending messages too fast!
+            self.user_timeout_length[message.author.id] = self.config.message_timeout
+            await message.channel.send("Slow down cowboy! You are sending messages real sped-like!")
+            return
+
+        self.user_timeout_length[message.author.id] = 0 # Reset user timeout length.
+
+        timeout_length = self.command_timeout_lengths.get(command, self.config.message_timeout)
+        time_since_last_command = time() - self.last_command_time.get(command, 0)
+        if time_since_last_command < timeout_length:
+            time_left = timeout_length - time_since_last_command
+            await message.channel.send(
+                f"Hold your horses! This command is on cooldown for {time_left:.1f} seconds."
+            )
+            return
+
+        self.last_command_time[command] = time()
+
+        await handler(args)
 
     async def send_message_unprompted(self, message, guild_id):
         try:

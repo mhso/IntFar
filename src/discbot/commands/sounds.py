@@ -201,7 +201,7 @@ class SearchCommand(Command):
         suggestions_msg = await self.message.channel.send(response)
         self.client.audio_handler.youtube_suggestions_msg[self.message.guild.id] = suggestions_msg
 
-    def parse_args(self, args: List[str]):
+    async def parse_args(self, args: List[str]):
         return args
 
 class SoundsCommand(Command):

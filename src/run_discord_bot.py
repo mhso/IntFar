@@ -2,11 +2,17 @@ from glob import glob
 import os
 import importlib
 
+from api.util import GUILD_IDS, MY_GUILD_ID
 from discbot.discord_bot import DiscordClient
 from discbot.commands.base import handle_command, Command
 
 def collect_commands(cmd_class):
     if cmd_class.__subclasses__() == []:
+        if not cmd_class.GUILDS:
+            cmd_class.GUILDS = GUILD_IDS
+
+        cmd_class.GUILDS.append(MY_GUILD_ID)
+
         cmd_class.COMMANDS_DICT[cmd_class.NAME] = cmd_class
         return
 
@@ -14,14 +20,14 @@ def collect_commands(cmd_class):
         collect_commands(sub_cls)
 
 def initialize_commands(client: DiscordClient):
-    files = glob(os.path.dirname(__file__))
+    files = glob(f"{client.config.src_folder}/discbot/commands/*.py")
 
     for file in files:
-        basename = os.path.basename(file)
-        if basename.startswith("_") or basename in ("base.py", "util.py"):
+        basename = os.path.basename(file).replace(".py", "")
+        if basename.startswith("_") or basename in ("base", "util"):
             continue
 
-        importlib.import_module(f".{basename}")
+        importlib.import_module(f"discbot.commands.{basename}")
 
     collect_commands(Command)
 

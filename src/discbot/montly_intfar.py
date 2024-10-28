@@ -26,9 +26,6 @@ class MonthlyIntfar:
             year_to_announce, month_to_announce, 1, hour_of_announce, 0, 0, 0
         )
 
-        # Games for which we shouldn't announce IFOTM (yet)
-        self.disabled_games = ["cs2"]
-
     def should_announce(self):
         """
         Get seconds left until announcement time (first of the month at 12:00).

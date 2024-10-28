@@ -1,3 +1,3 @@
-going dicko mode and clutching {value} 1v4{quantifier} against all odds!
-refusing to crack under pressure, winning {value} 1v4{quantifier}!
-destroying the enemy team's mental, winning {value} 1v4{quantifier}!
+going dicko mode and clutching **{value}** 1v4{quantifier} against all odds!
+refusing to crack under pressure, winning **{value}** 1v4{quantifier}!
+destroying the enemy team's mental, winning **{value}** 1v4{quantifier}!

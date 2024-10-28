@@ -1,4 +1,3 @@
-import json
 from unittest import TestCase
 from tests.synthetic_data.spec import DataSpec
 from tests.synthetic_data.raw_data import create_synthetic_data

@@ -1,4 +1,4 @@
-going completely mental and somehow clutching {value} 1v5{quantifier}!
-stepping up in a insane way, pulling out a win in {value} 1v5{quantifier}!
-doing the impossible, acing {value} bonkers 1v5{quantifier}!
-giga stomping on the enemy shittertons, somehow winning {value} 1v5{quantifier}!
+going completely mental and somehow clutching **{value}** 1v5{quantifier}!
+stepping up in a insane way, pulling out a win in **{value}** 1v5{quantifier}!
+doing the impossible, acing **{value}** bonkers 1v5{quantifier}!
+giga stomping on the enemy shittertons, somehow winning **{value}** 1v5{quantifier}!

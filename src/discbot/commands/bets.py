@@ -5,7 +5,7 @@ import api.util as api_util
 from api.meta_database import DEFAULT_GAME
 from api import betting
 from discbot.commands.base import *
-from discbot.commands.meta import handle_usage_msg
+from discbot.commands.meta import UsageCommand
 from discbot.commands.util import extract_target_name
 
 class BettingCommand(Command):
@@ -16,13 +16,15 @@ class BettingCommand(Command):
     async def handle(self, game: str):
         max_mins = betting.MAX_BETTING_THRESHOLD
         tokens_name = self.client.config.betting_tokens
-        response = "Betting usage: `!bet [game] [amount] [event] (person)`\n"
-        response += "This places a bet on the next (or current) match for the given game.\n"
-        response += f"`!bet [game] all [event] (person)` bets **all** your {tokens_name} on an event!\n"
-        response += f"You can place a bet during a game, but it has to be done before {max_mins} "
-        response += "minutes. Betting during a game returns a lower reward, based on "
-        response += "how much time has passed in the game.\n"
-        response += f"**--- List of available events to bet on for {api_util.SUPPORTED_GAMES[game]} ---**"
+        response = (
+            "Betting usage: `!bet [game] [amount] [event] (person)`\n"
+            "This places a bet on the next (or current) match for the given game.\n"
+            f"`!bet [game] all [event] (person)` bets **all** your {tokens_name} on an event!\n"
+            f"You can place a bet during a game, but it has to be done before {max_mins} "
+            "minutes. Betting during a game returns a lower reward, based on "
+            "how much time has passed in the game.\n"
+            f"**--- List of available events to bet on for {api_util.SUPPORTED_GAMES[game]} ---**"
+        )
         await self.message.channel.send(response)
 
         game_response = ""
@@ -43,7 +45,7 @@ class MakeBetCommand(Command):
 
     async def handle(self, game: str, amounts: List[str], events: List[str], targets: List[str]):
         if events == [] or amounts == [] or None in amounts or None in events:
-            await handle_usage_msg(self.client, self.message, "bet")
+            await UsageCommand(self.client, self.message).handle("bet")
             return
 
         target_ids = []
@@ -85,7 +87,7 @@ class MakeBetCommand(Command):
 
         await self.message.channel.send(response)
 
-    def parse_args(self, args: List[str]):
+    async def parse_args(self, args: List[str]):
         amounts = []
         events = []
         targets = []
@@ -208,7 +210,7 @@ class ActiveBetCommand(Command):
                         response += f"\n=== In **{guild_name}** ==="
 
                     for _, guild_id, _, amounts, events, targets, _, ticket, _ in guild_bets:
-                        bets_str = "\n - "
+                        bets_str = "\n- "
                         total_cost = 0
                         if len(amounts) > 1:
                             bets_str += f"Multi-bet (ticket = {ticket}): "
@@ -224,7 +226,7 @@ class ActiveBetCommand(Command):
 
                             total_cost += amount
 
-                        bets_str += f" for {total_cost} {tokens_name}"
+                        bets_str += f" for **{total_cost}** {tokens_name}"
 
                         response += bets_str
 
@@ -346,13 +348,16 @@ class TokenBalanceCommand(Command):
                 balance, name = get_token_balance(disc_id)
                 balances.append((balance, name))
 
-            balances.sort(key=lambda x: x[0], reverse=True)
+            balances = [
+                f"{name} has **{api_util.format_tokens_amount(balance)}** {tokens_name}"
+                for balance, name
+                in sorted(balances, key=lambda x: x[0], reverse=True)
+            ]
 
-            for balance, name in balances:
-                response += f"\n{name} has **{api_util.format_tokens_amount(balance)}** {tokens_name}"
+            response = "\n".join(balances)
         else:
             balance, name = get_token_balance(target_id)
-            response = f"\n{name} has **{api_util.format_tokens_amount(balance)}** {tokens_name}"
+            response = f"{name} has **{api_util.format_tokens_amount(balance)}** {tokens_name}"
 
         await self.message.channel.send(response)
 

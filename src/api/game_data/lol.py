@@ -126,7 +126,6 @@ class LoLPlayerStats(PlayerStats):
 @dataclass
 class LoLGameStats(GameStats):
     first_blood: int = None
-    map_id: int = None
     queue_id: int = None
     team_id: int = None
     damage_by_our_team: int = None
@@ -555,8 +554,8 @@ class LoLGameStatsParser(GameStatsParser):
             guild_id=self.guild_id,
             players_in_game=active_users,
             all_player_stats=player_stats,
-            first_blood=first_blood_id,
             map_id=self.raw_data["mapId"],
+            first_blood=first_blood_id,
             queue_id=self.raw_data["queueId"],
             team_id=team_id,
             damage_by_our_team=damage_per_team[our_team],
@@ -697,8 +696,8 @@ class LoLGameStatsParser(GameStatsParser):
             guild_id=self.guild_id,
             players_in_game=active_users,
             all_player_stats=player_stats,
-            first_blood=first_blood_id,
             map_id=self.raw_data["mapId"],
+            first_blood=first_blood_id,
             queue_id=self.raw_data["queueId"],
             team_id=team_id,
             damage_by_our_team=damage_per_team[our_team],
