@@ -8,7 +8,7 @@ from api import util as api_util
 from api.config import Config
 from api.game_data import get_stat_parser, get_formatted_stat_names, get_formatted_stat_value
 from discbot.commands.base import *
-from src.discbot.discord_bot import DiscordClient
+from discbot.discord_bot import DiscordClient
 
 config = Config()
 

@@ -13,7 +13,7 @@ from api.game_data import (
 from api.game_data.cs2 import RANKS
 from discbot.commands.misc import get_winrate
 from discbot.commands.base import *
-from src.discbot.discord_bot import DiscordClient
+from discbot.discord_bot import DiscordClient
 
 class StatsCommand(Command):
     NAME = "stats"
@@ -127,7 +127,7 @@ class BestOrWorstStatCommand(Command):
         super().__init__(client, message)
         self.best = best
 
-    async def handle(self, game: str, stat: str, target_id: int):
+    async def handle(self, stat: str, game: str, target_id: int):
         """
         Get the highest or lowest value of the requested stat for the given player
         and write it to Discord. If target_id is None, instead gets the highest/lowest
@@ -178,7 +178,7 @@ class BestOrWorstStatCommand(Command):
         game_summary = None
         if min_or_max_value is not None and game_id is not None:
             min_or_max_value = api_util.round_digits(min_or_max_value)
-            game_summary = self.get_game_summary(self.client, game, game_id, target_id, self.message.guild.id)
+            game_summary = self.get_game_summary(game, game_id, target_id, self.message.guild.id)
 
         emote_to_use = "{emote_pog}" if self.best else "{emote_peberno}"
 

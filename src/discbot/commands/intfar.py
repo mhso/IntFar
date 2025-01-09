@@ -180,7 +180,7 @@ class IntfarCriteriaCommand(Command):
             for reason in intfar_reasons:
                 response += f"- **{reason}**: {intfar_reasons[reason]}\n"
 
-            response += "Write `!intfar_criteria [reason] to see more specific criteria."
+            response += "Write `!intfar_criteria [reason]` to see more specific criteria."
 
         if valid_criteria:
             response += "\nThese criteria must **all** be met to be Int-Far."

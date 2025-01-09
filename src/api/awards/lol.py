@@ -234,12 +234,14 @@ class LoLAwardQualifiers(AwardQualifiers):
             own_epics = (
                 self.parsed_game_stats.our_baron_kills +
                 self.parsed_game_stats.our_dragon_kills +
-                self.parsed_game_stats.our_herald_kills
+                self.parsed_game_stats.our_herald_kills +
+                self.parsed_game_stats.our_atakhan_kills
             )
             enemy_epics = (
                 self.parsed_game_stats.enemy_baron_kills +
                 self.parsed_game_stats.enemy_dragon_kills +
-                self.parsed_game_stats.enemy_herald_kills
+                self.parsed_game_stats.enemy_herald_kills +
+                self.parsed_game_stats.enemy_atakhan_kills
             )
 
             if stats.lane == "JUNGLE" and stats.position == "NONE" and own_epics > 3 and enemy_epics == 0:

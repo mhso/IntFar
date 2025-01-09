@@ -43,7 +43,7 @@ async def home():
                 )
 
         api_client = flask.current_app.config["GAME_API_CLIENTS"]["cs2"]
-        steam_id = int(data["steam_id"])
+        steam_id = data["steam_id"]
         match_token = data["match_token"]
         match_auth_code = data["match_auth_code"]
 

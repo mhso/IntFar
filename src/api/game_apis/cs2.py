@@ -46,6 +46,7 @@ class SteamAPIClient(GameAPIClient):
     def __init__(self, game: str, config: Config):
         super().__init__(game, config)
         self.logged_on_once = False
+        self._logging_on = False
 
         self.map_names = {}
         self.game_types = {
@@ -53,6 +54,7 @@ class SteamAPIClient(GameAPIClient):
             8200: "nuke",
             4104: "inferno",
             2056: "ancient",
+            264: "thera",
             520: "dust2",
             1032: "train",
             16392: "vertigo",
@@ -71,9 +73,7 @@ class SteamAPIClient(GameAPIClient):
         self.steam_client.on("error", self._handle_steam_error)
         self.steam_client.on("channel_secured", self._handle_channel_secured)
         self.steam_client.on("disconnected", self._handle_steam_disconnect)
-
-        if self.is_logged_in():
-            raise RuntimeError("Already logged in to Steam!")
+        self.steam_client.on("auth_code_required", self._handle_2fa_code)
 
         self.login()
 
@@ -210,6 +210,7 @@ class SteamAPIClient(GameAPIClient):
         This includes basic stats about the game (everything seen on the scoreboard
         in-game) as well as a URL to download the demo.
         """
+        self.login()
         code_dict = sharecode.decode(match_sharecode)
         self.cs_client.request_full_match_info(
             code_dict["matchid"],
@@ -238,6 +239,7 @@ class SteamAPIClient(GameAPIClient):
         return game_info
 
     async def get_active_game(self, steam_id: str) -> dict:
+        self.login()
         self.cs_client.request_watch_info_friends([self.get_account_id(steam_id)])
         resp = await self.wait_event_async(self.cs_client, "watch_info", 10, False)
 
@@ -292,7 +294,7 @@ class SteamAPIClient(GameAPIClient):
         return SteamID(steam_id).account_id
 
     def get_map_name(self, map_id: str):
-        return self.map_names.get(map_id)
+        return self.map_names.get(map_id, map_id.capitalize())
 
     def get_map_id(self, game_type: int):
         return self.game_types.get(int(game_type))
@@ -308,6 +310,8 @@ class SteamAPIClient(GameAPIClient):
         )
 
         response = await self.httpx_client.get(url)
+        logger.info("Response code: ", response.status_code)
+        logger.info("Response json: ", response.json())
         if response.status_code != 200:
             return None
 
@@ -320,7 +324,9 @@ class SteamAPIClient(GameAPIClient):
     async def get_player_names_for_user(self, user: User) -> list[str]:
         names = []
         for steam_id in user.player_id:
+            logger.info(f"Getting username for Steam ID {steam_id}", flush=True)
             player_name = await self.get_player_name(steam_id)
+            logger.info(f"Name: {player_name}", flush=True)
             names.append(player_name)
 
             await asyncio.sleep(1)
@@ -339,7 +345,7 @@ class SteamAPIClient(GameAPIClient):
 
         try:
             response = await self.httpx_client.get(url, timeout=20)
-        except httpx.Timeout:
+        except httpx.TimeoutException:
             return False
 
         if response.status_code != 200:
@@ -382,6 +388,7 @@ class SteamAPIClient(GameAPIClient):
 
     async def send_friend_request(self, steam_id: str):
         try:
+            self.login()
             self.steam_client.send(MsgProto(EMsg.ClientAddFriend), {"steamid_to_add": int(steam_id)})
             resp_msg = await self.wait_event_async(self.steam_client, EMsg.ClientAddFriendResponse, 5, False)
             if resp_msg is None: # gevent timeout error
@@ -404,11 +411,10 @@ class SteamAPIClient(GameAPIClient):
             return 0
 
     def _handle_steam_start(self):
-        self.cs_client.launch()
-        self.steam_client.run_forever()
-        self.logged_on_once = True
-
         logger.info("Steam and CS2 client started.")
+
+        self.cs_client.launch()
+        self.logged_on_once = True
 
     def _handle_steam_error(self, status_code):
         logger.bind(status_code=status_code.value).error(
@@ -422,7 +428,18 @@ class SteamAPIClient(GameAPIClient):
     def _handle_steam_disconnect(self):
         logger.warning("Steam disconnected!")
         if self.logged_on_once:
-            self.steam_client.reconnect(maxdelay=30)
+            logger.info("Trying to reconnect...")
+            try:
+                connected = self.steam_client.reconnect(maxdelay=30)
+            except Exception:
+                connected = False
+
+            if not connected:
+                logger.info("Reconnect failed, logging in again.")
+                self.login()
+
+    def _handle_2fa_code(self, is_2fa, status_code):
+        self.login()
 
     def get_2fa_codes(self):
         """
@@ -432,14 +449,28 @@ class SteamAPIClient(GameAPIClient):
         return p.communicate()[0]
 
     def login(self):
+        if self._logging_on or self.is_logged_in():
+            return
+
+        logger.info(f"Logging in to Steam...")
+
+        self._logging_on = True
+        self.logged_on_once = False
+
+        self.close()
+
         attempts = 3
         success = False
         for _ in range(attempts):
-            status_code = self.steam_client.login(
-                self.config.steam_username,
-                self.config.steam_password,
-                two_factor_code=self.get_2fa_codes()
-            )
+            try:
+                status_code = self.steam_client.login(
+                    self.config.steam_username,
+                    self.config.steam_password,
+                    two_factor_code=self.get_2fa_codes()
+                )
+            except RuntimeError:
+                logger.warning("Already logged in to Steam!")
+                return
 
             if status_code == EResult.OK:
                 success = True
@@ -448,12 +479,17 @@ class SteamAPIClient(GameAPIClient):
                 break
 
             logger.warning("Could not login to Steam client! Retrying...")
-            sleep(10)
+            sleep(5)
 
         if not success:
             logger.error(
                 f"Could not login to Steam client after {attempts} attempts! Error code: {status_code.value} ({status_code.name})"
             )
+
+        while not self.logged_on_once:
+            sleep(0.01)
+
+        self._logging_on = False
 
     def is_logged_in(self):
         return self.steam_client.logged_on

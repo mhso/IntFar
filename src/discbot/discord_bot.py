@@ -92,7 +92,7 @@ class DiscordClient(discord.Client):
         self.api_clients = api_clients
 
         if self.config.env == "production":
-           streamscape = Streamscape(chrome_executable="/usr/bin/google-chrome")
+           streamscape = Streamscape(browser_executable="/usr/bin/google-chrome")
         else:
            streamscape = None
 
@@ -1922,6 +1922,8 @@ class DiscordClient(discord.Client):
                     )
             return
         
+        if handler.NAME == "usage":
+            args.append(command)
 
         # The following lines are spam protection.
         time_from_last_msg = time() - self.last_message_time.get(message.author.id, 0)

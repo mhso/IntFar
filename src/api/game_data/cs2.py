@@ -769,12 +769,15 @@ class CS2GameStatsParser(GameStatsParser):
         # Get the biggest lead and deficit throughout the course of the game
         biggest_lead = 0
         biggest_deficit = 0
-        for round_data in round_stats:
-            rounds_1 = round_data["teamScores"][0]
-            rounds_2 = round_data["teamScores"][1]
+        for index, round_data in enumerate(round_stats):
+            rounds_t = round_data["teamScores"][0]
+            rounds_ct = round_data["teamScores"][1]
 
-            lead = rounds_1 - rounds_2
-            deficit = rounds_2 - rounds_1
+            rounds_us_then = rounds_t if started_t else rounds_ct
+            rounds_them_then = rounds_ct if started_t else rounds_t
+
+            lead = rounds_us_then - rounds_them_then
+            deficit = rounds_them_then - rounds_us_then
 
             if lead > biggest_lead:
                 biggest_lead = lead

@@ -14,15 +14,27 @@ async def register_for_lol(
     *summ_name: tuple[str]
 ):
     if len(summ_name) == 0:
-        return 0, "You must supply a summoner name."
+        return 0, "You must supply a Riot ID (in the format 'name#tag)."
 
     summ_name_joined = " ".join(summ_name)
 
-    if game_database.discord_id_from_ingame_info(player_name=summ_name_joined):
-        return 0, "User with that summoner name is already registered."
+    if "#" not in summ_name_joined:
+        return 0, "You must supply your tag aswell (like this: 'name#tag')."
 
-    elif (summ_info := await api_client.get_summoner_data(summ_name_joined.replace(" ", "%20"))) is None:
-        return 0, "Invalid summoner name."
+    split = summ_name_joined.split("#")
+    if len(split) != 2:
+        return 0, "Invalid Riot ID (should be in the format 'name#tag')."
+
+    game_name = split[0].strip().replace(" ", "%20")
+    tag = split[1].strip()
+
+    if game_database.discord_id_from_ingame_info(player_name=summ_name_joined):
+        return 0, "User with that Riot ID is already registered."
+
+    elif (puuid := await api_client.get_puuid(game_name, tag)) is None:
+        return 0, "Riot ID does not exist (acording to Rito)."
+
+    summ_id = await api_client.get_player_data_from_puuid(puuid)["id"]
 
     # Add user to Int-Far base users if they are new
     meta_database.add_user(disc_id)
@@ -31,8 +43,8 @@ async def register_for_lol(
     status_code, status = game_database.add_user(
         disc_id,
         player_name=summ_name_joined,
-        player_id=summ_info["id"],
-        puuid=summ_info["puuid"]
+        player_id=summ_id,
+        puuid=puuid
     )
 
     return status_code, status
@@ -42,7 +54,7 @@ async def register_for_cs2(
     game_database: GameDatabase,
     api_client: SteamAPIClient,
     disc_id: int,
-    steam_id: int,
+    steam_id: str,
     match_auth_code: str = None,
     match_token: str = None
 ):

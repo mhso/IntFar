@@ -157,7 +157,7 @@ class AudioHandler:
                             admin_mention = member.mention
                             break
 
-                    response = f"Weird error happened while playing sound... "
+                    response = "Weird error happened while playing sound... "
                     if admin_mention is not None:
                         response += f"This sounds like a job for {admin_mention}!"
 
@@ -275,7 +275,8 @@ class AudioHandler:
                         valid_sites = ", ".join(f"{site}.com" for site in SITES)
                         err_msg = (
                             f"Can't play sound `{sound}`. " +
-                            f"Either provide a link to one of `{valid_sites}` or the name of a sound.\n"
+                            f"Either provide a link to one of `{valid_sites}` "
+                            "or the name of a sound.\n"
                             "Use `!sounds` for a list of available sounds.\n"
                             "Use `!search` to search for a video on YouTube."
                         )

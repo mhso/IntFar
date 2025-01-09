@@ -282,13 +282,33 @@ class RiotAPIClient(GameAPIClient):
 
         return response
 
-    async def get_summoner_data(self, summ_name):
-        endpoint = "/lol/summoner/v4/summoners/by-name/{0}"
-        response = await self.make_request(endpoint, API_PLATFORM, summ_name)
+    async def get_puuid(self, game_name, tag):
+        endpoint = "/riot/account/v1/accounts/by-riot-id/{0}/{1}"
+        response = await self.make_request(endpoint, API_REGION, game_name, tag)
+        if response.status_code != 200:
+            return None
+
+        return response.json()["puuid"]
+
+    async def get_player_data(self, player_id: str, puuid: bool):
+        endpoint = "/lol/summoner/v4/summoners"
+        route = API_PLATFORM
+        if puuid:
+            endpoint = f"{endpoint}/by-puuid"
+            route = API_REGION
+        endpoint = endpoint + "/" + "{0}"
+
+        response = await self.make_request(endpoint, route, player_id)
         if response.status_code != 200:
             return None
 
         return response.json()
+
+    async def get_player_data_from_summ_id(self, summ_id):
+        return await self.get_player_data(summ_id, False)
+
+    async def get_player_data_from_puuid(self, puuid):
+        return await self.get_player_data(puuid, True)
 
     async def get_player_name(self, puuid):
         endpoint = "/riot/account/v1/accounts/by-puuid/{0}"
@@ -296,7 +316,8 @@ class RiotAPIClient(GameAPIClient):
         if response.status_code != 200:
             return None
 
-        return response.json()["gameName"]
+        data = response.json()
+        return f"{data['gameName']}#{data['tagLine']}"
 
     async def get_player_names_for_user(self, user: User) -> list[str]:
         names = []
@@ -321,12 +342,12 @@ class RiotAPIClient(GameAPIClient):
         return response.json()
 
     async def get_active_game_for_user(self, user: User):
-        for summ_id, puuid in zip(user.player_id, user.puuid):
+        for puuid in user.puuid:
             game_info = await self.get_active_game(puuid)
 
             if game_info is not None:
-                return game_info, summ_id
-            
+                return game_info, puuid
+
             await asyncio.sleep(1)
 
         return None, None

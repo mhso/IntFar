@@ -177,7 +177,7 @@ class GameMonitor(ABC):
 
         if len(self.users_in_game.get(guild_id, [])) == 1:
             return self.POSTGAME_STATUS_SOLO
-        
+
         return None
 
     async def _get_finished_game_and_status(self, game_id: str, guild_id: int):

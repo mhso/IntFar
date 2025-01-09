@@ -803,13 +803,13 @@ class LoLGameDatabase(GameDatabase):
         with self:
             self.execute_query(query, *item_ids)
 
-    def insert_bingo_challenge(self, challenge_id, challenge_name, total):
-        query = "INSERT INTO lan_bingo (id, name, total) VALUES (?, ?, ?)"
+    def insert_bingo_challenge(self, challenge_id, date, challenge_name, total):
+        query = "INSERT INTO lan_bingo (id, lan_date, name, total) VALUES (?, ?, ?, ?)"
 
         with self:
-            self.execute_query(query, challenge_id, challenge_name, total)
+            self.execute_query(query, challenge_id, date, challenge_name, total)
 
-    def update_bingo_challenge(self, challenge_id, progress=0, new_progress=0, completed=0, completed_by=None):
+    def update_bingo_challenge(self, challenge_id, date, progress=0, new_progress=0, completed=0, completed_by=None):
         query = """
             UPDATE lan_bingo
             SET
@@ -817,7 +817,9 @@ class LoLGameDatabase(GameDatabase):
                 new_progress = ?,
                 completed = ?,
                 completed_by = ?
-            WHERE id = ?
+            WHERE
+                id = ?
+                AND lan_date = ?
         """
 
         with self:
@@ -828,6 +830,7 @@ class LoLGameDatabase(GameDatabase):
                 completed,
                 completed_by,
                 challenge_id,
+                date,
             )
 
     def reset_bingo_new_progress(self, challenge_id):
@@ -882,7 +885,7 @@ class LoLGameDatabase(GameDatabase):
 
             self.execute_query(query_update)
 
-    def get_active_bingo_challenges(self):
+    def get_active_bingo_challenges(self, lan_date):
         query_select = f"""
             SELECT
                 id,
@@ -894,9 +897,11 @@ class LoLGameDatabase(GameDatabase):
                 completed_by,
                 notification_sent
             FROM lan_bingo
-            WHERE active = 1
+            WHERE
+                lan_date = ?
+                AND active = 1
             ORDER BY id
         """
 
         with self:
-            return self.execute_query(query_select).fetchall()
+            return self.execute_query(query_select, lan_date).fetchall()

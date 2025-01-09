@@ -101,6 +101,7 @@ class ProxyManager(object):
                         continue
 
                     result = None
+                    done = False
                     self.database.enqueue_command(command_id, self.target_name, command, *args)
 
                     if command == "close":
@@ -116,6 +117,9 @@ class ProxyManager(object):
 
                         wait_time += time_to_sleep
                         sleep(time_to_sleep)
+
+                    if not done:
+                        logger.bind(command=command, args=args).warning("Steam command timed out!")
 
                     proxy.send(result)
                     command_id += 1

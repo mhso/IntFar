@@ -197,16 +197,16 @@ class TestFuncs:
         next_code = await api_client.get_next_sharecode(user.player_id[0], user.match_auth_code[0], user.latest_match_token[0])
         print(next_code)
 
-    def test_cs_parse(self):
-        sharecode = "CSGO-JPzyG-faFGY-jHDaM-5YQjz-2B3xK"
+    async def test_cs_parse(self):
+        sharecode = "CSGO-7CowZ-OFhzM-6ytLZ-fXJ2J-Kn6nM"
         api_client = SteamAPIClient("cs2", self.config)
 
-        game_stats = api_client.get_game_details(sharecode)
+        game_stats = await api_client.get_game_details(sharecode)
         with open(f"data_{sharecode}.json", "w", encoding="utf-8") as fp:
             json.dump(game_stats, fp)
 
         parser = get_stat_parser("cs2", game_stats, api_client, self.game_databases["cs2"].game_users, 619073595561213953)
-        data = parser.parse_data()
+        parser.parse_data()
 
     def test_get_stats(self):
         api_client = SteamAPIClient("cs2", self.config)
@@ -321,24 +321,6 @@ class TestFuncs:
         os.remove(f"{match_id}.json")
         print(demo_game_data)
 
-    def awpy2(self):
-        from awpy.demo import Demo
-
-        file = self.config.resources_folder + "/data/cs2/CSGO-arbVk-zLoYq-qwbCh-dekfW-MvNUD.dem"
-
-        demo = Demo(file)
-        print(demo.rounds)
-
-    def demoparser2(self):
-        from demoparser2 import DemoParser
-        file = self.config.resources_folder + "/data/cs2/CSGO-2COpV-NpZRW-tehjm-Bd3QK-cwa3K.dem"
-
-        parser = DemoParser(file)
-        event_df = parser.parse_event("player_death", player=["X", "Y"], other=["total_rounds_played"])
-        ticks_df = parser.parse_ticks(["X", "Y"])
-
-        print(event_df.head())
-
     def test_generate_schema(self):
         game = "lol"
         in_file = f"{self.config.resources_folder}/data/game_6950463351.json"
@@ -358,7 +340,24 @@ class TestFuncs:
             print(f"{arg}: {annotations[arg].__name__}")
 
     def insert_bingo_challenges(self):
-        insert_bingo_challenges(self.game_databases["lol"])
+        insert_bingo_challenges(self.game_databases["lol"], "february_25")
+
+    async def active_game(self):
+        user = self.game_databases["lol"].game_users[219497453374668815]
+        game_data, active_id = await self.riot_api.get_active_game_for_user(user)
+        print(game_data, active_id)
+
+    async def get_puuids(self):
+        database = self.game_databases["lol"]
+        users = database.game_users
+        query = "UPDATE users SET puuid=? WHERE player_id=?"
+        with database:
+            for disc_id in users:
+                print(f"Processing {disc_id}...")
+                for summ_id in users[disc_id].player_id:
+                    summ_data = await self.riot_api.get_player_data_from_summ_id(summ_id)
+                    database.execute_query(query, summ_data["puuid"], summ_id)
+                    await asyncio.sleep(2)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

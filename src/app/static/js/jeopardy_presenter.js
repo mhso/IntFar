@@ -148,7 +148,7 @@ function afterAnswer() {
     buzzFeed.classList.add("d-none");
     buzzFeed.getElementsByTagName("ul").item(0).innerHTML = "";
 
-    if (activeAnswer == null) {
+    if (activeAnswer == null && !isDailyDouble) {
         // Question has been answered or time ran out
         socket.emit("disable_buzz");
         return;
@@ -494,6 +494,11 @@ function showTip(index) {
             // Question is over, don't show tip
             return;
         }
+        if (answeringPlayer != null) {
+            // Player is answering, don't show more tips while they answer
+            showTip(index);
+            return
+        }
     
         let tipElem = tipElems.item(index);
         tipElem.style.setProperty("opacity", 1);
@@ -504,6 +509,7 @@ function showTip(index) {
 }
 
 function questionAsked(countdownDelay) {
+    window.onkeydown = null;
     setTimeout(function() {
         if (answeringPlayer == null && canPlayersBuzzIn()) {
             hideAnswerIndicator();
@@ -534,16 +540,15 @@ function showAnswerChoice(index) {
     let choiceElem = document.getElementsByClassName("question-answer-entry").item(index);
     choiceElem.style.opacity = 1;
 
-    if (index < 3) {
+    if (index == 3) {
+        questionAsked(500);
+    }
+    else {
         window.onkeydown = function(e) {
             if (e.key == PRESENTER_ACTION_KEY) {
                 showAnswerChoice(index + 1);
             }
         }
-    }
-    else {
-        window.onkeydown = null;
-        questionAsked(500);
     }
 }
 
@@ -763,8 +768,14 @@ function setContestantTextColors() {
 function setPlayerTurn(player, save) {
     let playerEntries = document.getElementsByClassName("footer-contestant-entry");
     for (let i = 0; i < playerEntries.length; i++) {
-        let size = i == player ? "100%" : "60%";
-        playerEntries.item(i).style.height = size;
+        let entry = playerEntries.item(i);
+        if (entry.classList.contains("active-contestant-entry")) {
+            entry.classList.remove("active-contestant-entry");
+        }
+
+        if (i == player) {
+            entry.classList.add("active-contestant-entry");
+        }
     }
     if (save) {
         playerTurn = player;
@@ -847,28 +858,34 @@ function addPlayerDiv(id, index, name, avatar, color) {
         wrapper.removeChild(placeholder);
     }
 
-    let div = document.createElement("div");
+    let divId = "player_" + id;
+    let existingDiv = document.getElementById(divId);
+    let div = existingDiv != null ? existingDiv : document.createElement("div");
+
+    div.id = divId;
     div.dataset["disc_id"] = id;
     div.dataset["color"] = color;
     div.className = "menu-contestant-entry";
     div.style.border = "2px solid " + color;
 
-    let avatarElem = document.createElement("img");
-    avatarElem.className = "menu-contestant-avatar";
-    avatarElem.src = avatar;
-
-    let nameElem = document.createElement("div");
-    nameElem.className = "menu-contestant-id";
-    nameElem.textContent = name;
-
-    div.appendChild(avatarElem);
-    div.appendChild(nameElem);
-
-    if (index >= wrapper.children.length) {
-        wrapper.appendChild(div);
-    }
-    else {
-        wrapper.insertBefore(div, wrapper.children[index]);
+    if (existingDiv == null) {
+        let avatarElem = document.createElement("img");
+        avatarElem.className = "menu-contestant-avatar";
+        avatarElem.src = avatar;
+    
+        let nameElem = document.createElement("div");
+        nameElem.className = "menu-contestant-id";
+        nameElem.textContent = name;
+    
+        div.appendChild(avatarElem);
+        div.appendChild(nameElem);
+    
+        if (index >= wrapper.children.length) {
+            wrapper.appendChild(div);
+        }
+        else {
+            wrapper.insertBefore(div, wrapper.children[index]);
+        }
     }
 }
 
@@ -877,11 +894,11 @@ function showFinaleCategory(category) {
         if (e.key == PRESENTER_ACTION_KEY) {
             let header1 = document.getElementById("selection-finale-header1");
             header1.style.setProperty("opacity", 1);
-    
+
             setTimeout(function() {
                 let header2 = document.getElementById("selection-finale-header2");
                 header2.style.setProperty("opacity", 1);
-    
+
                 let header3 = document.getElementById("selection-finale-header3");
                 header3.style.setProperty("opacity", 1);
             }, 2000);

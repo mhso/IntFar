@@ -88,6 +88,18 @@ if not TESTING:
             },
             803987403932172359 # Core Nibs
         ),
+        "february_25": LANInfo(
+            datetime(2025, 2, 1, 11, 0, 0).timestamp(),
+            datetime(2025, 2, 2, 12, 0, 0).timestamp(),
+            {
+                115142485579137029: "Dave",
+                172757468814770176: "Murt",
+                267401734513491969: "Gual",
+                331082926475182081: "Muds",
+                347489125877809155: "Nønø"
+            },
+            803987403932172359 # Core Nibs
+        ),
     }
 
 else: # Use old data for testing.
@@ -106,7 +118,7 @@ else: # Use old data for testing.
         )
     }
 
-LATEST_LAN_PARTY = max(lan_info.start_time for lan_info in LAN_PARTIES.values())
+LATEST_LAN_PARTY = max(LAN_PARTIES.keys(), key=lambda k: LAN_PARTIES[k].start_time)
 
 def is_lan_ongoing(timestamp: int, guild_id=None):
     lan_data = list(filter(
@@ -277,7 +289,7 @@ class BingoSolver:
                     event["type"] == "ELITE_MONSTER_KILL"
                     and event["monsterType"] == "BARON_NASHOR"
                     and event.get("teamId", None) == self.parsed_data.team_id
-                    and event["timestamp"] / 1000 / 60 < 21
+                    and event["timestamp"] / 1000 / 60 < 24
                 ):
                     self.progress = 1
                     return
@@ -327,12 +339,8 @@ class BingoSolver:
     def outnumbered_kills(self):
         self.progress += sum(player.challenges["outnumberedKills"] for player in self.parsed_data.filtered_player_stats)
 
-    def pentakill(self):
-        for player in self.parsed_data.filtered_player_stats:
-            if player.pentakills:
-                self.progress = 1
-                self.completed_by = player.disc_id
-                break
+    def atakhan_kills(self):
+        self.progress += self.parsed_data.our_atakhan_kills
 
     def solo_kills(self):
         self.progress += sum(player.challenges["soloKills"] for player in self.parsed_data.filtered_player_stats)
@@ -370,9 +378,9 @@ BINGO_CHALLENGE_NAMES = {
     "dives": ("Dive Kills", 5),
     "doinks": ("Doinks", 10),
     "dragon_souls": ("Dragon Souls", 3),
-    "early_baron": ("Baron Before 21 Mins", 1),
+    "early_baron": ("Baron Before 28 Mins", 1),
     "elder_dragon": ("Elder Dragon", 1),
-    "fast_win": ("Twenty Minute Win", 1),
+    "fast_win": ("Win before 22 Mins", 1),
     "flawless_ace": ("Flawless Ace", 1),
     "fountain_kill": ("Fountain Kill", 1),
     "invade_kills": ("Invade Kills", 5),
@@ -380,7 +388,7 @@ BINGO_CHALLENGE_NAMES = {
     "killing_sprees": ("Killing Sprees", 10),
     "kills": ("Kills", 100),
     "outnumbered_kills": ("Outnumbered Kills", 5),
-    "pentakill": ("Pentakill", 1),
+    "atakhan_kills": ("Atakhan Kills", 5),
     "solo_kills": ("Solo Kills", 10),
     "spells_casted": ("Spell Casts", 5000),
     "spells_dodged": ("Skillshots Dodged", 200),
@@ -393,7 +401,7 @@ BINGO_CHALLENGE_NAMES = {
 def get_random_challenges(database: LoLGameDatabase):
     return database.get_new_bingo_challenges(BINGO_WIDTH ** 2)
 
-def get_current_bingo_challenges(database: LoLGameDatabase):
+def get_current_bingo_challenges(database: LoLGameDatabase, lan_date: str):
     return [
         {
             "id": id,
@@ -407,11 +415,11 @@ def get_current_bingo_challenges(database: LoLGameDatabase):
             "bingo": False
         }
         for id, name, progress, new_progress, total, completed, completed_by, notification_sent
-        in database.get_active_bingo_challenges()
+        in database.get_active_bingo_challenges(lan_date)
     ]
 
 def update_bingo_progress(database: LoLGameDatabase, post_game_stats: PostGameStats):
-    active_challenges = get_current_bingo_challenges(database)
+    active_challenges = get_current_bingo_challenges(database, LATEST_LAN_PARTY)
 
     with database:
         for challenge_data in active_challenges:
@@ -425,12 +433,13 @@ def update_bingo_progress(database: LoLGameDatabase, post_game_stats: PostGameSt
 
             database.update_bingo_challenge(
                 challenge_data["id"],
+                LATEST_LAN_PARTY,
                 min(progress, challenge_data["total"]),
                 progress > challenge_data["progress"],
                 completed,
                 completed_by
             )
 
-def insert_bingo_challenges(database: LoLGameDatabase):
+def insert_bingo_challenges(database: LoLGameDatabase, date: str):
     for challenge_id in BINGO_CHALLENGE_NAMES:
-        database.insert_bingo_challenge(challenge_id, *BINGO_CHALLENGE_NAMES[challenge_id])
+        database.insert_bingo_challenge(challenge_id, date, *BINGO_CHALLENGE_NAMES[challenge_id])

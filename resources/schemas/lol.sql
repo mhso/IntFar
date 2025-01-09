@@ -78,7 +78,7 @@ CREATE TABLE [missed_games] (
     [timestamp] INTEGER
 );
 CREATE TABLE [lan_bingo] (
-    [id] NVARCHAR(32) PRIMARY KEY,
+    [id] NVARCHAR(32) NOT NULL,
     [name] NVARCHAR(64) NOT NULL,
     [active] INTEGER DEFAULT(1),
     [progress] INTEGER DEFAULT(0),
@@ -86,7 +86,9 @@ CREATE TABLE [lan_bingo] (
     [total] INTEGER DEFAULT(1),
     [completed] INTEGER DEFAULT(0),
     [completed_by] INTEGER NULL,
-    [notification_sent] INTEGER DEFAULT(0)
+    [notification_sent] INTEGER DEFAULT(0),
+    [lan_date] NVARCHAR(32),
+    PRIMARY KEY (id, lan_date)
 );
 CREATE TABLE [split_messages] (
     [player_id] NVARCHAR(64) NOT NULL,

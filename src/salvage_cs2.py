@@ -14,6 +14,29 @@ from api.user import User
 from discbot.commands.util import ADMIN_DISC_ID
 from awpy import DemoParser
 
+async def download_single_demo(config, steam_api, sharecode):
+    demo_file = f"{config.resources_folder}/data/cs2/{sharecode}"
+
+    if os.path.exists(demo_file + ".dem"):
+        print(f"Demo file for sharecode '{sharecode}' already exists.")
+        return
+
+    game_stats = await steam_api.get_basic_match_info(sharecode)
+    round_stats = game_stats["matches"][0]["roundstatsall"]
+    demo_url = round_stats[-1]["map"]
+
+    filename = await steam_api.download_demo_file(demo_file, demo_url)
+    with open(filename + ".dem.bz2", "rb") as fp:
+        all_bytes = fp.read()
+
+    # Decompress the gz2 compressed demo file
+    decompressed = bz2.decompress(all_bytes)
+    with open(filename + ".dem", "wb") as fp:
+        fp.write(decompressed)
+
+    os.remove(filename + ".dem.bz2")
+
+    print(f"Downloaded demo to {filename}.dem")
 
 async def download_missing_demos(config, database, steam_api, sharecode):
     user = database.game_users[ADMIN_DISC_ID]
@@ -21,25 +44,7 @@ async def download_missing_demos(config, database, steam_api, sharecode):
     auth_code = user.match_auth_code[0]
 
     while sharecode is not None:
-        demo_file = f"{config.resources_folder}/data/cs2/{sharecode}"
-
-        if not os.path.exists(demo_file + ".dem"):
-            game_stats = await steam_api.get_basic_match_info(sharecode)
-            round_stats = game_stats["matches"][0]["roundstatsall"]
-            demo_url = round_stats[-1]["map"]
-
-            filename = await steam_api.download_demo_file(demo_file, demo_url)
-            with open(filename + ".dem.bz2", "rb") as fp:
-                all_bytes = fp.read()
-
-            # Decompress the gz2 compressed demo file
-            decompressed = bz2.decompress(all_bytes)
-            with open(filename + ".dem", "wb") as fp:
-                fp.write(decompressed)
-
-            os.remove(filename + ".dem.bz2")
-
-            print(f"Downloaded demo to {filename}.dem")
+        download_single_demo(config, steam_api, sharecode)
 
         sharecode = await steam_api.get_next_sharecode(steam_id, auth_code, sharecode)
 
@@ -97,7 +102,7 @@ async def parse_missing_demos(config, database, steam_api, sharecode):
 if __name__ == "__main__":
     parser = ArgumentParser()
 
-    parser.add_argument("task", choices=("download", "parse"))
+    parser.add_argument("task", choices=("download_one", "download_all", "parse"))
     parser.add_argument("sharecode")
 
     args = parser.parse_args()
@@ -111,7 +116,11 @@ if __name__ == "__main__":
     except RuntimeError:
         loop = asyncio.new_event_loop()
 
-    if args.task == "download":
-        loop.run_until_complete(download_missing_demos(config, database, steam_api, args.sharecode))
+    if args.task == "download_one":
+        coroutine = download_single_demo(config, steam_api, args.sharecode)
+    if args.task == "download_all":
+        coroutine = download_missing_demos(config, database, steam_api, args.sharecode)
     elif args.task == "parse":
-        loop.run_until_complete(parse_missing_demos(config, database, steam_api, args.sharecode))
+        coroutine = parse_missing_demos(config, database, steam_api, args.sharecode)
+
+    loop.run_until_complete(coroutine)

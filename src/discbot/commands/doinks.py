@@ -1,6 +1,6 @@
 from api.util import SUPPORTED_GAMES
 from api.awards import get_doinks_reasons, organize_doinks_stats
-from src.discbot.commands.base import *
+from discbot.commands.base import *
 
 class DoinksCommand(Command):
     NAME = "doinks"

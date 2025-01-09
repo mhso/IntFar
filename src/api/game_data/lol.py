@@ -132,9 +132,11 @@ class LoLGameStats(GameStats):
     our_baron_kills: int = None
     our_dragon_kills: int = None
     our_herald_kills: int = None
+    our_atakhan_kills: int = None
     enemy_baron_kills: int = None
     enemy_dragon_kills: int = None
     enemy_herald_kills: int = None
+    enemy_atakhan_kills: int = None
     timeline_data: dict = None
 
     def __post_init__(self):
@@ -670,9 +672,11 @@ class LoLGameStatsParser(GameStatsParser):
         our_baron_kills = 0
         our_dragon_kills = 0
         our_herald_kills = 0
+        our_atakhan_kills = 0
         enemy_baron_kills = 0
         enemy_dragon_kills = 0
         enemy_herald_kills = 0
+        enemy_atakhan_kills = 0
 
         for team in self.raw_data["teams"]:
             objectives = team["objectives"]
@@ -680,12 +684,14 @@ class LoLGameStatsParser(GameStatsParser):
                 our_baron_kills = objectives["baron"]["kills"]
                 our_dragon_kills = objectives["dragon"]["kills"]
                 our_herald_kills = objectives["riftHerald"]["kills"]
+                our_atakhan_kills = team["atakhanKills"]
                 game_win = 1 if team["win"] else -1
                 team_id = team["teamId"]
             else:
                 enemy_baron_kills = objectives["baron"]["kills"]
                 enemy_dragon_kills = objectives["dragon"]["kills"]
                 enemy_herald_kills = objectives["riftHerald"]["kills"]
+                enemy_atakhan_kills = team["atakhanKills"]
 
         return LoLGameStats(
             game=self.game,
@@ -704,9 +710,11 @@ class LoLGameStatsParser(GameStatsParser):
             our_baron_kills=our_baron_kills,
             our_dragon_kills=our_dragon_kills,
             our_herald_kills=our_herald_kills,
+            our_atakhan_kills=our_atakhan_kills,
             enemy_baron_kills=enemy_baron_kills,
             enemy_dragon_kills=enemy_dragon_kills,
             enemy_herald_kills=enemy_herald_kills,
+            enemy_atakhan_kills=enemy_atakhan_kills,
             timeline_data=self.raw_data["timeline"]
         )
 
@@ -756,7 +764,7 @@ class LoLGameStatsParser(GameStatsParser):
 
         return response
 
-def get_player_stats(data, summ_ids):
+def get_player_stats(data, player_ids):
     """
     Get a specific player's stats from a dictionary of game data
 
@@ -768,7 +776,7 @@ def get_player_stats(data, summ_ids):
     if "participantIdentities" in data:
         # We have to do this to handle /match/v4 stuff...
         for part_info in data["participantIdentities"]:
-            if part_info["player"]["summonerId"] in summ_ids:
+            if part_info["player"]["summonerId"] in player_ids:
                 for participant in data["participants"]:
                     if part_info["participantId"] == participant["participantId"]:
                         stats = participant["stats"]
@@ -777,7 +785,7 @@ def get_player_stats(data, summ_ids):
 
     else:
         for participant_data in data["participants"]:
-            if participant_data["summonerId"] in summ_ids:
+            if participant_data["puuid"] in player_ids:
                 return participant_data
 
     return None

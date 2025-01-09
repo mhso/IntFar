@@ -344,6 +344,41 @@ class TestWrapper(TestCase):
 
                 self.assertEqual(expected_desc, turn_desc.text_content())
 
+    def test_buzz_in_correct_person(self):
+        round_num = 1
+        category = "lore"
+        difficulty = 1
+        question_num = 1
+        turn_id = 1
+        player_data = [
+            (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+            (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+            (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+            (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+        ]
+
+        with ContextHandler() as context:
+            # Go to question page
+            context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+            sleep(1)
+
+            context.show_question()
+            sleep_time = 1.5 + self.random.random() * 2
+            sleep(sleep_time)
+
+            context.contestant_pages[1].wait_for_selector("#buzzer-wrapper")
+            context.contestant_pages[1].query_selector("#buzzer-wrapper").tap()
+
+            sleep(2)
+
+            for index in range(len(player_data)):
+                buzz_winner_elem = context.contestant_pages[index].query_selector("#buzzer-winner")
+                buzzed_in_first = buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
+                if index == 1:
+                    self.assertTrue(buzzed_in_first, "Correct player did not buzz in")
+                else:
+                    self.assertFalse(buzzed_in_first, "Wrong player buzzed in")
+
     def test_buzz_in_sequential(self):
         round_num = 1
         category = "lore"

@@ -143,6 +143,7 @@ class CommandsCommand(Command):
 class UsageCommand(Command):
     NAME = "usage"
     DESCRIPTION = "Show how to use a given command."
+    MANDATORY_PARAMS = [CommandParam("command")]
 
     async def handle(self, command: str):
         valid_cmd, show_usage = is_command_valid(self.message, command, None)
@@ -151,7 +152,7 @@ class UsageCommand(Command):
             return
 
         # Get main command (if it is an alias)
-        cmd_obj: Command = commands_util.get_main_command(command)
+        cmd_obj: Command = commands_util.get_main_command(command)(self.client, self.message)
         response = f"Usage: `{cmd_obj}`\n"
         response += cmd_obj.DESCRIPTION
 

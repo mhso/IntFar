@@ -17,12 +17,12 @@ class LoLGameMonitor(GameMonitor):
     def get_users_in_game(self, user_dict: dict[int, User], game_data: dict):
         users_in_game = {}
         for disc_id in user_dict:
-            summ_ids = user_dict[disc_id].player_id
-            player_stats = get_player_stats(game_data, summ_ids)
+            puuids = user_dict[disc_id].puuid
+            player_stats = get_player_stats(game_data, puuids)
             if player_stats is not None:
                 active_summ_name = None
-                for summ_id, summ_name in zip(user_dict[disc_id].player_id, user_dict[disc_id].player_name):
-                    if summ_id == player_stats["summonerId"]:
+                for puuid, summ_name in zip(user_dict[disc_id].puuid, user_dict[disc_id].player_name):
+                    if puuid == player_stats["puuid"]:
                         active_summ_name = summ_name
                         break
 
@@ -60,6 +60,9 @@ class LoLGameMonitor(GameMonitor):
             active_game_start = game_start
 
             player_stats = get_player_stats(game_data, [active_id])
+            if player_stats is None:
+                logger.bind(game_data=game_data).warning(f"Could not find player stats for {active_id}!")
+
             game_ids.add(game_data["gameId"])
             active_game_team = player_stats["teamId"]
             active_game = game_data
@@ -134,12 +137,9 @@ class LoLGameMonitor(GameMonitor):
             game_info = {"gameId": game_id}
             status_code = self.POSTGAME_STATUS_MISSING
 
-        else:
-            self.active_game[guild_id]["queue_id"] = game_info["queueId"]
-
         # Get rank of each player in the game, if status is OK
-        player_ranks = {}
         if status_code == self.POSTGAME_STATUS_OK:
+            player_ranks = {}
             await asyncio.sleep(2)
 
             for disc_id in self.users_in_game[guild_id]:
@@ -150,11 +150,14 @@ class LoLGameMonitor(GameMonitor):
 
                 await asyncio.sleep(1.5)
 
-        game_info["player_ranks"] = player_ranks
+            game_info["player_ranks"] = player_ranks
 
         return game_info, status_code
 
     def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
+        if game_info is not None:
+            self.active_game[guild_id]["queue_id"] = game_info["queueId"]
+        
         post_game_data = super().handle_game_over(game_info, status_code, guild_id)
 
         if post_game_data is not None and lan.is_lan_ongoing(time(), guild_id):

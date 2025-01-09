@@ -51,14 +51,6 @@ class CS2GameMonitor(GameMonitor):
         return None
 
     async def get_active_game_info(self, guild_id):
-        if not self.api_client.is_logged_in():
-            # Steam is not logged on, try to relog once, but then give up
-            logger.info("Steam is not logged in, trying to relog...")
-            self.api_client.login()
-            if not self.api_client.is_logged_in():
-                logger.warning("Could not login to Steam!")
-                return None, {}, self.GAME_STATUS_NOCHANGE
-
         # Create a bunch of maps for different ID representations
         user_dict = (
             self.users_in_voice.get(guild_id, {})

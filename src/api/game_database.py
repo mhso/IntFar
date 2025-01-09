@@ -1489,7 +1489,10 @@ class GameDatabase(SQLiteDatabase):
     def save_missed_game(self, game_id, guild_id, timestamp):
         query = "INSERT INTO missed_games VALUES (?, ?, ?)"
         with self:
-            self.execute_query(query, game_id, guild_id, timestamp)
+            try:
+                self.execute_query(query, game_id, guild_id, timestamp)
+            except DBException:
+                pass # Missed game has already been saved, just ignore error
 
     def get_missed_games(self):
         query = "SELECT game_id, guild_id FROM missed_games"
@@ -1498,7 +1501,7 @@ class GameDatabase(SQLiteDatabase):
 
     def inspect_missed_games(self):
         query = "SELECT game_id, guild_id, timestamp FROM missed_games"
-        
+
         def format_result(cursor):
             results = []
             for game_id, guild_id, timestamp in cursor.fetchall():

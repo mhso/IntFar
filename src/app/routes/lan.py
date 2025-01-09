@@ -134,8 +134,8 @@ def get_active_game_data(face_images, lan_info):
 
     return game_data
 
-def get_bingo_data(database, face_images={}):
-    bingo_challenges = lan_api.get_current_bingo_challenges(database)
+def get_bingo_data(database, lan_date, face_images={}):
+    bingo_challenges = lan_api.get_current_bingo_challenges(database, lan_date)
 
     bingo_data = []
     curr_row = []
@@ -198,7 +198,7 @@ def get_bingo_data(database, face_images={}):
 
     return bingo_data
 
-def get_data(lan_info):
+def get_data(lan_info, lan_date):
     config = flask.current_app.config["APP_CONFIG"]
     database = flask.current_app.config["GAME_DATABASES"]["lol"]
     riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
@@ -401,7 +401,7 @@ def get_data(lan_info):
         data["lan_over"] = False
 
     # LAN Bingo!
-    bingo_data = get_bingo_data(database, face_images)
+    bingo_data = get_bingo_data(database, lan_date, face_images)
     for bingo_row in bingo_data:
         for bingo_challenge in bingo_row:
             if bingo_challenge["new_progress"]:
@@ -429,7 +429,7 @@ def lan_view_for_date(date):
     if not _allowed_access(lan_info, logged_in_user):
         return flask.abort(404) # User not logged in or not a part of the LAN.
 
-    data = get_data(lan_info)
+    data = get_data(lan_info, date)
 
     lan_dt = datetime.fromtimestamp(lan_info.start_time)
 
@@ -448,7 +448,7 @@ def live_data(date):
     if not _allowed_access(lan_info, logged_in_user):
         return flask.abort(404) # User not logged in or not a part of the LAN.
 
-    all_data = get_data(lan_info)
+    all_data = get_data(lan_info, date)
 
     data_filter = flask.request.args.get("filter")
     if data_filter is not None:
@@ -498,14 +498,24 @@ def _get_lol_event_description(event):
     desc = None
     icon = None
 
-    if not "Ally" in event:
+    if "Ally" not in event:
         category = "neutral"
     elif event["Ally"]:
         category = "ally"
     else:
         category = "enemy"
 
-    if event["EventName"] == "ChampionKill":
+    if event["EventName"] == "GameStart":
+        desc = "Let the games begin!"
+
+    elif event["EventName"] == "GameEnd":
+        desc = "Game over! "
+        if event["Result"] == "Win":
+            desc += "The bois claw home another victory!"
+        else:
+            desc += "We kinda inted that one :("
+
+    elif event["EventName"] == "ChampionKill":
         killed = random.choice(_EVENTS_KILLED_SYNONYMS)
         desc = f"{event['KillerName']} {killed} {event['VictimName']}"
 
@@ -556,7 +566,7 @@ def _get_lol_event_description(event):
 
         icon = "game_feed_turret.png"
 
-    elif event["EventName"] in ("BaronKill", "HeraldKill", "DragonKill"):
+    elif event["EventName"] in ("BaronKill", "HeraldKill", "AtakhanKill", "DragonKill"):
         if event["Stolen"] == "True":
             killed = "stole"
         else:
@@ -584,13 +594,17 @@ def _get_lol_event_description(event):
             monster_name = "Shelly"
             icon = "game_feed_herald.png"
 
+        elif event["EventName"] == "AtakhanKill":
+            monster_name = "Akshan's Creepy Uncle"
+            icon = "game_feed_atakhan.png"
+
         killer = "The brois" if category == "ally" else "Enemy team"
 
         desc = f"{killer} {killed} {monster_name}!"
 
     if icon is not None:
         icon = flask.url_for("static", filename=f"img/{icon}", _external=True)
-    
+
     return {"description": desc, "category": category, "icon": icon}
 
 @lan_page.route("/live_league_data", methods=["GET"])

@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:207fef9f0b69e4d2250d09366019918c6464b0b3572675e6cb4cd7bcba87259d"
+content_hash = "sha256:11d6dfa308bcfb554b50c49b82363e43deb9818c66dde0cc7394a5cf9721864d"
 
 [[metadata.targets]]
 requires_python = ">=3.11,<3.12"
@@ -1560,6 +1560,17 @@ files = [
 ]
 
 [[package]]
+name = "random-user-agent"
+version = "1.0.1"
+summary = "A package to get random user agents based filters provided by user"
+groups = ["default"]
+marker = "python_version >= \"3.11\" and python_version < \"3.12\""
+files = [
+    {file = "random_user_agent-1.0.1-py3-none-any.whl", hash = "sha256:535636a55fb63fe3d74fd0260d854c241d9f2946447026464e578e68eac17dac"},
+    {file = "random_user_agent-1.0.1.tar.gz", hash = "sha256:8f8ca26ec8cb1d24ad1758d8b8f700d154064d641dbe9a255cfec42960fbd012"},
+]
+
+[[package]]
 name = "rapidfuzz"
 version = "3.6.1"
 requires_python = ">=3.8"
@@ -1923,6 +1934,7 @@ marker = "python_version >= \"3.11\" and python_version < \"3.12\""
 dependencies = [
     "beautifulsoup4>=4.12.3",
     "playwright>=1.34.0",
+    "random-user-agent>=1.0.1",
     "requests>=2.28.2",
 ]
 
