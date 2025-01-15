@@ -253,11 +253,15 @@ def get_round_data(request_args):
             buzzes = 0
             hits = 0
             misses = 0
+            score = int(request_args.get(score_key, 0))
             if disc_id in contestants:
                 avatar = contestants[disc_id].avatar
                 buzzes = contestants[disc_id].buzzes
                 hits = contestants[disc_id].hits
                 misses = contestants[disc_id].misses
+
+                if contestants[disc_id].score != score:
+                    contestants[disc_id].score = score
             else:
                 avatar = app_util.discord_request(
                     "func", "get_discord_avatar", (disc_id, 128)
@@ -271,7 +275,7 @@ def get_round_data(request_args):
                 "disc_id": str(disc_id),
                 "name": request_args[name_key],
                 "avatar": avatar,
-                "score": int(request_args[score_key]),
+                "score": score,
                 "buzzes": buzzes,
                 "hits": hits,
                 "misses": misses,
@@ -391,7 +395,7 @@ def active_jeopardy(jeopardy_round):
             used_questions = json.load(fp)
 
         if jeopardy_round == 3:
-            ordered_categories = ["bois"]
+            ordered_categories = ["history"]
         else:
             ordered_categories = [None] * 6
             for category in questions:
@@ -434,7 +438,7 @@ def active_jeopardy(jeopardy_round):
             jeopardy_round,
             ROUND_NAMES[jeopardy_round-1],
             player_data,
-            question_num,
+            question_num + 1,
             player_turn,
             questions,
             ordered_categories
@@ -492,7 +496,14 @@ def jeopardy_endscreen():
         player_data = get_round_data(flask.request.args)[0]
 
         # Game over! Go to endscreen
-        player_data.sort(key=lambda x: x["score"], reverse=True)
+        player_data = sorted(
+            (
+                dict(map(lambda x: (x, int(data[x]) if x == "disc_id" else data[x]), data))
+                for data in player_data
+            ),
+            key=lambda x: x["score"],
+            reverse=True
+        )
 
         jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
         contestants = jeopardy_data["contestants"]
@@ -664,7 +675,7 @@ def buzzer_pressed(disc_id: str):
         emit("buzz_loser", to="contestants", skip_sid=earliest_buzz_player.sid)
 
 @app_util.socket_io.event
-def correct_answer(turn_id: int):
+def correct_answer(turn_id: int, value: int):
     disc_id = PLAYER_INDEXES[turn_id]
     contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(disc_id)
 
@@ -672,6 +683,7 @@ def correct_answer(turn_id: int):
         return
 
     contestant.hits += 1
+    contestant.score += value
 
 @app_util.socket_io.event
 def wrong_answer(turn_id: int):

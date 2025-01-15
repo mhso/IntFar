@@ -133,7 +133,7 @@ class CommandsCommand(Command):
         header = "**--- Valid commands, and their usages: ---**"
         lines = []
         for cmd in commands_util.COMMANDS:
-            cmd_obj = commands_util.COMMANDS[cmd]
+            cmd_obj = commands_util.COMMANDS[cmd](self.client, self.message)
             if self.message.guild.id in cmd_obj.GUILDS:
                 cmd_str = f"`{cmd_obj}` - {cmd_obj.DESCRIPTION}"
                 lines.append(cmd_str)

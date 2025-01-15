@@ -53,9 +53,9 @@ class DiscordClient(discord.Client):
         self,
         config: Config,
         meta_database: MetaDatabase,
-        game_databases: dict[str, GameDatabase],
-        betting_handlers: dict[str, BettingHandler],
-        api_clients: dict[str, GameAPIClient],
+        game_databases: dict[str, GameDatabase] = {},
+        betting_handlers: dict[str, BettingHandler] = {},
+        api_clients: dict[str, GameAPIClient] = {},
         **kwargs
     ):
         """
@@ -113,6 +113,7 @@ class DiscordClient(discord.Client):
                 self.on_game_over
             )
             for game in api_util.SUPPORTED_GAMES
+            if game in self.game_databases
         }
 
         self.pagination_data = {}
@@ -1617,6 +1618,7 @@ class DiscordClient(discord.Client):
     async def announce_jeopardy_winner(self, player_data):
         iteration = api_util.JEOPARDY_ITERATION
         edition = api_util.JEOPADY_EDITION
+        guild_id = api_util.GUILD_MAP["core"] if self.config.env == "production" else api_util.MY_GUILD_ID
 
         ties = 0
         for index, data in enumerate(player_data[1:], start=1):
@@ -1626,7 +1628,7 @@ class DiscordClient(discord.Client):
             ties += 1
 
         if ties == 0:
-            mention = self.get_mention_str(player_data[0]["id"])
+            mention = self.get_mention_str(player_data[0]["disc_id"], guild_id)
             winner_desc = (
                 f"{mention} is the winner of the *LoL Jeopardy {edition}* with **{player_data[0]['score']} points**!!! "
                 "All hail the king :crown:\n"
@@ -1634,18 +1636,18 @@ class DiscordClient(discord.Client):
             )
 
         elif ties == 1:
-            mention_1 = self.get_mention_str(player_data[0]["id"])
-            mention_2 = self.get_mention_str(player_data[1]["id"])
+            mention_1 = self.get_mention_str(player_data[0]["disc_id"], guild_id)
+            mention_2 = self.get_mention_str(player_data[1]["disc_id"], guild_id)
             winner_desc = (
                 f"{mention_1} and {mention_2} both won the *LoL Jeopardy {edition}* with "
                 f"**{player_data[0]['score']} points**!!!\n"
-                "They both get a special badge of honor on Discord and win a **975 RP** skin!"
+                "They both get a special badge of honor on Discord and each win a **975 RP** skin!"
             )
 
         elif ties > 1:
             players_tied = ", ".join(
-                self.get_mention_str(data["id"]) for data in player_data[:ties]
-            ) + self.get_mention_str(player_data[ties]["id"])
+                self.get_mention_str(data["disc_id"], guild_id) for data in player_data[:ties]
+            ) + self.get_mention_str(player_data[ties]["disc_id"], guild_id)
             winner_desc = (
                 f"{players_tied} all got the same score (with **{player_data[0]['score']} points**) "
                 f"in the *LoL Jeopardy {edition}*!!!\n"
@@ -1653,19 +1655,85 @@ class DiscordClient(discord.Client):
             )
 
         # Hand out a special badge to the winner(s)
-        guild_id = api_util.MY_GUILD_ID if self.config.env == "dev" else api_util.GUILD_MAP["core"]
         guild = self.get_guild(guild_id)
-        role = self.get_role(f"Jeopardy v{iteration} Master", guild)
-        if role is not None:
-            for data in player_data[:ties+1]:
-                member = guild.get_member(data["id"])
-                if member is not None:
-                    await member.add_roles(role)
+        role_name = f"Jeopardy v{iteration} Master"
+        role = self.get_role(role_name, guild)
 
-        channel_id = 512363920044982274 if self.config.env == "dev" else 808796236692848650
-        channel = guild.get_channel(channel_id)
+        if role is None:
+            colors = [(0, 128, 255), (250, 50, 0), (255, 51, 255), (0, 204, 0)]
+            role = await guild.create_role(name=role_name, color=colors[iteration-1])
 
+        for data in player_data[:ties+1]:
+            member = guild.get_member(data["disc_id"])
+            if member is not None:
+                await member.add_roles(role)
+
+        channel = self.channels_to_write[guild_id]
         await channel.send(winner_desc)
+
+        await asyncio.sleep(1)
+
+        # Send message about who got the most correct answers
+        sorted_by_hits = sorted(player_data, key=lambda x: x["hits"], reverse=True)
+        ties = 0
+        for index, data in enumerate(sorted_by_hits[1:], start=1):
+            if sorted_by_hits[index-1]["hits"] > data["hits"]:
+                break
+
+            ties += 1
+
+        hits_desc = None
+        if ties == 0 and sorted_by_hits[0]["disc_id"] != player_data[0]["disc_id"]:
+            mention = self.get_mention_str(sorted_by_hits[0]["disc_id"], guild_id)
+            hits_desc = (
+                f"Honorable mention to {mention} for answering the most questions correct with "
+                f"**{sorted_by_hits[0]['hits']}** correct answers! Big nerd legend over here :nerd:!"
+            )
+
+        elif (
+            ties == 1
+            and sorted_by_hits[0]["disc_id"] != player_data[0]["disc_id"]
+            and sorted_by_hits[1]["disc_id"] != player_data[1]["disc_id"]
+        ):
+            mention_1 = self.get_mention_str(sorted_by_hits[0]["disc_id"], guild_id)
+            mention_2 = self.get_mention_str(sorted_by_hits[1]["disc_id"], guild_id)
+            hits_desc = (
+                f"Honorable mentions to {mention_1} and {mention_2} for having the most correct answers, "
+                f"both answering correct **{sorted_by_hits[0]['hits']}** times! They are both nerds :nerd:!"
+            )
+
+        if hits_desc:
+            await channel.send(hits_desc)
+
+        await asyncio.sleep(1)
+
+        # Send message about who buzzed in the most
+        sorted_by_buzzes = sorted(player_data, key=lambda x: x["buzzes"], reverse=True)
+        ties = 0
+        for index, data in enumerate(sorted_by_buzzes[1:], start=1):
+            if sorted_by_buzzes[index-1]["buzzes"] > data["buzzes"]:
+                break
+
+            ties += 1
+
+        buzz_desc = None
+        if ties == 0:
+            mention = self.get_mention_str(sorted_by_buzzes[0]["disc_id"], guild_id)
+            buzz_desc = (
+                f"Shout out to {mention} for buzzing in the most with **{sorted_by_buzzes[0]['buzzes']}** "
+                "buzz-ins! Big respect for not being a poon!"
+            )
+
+        elif ties == 1:
+            mention_1 = self.get_mention_str(sorted_by_buzzes[0]["disc_id"], guild_id)
+            mention_2 = self.get_mention_str(sorted_by_buzzes[1]["disc_id"], guild_id)
+            buzz_desc = (
+                f"Shout out to {mention_1} and {mention_2} for having the most buzz-ins, both buzzing in "
+                f"**{sorted_by_buzzes[0]['buzzes']}** times! They are both real G's!"
+            )
+
+        if buzz_desc:
+            await channel.send(buzz_desc)
 
     async def send_error_msg(self, guild_id):
         """
@@ -1824,9 +1892,13 @@ class DiscordClient(discord.Client):
                 reaction_next = react_event.emoji.name == "▶"
                 new_chunk = message_data["chunk"] + 1 if reaction_next else message_data["chunk"] - 1
                 await self.paginate(
-                    message_data["message"].channel, message_data["data"],
-                    new_chunk, message_data["lines"], message_data["header"],
-                    message_data["footer"], message_data["message"]
+                    message_data["message"].channel,
+                    message_data["data"],
+                    new_chunk,
+                    message_data["lines"],
+                    message_data["header"],
+                    message_data["footer"],
+                    message_data["message"]
                 )
             elif (
                 self.audio_handler.playback_msg.get(guild_id) is not None

@@ -1,7 +1,11 @@
+import asyncio
 from glob import glob
 import os
 import importlib
 
+from mhooge_flask.logging import logger
+
+from api.config import Config
 from api.util import GUILD_IDS, MY_GUILD_ID
 from discbot.discord_bot import DiscordClient
 from discbot.commands.base import handle_command, Command
@@ -12,15 +16,14 @@ def collect_commands(cmd_class):
             cmd_class.GUILDS = GUILD_IDS
 
         cmd_class.GUILDS.append(MY_GUILD_ID)
-
         cmd_class.COMMANDS_DICT[cmd_class.NAME] = cmd_class
         return
 
     for sub_cls in cmd_class.__subclasses__():
         collect_commands(sub_cls)
 
-def initialize_commands(client: DiscordClient):
-    files = glob(f"{client.config.src_folder}/discbot/commands/*.py")
+def initialize_commands(config: Config):
+    files = glob(f"{config.src_folder}/discbot/commands/*.py")
 
     for file in files:
         basename = os.path.basename(file).replace(".py", "")
@@ -30,8 +33,6 @@ def initialize_commands(client: DiscordClient):
         importlib.import_module(f"discbot.commands.{basename}")
 
     collect_commands(Command)
-
-    client.add_event_listener("command", handle_command)
 
 def run_client(config, meta_database, game_databases, betting_handlers, api_clients, ai_pipe, flask_pipe, main_pipe):
     client = DiscordClient(
@@ -44,6 +45,16 @@ def run_client(config, meta_database, game_databases, betting_handlers, api_clie
         flask_pipe=flask_pipe,
         main_pipe=main_pipe,
     )
-    initialize_commands(client)
+    initialize_commands(client.config)
+    client.add_event_listener("command", handle_command)
 
-    client.run(config.discord_token)
+    async def runner():
+        async with client:
+            await client.start(config.discord_token, reconnect=True)
+
+    try:
+        asyncio.run(runner())
+    except KeyboardInterrupt:
+        return
+    except Exception:
+        logger.exception("Unhandled exception in Discord client")

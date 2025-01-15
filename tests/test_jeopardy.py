@@ -1,16 +1,20 @@
-from unittest import TestCase
+import json
+from typing import List
 from io import BytesIO
 from PIL import Image
 from multiprocessing import Process
-from random import Random
+import random
 from time import sleep
 import os
 from playwright.sync_api import sync_playwright, Playwright, BrowserContext, Page, Dialog
 from urllib.parse import urlencode, quote_plus
 from threading import Thread, Barrier, Event
 
+import pytest
+
 from src.run_flask import run_app
 from src.app.util import get_hashed_secret
+from src.api.util import MY_GUILD_ID
 from src.api.config import Config
 from src.api.meta_database import MetaDatabase
 from src.discbot.commands.util import ADMIN_DISC_ID
@@ -66,10 +70,10 @@ class ContextHandler:
         self.config = Config()
         self.playwright_contexts = []
         self.flask_process = None
-        self.presenter_context = None
-        self.presenter_page = None
-        self.contestant_contexts = []
-        self.contestant_pages = []
+        self.presenter_context: BrowserContext = None
+        self.presenter_page: Page = None
+        self.contestant_contexts: List[BrowserContext] = []
+        self.contestant_pages: List[Page] = []
         self._browser_threads = []
         self._player_names = player_names
         self._setup_callback = setup_callback
@@ -273,340 +277,504 @@ class ContextHandler:
 
         self.flask_process.close()
 
-class TestWrapper(TestCase):
-    def setUp(self):
-        self.random = Random(1337)
+def test_join():
+    player_names = {
+        CONTESTANT_IDS[0]: "Davido",
+        CONTESTANT_IDS[1]: "Martini",
+        CONTESTANT_IDS[2]: "Terning",
+        CONTESTANT_IDS[3]: "Nønton"
+    }
 
-    def test_join(self):
-        player_names = {
-            CONTESTANT_IDS[0]: "Davido",
-            CONTESTANT_IDS[1]: "Martini",
-            CONTESTANT_IDS[2]: "Terning",
-            CONTESTANT_IDS[3]: "Nønton"
-        }
+    with ContextHandler(player_names=player_names) as context:
+        # Simulate a person going to the previous page
+        context.contestant_pages[0].go_back()
 
-        with ContextHandler(player_names=player_names) as context:
-            # Simulate a person going to the previous page
-            context.contestant_pages[0].go_back()
+        assert _normalize_url(context.presenter_page.url) == JEOPARDY_PRESENTER_URL
 
-            self.assertEqual(_normalize_url(context.presenter_page.url), JEOPARDY_PRESENTER_URL)
+        for page in context.contestant_pages:
+            assert _normalize_url(page.url) == f"{BASE_URL}/game"
+            status_header = page.query_selector("#contestant-game-waiting")
+            assert status_header is not None
+            assert status_header.text_content() == "Venter på at spillet starter..."
 
-            for page in context.contestant_pages:
-                self.assertEqual(_normalize_url(page.url), f"{BASE_URL}/game")
-                status_header = page.query_selector("#contestant-game-waiting")
-                self.assertNotEqual(status_header, None)
-                self.assertEqual(status_header.text_content(), "Venter på at spillet starter...")
+        assert _normalize_url(context.contestant_pages[0].url) == f"{BASE_URL}/game"
 
-            self.assertEqual(_normalize_url(context.contestant_pages[0].url), f"{BASE_URL}/game")
+        # Simulate person closing the page and re-opening it
+        context._open_contestant_lobby_page(
+            context.contestant_contexts[0],
+            CONTESTANT_IDS[0],
+            context.contestant_pages[0]
+        )
 
-            # Simulate person closing the page and re-opening it
-            context._open_contestant_lobby_page(
-                context.contestant_contexts[0],
-                CONTESTANT_IDS[0],
-                context.contestant_pages[0]
-            )
+        assert _normalize_url(context.contestant_pages[0].url) == f"{BASE_URL}/game"
 
-            self.assertEqual(_normalize_url(context.contestant_pages[0].url), f"{BASE_URL}/game")
+        name_elems = context.presenter_page.query_selector_all("#menu-contestants > .menu-contestant-id")
+        expected_names = list(player_names.values())
+        for index, name in enumerate(name_elems):
+            assert expected_names[index] == name.text_content()
 
-            name_elems = context.presenter_page.query_selector_all("#menu-contestants > .menu-contestant-id")
-            expected_names = list(player_names.values())
-            for index, name in enumerate(name_elems):
-                self.assertEqual(expected_names[index], name.text_content())
+def test_first_turn():
+    with ContextHandler() as context:
+        # Start the game
+        context.start_game()
 
-    def test_first_turn(self):
-        with ContextHandler() as context:
-            # Start the game
-            context.start_game()
+        sleep(1)
 
-            sleep(1)
+        for page in context.contestant_pages:
+            assert _normalize_url(page.url) == f"{BASE_URL}/game"
+            round_headers = page.query_selector_all(".contestant-round-header")
+            turn_desc = page.query_selector("#contestant-turn-desc")
+            assert round_headers[0].text_content() == "Runde 1/3"
+            assert round_headers[1].text_content() == "Spørgsmål 1/30"
+            assert turn_desc.text_content() == ""
 
-            for page in context.contestant_pages:
-                self.assertEqual(_normalize_url(page.url), f"{BASE_URL}/game")
-                round_headers = page.query_selector_all(".contestant-round-header")
-                turn_desc = page.query_selector("#contestant-turn-desc")
-                self.assertEqual(round_headers[0].text_content(), "Runde 1/3")
-                self.assertEqual(round_headers[1].text_content(), "Spørgsmål 1/30")
-                self.assertEqual(turn_desc.text_content(), "")
+        # Choose a player to get the first turn
+        context.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
-            # Choose a player to get the first turn
-            context.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        # Wait until player has been chosen
+        context.presenter_page.wait_for_function("() => playerTurn != -1")
+        player_turn = context.presenter_page.evaluate("() => playerTurn")
 
-            # Wait until player has been chosen
-            context.presenter_page.wait_for_function("() => playerTurn != -1")
-            player_turn = context.presenter_page.evaluate("() => playerTurn")
+        for index, page in enumerate(context.contestant_pages):
+            turn_desc = page.query_selector("#contestant-turn-desc")
+            if index == player_turn:
+                expected_desc = "Din tur til at vælge en kategori!"
+            else:
+                expected_desc = "Venter på at en anden spiller vælger en kategori..."
 
-            for index, page in enumerate(context.contestant_pages):
-                turn_desc = page.query_selector("#contestant-turn-desc")
-                if index == player_turn:
-                    expected_desc = "Din tur til at vælge en kategori!"
-                else:
-                    expected_desc = "Venter på at en anden spiller vælger en kategori..."
+            assert expected_desc == turn_desc.text_content()
 
-                self.assertEqual(expected_desc, turn_desc.text_content())
+def test_buzz_in_correct_person():
+    round_num = 1
+    category = "lore"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
 
-    def test_buzz_in_correct_person(self):
-        round_num = 1
-        category = "lore"
-        difficulty = 1
-        question_num = 1
-        turn_id = 1
-        player_data = [
-            (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
-            (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
-            (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
-            (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
-        ]
+    random.seed(1337)
 
-        with ContextHandler() as context:
-            # Go to question page
-            context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
-            sleep(1)
+    with ContextHandler() as context:
+        # Go to question page
+        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        sleep(1)
 
-            context.show_question()
-            sleep_time = 1.5 + self.random.random() * 2
-            sleep(sleep_time)
+        context.show_question()
+        sleep_time = 1.5 + random.random() * 2
+        sleep(sleep_time)
 
-            context.contestant_pages[1].wait_for_selector("#buzzer-wrapper")
-            context.contestant_pages[1].query_selector("#buzzer-wrapper").tap()
+        context.contestant_pages[1].wait_for_selector("#buzzer-wrapper")
+        context.contestant_pages[1].query_selector("#buzzer-wrapper").tap()
 
-            sleep(2)
+        sleep(2)
 
-            for index in range(len(player_data)):
-                buzz_winner_elem = context.contestant_pages[index].query_selector("#buzzer-winner")
-                buzzed_in_first = buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
-                if index == 1:
-                    self.assertTrue(buzzed_in_first, "Correct player did not buzz in")
-                else:
-                    self.assertFalse(buzzed_in_first, "Wrong player buzzed in")
+        for index in range(len(player_data)):
+            buzz_winner_elem = context.contestant_pages[index].query_selector("#buzzer-winner")
+            buzzed_in_first = buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
+            if index == 1:
+                assert buzzed_in_first, "Correct player did not buzz in"
+            else:
+                assert not buzzed_in_first, "Wrong player buzzed in"
 
-    def test_buzz_in_sequential(self):
-        round_num = 1
-        category = "lore"
-        difficulty = 1
-        question_num = 1
-        turn_id = 1
-        player_data = [
-            (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
-            (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
-            (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
-            (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
-        ]
+def test_buzz_in_sequential():
+    round_num = 1
+    category = "lore"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
 
-        with ContextHandler() as context:
-            # Go to question page
-            context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
-            sleep(1)
+    with ContextHandler() as context:
+        # Go to question page
+        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        sleep(1)
 
-            context.show_question()
-            sleep(2)
+        context.show_question()
+        sleep(2)
 
-            player_pings = []
-            for index, page in enumerate(context.contestant_pages):
-                ping_elem = page.query_selector("#contestant-game-ping")
-                player_pings.append((float(ping_elem.text_content().split(" ")[0]), index))
+        player_pings = []
+        for index, page in enumerate(context.contestant_pages):
+            ping_elem = page.query_selector("#contestant-game-ping")
+            player_pings.append((float(ping_elem.text_content().split(" ")[0]), index))
 
-            player_pings.sort(key=lambda x: x[0], reverse=True)
+        player_pings.sort(key=lambda x: x[0], reverse=True)
 
-            for _, index in player_pings:
-                context.contestant_pages[index].wait_for_selector("#buzzer-wrapper")
+        for _, index in player_pings:
+            context.contestant_pages[index].wait_for_selector("#buzzer-wrapper")
 
-            for _, index in player_pings:
-                context.contestant_pages[index].query_selector("#buzzer-wrapper").tap()
+        for _, index in player_pings:
+            context.contestant_pages[index].query_selector("#buzzer-wrapper").tap()
 
-            sleep(2)
+        sleep(2)
 
-            buzzed_in_first = []
-            for _, index in player_pings:
-                buzz_winner_elem = context.contestant_pages[index].query_selector("#buzzer-winner")
-                buzzed_first = buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
-                buzzed_in_first.append(buzzed_first)
+        buzzed_in_first = []
+        for _, index in player_pings:
+            buzz_winner_elem = context.contestant_pages[index].query_selector("#buzzer-winner")
+            buzzed_first = buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
+            buzzed_in_first.append(buzzed_first)
 
-            candidates = []
-            prev_ping = player_pings[0][0]
-            for ping, index in player_pings:
-                if ping > prev_ping:
+        candidates = []
+        prev_ping = player_pings[0][0]
+        for ping, index in player_pings:
+            if ping > prev_ping:
+                break
+
+            candidates.append((ping, index))
+            prev_ping = ping
+
+        if len(candidates) == 1:
+            assert buzzed_in_first[candidates[0][1]]
+            for i in range(1, len(player_pings)):
+                assert buzzed_in_first[player_pings[i][1]]
+        else:
+            won_buzz_players = []
+            for index, won in enumerate(buzzed_in_first):
+                if won:
+                    won_buzz_players.append(index)
+
+            assert len(won_buzz_players) == 1
+            assert won_buzz_players[0] in [x[1] for x in candidates]
+
+def _do_buzz_in(page: Page, disc_id: int):
+    for _ in range(10):
+        try:
+            page.wait_for_function("() => document.getElementById('buzzer-active') != null && !document.getElementById('buzzer-active').classList.contains('d-none')", timeout=1000)
+        except Exception:
+            pass
+
+    BARRIER.wait()
+
+    if disc_id == 347489125877809155:
+        # Nø never buzzes in...
+        return
+
+    # Sleep for a random amount of time, between 0 and 10 ms
+    sleep_duration = random.random() * 0.001
+    sleep(sleep_duration)
+
+    page.query_selector("#buzzer-wrapper").tap()
+
+def test_buzz_in_parallel():
+    round_num = 1
+    category = "lore"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+
+    random.seed(1337)
+
+    with ContextHandler(setup_callback=_do_buzz_in) as context:
+        # Go to question page
+        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+
+        sleep(3)
+
+        context.show_question()
+
+        sleep(2)
+
+        context.presenter_page.wait_for_load_state("domcontentloaded")
+
+        context.presenter_page.wait_for_function(
+            "() => document.getElementById('question-buzz-feed').children[0].children.length == 3", timeout=15000
+        )
+
+        players_buzzed_in = context.presenter_page.eval_on_selector(
+            "#question-buzz-feed", "(elem) => Array.from(elem.children[0].children).map((c) => c.textContent)"
+        )
+
+        assert len(players_buzzed_in) == 3
+
+        # Verify that everyone we expected to have buzzed in, did
+        people_missing_buzz_in = set(["Murt", "Dave", "Muds", "Nø"])
+        for buzz_desc in players_buzzed_in:
+            for name in people_missing_buzz_in:
+                if buzz_desc.startswith(f"{name} buzzede ind efter"):
                     break
 
-                candidates.append((ping, index))
-                prev_ping = ping
+            people_missing_buzz_in.remove(name)
 
-            if len(candidates) == 1:
-                self.assertTrue(buzzed_in_first[candidates[0][1]])
-                for i in range(1, len(player_pings)):
-                    self.assertFalse(buzzed_in_first[player_pings[i][1]])
+        assert {"Nø"} == people_missing_buzz_in
+
+def _get_daily_double_question(config):
+    filename = f"{config.static_folder}/data/jeopardy_used.json"
+    with open(filename, "r", encoding="utf-8") as fp:
+        data = json.load(fp)
+        for category in data:
+            for index, question in enumerate(data[category]):
+                if question["double"]:
+                    return category, (index + 1)
+
+    data["mechanics"][0]["double"] = True
+    with open(filename, "w", encoding="utf-8") as fp:
+        json.dump(data, fp, indent=4)
+
+    return "mechanics", 1
+
+def test_daily_double_low_score(config):
+    round_num = 1
+    category, difficulty = _get_daily_double_question(config)
+    question_num = 2
+    turn_id = 2
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], -1200, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+
+    with ContextHandler() as context:
+        sleep(1)
+
+        # Go to question page
+        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        sleep(1)
+
+        # Verify that the correct contestant can answer the daily double
+        for index, page in enumerate(context.contestant_pages):
+            header_text = page.query_selector("h3").text_content()
+            if index == turn_id:
+                assert header_text.startswith("Your move! Hvor mange GBP vil du satse?")
             else:
-                won_buzz_players = []
-                for index, won in enumerate(buzzed_in_first):
-                    if won:
-                        won_buzz_players.append(index)
+                assert header_text, "Venter på at Muds svarer på Daily Double..."
 
-                self.assertEqual(len(won_buzz_players), 1)
-                self.assertIn(won_buzz_players[0], [x[1] for x in candidates])
+        def dialog_callback(dialog: Dialog, is_valid: bool):
+            assert not is_valid
+            assert dialog.message == "Ugyldig mængde point, skal være mellem 100 og 500"
+            dialog.accept()
 
-    def _do_buzz_in(self, page: Page, disc_id: int):
-        for _ in range(10):
-            try:
-                page.wait_for_function("() => document.getElementById('buzzer-active') != null && !document.getElementById('buzzer-active').classList.contains('d-none')", timeout=1000)
-            except Exception:
-                pass
+        # Wager an amount that is too low
+        context.make_daily_double_wager(context.contestant_pages[turn_id], 0, dialog_callback, False)
+        sleep(0.5)
 
-        BARRIER.wait()
+        # Wager an amount that is too hight
+        context.make_daily_double_wager(context.contestant_pages[turn_id], 600, dialog_callback, False)
+        sleep(0.5)
 
-        if disc_id == 347489125877809155:
-            # Nø never buzzes in...
-            return
+        # Wager an amount that is just right
+        context.make_daily_double_wager(context.contestant_pages[turn_id], 500, dialog_callback, True)
+        sleep(1)
 
-        # Sleep for a random amount of time, between 0 and 10 ms
-        sleep_duration = self.random.random() * 0.001
-        sleep(sleep_duration)
+        context.show_question(True)
+        sleep(1)
 
-        page.query_selector("#buzzer-wrapper").tap()
+        context.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        sleep(0.5)
+        context.presenter_page.press("body", "1")
+        sleep(3)
 
-    def test_buzz_in_parallel(self):
-        round_num = 1
-        category = "lore"
-        difficulty = 1
-        question_num = 1
-        turn_id = 1
-        player_data = [
-            (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
-            (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
-            (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
-            (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
-        ]
+        score_text = context.presenter_page.query_selector_all(".footer-contestant-entry-score")[turn_id].text_content()
+        player_score = int(score_text.split(" ")[0])
+        assert player_score == player_data[turn_id][1] + 500
 
-        with ContextHandler(setup_callback=self._do_buzz_in) as context:
-            # Go to question page
-            context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+def test_daily_double_high_score(config):
+    round_num = 1
+    category, difficulty = _get_daily_double_question(config)
+    question_num = 2
+    turn_id = 2
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 1200, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
 
-            sleep(3)
+    with ContextHandler() as context:
+        sleep(1)
 
-            context.show_question()
+        # Go to question page
+        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        sleep(1)
 
-            sleep(2)
+        # Verify that the correct contestant can answer the daily double
+        for index, page in enumerate(context.contestant_pages):
+            header_text = page.query_selector("h3").text_content()
+            if index == turn_id:
+                assert header_text.startswith("Your move! Hvor mange GBP vil du satse?")
+            else:
+                assert header_text, "Venter på at Muds svarer på Daily Double..."
 
-            context.presenter_page.wait_for_load_state("domcontentloaded")
+        def dialog_callback(dialog: Dialog, is_valid: bool):
+            assert not is_valid
+            assert dialog.message == "Ugyldig mængde point, skal være mellem 100 og 1200"
+            dialog.accept()
 
-            context.presenter_page.wait_for_function(
-                "() => document.getElementById('question-buzz-feed').children[0].children.length == 3", timeout=15000
-            )
+        # Wager an amount that is too low
+        context.make_daily_double_wager(context.contestant_pages[turn_id], 0, dialog_callback, False)
+        sleep(0.5)
 
-            players_buzzed_in = context.presenter_page.eval_on_selector(
-                "#question-buzz-feed", "(elem) => Array.from(elem.children[0].children).map((c) => c.textContent)"
-            )
+        # Wager an amount that is too hight
+        context.make_daily_double_wager(context.contestant_pages[turn_id], 1300, dialog_callback, False)
+        sleep(0.5)
 
-            self.assertEqual(len(players_buzzed_in), 3)
+        # Wager an amount that is just right
+        context.make_daily_double_wager(context.contestant_pages[turn_id], 1100, dialog_callback, True)
+        sleep(1)
 
-            # Verify that everyone we expected to have buzzed in, did
-            people_missing_buzz_in = set(["Murt", "Dave", "Muds", "Nø"])
-            for buzz_desc in players_buzzed_in:
-                for name in people_missing_buzz_in:
-                    if buzz_desc.startswith(f"{name} buzzede ind efter"):
-                        break
+        context.show_question(True)
+        sleep(1)
 
-                people_missing_buzz_in.remove(name)
+        context.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        sleep(0.5)
+        context.presenter_page.press("body", "1")
+        sleep(3)
 
-            self.assertEqual({"Nø"}, people_missing_buzz_in)
+        score_text = context.presenter_page.query_selector_all(".footer-contestant-entry-score")[turn_id].text_content()
+        player_score = int(score_text.split(" ")[0])
+        assert player_score == player_data[turn_id][1] + 1100
 
-    def test_daily_double(self):
-        round_num = 1
-        category = "mechanics"
-        difficulty = 1
-        question_num = 2
-        turn_id = 2
-        player_data = [
-            (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
-            (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
-            (CONTESTANT_IDS[2], -1200, "Muds", "FF00FF"),
-            (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
-        ]
+def test_final_jeopardy():
+    round_num = 2
+    question_num = 30
+    turn_id = 0
+    player_data = [
+        (CONTESTANT_IDS[0], 500, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], -500, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 1500, "Nø", "00FFFF")
+    ]
 
-        with ContextHandler() as context:
-            sleep(1)
+    with ContextHandler() as context:
+        # Go to question page
+        context.open_presenter_selection_page(round_num, question_num, turn_id, player_data)
+        sleep(1)
 
-            # Go to question page
-            context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
-            sleep(1)
+        # Verify that we are on the correct page
+        for page in context.contestant_pages:
+            headers = page.query_selector_all(".contestant-round-header")
+            assert headers[0].text_content() == "Runde 3/3"
+            assert headers[1].text_content() == "Final Jeopardy!"
 
-            # Verify that the correct contestant can answer the daily double
-            for index, page in enumerate(context.contestant_pages):
-                header_text = page.query_selector("h3").text_content()
-                if index == turn_id:
-                    self.assertTrue(header_text.startswith("Your move! Hvor mange GBP vil du satse?"))
-                else:
-                    self.assertEqual(header_text, "Venter på at Muds svarer på Daily Double...")
+def test_endscreen():
+    player_data = [
+        (CONTESTANT_IDS[0], 800, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 500, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], -1200, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+    with ContextHandler() as context:
+        sleep(1)
 
-            def dialog_callback(dialog: Dialog, is_valid: bool):
-                self.assertFalse(is_valid)
-                self.assertEqual(dialog.message, "Ugyldig mængde point, skal være mellem 100 og 500")
-                dialog.accept()
+        # Go to endscreen page
+        context.open_endscreen_page(player_data)
+        sleep(1)
 
-            # Wager an amount that is too low
-            context.make_daily_double_wager(context.contestant_pages[turn_id], 0, dialog_callback, False)
-            sleep(0.5)
+@pytest.mark.asyncio
+async def test_discord_message_simple(discord_client):
+    player_data = [
+        {"disc_id": 2, "name": "Dave", "avatar": None, "score": 800, "buzzes": 4, "hits": 2, "misses": 2, "color": "F30B0B"},
+        {"disc_id": 3, "name": "Murt", "avatar": None, "score": 500, "buzzes": 4, "hits": 3, "misses": 1, "color": "CCCC00"},
+        {"disc_id": 4, "name": "Muds", "avatar": None, "score": -1200, "buzzes": 6, "hits": 1, "misses": 5, "color": "FF00FF"},
+        {"disc_id": 5, "name": "Nø", "avatar": None, "score": -200, "buzzes": 1, "hits": 0, "misses": 1, "color": "00FFFF"},
+    ]
 
-            # Wager an amount that is too hight
-            context.make_daily_double_wager(context.contestant_pages[turn_id], 700, dialog_callback, False)
-            sleep(0.5)
+    await discord_client.announce_jeopardy_winner(player_data)
 
-            # Wager an amount that is just right
-            context.make_daily_double_wager(context.contestant_pages[turn_id], 500, dialog_callback, True)
-            sleep(1)
+    channel = discord_client.channels_to_write[MY_GUILD_ID]
 
-            context.show_question(True)
-            sleep(1)
+    assert len(channel.messages_sent) == 3
 
-            context.presenter_page.press("body", PRESENTER_ACTION_KEY)
-            sleep(0.5)
-            context.presenter_page.press("body", "1")
-            sleep(3)
+    # Verify the contents of the first message (winner message)
+    expected_message_1 = (
+        "@Slugger is the winner of the *LoL Jeopardy 3rd Edition* with **800 points**!!! "
+        "All hail the king :crown:\n"
+        "They get a special badge of honor on Discord and wins a **1350 RP** skin!"
+    )
+    assert channel.messages_sent[0] == expected_message_1
 
-            score_text = context.presenter_page.query_selector_all(".footer-contestant-entry-score")[turn_id].text_content()
-            player_score = int(score_text.split(" ")[0])
-            self.assertEqual(player_score, player_data[turn_id][1] + 500)
+    # Verify the contents of the second message (most hits message)
+    expected_message_2 = (
+        "Honorable mention to @Murt for answering the most questions correct "
+        "with **3** correct answers! Big nerd legend over here :nerd:!"
+    )
+    assert channel.messages_sent[1] == expected_message_2
 
-    def test_final_jeopardy(self):
-        pass
+    # Verify the contents of the third message (most buzzer hits)
+    expected_message_3 = (
+        "Shout out to @Eddie Smurphy for buzzing in the most with "
+        "**6** buzz-ins! Big respect for not being a poon!"
+    )
+    assert channel.messages_sent[2] == expected_message_3
 
-    def test_endscreen(self):
-        player_data = [
-            (CONTESTANT_IDS[0], 800, "Dave", "F30B0B"),
-            (CONTESTANT_IDS[1], 500, "Murt", "CCCC00"),
-            (CONTESTANT_IDS[2], -1200, "Muds", "FF00FF"),
-            (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
-        ]
-        with ContextHandler() as context:
-            sleep(1)
+@pytest.mark.asyncio
+async def test_discord_message_ties(discord_client):
+    player_data = [
+        {"disc_id": 2, "name": "Dave", "avatar": None, "score": 800, "buzzes": 4, "hits": 3, "misses": 1, "color": "F30B0B"},
+        {"disc_id": 3, "name": "Murt", "avatar": None, "score": 800, "buzzes": 7, "hits": 4, "misses": 3, "color": "CCCC00"},
+        {"disc_id": 4, "name": "Muds", "avatar": None, "score": 500, "buzzes": 7, "hits": 5, "misses": 2, "color": "FF00FF"},
+        {"disc_id": 5, "name": "Nø", "avatar": None, "score": 200, "buzzes": 6, "hits": 5, "misses": 1, "color": "00FFFF"},
+    ]
 
-            # Go to endscreen page
-            context.open_endscreen_page(player_data)
-            sleep(1)
+    await discord_client.announce_jeopardy_winner(player_data)
 
-    # def test_all_questions(self):
-    #     turn_id = 0
-    #     player_data = [
-    #         (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
-    #         (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
-    #         (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
-    #         (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
-    #     ]
-    #     with ContextHandler() as context:
-    #         context.presenter_page.on("requestfinished", lambda req: print("Request:", req.url))
+    channel = discord_client.channels_to_write[MY_GUILD_ID]
 
-    #         context.open_presenter_selection_page(1, 0, turn_id, player_data)
-    #         context.screenshot_views(0)
+    assert len(channel.messages_sent) == 3
 
-    #         for round_num in range(2):
-    #             question_num = 0
-    #             for category in ("mechanics", "lore", "icons", "outlines", "brois", "audio"):
-    #                 for difficulty in range(1, 6):
-    #                     # Go to question page
-    #                     context.open_presenter_question_page(round_num + 1, category, difficulty, question_num, turn_id, player_data)
-    #                     sleep(1)
+    # Verify the contents of the first message (winner message)
+    expected_message_1 = (
+        "@Slugger and @Murt both won the *LoL Jeopardy 3rd Edition* with "
+        "**800 points**!!!\nThey both get a special badge of honor "
+        "on Discord and each win a **975 RP** skin!"
+    )
+    assert channel.messages_sent[0] == expected_message_1
 
-    #                     context.show_question()
-    #                     sleep(1)
+    # Verify the contents of the second message (most hits message)
+    expected_message_2 = (
+        "Honorable mentions to @Eddie Smurphy and @Nønø for having the most correct answers, "
+        "both answering correct **5** times! They are both nerds :nerd:!"
+    )
+    assert channel.messages_sent[1] == expected_message_2
 
-    #                     context.screenshot_views((round_num * 30) + question_num + 1)
+    # Verify the contents of the third message (most buzzer hits)
+    expected_message_3 = (
+        "Shout out to @Murt and @Eddie Smurphy for having the most buzz-ins, both buzzing in "
+        "**7** times! They are both real G's!"
+    )
+    assert channel.messages_sent[2] == expected_message_3
 
-    #                     question_num += 1
+@pytest.mark.skip()
+def test_all_questions():
+    turn_id = 0
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+    with ContextHandler() as context:
+        #context.presenter_page.on("requestfinished", lambda req: print("Request:", req.url))
+
+        context.open_presenter_selection_page(1, 0, turn_id, player_data)
+        context.screenshot_views(0)
+
+        for round_num in range(2):
+            question_num = 0
+            for category in ("mechanics", "lore", "icons", "outlines", "brois", "audio"):
+                for difficulty in range(1, 6):
+                    # Go to question page
+                    context.open_presenter_question_page(round_num + 1, category, difficulty, question_num, turn_id, player_data)
+                    sleep(1)
+
+                    context.show_question()
+                    sleep(1)
+
+                    context.screenshot_views((round_num * 30) + question_num + 1)
+
+                    question_num += 1

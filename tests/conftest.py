@@ -4,7 +4,7 @@ from src.api.config import Config
 from src.api.meta_database import MetaDatabase
 from src.api.bets import get_betting_handler
 from src.api.game_databases import get_database_client
-from src.api.util import SUPPORTED_GAMES
+from src.api.util import SUPPORTED_GAMES, MY_GUILD_ID, GUILD_IDS
 from src.discbot.commands.base import handle_command
 from src.discbot.commands.util import COMMANDS
 from src.run_discord_bot import initialize_commands
@@ -94,12 +94,24 @@ def discord_client(config, meta_database, game_databases):
         MockUser(5, "Nønø"),
         MockUser(6, "Zikzak"),
     ]
-    channels = [MockChannel("Test channel", members)]
-    guilds = [MockGuild("Test guild", members, channels)]
+
+    guilds = []
+    for index, guild_id in enumerate(GUILD_IDS, start=1):
+        channels = [
+            MockChannel("Test channel 1", members),
+            MockChannel("Test channel 2", members),
+        ]
+        guilds.append(MockGuild(f"Test guild {index}", members, channels, guild_id))
+
+    channels = [MockChannel("Test channel", [members[0]])]
+    guilds.append(MockGuild("Test guild", members, channels, MY_GUILD_ID))
 
     client._guilds = guilds
 
-    initialize_commands(client)
+    for guild in guilds:
+        client.channels_to_write[guild.id] = guild.text_channels[0]
+
+    initialize_commands(config)
 
     for command in COMMANDS:
         client.command_timeout_lengths[command] = 0

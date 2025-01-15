@@ -16,10 +16,15 @@ class MockUser:
         self.name = name
         self.global_name = name
         self.nick = name
+        self.roles = []
         self.messages_sent = []
 
     async def send(self, content: str):
         self.messages_sent.append(content)
+
+    async def add_roles(self, *roles):
+        for role in roles:
+            self.roles.append(role)
 
     @property
     def display_name(self):
@@ -39,16 +44,40 @@ class MockChannel:
     async def send(self, content: str):
         self.messages_sent.append(content)
 
+class MockRole:
+    def __init__(self, role_id: int, name: str, color: tuple):
+        self.id = role_id
+        self.name = name
+        self.color = color
+
 class MockGuild:
     def __init__(self, name: str, members: List[MockUser], channels: List[MockChannel], guild_id: int = MAIN_GUILD_ID):
         self.name = name
         self.members = members
         self.id = guild_id
+        self.roles = []
         self._channels = channels
 
     @property
     def text_channels(self):
         return self._channels
+
+    def get_member(self, user_id):
+        for member in self.members:
+            if member.id == user_id:
+                return member
+            
+        return None
+
+    def get_channel(self, channel_id):
+        for channel in self.text_channels:
+            if channel.id == channel_id:
+                return channel
+
+        return None
+
+    async def create_role(self, name, color):
+        self.roles.append(MockRole(len(self.roles), name, color))
 
 class MockMessage:
     def __init__(self, content: str, author: MockUser, channel: MockChannel, guild: MockGuild):

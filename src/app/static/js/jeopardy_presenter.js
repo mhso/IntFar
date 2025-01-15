@@ -133,7 +133,6 @@ function afterQuestion() {
     hideTips();
     window.onkeydown = function(e) {
         if (e.key == PRESENTER_ACTION_KEY) {
-            questionNum += 1;
             window.location.href = getSelectionURL(activeRound);
         }
     }
@@ -148,9 +147,11 @@ function afterAnswer() {
     buzzFeed.classList.add("d-none");
     buzzFeed.getElementsByTagName("ul").item(0).innerHTML = "";
 
-    if (activeAnswer == null && !isDailyDouble) {
+    if (activeAnswer == null) {
         // Question has been answered or time ran out
-        socket.emit("disable_buzz");
+        if (!isDailyDouble) {
+            socket.emit("disable_buzz");
+        }
         return;
     }
 
@@ -222,7 +223,7 @@ function correctAnswer() {
     }
 
     // Send update to server
-    socket.emit("correct_answer", answeringPlayer);
+    socket.emit("correct_answer", answeringPlayer, activeValue);
 
     // Move on to next question
     afterQuestion();
@@ -258,7 +259,7 @@ function wrongAnswer(reason) {
 
     let outOfTime = reason == "Ikke mere tid" && answeringPlayer == null;
 
-    if (activePlayers.every((v) => !v) || outOfTime) {
+    if (activePlayers.every(v => !v) || outOfTime) {
         if (outOfTime && !coinElem.classList.contains("d-none")) {
             valueElem.textContent = "";
             coinElem.classList.add("d-none");
@@ -511,6 +512,10 @@ function showTip(index) {
 function questionAsked(countdownDelay) {
     window.onkeydown = null;
     setTimeout(function() {
+        if (!activeAnswer) {
+            return;
+        }
+
         if (answeringPlayer == null && canPlayersBuzzIn()) {
             hideAnswerIndicator();
             showTip(0);
@@ -567,7 +572,7 @@ function afterShowQuestion() {
 
 function showQuestion() {
     for (let i = 0; i < playerIds.length; i++) {
-        activePlayers.push(isDailyDouble ? false : true);
+        activePlayers.push(!isDailyDouble);
     }
 
     // Show the question, if it exists
@@ -576,16 +581,17 @@ function showQuestion() {
         questionElem.style.opacity = 1;
     }
 
-    let imageElem = document.getElementById("question-question-image");
+    let questionImage = document.getElementById("question-question-image");
+    let answerImage = document.getElementById("question-answer-image");
     let videoElem = document.getElementById("question-question-video");
 
-    if (imageElem != null || videoElem != null) {
+    if (answerImage != null || videoElem != null) {
         // If there is an answer image, first show the question, then show
         // the image after pressing action key again. Otherwise show image instantly
         window.onkeydown = function(e) {
             if (e.key == PRESENTER_ACTION_KEY) {
-                if (imageElem != null) {
-                    imageElem.style.opacity = 1;
+                if (questionImage != null) {
+                    questionImage.style.opacity = 1;
                     afterShowQuestion();
                 }
                 else {
@@ -603,17 +609,17 @@ function showQuestion() {
     }
     else {
         if (isQuestionMultipleChoice()) {
-            if (imageElem != null) {
-                imageElem.style.opacity = 1;
+            if (questionImage != null) {
+                questionImage.style.opacity = 1;
             }
             afterShowQuestion();
         }
         else {
+            if (questionImage != null) {
+                questionImage.style.opacity = 1;
+            }
             window.onkeydown = function(e) {
                 if (e.key == PRESENTER_ACTION_KEY) {
-                    if (imageElem != null) {
-                        imageElem.style.opacity = 1;
-                    }
                     afterShowQuestion();
                 }
             }
@@ -790,14 +796,12 @@ function chooseStartingPlayer(callback) {
     let minWait = 30;
     let maxWait = 400;
 
-    let player = 0;
-
     function showStartPlayerCandidate(iter) {
         let wait = minWait + (maxWait - minWait) * (iter / iters);
 
         setTimeout(() => {
-            setPlayerTurn(player, false);
             player = iter % playerEntries.length;
+            setPlayerTurn(player, false);
 
             if (iter < iters) {
                 showStartPlayerCandidate(iter + 1);
@@ -814,8 +818,6 @@ function chooseStartingPlayer(callback) {
     for (let i = 0; i < questionBoxes.length; i++) {
         questionBoxes.item(i).classList.remove("inactive");
     }
-
-    return player;
 }
 
 function beginJeopardy() {
@@ -864,6 +866,7 @@ function addPlayerDiv(id, index, name, avatar, color) {
 
     div.id = divId;
     div.dataset["disc_id"] = id;
+    div.dataset["index"] = index;
     div.dataset["color"] = color;
     div.className = "menu-contestant-entry";
     div.style.border = "2px solid " + color;
@@ -879,13 +882,16 @@ function addPlayerDiv(id, index, name, avatar, color) {
     
         div.appendChild(avatarElem);
         div.appendChild(nameElem);
-    
-        if (index >= wrapper.children.length) {
-            wrapper.appendChild(div);
+
+        // Find the index of the contestant
+        for (let i = 0; i < wrapper.children.length; i++) {
+            let child = wrapper.children[i];
+            if (child.dataset["index"] > index) {
+                wrapper.insertBefore(div, child);
+                return;
+            }
         }
-        else {
-            wrapper.insertBefore(div, wrapper.children[index]);
-        }
+        wrapper.appendChild(div);
     }
 }
 
@@ -1053,7 +1059,7 @@ function champOPGG() {
 }
 
 function mergeOPGG(stats) {
-    let playedDict = stuffs();
+    let playedDict = champOPGG();
     for (var champ in playedDict) { stats[champ] = playedDict[champ] + (stats[champ] || 0); }
     return stats;
 }

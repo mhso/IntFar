@@ -33,7 +33,7 @@ class TestMock(DiscordClient):
         super().__init__(config, database, game_databases, betting_handlers, api_clients, **kwargs)
         self.missing = args.missing
         self.game = args.game
-        self.game_id = args.game_id
+        self.game_id = args.id
         self.guild_to_use = GUILDS.get(args.guild)
         self.task = args.task if not self.missing else "all"
         self.loud = not args.silent if not self.missing else False
@@ -164,7 +164,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--missing", action="store_true")
 parser.add_argument("--game", type=str)
-parser.add_argument("--game_id", type=str)
+parser.add_argument("--id", type=str)
 parser.add_argument("--guild", type=str, choices=GUILDS)
 parser.add_argument("--task", type=str, choices=("all", "bets", "stats", "train", "announce"))
 parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
@@ -176,7 +176,7 @@ parser.add_argument("-s", "--silent", action="store_true")
 args = parser.parse_args()
 
 if not args.missing:
-    if None in (args.game, args.game_id, args.guild, args.task, args.sound):
+    if None in (args.game, args.id, args.guild, args.task, args.sound):
         logger.warning("Either specificy --missing or all of --game, --guild, --task, and --sound")
         exit(0)
 

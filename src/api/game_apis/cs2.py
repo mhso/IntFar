@@ -310,8 +310,6 @@ class SteamAPIClient(GameAPIClient):
         )
 
         response = await self.httpx_client.get(url)
-        logger.info("Response code: ", response.status_code)
-        logger.info("Response json: ", response.json())
         if response.status_code != 200:
             return None
 

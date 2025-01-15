@@ -38,7 +38,7 @@
                 <h2 class="contestant-round-header">Runde {{ jeopardy_round }}/3</h2>
                 {% if jeopardy_round < 3 %}
                 {% set has_turn = turn_id == player_turn %}
-                <h2 class="contestant-round-header">Spørgsmål {{ question_num + 1 }}/30</h2>
+                <h2 class="contestant-round-header">Spørgsmål {{ question_num }}/30</h2>
                 {% else %}
                 <h2 class="contestant-round-header">Final Jeopardy!</h2>
                 {% endif %}

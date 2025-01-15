@@ -104,9 +104,9 @@ if not TESTING:
 
 else: # Use old data for testing.
     LAN_PARTIES = {
-        "august_24": LANInfo(
-            datetime(2024, 8, 17, 10, 0, 0).timestamp(),
-            datetime(2024, 8, 18, 10, 0, 0).timestamp(),
+        "february_25": LANInfo(
+            datetime(2025, 2, 1, 10, 0, 0).timestamp(),
+            datetime(2025, 2, 2, 12, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",

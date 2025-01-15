@@ -132,11 +132,13 @@ class LoLGameStats(GameStats):
     our_baron_kills: int = None
     our_dragon_kills: int = None
     our_herald_kills: int = None
+    our_grub_kills: int = None
     our_atakhan_kills: int = None
     enemy_baron_kills: int = None
     enemy_dragon_kills: int = None
     enemy_herald_kills: int = None
     enemy_atakhan_kills: int = None
+    enemy_grub_kills: int = None
     timeline_data: dict = None
 
     def __post_init__(self):
@@ -672,10 +674,12 @@ class LoLGameStatsParser(GameStatsParser):
         our_baron_kills = 0
         our_dragon_kills = 0
         our_herald_kills = 0
+        our_grub_kills = 0
         our_atakhan_kills = 0
         enemy_baron_kills = 0
         enemy_dragon_kills = 0
         enemy_herald_kills = 0
+        enemy_grub_kills = 0
         enemy_atakhan_kills = 0
 
         for team in self.raw_data["teams"]:
@@ -684,14 +688,16 @@ class LoLGameStatsParser(GameStatsParser):
                 our_baron_kills = objectives["baron"]["kills"]
                 our_dragon_kills = objectives["dragon"]["kills"]
                 our_herald_kills = objectives["riftHerald"]["kills"]
-                our_atakhan_kills = team["atakhanKills"]
+                our_atakhan_kills = objectives.get("atakhan", {}).get("kills", 0)
+                our_grub_kills = objectives["horde"]["kills"]
                 game_win = 1 if team["win"] else -1
                 team_id = team["teamId"]
             else:
                 enemy_baron_kills = objectives["baron"]["kills"]
                 enemy_dragon_kills = objectives["dragon"]["kills"]
                 enemy_herald_kills = objectives["riftHerald"]["kills"]
-                enemy_atakhan_kills = team["atakhanKills"]
+                enemy_atakhan_kills = objectives.get("atakhan", {}).get("kills", 0)
+                enemy_grub_kills = objectives["horde"]["kills"]
 
         return LoLGameStats(
             game=self.game,
@@ -710,10 +716,12 @@ class LoLGameStatsParser(GameStatsParser):
             our_baron_kills=our_baron_kills,
             our_dragon_kills=our_dragon_kills,
             our_herald_kills=our_herald_kills,
+            our_grub_kills=our_grub_kills,
             our_atakhan_kills=our_atakhan_kills,
             enemy_baron_kills=enemy_baron_kills,
             enemy_dragon_kills=enemy_dragon_kills,
             enemy_herald_kills=enemy_herald_kills,
+            enemy_grub_kills=enemy_grub_kills,
             enemy_atakhan_kills=enemy_atakhan_kills,
             timeline_data=self.raw_data["timeline"]
         )

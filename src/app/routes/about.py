@@ -1,6 +1,7 @@
 import flask
 import app.util as app_util
 import api.util as api_util
+from run_discord_bot import initialize_commands
 import discbot.commands.util as commands_util
 
 about_page = flask.Blueprint("about", __name__, template_folder="templates")
@@ -21,6 +22,9 @@ def home():
     guilds_for_user = None
     if logged_in_user is not None:
        guilds_for_user = app_util.discord_request("func", "get_guilds_for_user", logged_in_user)
+
+    if commands_util.COMMANDS == []:
+        initialize_commands(flask.current_app.config["APP_CONFIG"])
 
     commands = []
     for cmd in commands_util.COMMANDS:

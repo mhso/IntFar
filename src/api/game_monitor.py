@@ -299,7 +299,7 @@ class GameMonitor(ABC):
         try: # Get formatted stats that are relevant for the players in the game.
             stat_parser = get_stat_parser(self.game, game_info, self.api_client, self.game_database.game_users, guild_id)
             return stat_parser.parse_data()
-        except ValueError:
+        except Exception:
             # Game data was not formatted correctly for some reason (Rito/Volvo pls).
             logger.bind(event="parse_stats_error", game_id=game_info["gameId"]).exception("Error when parsing game data!")
             return None
