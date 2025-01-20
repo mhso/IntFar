@@ -168,7 +168,7 @@ function afterAnswer() {
 
         setTimeout(function() {
             // Resume playing video after a delay if no one has buzzed in
-            if (answeringPlayer == null) {
+            if (answeringPlayer == null && activeAnswer != null) {
                 hideAnswerIndicator();
                 videoElem.play();
                 videoElem.onended = afterShowQuestion;

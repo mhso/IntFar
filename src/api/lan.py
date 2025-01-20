@@ -388,7 +388,7 @@ BINGO_CHALLENGE_NAMES = {
     "killing_sprees": ("Killing Sprees", 10),
     "kills": ("Kills", 100),
     "outnumbered_kills": ("Outnumbered Kills", 5),
-    "atakhan_kills": ("Atakhan Kills", 5),
+    "atakhan_kills": ("Atakhan Kills", 4),
     "solo_kills": ("Solo Kills", 10),
     "spells_casted": ("Spell Casts", 5000),
     "spells_dodged": ("Skillshots Dodged", 200),

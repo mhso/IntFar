@@ -58,7 +58,7 @@ class LoLGameDatabase(GameDatabase):
         with self:
             return self.execute_query(query, disc_id).fetchone()
 
-    def get_average_stat_rank(self, stat, disc_id, champ_id, comparison, min_games=10):
+    def get_average_stat_rank(self, stat, disc_id, champ_id, comparison, role=None, min_games=10):
         parameters = []
 
         where_clause = ""
@@ -66,13 +66,19 @@ class LoLGameDatabase(GameDatabase):
         if comparison == 1: # Compare to other champs played by person
             where_clause = "WHERE u.disc_id=?"
             group_clause = "GROUP BY p.champ_id"
-            parameters.extend([disc_id] * 2)
+            parameters = [disc_id]
         elif comparison == 2: # Compare to other people playing the same champ
             where_clause = "WHERE p.champ_id=?"
             group_clause = "GROUP BY u.disc_id"
-            parameters.extend([champ_id] * 2)
+            parameters = [champ_id]
         elif comparison == 3: # Compare to all people across all champs
             group_clause = "GROUP BY u.disc_id, p.champ_id"
+
+        if role is not None:
+            where_clause = where_clause + f" AND p.role = ?" if where_clause else "WHERE p.role = ?"
+            parameters.append(role)
+
+        parameters = parameters * 2
 
         parameters.extend([disc_id, champ_id])
         ordering = "ASC" if stat == "deaths" else "DESC"
@@ -145,13 +151,16 @@ class LoLGameDatabase(GameDatabase):
         role_condition = ""
         player_condition, params = self.get_delimeter(time_after, time_before, None, "played.disc_id", disc_id, "AND")
 
+        extra_params = []
         if played_id is not None:
-            params = ([played_id] * 2) + params
+            extra_params.append(played_id)
             champ_condition = "WHERE p.champ_id = ?"
 
         if role is not None:
-            params = ([role] * 2) + params
-            role_condition = f"{'AND' if played_id else 'WHERE'} p.role <> ?"
+            extra_params.append(role)
+            role_condition = f"{'AND' if played_id else 'WHERE'} p.role = ?"
+
+        params = (extra_params * 2) + params
 
         if stat == "first_blood":
             query = f"""
@@ -257,9 +266,15 @@ class LoLGameDatabase(GameDatabase):
 
         return self.query(query, disc_id, format_func="all")
 
-    def get_played_doinks_count(self, disc_id, champ_id=None):
-        champ_condition = ""
+    def get_played_doinks_count(self, disc_id, champ_id=None, role=None):
         parameters = [disc_id]
+
+        if role is not None:
+            role_condition = "AND p.role = ?"
+            parameters.append(role)
+        else:
+            role_condition = ""
+
         if champ_id is not None:
             champ_condition = "AND p.champ_id=?"
             parameters.append(champ_id)
@@ -275,17 +290,24 @@ class LoLGameDatabase(GameDatabase):
                 ON u.player_id = p.player_id
             WHERE p.doinks IS NOT NULL
                 AND u.disc_id=?
+                {role_condition}
                 {champ_condition}
         """
 
         def format_result(cursor):
             return cursor.fetchone()[1] if champ_id is not None else cursor.fetchall()
 
-        return self.query(query, disc_id, champ_id, format_func=format_result)
+        return self.query(query, *parameters, format_func=format_result)
 
-    def get_played_intfar_count(self, disc_id, champ_id=None):
-        champ_condition = ""
+    def get_played_intfar_count(self, disc_id, champ_id=None, role=None):
         parameters = [disc_id]
+
+        if role is not None:
+            role_condition = "AND p.role = ?"
+            parameters.append(role)
+        else:
+            role_condition = ""
+
         if champ_id is not None:
             champ_condition = "AND p.champ_id=?"
             parameters.append(champ_id)
@@ -305,13 +327,14 @@ class LoLGameDatabase(GameDatabase):
             WHERE
                 g.intfar_id IS NOT NULL
                 AND g.intfar_id = ?
+                {role_condition}
                 {champ_condition}
         """
 
         def format_result(cursor):
             return cursor.fetchone()[1] if champ_id is not None else cursor.fetchall()
 
-        return self.query(query, disc_id, champ_id, format_func=format_result)
+        return self.query(query, *parameters, format_func=format_result)
 
     def get_played_with_most_doinks(self, disc_id):
         doinks_query = self.get_played_doinks_count(disc_id).query
@@ -349,7 +372,9 @@ class LoLGameDatabase(GameDatabase):
         with self:
             return self.execute_query(query, *params).fetchall()
 
-    def get_played_winrate(self, disc_id, champ_id):
+    def get_played_winrate(self, disc_id, champ_id, role: str=None):
+        role_condition = "AND p.role = ?" if role is not None else ""
+
         query = f"""
             SELECT
                 (wins.c / played.c) * 100 AS wr,
@@ -367,6 +392,7 @@ class LoLGameDatabase(GameDatabase):
                     u.disc_id = ?
                     AND p.champ_id = ?
                     AND g.win = 1
+                    {role_condition}
             ) wins,
             (
                 SELECT
@@ -380,13 +406,17 @@ class LoLGameDatabase(GameDatabase):
                 WHERE
                     u.disc_id = ?
                     AND p.champ_id = ?
+                    {role_condition}
             ) played
             WHERE wins.champ_id = played.champ_id OR wins.champ_id IS NULL
         """
 
         with self:
-            params = [disc_id, champ_id] * 2
-            return self.execute_query(query, *params).fetchone()
+            params = [disc_id, champ_id]
+            if role is not None:
+                params.append(role)
+
+            return self.execute_query(query, *(params * 2)).fetchone()
 
     def get_min_or_max_winrate_played(
         self,

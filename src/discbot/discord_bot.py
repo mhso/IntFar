@@ -36,6 +36,7 @@ import api.util as api_util
 #from ai.data import shape_predict_data
 
 MAIN_CHANNEL_ID = 730744358751567902
+TEST_CHANNLEL_ID = 512363920044982274
 
 CHANNEL_IDS = [ # List of channels that Int-Far will write to.
     MAIN_CHANNEL_ID,
@@ -1275,48 +1276,6 @@ class DiscordClient(discord.Client):
 
         return self.insert_emotes(response) if response != "" else None
 
-    def save_stats(self, parsed_game_stats: GameStats):
-        """
-        Save all the stats after a finished game. This includes who was the Int-Far,
-        information about doinks, general information about the game, such as
-        duration, timestamp, and stats of players such as kills, gold earned, etc.
-
-        :param filtered_stats:  List containing a tuple of (discord_id, game_stats)
-                                for each Int-Far registered player on our team
-        :param intfar_id:       Discord ID of the user who is the Int-Far.
-                                This is None if no one was Int-Far
-        :param intfar_reason:   String that encodes the reasons why a person was the
-                                Int-Far in the finished game. This is None if no one
-                                was Int-Far
-        :param doinks:          Dictionary mapping discord IDs, for each player, to
-                                a list of doink criterias met for that player
-        :param guild_id:        ID of the Discord server where the game took place
-        """
-        try:
-            # Save stats to database.
-            database = self.game_databases[parsed_game_stats.game]
-            best_records, worst_records = database.save_stats(parsed_game_stats)
-
-            # Create backup of databases
-            self.meta_database.create_backup()
-            database.create_backup()
-            logger.info("Game over! Stats were saved succesfully.")
-
-            return best_records, worst_records
-
-        except DBException as exception:
-            # Log error along with relevant variables.
-            game_id = self.game_monitors[game_id].active_game.get(parsed_game_stats.guild_id, {}).get("id")
-            logger.bind(
-                game_id=game_id,
-                intfar_id=parsed_game_stats.intfar_id,
-                intfar_reason=parsed_game_stats.intfar_reason,
-                doinks=[player_stats.doinks for player_stats in parsed_game_stats.filtered_player_stats],
-                guild_id=parsed_game_stats.guild_id
-            ).exception("Game stats could not be saved!")
-
-            raise exception
-
     async def user_joined_voice(
         self,
         disc_id: int,
@@ -1967,7 +1926,7 @@ class DiscordClient(discord.Client):
             # If Int-Far is running in dev mode, only handle messages that are sent from
             # my personal sandbox Discord server.
             return
-
+        
         msg = message.content.strip()
         if not msg.startswith("!"):
             return

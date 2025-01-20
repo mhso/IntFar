@@ -3,8 +3,8 @@ import pytest
 
 from src.api import betting
 from src.api.util import SUPPORTED_GAMES
-from tests.mocks.discord_mocks import *
-from tests.commands import get_games
+from src.discbot.discord_mocks import *
+from tests.commands import get_games, call_command
 
 @pytest.mark.asyncio
 async def test_betting(discord_client):
@@ -14,8 +14,9 @@ async def test_betting(discord_client):
 
     for game in list(SUPPORTED_GAMES) + [None]:
         channel.messages_sent = []
-        game = await discord_client.call_command(
+        game = await call_command(
             "!betting [game]",
+            discord_client,
             member,
             channel,
             guild,
@@ -57,8 +58,9 @@ async def test_bet_simple(discord_client):
         should_succeed = game is not None
 
         # Make a bet on winning a game
-        game = await discord_client.call_command(
+        game = await call_command(
             "!bet [game] 10 game_win",
+            discord_client,
             member,
             channel,
             guild,
@@ -102,8 +104,9 @@ async def test_bet_targetted(discord_client):
         should_succeed = game is not None
 
         # Make a bet on winning a game
-        game = await discord_client.call_command(
+        game = await call_command(
             "!bet [game] 10 intfar Slugger",
+            discord_client,
             member,
             channel,
             guild,
@@ -149,8 +152,9 @@ async def test_bet_multi(discord_client):
         should_succeed = game is not None
 
         # Make a bet on winning a game
-        game = await discord_client.call_command(
+        game = await call_command(
             "!bet [game] 10 game_win & 10 doinks & 5 intfar Slugger & 5 most_kills Murt",
+            discord_client,
             member,
             channel,
             guild,
@@ -205,8 +209,9 @@ async def test_cancel_bet(discord_client):
         discord_client.meta_database.update_token_balance(disc_id, 5, False)
 
         # Cancel the bet
-        game = await discord_client.call_command(
+        game = await call_command(
             "!cancel_bet game_win [game]",
+            discord_client,
             members[0],
             channel,
             guild,
@@ -233,8 +238,9 @@ async def test_cancel_bet(discord_client):
             discord_client.meta_database.update_token_balance(disc_id, 5, False)
 
         # Cancel the bet
-        game = await discord_client.call_command(
+        game = await call_command(
             f"!cancel_bet {ticket} [game]",
+            discord_client,
             members[0],
             channel,
             guild,
@@ -263,8 +269,9 @@ async def test_active_bets(discord_client):
         channel.messages_sent = []
         disc_id = members[0].id
 
-        game = await discord_client.call_command(
+        game = await call_command(
             "!active_bets [game]",
+            discord_client,
             members[0],
             channel,
             guild,
@@ -291,8 +298,9 @@ async def test_active_bets(discord_client):
             game_database.make_bet(disc_id, guild.id, event, amount, 0, target, ticket)
             discord_client.meta_database.update_token_balance(disc_id, amount, False)
 
-        game = await discord_client.call_command(
+        game = await call_command(
             "!active_bets [game]",
+            discord_client,
             members[0],
             channel,
             guild,
@@ -323,8 +331,9 @@ async def test_all_bets(discord_client):
         disc_id_1 = members[0].id
         disc_id_2 = members[1].id
 
-        game = await discord_client.call_command(
+        game = await call_command(
             "!bets [game]",
+            discord_client,
             members[0],
             channel,
             guild,
@@ -349,8 +358,9 @@ async def test_all_bets(discord_client):
 
         discord_client.meta_database.update_token_balance(disc_id_2, 100, True)
 
-        game = await discord_client.call_command(
+        game = await call_command(
             "!bets [game] Slugger",
+            discord_client,
             members[0],
             channel,
             guild,
@@ -375,8 +385,9 @@ async def test_all_bets(discord_client):
         discord_client.meta_database.update_token_balance(disc_id_1, 25, False)
         game_database.mark_bet_as_resolved(bet_id, 2, time(), False, 25)
 
-        game = await discord_client.call_command(
+        game = await call_command(
             "!bets [game]",
+            discord_client,
             members[0],
             channel,
             guild,
@@ -408,8 +419,9 @@ async def test_token_balance(discord_client):
     tokens_name = discord_client.config.betting_tokens
     tokens_now = discord_client.config.starting_tokens
 
-    await discord_client.call_command(
+    await call_command(
         "!gbp",
+        discord_client,
         member,
         channel,
         guild,
@@ -420,8 +432,9 @@ async def test_token_balance(discord_client):
 
     assert channel.messages_sent[0] == expected_output, "Wrong content of sent messages"
 
-    await discord_client.call_command(
+    await call_command(
         "!gbp all",
+        discord_client,
         member,
         channel,
         guild,
@@ -448,8 +461,9 @@ async def test_bet_return(discord_client):
     for game in get_games():
         channel.messages_sent = []
 
-        await discord_client.call_command(
+        await call_command(
             "!bet_return bleh [game]",
+            discord_client,
             member,
             channel,
             guild,
@@ -461,8 +475,9 @@ async def test_bet_return(discord_client):
 
         assert channel.messages_sent[0] == expected_output, "Wrong content of sent messages"
 
-        await discord_client.call_command(
+        await call_command(
             "!bet_return game_win [game]",
+            discord_client,
             member,
             channel,
             guild,
@@ -477,8 +492,9 @@ async def test_bet_return(discord_client):
 
         assert channel.messages_sent[1] == expected_output, "Wrong content of sent messages"
 
-        await discord_client.call_command(
+        await call_command(
             "!bet_return doinks [game]",
+            discord_client,
             member,
             channel,
             guild,
@@ -496,8 +512,9 @@ async def test_bet_return(discord_client):
 
         assert channel.messages_sent[2] == expected_output, "Wrong content of sent messages"
 
-        await discord_client.call_command(
+        await call_command(
             "!bet_return intfar [game] Slugger",
+            discord_client,
             member,
             channel,
             guild,

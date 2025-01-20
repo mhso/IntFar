@@ -183,7 +183,7 @@ class ActiveBetCommand(Command):
     DESCRIPTION = "See a list of your (or someone else's) active bets."
     TARGET_ALL = True
     ACCESS_LEVEL = "self"
-    OPTIONAL_PARAMS = [GameParam("game", allow_default=False), TargetParam("person")]
+    OPTIONAL_PARAMS = [GameParam("game", default=None), TargetParam("person")]
 
     async def handle(self, game: str, target_id: int):
         def get_bet_description(game: str, disc_id: int, single_person :bool = True):

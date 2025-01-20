@@ -1,6 +1,6 @@
-from src.api.config import Config
-from src.api.game_apis.cs2 import SteamAPIClient
-from tests.mocks.httpx_client import MockAsyncClient
+from api.config import Config
+from api.game_apis.cs2 import SteamAPIClient
+from api.game_apis.mocks.httpx_client import MockAsyncClient
 
 class MockSteamAPI(SteamAPIClient):
     def __init__(self, game: str, config: Config):

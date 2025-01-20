@@ -3294,6 +3294,9 @@
                 }
             ],
             "objectives": {
+                "atakhan": {
+                    "kills": "int"
+                },
                 "baron": {
                     "first": "bool",
                     "kills": "int"
@@ -3350,6 +3353,9 @@
                 }
             ],
             "objectives": {
+                "atakhan": {
+                    "kills": "int"
+                },
                 "baron": {
                     "first": "bool",
                     "kills": "int"

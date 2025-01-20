@@ -381,11 +381,6 @@ if __name__ == "__main__":
     func = getattr(TEST_RUNNER, ARGS.func)
 
     if asyncio.iscoroutinefunction(func):
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-
-        loop.run_until_complete(func())
+        asyncio.run(func())
     else:
         func()

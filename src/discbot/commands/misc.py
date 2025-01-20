@@ -283,8 +283,8 @@ class PerformanceCommand(Command):
 
         await self.message.channel.send(response)
 
-def get_winrate(client: DiscordClient, champ_or_map: str, game: str, target_id: int):
-    winrate, games = client.game_databases[game].get_played_winrate(target_id, champ_or_map)
+def get_winrate(client: DiscordClient, champ_or_map: str, game: str, target_id: int, role: str=None):
+    winrate, games = client.game_databases[game].get_played_winrate(target_id, champ_or_map, role)
     qualified_name = client.api_clients[game].get_playable_name(champ_or_map)
 
     return qualified_name, winrate, games
@@ -298,10 +298,14 @@ class WinrateCommand(Command):
     )
     ACCESS_LEVEL = "self"
     MANDATORY_PARAMS = [CommandParam("champion_or_map")]
-    OPTIONAL_PARAMS = [GameParam("game"), TargetParam("person")]
+    OPTIONAL_PARAMS = [
+        GameParam("game"),
+        CommandParam("role", choices=["top", "mid", "support", "bot", "jungle"], consume_if_unmatched=False),
+        TargetParam("person")
+    ]
     ALIASES = ["winrate"]
 
-    async def handle(self, champ_or_map: str, game: str, target_id: int):
+    async def handle(self, champ_or_map: str, game: str, role: str = None, target_id: int = None):
         playable_id = self.client.api_clients[game].try_find_playable_id(champ_or_map)
 
         if playable_id is None:
@@ -309,7 +313,12 @@ class WinrateCommand(Command):
             await self.message.channel.send(f"{played_name} is not valid.")
             return
 
-        qualified_name, winrate, games = get_winrate(self.client, playable_id, game, target_id)
+        choices = WinrateCommand.OPTIONAL_PARAMS[1].choices
+        if role is not None and role not in choices:
+            target_id = role
+            role = None
+
+        qualified_name, winrate, games = get_winrate(self.client, playable_id, game, target_id, role)
 
         user_name = self.client.get_discord_nick(target_id, self.message.guild.id)
         if winrate is not None:

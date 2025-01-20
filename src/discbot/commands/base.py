@@ -13,17 +13,19 @@ class CommandParsingError(Exception):
     pass
 
 class CommandParam:
-    def __init__(self, name):
+    def __init__(self, name, default=None, choices=None, consume_if_unmatched=True):
         self.name = name
+        self.default = default
+        self.choices = choices
+        self.consume_if_unmatched = consume_if_unmatched
 
     def __str__(self):
         return self.name
 
 class TargetParam(CommandParam):
     def __init__(self, name, default="me", return_val: str = "disc_id", end_index=None):
-        super().__init__(name)
+        super().__init__(name, default)
 
-        self.default = default
         self.return_val = return_val
         self.end_index = end_index
 
@@ -83,9 +85,8 @@ class PlayableParam(CommandParam):
         return prev_played_id, index - start_index
 
 class GameParam(CommandParam):
-    def __init__(self, name, allow_default=True):
-        super().__init__(name)
-        self.allow_default = allow_default
+    def __init__(self, name, default=DEFAULT_GAME):
+        super().__init__(name, default)
 
 class Command:
     NAME: str
@@ -150,10 +151,7 @@ class Command:
 
             elif isinstance(param, GameParam):
                 if index >= len(args):
-                    if param.allow_default:
-                        game_value = user.default_game or DEFAULT_GAME
-                    else:
-                        game_value = None
+                    game_value = user.default_game or param.default if param.default else None
 
                     parsed_args.append(game_value)
                     continue
@@ -168,10 +166,7 @@ class Command:
                         )
                         return None
 
-                    if param.allow_default:
-                        game_value = user.default_game or DEFAULT_GAME
-                    else:
-                        game_value = None
+                    game_value = user.default_game or param.default if param.default else None
 
                     parsed_args.append(game_value)
                     continue
@@ -180,8 +175,11 @@ class Command:
                 index += 1
 
             elif index < len(args): # Regular parameter.
-                parsed_args.append(args[index])
-                index += 1
+                if not param.choices or args[index] in param.choices:
+                    parsed_args.append(args[index])
+                    index += 1
+                elif param.consume_if_unmatched:
+                    index += 1
 
         return parsed_args
 

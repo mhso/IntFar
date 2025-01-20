@@ -11,11 +11,13 @@ from discbot.discord_bot import DiscordClient
 from discbot.commands.base import handle_command, Command
 
 def collect_commands(cmd_class):
-    if cmd_class.__subclasses__() == []:
+    if cmd_class.__subclasses__() == [] and cmd_class.NAME not in cmd_class.COMMANDS_DICT:
         if not cmd_class.GUILDS:
             cmd_class.GUILDS = GUILD_IDS
 
-        cmd_class.GUILDS.append(MY_GUILD_ID)
+        if MY_GUILD_ID not in cmd_class.GUILDS:
+           cmd_class.GUILDS.append(MY_GUILD_ID)
+
         cmd_class.COMMANDS_DICT[cmd_class.NAME] = cmd_class
         return
 

@@ -1,7 +1,6 @@
 from typing import List
-from src.api.util import MAIN_GUILD_ID
-from src.api.meta_database import DEFAULT_GAME
-from src.discbot.discord_bot import DiscordClient, MAIN_CHANNEL_ID
+from api.util import MAIN_GUILD_ID
+from discbot.discord_bot import DiscordClient, MAIN_CHANNEL_ID
 
 class Emoji:
     def __init__(self, name):
@@ -25,6 +24,9 @@ class MockUser:
     async def add_roles(self, *roles):
         for role in roles:
             self.roles.append(role)
+
+    def is_on_mobile(self):
+        return False
 
     @property
     def display_name(self):
@@ -107,7 +109,7 @@ class MockDiscordClient(DiscordClient):
         for guild in self.guilds:
             if guild.id == guild_id:
                 return guild
-            
+
         return None
 
     def get_user(self, disc_id: int) -> MockUser:
@@ -130,24 +132,8 @@ class MockDiscordClient(DiscordClient):
         author: MockUser,
         channel: MockChannel,
         guild: MockGuild,
-        expected_messages: int,
-        game: str = None,
     ):
-        if not game:
-            game = ""
-        else:
-            game = " " + game
-
-        command = command.replace(" [game]", game)
-
-        if not game:
-            game = DEFAULT_GAME
-
         message = MockMessage(command, author, channel, guild)
         await self.on_message(message)
 
-        assert len(channel.messages_sent) == expected_messages, "Wrong number of messages sent"
-        for message in channel.messages_sent:
-            assert len(message) < 2000, "Length of sent message is too long"
-
-        return game
+        return message

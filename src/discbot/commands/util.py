@@ -17,7 +17,7 @@ def get_main_command(cmd):
         return COMMANDS[cmd]
     
     for possible_alias in COMMANDS:
-        if cmd in COMMANDS[possible_alias].aliases:
+        if cmd in COMMANDS[possible_alias].ALIASES:
             return COMMANDS[possible_alias]
      
     return None

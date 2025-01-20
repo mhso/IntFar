@@ -87,7 +87,7 @@ CREATE TABLE [lan_bingo] (
     [completed] INTEGER DEFAULT(0),
     [completed_by] INTEGER NULL,
     [notification_sent] INTEGER DEFAULT(0),
-    [lan_date] NVARCHAR(32),
+    [lan_date] NVARCHAR(32) NOT NULL,
     PRIMARY KEY (id, lan_date)
 );
 CREATE TABLE [split_messages] (

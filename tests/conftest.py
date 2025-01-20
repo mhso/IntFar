@@ -2,18 +2,16 @@ import pytest
 
 from src.api.config import Config
 from src.api.meta_database import MetaDatabase
-from src.api.bets import get_betting_handler
 from src.api.game_databases import get_database_client
-from src.api.util import SUPPORTED_GAMES, MY_GUILD_ID, GUILD_IDS
-from src.discbot.commands.base import handle_command
-from src.discbot.commands.util import COMMANDS
-from src.run_discord_bot import initialize_commands
-from tests.mocks.discord_mocks import MockDiscordClient, MockUser, MockGuild, MockChannel
-from tests.mocks.riot_api import MockRiotAPI
-from tests.mocks.steam_api import MockSteamAPI
+from src.api.game_monitors import get_game_monitor
+from src.api.game_apis.mocks.riot_api import MockRiotAPI
+from src.api.game_apis.mocks.steam_api import MockSteamAPI
+from src.api.util import SUPPORTED_GAMES
+from src.discbot.commands.util import ADMIN_DISC_ID
+from src.run_command import create_client
 
 _TEST_USERS = [
-    1, 2, 3, 4, 5, 6
+    ADMIN_DISC_ID, 2, 3, 4, 5, 6
 ]
 _GAME_USERS = {
     "lol": [
@@ -68,52 +66,21 @@ def game_databases(config):
         game_databases[game].clear_tables()
 
 @pytest.fixture()
-def discord_client(config, meta_database, game_databases):
-    config.message_timeout = 0
-
-    betting_handlers = {game: get_betting_handler(game, config, meta_database, game_databases[game]) for game in SUPPORTED_GAMES}
+def api_clients(config):
     api_clients = {
         "lol": MockRiotAPI("lol", config),
-        "cs2": MockSteamAPI("cs2", config)
+        "cs2": MockSteamAPI("cs2", config),
     }
 
-    client =  MockDiscordClient(
-        config,
-        meta_database,
-        game_databases,
-        betting_handlers,
-        api_clients
-    )
-    client.add_event_listener("command", handle_command)
+    yield api_clients
 
-    members = [
-        MockUser(1, "Say wat"),
-        MockUser(2, "Slugger"),
-        MockUser(3, "Murt"),
-        MockUser(4, "Eddie Smurphy"),
-        MockUser(5, "Nønø"),
-        MockUser(6, "Zikzak"),
-    ]
+@pytest.fixture()
+def game_monitors(config, meta_database, game_databases, api_clients):
+    yield {
+        game: get_game_monitor(game, config, meta_database, game_databases[game], api_clients[game])
+        for game in SUPPORTED_GAMES
+    }
 
-    guilds = []
-    for index, guild_id in enumerate(GUILD_IDS, start=1):
-        channels = [
-            MockChannel("Test channel 1", members),
-            MockChannel("Test channel 2", members),
-        ]
-        guilds.append(MockGuild(f"Test guild {index}", members, channels, guild_id))
-
-    channels = [MockChannel("Test channel", [members[0]])]
-    guilds.append(MockGuild("Test guild", members, channels, MY_GUILD_ID))
-
-    client._guilds = guilds
-
-    for guild in guilds:
-        client.channels_to_write[guild.id] = guild.text_channels[0]
-
-    initialize_commands(config)
-
-    for command in COMMANDS:
-        client.command_timeout_lengths[command] = 0
-
-    yield client
+@pytest.fixture()
+def discord_client(config, meta_database, game_databases):
+    yield create_client(config, meta_database, game_databases)

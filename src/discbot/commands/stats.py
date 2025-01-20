@@ -364,16 +364,25 @@ class ChampionCommand(Command):
     DESCRIPTION = "Show your or someone else's stats on a specific champion."
     ACCESS_LEVEL = "self"
     MANDATORY_PARAMS = [PlayableParam("champion")]
-    OPTIONAL_PARAMS = [GameParam("game"), TargetParam("person")]
+    OPTIONAL_PARAMS = [
+        CommandParam("role", choices=["top", "mid", "support", "bot", "jungle"], consume_if_unmatched=False),
+        TargetParam("person"),
+    ]
     ALIASES = ["champ"]
 
-    async def handle(self, champ_id: str, game: str, target_id: int):
+    async def handle(self, champ_id: str, role: str = None, target_id: int = None):
+        game = "lol"
         if champ_id is None:
             await self.message.channel.send(f"Champion is not valid.")
             return
 
+        choices = ChampionCommand.OPTIONAL_PARAMS[0].choices
+        if role is not None and role not in choices:
+            target_id = role
+            role = None
+
         with self.client.game_databases["lol"] as database:
-            champ_name, winrate, games = get_winrate(self.client, champ_id, game, target_id)
+            champ_name, winrate, games = get_winrate(self.client, champ_id, game, target_id, role)
             user_name = self.client.get_discord_nick(target_id, self.message.guild.id)
 
             if winrate is None or games == 0:
@@ -381,10 +390,14 @@ class ChampionCommand(Command):
                 await self.message.channel.send(response)
                 return
 
-            doinks = database.get_played_doinks_count(target_id, champ_id)()
-            intfars = database.get_played_intfar_count(target_id, champ_id)()
+            doinks = database.get_played_doinks_count(target_id, champ_id, role)()
+            intfars = database.get_played_intfar_count(target_id, champ_id, role)()
 
-            response = f"Stats for {user_name} on *{champ_name}*:\n"
+            game_description = champ_name
+            if role is not None:
+                game_description += f" {role}"
+
+            response = f"Stats for {user_name} on *{game_description}*:\n"
             response += f"Winrate: **{winrate:.2f}%** in **{int(games)}** games.\n"
             response += f"Doinks: **{doinks}**\n"
             response += f"Int-Fars: **{intfars}**\n"
@@ -415,7 +428,7 @@ class ChampionCommand(Command):
                 stat: get_formatted_stat_value(
                     game,
                     stat,
-                    database.get_average_stat(stat, target_id, champ_id, min_games=1)()[0][1]
+                    database.get_average_stat(stat, target_id, champ_id, role, min_games=1)()[0][1]
                 )
                 for stat in stats_to_get
             }
@@ -446,7 +459,7 @@ class ChampionCommand(Command):
 
                 for comparison in range(1, 4):
                     rank, best_id, total = database.get_average_stat_rank(
-                        stat, target_id, champ_id, comparison, min_games
+                        stat, target_id, champ_id, comparison, role, min_games
                     )()
                     row.append(str(rank))
 
@@ -479,10 +492,10 @@ class ChampionCommand(Command):
 
         response += "```\n"
         response += f"**{text_rows[0][2]}**: Rank compared to {user_name}'s **{totals[0]}*** other champs played\n"
-        response += f"**{text_rows[0][3]}**: Rank compared to **{totals[1] - 1}*** other {person} playing {champ_name}\n"
+        response += f"**{text_rows[0][3]}**: Rank compared to **{totals[1] - 1}*** other {person} playing {game_description}\n"
         response += f"**{text_rows[0][4]}**: Rank compared to **{totals[2]}*** other people playing any champ\n"
         if show_best:
-            response += f"**Best**: Who has the best rank on a stat with {champ_name}\n"
+            response += f"**Best**: Who has the best rank on a stat with {game_description}\n"
         response += f"*A minimum of **{min_games}** games on a champ is required"
 
         await self.message.channel.send(response)

@@ -75,7 +75,7 @@ class UnregisterCommand(Command):
 class UsersCommand(Command):
     NAME = "users"
     DESCRIPTION = "List all users who are currently signed up for the Int-Far:tm: Tracker:tm:."
-    OPTIONAL_PARAMS = [GameParam("game", allow_default=False)]
+    OPTIONAL_PARAMS = [GameParam("game", default=None)]
 
     async def handle(self, game: str = None): 
         response = ""
@@ -367,7 +367,7 @@ class DefaultGameCommand(Command):
     NAME = "default_game"
     DESCRIPTION = "Set your prefered default game for use with commands."
     ACCESS_LEVEL = "all"
-    OPTIONAL_PARAMS = [GameParam("game", allow_default=False)]
+    OPTIONAL_PARAMS = [GameParam("game", default=None)]
 
     async def handle(self, game=None):
         if game is None:

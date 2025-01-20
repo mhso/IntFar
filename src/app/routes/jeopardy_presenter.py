@@ -30,7 +30,7 @@ USED_QUESTIONS_FILE = "app/static/data/jeopardy_used.json"
 
 PLAYER_NAMES = {
     115142485579137029: "Dave",
-    172757468814770176: "Murt", 
+    172757468814770176: "Murt",
     331082926475182081: "Muds",
     347489125877809155: "Nø"
 }
