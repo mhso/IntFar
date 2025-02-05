@@ -29,30 +29,30 @@ function makeDailyDoubleWager(userId) {
 
     btn.disabled = true;
     let value = document.getElementById("question-wager-input").value;
-    socket.emit("make_daily_wager", userId, value);
     socket.once("daily_wager_made", function(amount) {
         btn.style.backgroundColor = "#00b000";
     });
+    socket.emit("make_daily_wager", userId, value);
 }
 
 function makeFinalJeopardyWager(userId) {
     let btn = document.getElementById("contestant-wager-btn");
 
     let value = document.getElementById("finale-wager-amount").value;
-    socket.emit("make_finale_wager", userId, value);
     socket.once("finale_wager_made", function() {
         btn.style.backgroundColor = "#00b000";
     });
+    socket.emit("make_finale_wager", userId, value);
 }
 
 function giveFinalJeopardyAnswer(userId) {
     let btn = document.getElementById("contestant-wager-btn");
 
     let answer = document.getElementById("finale-answer").value;
-    socket.emit("give_finale_answer", userId, answer);
     socket.once("finale_answer_given", function() {
         btn.style.backgroundColor = "#00b000";
     });
+    socket.emit("give_finale_answer", userId, answer);
 }
 
 function pressBuzzer(userId) {

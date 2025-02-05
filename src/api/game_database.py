@@ -572,13 +572,15 @@ class GameDatabase(SQLiteDatabase):
             )
             SELECT
                 games.c,
-                games.t,
+                games.t_min,
+                games.t_max,
                 wins.c,
                 guilds.c
             FROM (
                 SELECT
                     COUNT(DISTINCT game_id) AS c,
-                    MIN(timestamp) AS t
+                    MIN(timestamp) AS t_min,
+                    MAX(timestamp) AS t_max
                 FROM game_cte
             ) games,
             (

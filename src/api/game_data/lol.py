@@ -803,13 +803,13 @@ def parse_player_rank(rank_data):
     solo_rank = None
     flex_rank = None
     for queue_info in rank_data:
-        if queue_info["queueType"] in ("RANKED_SOLO_SR", "RANKED_FLEX_SR"):
+        if queue_info["queueType"] in ("RANKED_SOLO_5x5", "RANKED_FLEX_SR"):
             division = queue_info["tier"].lower()
             tier = queue_info["rank"]
             points = queue_info["leaguePoints"]
             rank = f"{division}_{tier}_{points}"
 
-            if queue_info["queueType"] == "RANKED_SOLO_SR":
+            if queue_info["queueType"] == "RANKED_SOLO_5x5":
                 solo_rank = rank
             else:
                 flex_rank = rank

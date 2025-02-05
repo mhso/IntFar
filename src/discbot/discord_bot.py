@@ -1513,7 +1513,7 @@ class DiscordClient(discord.Client):
                 latest_timestamp = database.get_split_message_status(disc_id)
                 if (
                     latest_timestamp is not None
-                    and database.get_games_count(disc_id, prev_split_start) >= min_games
+                    and database.get_games_count(disc_id, prev_split_start)[0] >= min_games
                 ):
                     try:
                         await handle_end_of_split_msg(self, disc_id)
@@ -1952,7 +1952,7 @@ class DiscordClient(discord.Client):
                         f"Invalid command `!{command}`, did you mean `!{closest_match}`?"
                     )
             return
-        
+
         if handler.NAME == "usage":
             args.append(command)
 

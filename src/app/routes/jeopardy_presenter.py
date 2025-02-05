@@ -7,6 +7,7 @@ from gevent import sleep
 
 import flask
 from flask_socketio import join_room, leave_room, emit
+from mhooge_flask.logging import logger
 
 from api.util import JEOPADY_EDITION, MONTH_NAMES, GUILD_MAP
 from api.lan import is_lan_ongoing
@@ -274,6 +275,7 @@ def get_round_data(request_args):
             player_data.append({
                 "disc_id": str(disc_id),
                 "name": request_args[name_key],
+                "index": PLAYER_INDEXES.index(disc_id),
                 "avatar": avatar,
                 "score": score,
                 "buzzes": buzzes,
@@ -309,8 +311,13 @@ def question_view(jeopardy_round, category, tier):
     with open(USED_QUESTIONS_FILE, encoding="utf-8") as fp:
         used_questions = json.load(fp)
 
-    question = questions[category]["tiers"][tier]["questions"][jeopardy_round-1]
-    question["id"] = jeopardy_round-1
+    if jeopardy_round < 3:
+        question = questions[category]["tiers"][tier]["questions"][jeopardy_round - 1]
+    else:
+        # If we are at Final Jeopardy, choose a random question from the relevant category
+        question = random.choice(questions[category]["tiers"][tier]["questions"])
+
+    question["id"] = jeopardy_round - 1
 
     if TRACK_UNUSED:
         used_questions[category][tier]["used"].append(question["id"])
@@ -331,7 +338,7 @@ def question_view(jeopardy_round, category, tier):
 
         question_state = QuestionState(
             jeopardy_round,
-            ROUND_NAMES[jeopardy_round-1],
+            ROUND_NAMES[jeopardy_round - 1],
             player_data,
             question_num,
             player_turn,
@@ -455,7 +462,7 @@ def final_jeopardy(question_id):
     if logged_in_user != ADMIN_DISC_ID and flask.current_app.config["APP_ENV"] != "dev":
         return flask.abort(404)
 
-    question_id = int(question_id)
+    question_id = int(question_id) - 1
 
     with open(QUESTIONS_FILE, encoding="utf-8") as fp:
         questions = json.load(fp)
@@ -550,6 +557,8 @@ def jeopardy_endscreen():
             winner_desc = (
                 f"{players_tied} har alle lige mange point! De har alle sammen vundet!!!"
             )
+
+        logger.bind(event="jeopardy_player_data", player_data=player_data).info(f"Jeopardy player data at endscreen: {player_data}")
 
         winner_ids = [str(data["disc_id"]) for data in player_data[:ties + 1]]
         endscreen_state = EndscreenState(
@@ -708,6 +717,10 @@ def disable_buzz():
 @app_util.socket_io.event
 def first_turn(turn_id: int):
     emit("turn_chosen", turn_id, to="contestants")
+
+@app_util.socket_io.event
+def enable_finale_wager():
+    emit("finale_wager_enabled", to="contestants")
 
 @app_util.socket_io.event
 def reveal_finale_category():

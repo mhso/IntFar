@@ -364,7 +364,7 @@ class RiotAPIClient(GameAPIClient):
             return None
 
         return response.json()["info"]
-    
+
     async def get_player_rank(self, summ_id):
         endpoint = "/lol/league/v4/entries/by-summoner/{0}"
 

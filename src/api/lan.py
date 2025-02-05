@@ -89,8 +89,8 @@ if not TESTING:
             803987403932172359 # Core Nibs
         ),
         "february_25": LANInfo(
-            datetime(2025, 2, 1, 11, 0, 0).timestamp(),
-            datetime(2025, 2, 2, 12, 0, 0).timestamp(),
+            datetime(2025, 2, 8, 11, 0, 0).timestamp(),
+            datetime(2025, 2, 9, 12, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",
@@ -105,8 +105,8 @@ if not TESTING:
 else: # Use old data for testing.
     LAN_PARTIES = {
         "february_25": LANInfo(
-            datetime(2025, 2, 1, 10, 0, 0).timestamp(),
-            datetime(2025, 2, 2, 12, 0, 0).timestamp(),
+            datetime(2025, 2, 8, 10, 0, 0).timestamp(),
+            datetime(2025, 2, 9, 12, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",

@@ -48,13 +48,13 @@ class LANCommand(BaseLANCommand):
         if games_stats is None:
             response = "No games have been played yet!"
         else:
-            games_played, first_game_timestamp, games_won, _ = games_stats
+            games_played, first_game_timestamp, last_game_timestamp, games_won, _ = games_stats
             pct_won = (games_won / games_played) * 100
 
             dt_start = datetime.fromtimestamp(first_game_timestamp)
             dt_now = datetime.now()
             if dt_now.timestamp() > lan_party.end_time:
-                dt_now = datetime.fromtimestamp(lan_party.end_time)
+                dt_now = datetime.fromtimestamp(last_game_timestamp)
 
             duration = api_util.format_duration(dt_start, dt_now)
 

@@ -185,7 +185,7 @@ class AwardQualifiers(ABC):
 
             game_data = database.get_games_count(stats.disc_id)
             total_games = game_data[0]
-            total_wins = game_data[2]
+            total_wins = game_data[3]
             total_intfars = database.get_intfar_count(stats.disc_id)
             total_doinks = database.get_doinks_count(stats.disc_id)[1]
 

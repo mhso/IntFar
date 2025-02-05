@@ -1,10 +1,11 @@
 <div id="contestants-footer">
     <div id="footer-contestants">
         {% for player_dict in player_data %}
-        <div class="footer-contestant-entry" style="background-color: #{{ player_dict['color'] }};">
+        <div class="footer-contestant-entry" style="background-color: #{{ player_dict['color'] }};" data-index="{{ player_dict['index'] }}">
             <p class="footer-contestant-entry-name">{{ player_dict["name"] }}</p>
             <p class="footer-contestant-entry-score">{{ player_dict["score"] }} GBP</p>
             <img class="footer-contestant-entry-avatar" src="{{ player_dict['avatar'] }}">
+            <img class="footer-contestant-entry-ready" src="{{ url_for('static', _external=True, filename='img/check.png') }}">
         </div>
         {% endfor %}
     </div>

@@ -204,7 +204,7 @@ h1 {
     margin-bottom: 30px;
 }
 
-#question-category-span {
+#question-category-name {
     font-weight: 1000;
     text-decoration: underline;
     color: rgb(255, 45, 222);
@@ -252,4 +252,13 @@ h1 {
     cursor: pointer;
     bottom: 1px;
     margin-left: 5px;
+}
+
+#contestant-wager-btn:disabled {
+    background-color: gray;
+    cursor: auto;
+}
+
+#finale-question-header {
+    font-style: italic;
 }

@@ -239,7 +239,10 @@ class Command:
         if params_list == []:
             return ""
 
-        param_list_str = [str(x) for x in params_list]
+        param_list_str = [
+            f'{x}/"all"' if isinstance(x, TargetParam) and self.TARGET_ALL else str(x)
+            for x in params_list
+        ]
 
         return f"{l_brace}" + f"{r_brace} {l_brace}".join(param_list_str) + f"{r_brace}"
 
@@ -284,7 +287,10 @@ def get_handler(cmd: str, client: DiscordClient, message: Message) -> Command:
                     cmd_name = possible_alias
                     break
 
-    handler = commands_util.COMMANDS[cmd_name]
+            handler = commands_util.COMMANDS[cmd_name]
+    
+    else:
+        handler = commands_util.COMMANDS[cmd_name]
 
     return handler(client, message)
 

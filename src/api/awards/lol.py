@@ -78,7 +78,7 @@ class LoLAwardQualifiers(AwardQualifiers):
         return {
             "kda": "KDA larger than or equal to 10",
             "kills": "20 kills or more",
-            "damage": "Half of the teams damage",
+            "damage": "Half of the teams damage (and more than 10k)",
             "penta": "Getting a pentakill",
             "vision_score": "Vision score larger than 100",
             "kp": "Kill participation over 80%",
@@ -219,7 +219,7 @@ class LoLAwardQualifiers(AwardQualifiers):
             if stats.kills >= 20:
                 mention_list.append((1, stats.kills))
 
-            if stats.damage > self.parsed_game_stats.damage_by_our_team - stats.damage:
+            if stats.damage > 10_000 and stats.damage > self.parsed_game_stats.damage_by_our_team - stats.damage:
                 mention_list.append((2, stats.damage))
 
             if stats.pentakills > 0:

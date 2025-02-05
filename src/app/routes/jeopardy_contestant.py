@@ -9,7 +9,7 @@ jeopardy_contestant_page = flask.Blueprint("jeopardy_contestant", __name__, temp
 
 @jeopardy_contestant_page.route("/")
 def home():
-    if "user_data" in flask.request.cookies:
+    if "jeopardy_user_id" in flask.request.cookies:
         return flask.redirect(flask.url_for(".game_view", _external=True))
 
     return flask.abort(404)
@@ -47,24 +47,30 @@ def join_lobby():
         avatar = flask.url_for("static", _external=True, filename="img/questionmark.png")
 
     turn_id = PLAYER_INDEXES.index(disc_id)
-    contestant = Contestant(disc_id, turn_id, name, avatar, color)
+    with flask.current_app.config["JEOPARDY_JOIN_LOCK"]:
+        active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+        contestant = Contestant(disc_id, turn_id, name, avatar, color)
+        active_contestants[disc_id] = contestant
 
     response = flask.redirect(flask.url_for(".game_view", _external=True))
     max_age = 60 * 60 * 6 # 6 hours
-    response.set_cookie("user_data", contestant.to_json(), max_age=max_age)
+    response.set_cookie("jeopardy_user_id", str(disc_id), max_age=max_age)
 
     return response
 
 @jeopardy_contestant_page.route("/game")
 def game_view():
-    if "user_data" not in flask.request.cookies:
+    if "jeopardy_user_id" not in flask.request.cookies:
         return flask.redirect(flask.url_for(".lobby", _external=True, client_secret="None"))
 
-    contestant = Contestant.from_json(flask.request.cookies["user_data"])
     state = flask.current_app.config["JEOPARDY_DATA"]["state"]
 
     if state is None:
         return app_util.make_template_context("jeopardy/contestant_nogame.html")
+
+    active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+    disc_id = int(flask.request.cookies["jeopardy_user_id"])
+    contestant = active_contestants[disc_id]
 
     state_dict = state.__dict__
     for data in state.player_data:
@@ -87,6 +93,7 @@ def game_view():
         hits=contestant.hits,
         misses=contestant.misses,
         ping=contestant.ping,
+        finale_wager=contestant.finale_wager,
         player_bg_img=PLAYER_BACKGROUNDS[contestant.disc_id],
         **state_dict
     )
@@ -112,7 +119,7 @@ def lobby(client_secret):
     if state is None:
         return app_util.make_template_context("jeopardy/contestant_nogame.html")
 
-    if "user_data" in flask.request.cookies:
+    if "jeopardy_user_id" in flask.request.cookies:
         return flask.redirect(flask.url_for(".game_view", _external=True))
 
     return app_util.make_template_context(
@@ -157,6 +164,7 @@ def make_daily_wager(disc_id: str, amount: str):
 
 @app_util.socket_io.event
 def make_finale_wager(disc_id: str, amount: str):
+    disc_id = int(disc_id)
     jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
     contestant: Contestant = jeopardy_data["contestants"][int(disc_id)]
 
@@ -169,8 +177,10 @@ def make_finale_wager(disc_id: str, amount: str):
         return
 
     if 100 <= amount <= max_wager:
+        print(f"Made finale wager for {disc_id} (#{contestant.index}) for {amount} points")
         contestant.finale_wager = amount
         emit("finale_wager_made")
+        emit("contestant_ready", contestant.index, to="presenter")
     else:
         emit("invalid_wager", max_wager)
 
@@ -178,5 +188,6 @@ def make_finale_wager(disc_id: str, amount: str):
 def give_finale_answer(disc_id: str, answer: str):
     contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"][int(disc_id)]
     contestant.finale_answer = answer
-    
+
     emit("finale_answer_given")
+    emit("contestant_ready", contestant.index, to="presenter")

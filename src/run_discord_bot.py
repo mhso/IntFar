@@ -2,6 +2,7 @@ import asyncio
 from glob import glob
 import os
 import importlib
+import traceback
 
 from mhooge_flask.logging import logger
 
@@ -10,7 +11,10 @@ from api.util import GUILD_IDS, MY_GUILD_ID
 from discbot.discord_bot import DiscordClient
 from discbot.commands.base import handle_command, Command
 
-def collect_commands(cmd_class):
+def collect_commands(cmd_class: Command):
+    """
+    Go through each subclass of cmd_class.
+    """
     if cmd_class.__subclasses__() == [] and cmd_class.NAME not in cmd_class.COMMANDS_DICT:
         if not cmd_class.GUILDS:
             cmd_class.GUILDS = GUILD_IDS
@@ -60,3 +64,4 @@ def run_client(config, meta_database, game_databases, betting_handlers, api_clie
         return
     except Exception:
         logger.exception("Unhandled exception in Discord client")
+        traceback.print_exc()

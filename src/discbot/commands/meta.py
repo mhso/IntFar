@@ -191,8 +191,8 @@ class StatusCommand(Command):
         response = f"**Uptime:** {get_uptime(self.client.time_initialized)}\n"
 
         (
-            games, earliest_game, games_won, unique_game_guilds,
-            longest_game_duration,
+            games, earliest_game, latest_game, games_won,
+            unique_game_guilds, longest_game_duration,
             longest_game_time, users, doinks_games,
             total_doinks, intfars, games_ratios,
             intfar_ratios, intfar_multi_ratios
@@ -211,6 +211,7 @@ class StatusCommand(Command):
         pct_intfar = int((intfars / games) * 100)
         pct_doinks = int((doinks_games / games) * 100)
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
+        latest_time = datetime.fromtimestamp(latest_game).strftime("%Y-%m-%d")
         doinks_emote = self.client.insert_emotes("{emote_Doinks}")
         all_bets = self.client.game_databases[game].get_bets(False)
 
@@ -267,7 +268,7 @@ class StatusCommand(Command):
         )
 
         response += (
-            f"--- Since **{earliest_time}** ---\n"
+            f"--- From **{earliest_time}** to **{latest_time}** ---\n"
             f"- **{games}** games of **{api_util.SUPPORTED_GAMES[game]}** have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
             f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
             f"- **{users}** users have signed up for this game\n"

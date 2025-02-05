@@ -40,10 +40,6 @@
                 <h3 id="selection-finale-header3">Tid til at satse hele baduljen!</h3>
             </div>
 
-            <script>
-                showFinaleCategory('{{ categories[0] }}');
-            </script>
-
             <!-- Jeopardy theme music -->
             <audio id="selection-jeopardy-theme">
                 <source src="{{ url_for('static', _external=True, filename='img/jeopardy/jeopardy_theme.mp3') }}" type="audio/mpeg">
@@ -66,6 +62,7 @@
         const arrowKeys = ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"];
 
         socket.on("connect", function() {
+            socket.emit("presenter_joined");
             window.onkeydown = function(e) {
                 {% if jeopardy_round == 1 and player_turn == -1 %}
                 if (e.key == PRESENTER_ACTION_KEY) {
@@ -84,6 +81,9 @@
             };
             {% if jeopardy_round < 3 %}
             setPlayerTurn({{ player_turn }});
+            {% else %}
+            showFinaleCategory('{{ categories[0] }}');
+            socket.on("contestant_ready", setPlayerReady);
             {% endif %}
         });
     </script>

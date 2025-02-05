@@ -153,6 +153,8 @@
             socket.on("daily_wager_made", function(amount) {
                 afterDailyDoubleWager(amount);
             });
+            {% elif jeopardy_round == 3 %}
+            socket.on("contestant_ready", setPlayerReady);
             {% endif %}
         });
 

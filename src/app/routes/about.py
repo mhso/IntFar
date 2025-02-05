@@ -11,7 +11,7 @@ def home():
     database = flask.current_app.config["GAME_DATABASES"]["lol"]
 
     (
-        games, earliest_game, games_won, unique_game_guilds,
+        games, earliest_game, latest_game, games_won, unique_game_guilds,
         longest_game_duration, longest_game_time, users,
         doinks_games, total_doinks, intfars, games_ratios,
         intfar_ratios, intfar_multi_ratios

@@ -7,7 +7,7 @@ from api.meta_database import MetaDatabase
 from api.game_database import GameDatabase
 from api.game_databases import get_database_client
 from api.bets import get_betting_handler
-from api.util import SUPPORTED_GAMES, MY_GUILD_ID, GUILD_IDS
+from api.util import SUPPORTED_GAMES, MY_GUILD_ID, GUILD_MAP, GUILD_IDS
 from discbot.discord_bot import CHANNEL_IDS, TEST_CHANNLEL_ID
 from discbot.commands.base import handle_command
 from discbot.commands.util import COMMANDS, ADMIN_DISC_ID
@@ -78,9 +78,11 @@ async def call_command(
 if __name__ == "__main__":
     parser = ArgumentParser()
 
+    guilds = list(GUILD_MAP) + ["test"]
+    members = list(range(2, 7)) + [ADMIN_DISC_ID]
     parser.add_argument("command")
-    parser.add_argument("-g", "--guild", type=int, choices=GUILD_IDS + [MY_GUILD_ID], default=MY_GUILD_ID)
-    parser.add_argument("-a", "--author", type=int, choices=range(1, 7), default=ADMIN_DISC_ID)
+    parser.add_argument("-g", "--guild", type=str, choices=guilds, default="test")
+    parser.add_argument("-a", "--author", type=int, choices=members, default=ADMIN_DISC_ID)
     parser.add_argument("-c", "--channel", type=int, choices=CHANNEL_IDS + [1337, 1], default=CHANNEL_IDS[0])
 
     args = parser.parse_args()
@@ -91,7 +93,7 @@ if __name__ == "__main__":
 
     client = create_client(config, meta_database, game_databases)
 
-    guild = client.get_guild(args.guild)
+    guild = client.get_guild(GUILD_MAP[args.guild] if args.guild != "test" else MY_GUILD_ID)
     member = guild.get_member(args.author)
     channel = guild.get_channel(args.channel)
 
@@ -100,7 +102,3 @@ if __name__ == "__main__":
     if not message.channel.messages_sent:
         print("No response.")
         exit(0)
-
-    for msg in message.channel.messages_sent:
-        print(msg)
-        print("")

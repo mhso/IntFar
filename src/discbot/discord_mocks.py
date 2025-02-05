@@ -44,6 +44,7 @@ class MockChannel:
         self.messages_sent = []
 
     async def send(self, content: str):
+        print(content)
         self.messages_sent.append(content)
 
 class MockRole:

@@ -526,6 +526,15 @@ h3 {
     border: solid 2px black;
 }
 
+.footer-contestant-entry-ready {
+    display: none;
+    position: absolute;
+    width: 60px;
+    top: -30px;
+    left: calc(50% - 30px);
+    border-radius: 30px;
+    background: #00000075;
+}
 
 /****************##############****************\
 |                   QUESTION                   |

@@ -895,6 +895,19 @@ function addPlayerDiv(id, index, name, avatar, color) {
     }
 }
 
+function setPlayerReady(index) {
+    console.log("Setting ready state for player:", index);
+    let wrappers = document.getElementsByClassName("footer-contestant-entry");
+    for (let i = 0; i < wrappers.length; i++) {
+        let wrapper = wrappers.item(i);
+        if (wrapper.dataset["index"] == index) {
+            let readyIcon = wrapper.getElementsByClassName("footer-contestant-entry-ready").item(0);
+            readyIcon.style.display = "block";
+            break;
+        }
+    }
+}
+
 function showFinaleCategory(category) {
     window.onkeydown = function(e) {
         if (e.key == PRESENTER_ACTION_KEY) {
@@ -910,14 +923,15 @@ function showFinaleCategory(category) {
             }, 2000);
 
             setTimeout(function() {
+                socket.emit("enable_finale_wager");
                 document.getElementById("selection-jeopardy-theme").play();
-            }, 3000);
 
-            window.onkeydown = function(e) {
-                if (e.key == PRESENTER_ACTION_KEY) {
-                    window.location.href = getQuestionURL(3, category, 5);
+                window.onkeydown = function(e) {
+                    if (e.key == PRESENTER_ACTION_KEY) {
+                        window.location.href = getQuestionURL(3, category, 5);
+                    }
                 }
-            }
+            }, 3000);
         }
     }
 }
