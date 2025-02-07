@@ -31,6 +31,10 @@
             <img id="menu-quinn" src="{{ url_for('static', _external=True, filename='img/quinn_thonk.gif') }}">
             <img id="menu-vi" src="{{ url_for('static', _external=True, filename='img/vi_point.gif') }}">
         </div>
+
+        <audio id="menu-lobby-music" loop>
+            <source src="{{ url_for('static', _external=True, filename='data/yerushalayim.mp3') }}" type="audio/mpeg">
+        </audio>
     </body>
 
     <script>
@@ -44,8 +48,17 @@
         {% endfor %}
 
         window.onkeydown = function(e) {
-            if (e.key == PRESENTER_ACTION_KEY) {
-                beginJeopardy();
+            if (e.code == PRESENTER_ACTION_KEY) {
+                let audio = document.getElementById("menu-lobby-music");
+                audio.volume = 0.1;
+                audio.play();
+                setTimeout(function() {
+                    window.onkeydown = function(e) {
+                        if (e.code == PRESENTER_ACTION_KEY) {
+                            beginJeopardy();
+                        }
+                    }
+                }, 1000);
             }
         }
     </script>

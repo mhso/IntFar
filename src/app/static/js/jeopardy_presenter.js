@@ -5,7 +5,7 @@ const TIME_FOR_WAGERING = 60;
 const TIME_FOR_FINAL_ANSWER = 40;
 const TIME_BEFORE_FIRST_TIP = 4;
 const TIME_BEFORE_EXTRA_TIPS = 4;
-const PRESENTER_ACTION_KEY = "NumLock"
+const PRESENTER_ACTION_KEY = "Space"
 const socket = io({"transports": ["polling"]});
 
 var countdownInterval = null;
@@ -132,7 +132,7 @@ function afterQuestion() {
     activeAnswer = null;
     hideTips();
     window.onkeydown = function(e) {
-        if (e.key == PRESENTER_ACTION_KEY) {
+        if (e.code == PRESENTER_ACTION_KEY) {
             window.location.href = getSelectionURL(activeRound);
         }
     }
@@ -412,7 +412,7 @@ function startAnswerCountdown(duration) {
 
     // Action key has to be pressed before an answer can be given (for safety)
     window.onkeydown = function(e) {
-        if (e.key == PRESENTER_ACTION_KEY) {
+        if (e.code == PRESENTER_ACTION_KEY) {
             // Pause video if one is playing
             pauseVideo();
 
@@ -550,7 +550,7 @@ function showAnswerChoice(index) {
     }
     else {
         window.onkeydown = function(e) {
-            if (e.key == PRESENTER_ACTION_KEY) {
+            if (e.code == PRESENTER_ACTION_KEY) {
                 showAnswerChoice(index + 1);
             }
         }
@@ -560,7 +560,7 @@ function showAnswerChoice(index) {
 function afterShowQuestion() {
     if (isQuestionMultipleChoice()) {
         window.onkeydown = function(e) {
-            if (e.key == PRESENTER_ACTION_KEY) {
+            if (e.code == PRESENTER_ACTION_KEY) {
                 showAnswerChoice(0);
             }
         }
@@ -589,7 +589,7 @@ function showQuestion() {
         // If there is an answer image, first show the question, then show
         // the image after pressing action key again. Otherwise show image instantly
         window.onkeydown = function(e) {
-            if (e.key == PRESENTER_ACTION_KEY) {
+            if (e.code == PRESENTER_ACTION_KEY) {
                 if (questionImage != null) {
                     questionImage.style.opacity = 1;
                     afterShowQuestion();
@@ -619,7 +619,7 @@ function showQuestion() {
                 questionImage.style.opacity = 1;
             }
             window.onkeydown = function(e) {
-                if (e.key == PRESENTER_ACTION_KEY) {
+                if (e.code == PRESENTER_ACTION_KEY) {
                     afterShowQuestion();
                 }
             }
@@ -729,17 +729,18 @@ function tabulateCategorySelection(key, cols) {
     }
 
     // Choose the next selected box based on input
-    let maxIndex = (cols + 1) * 5 - 1;
+    const rows = 5;
+    let maxIndex = (cols + 1) * rows - 1;
     if (key == "ArrowRight") {
         selectedIndex = selectedBox == null ? 0 : selectedIndex + cols;
         if (selectedIndex > maxIndex) {
-            return;
+            selectedIndex = selectedIndex - maxIndex - 1;
         }
     }
     else if (key == "ArrowLeft") {
-        selectedIndex = selectedBox == null ? cols * 5 : selectedIndex - cols;
+        selectedIndex = selectedBox == null ? cols * rows : selectedIndex - cols;
         if (selectedIndex < 0) {
-            return;
+            selectedIndex = maxIndex + selectedIndex + 1;
         }
     }
     else if (key == "ArrowUp") {
@@ -910,7 +911,7 @@ function setPlayerReady(index) {
 
 function showFinaleCategory(category) {
     window.onkeydown = function(e) {
-        if (e.key == PRESENTER_ACTION_KEY) {
+        if (e.code == PRESENTER_ACTION_KEY) {
             let header1 = document.getElementById("selection-finale-header1");
             header1.style.setProperty("opacity", 1);
 
@@ -927,7 +928,7 @@ function showFinaleCategory(category) {
                 document.getElementById("selection-jeopardy-theme").play();
 
                 window.onkeydown = function(e) {
-                    if (e.key == PRESENTER_ACTION_KEY) {
+                    if (e.code == PRESENTER_ACTION_KEY) {
                         window.location.href = getQuestionURL(3, category, 5);
                     }
                 }
@@ -976,7 +977,7 @@ function showFinaleResult() {
                     descElem.innerHTML = `og <strong>taber ${amount} GBP</strong>!`;
                     updatePlayerScore(player, -amount);
                 }
-                else if (e.key == PRESENTER_ACTION_KEY) {
+                else if (e.code == PRESENTER_ACTION_KEY) {
                     showNextResult(player + 1);
                 }
             }
@@ -984,7 +985,7 @@ function showFinaleResult() {
     }
 
     window.onkeydown = function(e) {
-        if (e.key == PRESENTER_ACTION_KEY) {
+        if (e.code == PRESENTER_ACTION_KEY) {
             showNextResult(0);
         }
     }
@@ -995,7 +996,7 @@ function showFinaleResult() {
 
 function startWinnerParty() {
     window.onkeydown = function(e) {
-        if (e.key == PRESENTER_ACTION_KEY) {
+        if (e.code == PRESENTER_ACTION_KEY) {
             document.getElementById("endscreen-confetti-video").play();
             document.getElementById("endscreen-music").play();
             let overlay = document.getElementById("endscreen-techno-overlay");

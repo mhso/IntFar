@@ -162,7 +162,7 @@
         document.getElementById("question-wager-wrapper").classList.remove("d-none");
         {% else %}
         window.onkeydown = function(e) {
-            if (e.key == PRESENTER_ACTION_KEY) {
+            if (e.code == PRESENTER_ACTION_KEY) {
                 showQuestion();
                 {% if jeopardy_round == 3 %}
                 setTimeout(function() {

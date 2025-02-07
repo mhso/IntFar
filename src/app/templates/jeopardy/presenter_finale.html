@@ -50,7 +50,7 @@
         });
 
         window.onkeydown = function(e) {
-            if (e.key == PRESENTER_ACTION_KEY) {
+            if (e.code == PRESENTER_ACTION_KEY) {
                 document.activeElement.blur();
                 showFinaleResult();
             }

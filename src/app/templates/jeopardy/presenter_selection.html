@@ -65,17 +65,18 @@
             socket.emit("presenter_joined");
             window.onkeydown = function(e) {
                 {% if jeopardy_round == 1 and player_turn == -1 %}
-                if (e.key == PRESENTER_ACTION_KEY) {
+                if (e.code == PRESENTER_ACTION_KEY) {
                     chooseStartingPlayer(function(turn) {
                         setPlayerTurn(turn, true);
-                        socket.emit("first_turn", turn);
+                        let index = document.getElementsByClassName("active-contestant-entry").item(0).dataset["index"];
+                        socket.emit("first_turn", index);
                     });
                 }
                 {% endif %}
-                if (arrowKeys.includes(e.key)) {
-                    tabulateCategorySelection(e.key, {{ categories | length - 1 }});
+                if (arrowKeys.includes(e.code)) {
+                    tabulateCategorySelection(e.code, {{ categories | length - 1 }});
                 }
-                else if (e.key == "Enter") {
+                else if (e.code == "Enter") {
                     goToSelectedCategory();
                 }
             };

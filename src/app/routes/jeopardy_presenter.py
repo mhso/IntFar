@@ -716,7 +716,7 @@ def disable_buzz():
 
 @app_util.socket_io.event
 def first_turn(turn_id: int):
-    emit("turn_chosen", turn_id, to="contestants")
+    emit("turn_chosen", int(turn_id), to="contestants")
 
 @app_util.socket_io.event
 def enable_finale_wager():
