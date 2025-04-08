@@ -40,12 +40,12 @@ class LoLBetResolver(BetResolver):
         stat = self.bet.event_id.split("_")[1]
         stat_outlier_ties = get_outlier(
             self.game_stats.filtered_player_stats, stat, asc=False, include_ties=True
-        )[0]
+        )
 
         if stat_outlier_ties is None:
             return None
 
-        return self.target_id in stat_outlier_ties and len(stat_outlier_ties) == 1
+        return any(self.target_id == stats.disc_id for stats in stat_outlier_ties) and len(stat_outlier_ties) == 1
 
     @property
     def should_resolve_with_game_outcome(self) -> list[str]:

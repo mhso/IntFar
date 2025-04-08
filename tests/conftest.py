@@ -4,6 +4,7 @@ from src.api.config import Config
 from src.api.meta_database import MetaDatabase
 from src.api.game_databases import get_database_client
 from src.api.game_monitors import get_game_monitor
+from src.api.bets import get_betting_handler
 from src.api.game_apis.mocks.riot_api import MockRiotAPI
 from src.api.game_apis.mocks.steam_api import MockSteamAPI
 from src.api.util import SUPPORTED_GAMES
@@ -80,6 +81,14 @@ def game_monitors(config, meta_database, game_databases, api_clients):
         game: get_game_monitor(game, config, meta_database, game_databases[game], api_clients[game])
         for game in SUPPORTED_GAMES
     }
+
+@pytest.fixture()
+def betting_handlers(config, meta_database, game_databases):
+    betting_handlers = {}
+    for game in SUPPORTED_GAMES:
+        betting_handlers[game] = get_betting_handler(game, config, meta_database, game_databases[game])
+
+    yield betting_handlers
 
 @pytest.fixture()
 def discord_client(config, meta_database, game_databases):

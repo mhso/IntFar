@@ -1620,7 +1620,8 @@ class DiscordClient(discord.Client):
 
         if role is None:
             colors = [(0, 128, 255), (250, 50, 0), (255, 51, 255), (0, 204, 0)]
-            role = await guild.create_role(name=role_name, color=colors[iteration-1])
+            color = discord.Color.from_rgb(*colors[iteration-1])
+            role = await guild.create_role(name=role_name, color=color)
 
         for data in player_data[:ties+1]:
             member = guild.get_member(data["disc_id"])

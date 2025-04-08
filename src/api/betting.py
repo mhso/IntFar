@@ -386,7 +386,7 @@ class BettingHandler(ABC):
             response += "You will need this ticket to cancel the bet.\n"
         else:
             amount, _, _, base_return, bet_desc = bet_data[0]
-            response = f"Bet succesfully placed: `{bet_desc}` in a {game_name} game for "
+            response = f"Bet successfully placed: `{bet_desc}` in a {game_name} game for "
             if all_in:
                 capitalized = tokens_name[1:-1].upper()
                 response += f"***ALL YOUR {capitalized}, YOU MAD LAD!!!***\n"

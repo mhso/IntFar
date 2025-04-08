@@ -331,7 +331,7 @@ class LoLAwardQualifiers(AwardQualifiers):
                 if curr_division < prev_division: # Demotion
                     rank_mentions[disc_id] = (0, curr_division)
                 elif curr_division > prev_division: # Promotion
-                    rank_mentions[disc_id] = (1, curr_division)
+                    rank_mentions[disc_id] = (1, curr_division - 1)
 
         return rank_mentions
 

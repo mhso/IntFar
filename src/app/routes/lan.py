@@ -1,6 +1,6 @@
 from datetime import datetime
 import random
-from time import time
+from time import sleep, time
 
 import flask
 import numpy as np
@@ -203,11 +203,20 @@ def get_data(lan_info, lan_date):
     database = flask.current_app.config["GAME_DATABASES"]["lol"]
     riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
-    games_stats = database.get_games_results(
-        time_after=lan_info.start_time,
-        time_before=lan_info.end_time,
-        guild_id=lan_info.guild_id
-    )
+    try:
+        games_stats = database.get_games_results(
+            time_after=lan_info.start_time,
+            time_before=lan_info.end_time,
+            guild_id=lan_info.guild_id
+        )
+    except Exception:
+        sleep(1)
+        games_stats = database.get_games_results(
+            time_after=lan_info.start_time,
+            time_before=lan_info.end_time,
+            guild_id=lan_info.guild_id
+        )
+
     if lan_api.TESTING:
         with open("dummy.txt", "r") as fp:
             if fp.readline().strip() in ("0", "1"):
