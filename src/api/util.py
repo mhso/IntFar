@@ -42,7 +42,7 @@ MONTH_NAMES = [
     "August", "September", "October", "November", "December"
 ]
 
-JEOPARDY_ITERATION = 3
+JEOPARDY_ITERATION = 4
 _suffix = ["st", "nd", "rd", "th"]
 JEOPADY_EDITION = f"{JEOPARDY_ITERATION}{_suffix[min(len(_suffix) - 1, JEOPARDY_ITERATION - 1)]} Edition"
 

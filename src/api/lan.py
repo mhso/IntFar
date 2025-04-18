@@ -100,6 +100,10 @@ if not TESTING:
             },
             803987403932172359 # Core Nibs
         ),
+        "april_25": LANInfo(
+            datetime(2025, 4, 26, 11, 0, 0).timestamp(),
+            datetime(2025, 4, 27, 12, 0, 0).timestamp()
+        )
     }
 
 else: # Use old data for testing.

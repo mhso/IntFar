@@ -778,3 +778,44 @@ def test_all_questions():
                     context.screenshot_views((round_num * 30) + question_num + 1)
 
                     question_num += 1
+
+def test_questions_well_formed(config):
+    def get_path(filename):
+        return f"{config.static_folder}/img/jeopardy/{filename}"
+
+    with open(f"{config.static_folder}/data/jeopardy_questions.json", "r", encoding="utf-8") as fp:
+        question_data = json.load(fp)
+
+    mandatory_category_keys = set(["name", "order", "background", "tiers"])
+    mandatory_tiers_keys = set(["value", "questions"])
+    mandatory_question_keys = set(["question", "answer"])
+    optional_question_keys = set(
+        ["choices", "image", "explanation", "answer_image", "video", "height", "border"]
+    )
+
+    for category in question_data:
+        category_data = question_data[category]
+
+        assert set(category_data.keys()) == mandatory_category_keys
+        assert os.path.exists(get_path(category_data["background"]))
+
+        for tier_data in question_data[category]["tiers"]:
+            assert set(tier_data.keys()) == mandatory_tiers_keys
+
+            for question_data in tier_data["questions"]:
+                for key in mandatory_question_keys:
+                    assert key in question_data
+
+                assert question_data.keys() - (mandatory_question_keys.union(optional_question_keys))
+
+                for key in ("image", "answer_image", "video"):
+                    if key in question_data:
+                        assert os.path.exists(get_path(question_data[key]))
+
+    with open(f"{config.static_folder}/data/jeopardy_used.json", "r", encoding="utf-8") as fp:
+        used_data = json.load(fp)
+
+    question_keys = set(question_data.keys())
+    used_keys = set(used_data.keys())
+
+    assert question_keys == used_keys
