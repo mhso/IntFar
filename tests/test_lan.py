@@ -7,7 +7,7 @@ from src.api.game_monitor import GameMonitor
 from src.api import lan
 
 TEST_ID = 5452408885
-LAN_DATE = "february_25"
+LAN_DATE = "april_25"
 
 @pytest.fixture(scope="function", autouse=True)
 def reset_bingo(game_databases):
@@ -308,7 +308,7 @@ def test_bingo_fountain_kill(game_monitors, game_databases):
 
     second_player = None
     for disc_id in game_databases["lol"].game_users.keys():
-        if raw_game_data["participants"][1]["summonerId"] in game_databases["lol"].game_users[disc_id].player_id:
+        if raw_game_data["participants"][1]["puuid"] in game_databases["lol"].game_users[disc_id].player_id:
             second_player = disc_id
             break
 
@@ -337,7 +337,7 @@ def test_bingo_jungle_doinks(game_monitors, game_databases):
     for participant_data in raw_game_data["participants"]:
         if participant_data["teamPosition"] == "JUNGLE":
             for disc_id in game_databases["lol"].game_users.keys():
-                if participant_data["summonerId"] in game_databases["lol"].game_users[disc_id].player_id:
+                if participant_data["puuid"] in game_databases["lol"].game_users[disc_id].player_id:
                     jungle_player = disc_id
                     break
 
@@ -511,7 +511,7 @@ def test_bingo_steals(game_monitors, game_databases):
 
     second_player = None
     for disc_id in game_databases["lol"].game_users.keys():
-        if raw_game_data["participants"][1]["summonerId"] in game_databases["lol"].game_users[disc_id].player_id:
+        if raw_game_data["participants"][1]["puuid"] in game_databases["lol"].game_users[disc_id].player_id:
             second_player = disc_id
             break
 

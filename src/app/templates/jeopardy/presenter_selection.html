@@ -10,7 +10,7 @@
             {% set first_round = jeopardy_round == 1 and player_turn == -1 %}
 
             <!-- Categories -->
-            {% if jeopardy_round < 3 %}
+            {% if jeopardy_round < total_rounds %}
 
             <!-- Jeopardy! and Double Jeopardy! question selection -->
             <div id="selection-categories-wrapper">
@@ -30,6 +30,12 @@
                 {% endfor %}
             </div>
 
+            {% if first_round %}
+            <audio id="selection-start-sound" loop="false">
+                <source src="{{ url_for('static', _external=True, filename='data/its_happening.mp3') }}" type="audio/mpeg">
+            </audio>
+            {% endif %}
+
             {% else %}
 
             <!-- Final Jeopardy! question selection -->
@@ -41,7 +47,7 @@
             </div>
 
             <!-- Jeopardy theme music -->
-            <audio id="selection-jeopardy-theme">
+            <audio id="selection-jeopardy-theme" loop="false">
                 <source src="{{ url_for('static', _external=True, filename='img/jeopardy/jeopardy_theme.mp3') }}" type="audio/mpeg">
             </audio>
             {% endif %}
@@ -54,6 +60,7 @@
     <script>
         setVariables(
             {{ jeopardy_round }},
+            {{ total_rounds }},
             {{ player_data | tojson }},
             {{ player_turn }},
             {{ question_num }}
@@ -66,6 +73,9 @@
             window.onkeydown = function(e) {
                 {% if jeopardy_round == 1 and player_turn == -1 %}
                 if (e.code == PRESENTER_ACTION_KEY) {
+                    let startSound = document.getElementById("selection-start-sound");
+                    startSound.volume = 0.3;
+                    startSound.play();
                     chooseStartingPlayer(function(turn) {
                         setPlayerTurn(turn, true);
                         let index = document.getElementsByClassName("active-contestant-entry").item(0).dataset["index"];
@@ -80,10 +90,10 @@
                     goToSelectedCategory();
                 }
             };
-            {% if jeopardy_round < 3 %}
+            {% if jeopardy_round < total_rounds %}
             setPlayerTurn({{ player_turn }});
             {% else %}
-            showFinaleCategory('{{ categories[0] }}');
+            showFinaleCategory({{ total_rounds }}, '{{ categories[0] }}');
             socket.on("contestant_ready", setPlayerReady);
             {% endif %}
         });

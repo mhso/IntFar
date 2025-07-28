@@ -234,7 +234,7 @@ class RandomNochestCommand(Command):
 
     async def handle(self, target_id: int = None):
         summ_data = self.client.game_databases[_GAME].game_user_data_from_discord_id(target_id)
-        champion_mastery_data = await self.client.api_clients[_GAME].get_champion_mastery(summ_data.puuid[0])
+        champion_mastery_data = await self.client.api_clients[_GAME].get_champion_mastery(summ_data.player_id[0])
 
         # Filter champs with no chest granted.
         no_chest_champs = []
@@ -267,7 +267,7 @@ class BestNochestCommand(Command):
         for the given player where no chest has yet been obtained.
         """
         summ_data = self.client.game_databases[_GAME].game_user_data_from_discord_id(target_id)
-        champion_mastery_data = await self.client.api_clients[_GAME].get_champion_mastery(summ_data.puuid[0])
+        champion_mastery_data = await self.client.api_clients[_GAME].get_champion_mastery(summ_data.player_id[0])
 
         # Filter champs with no chest granted.
         no_chest_champs = []

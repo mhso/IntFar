@@ -33,8 +33,8 @@ def register_discord_connection():
 def check_and_set_game():
     """
     Gets the game that the current page responds to, if any, based on the URL.
-    Sets this on the flask config for later use. Also redirects to LoL, if no
-    game is given in the URL, but the current page requires one.
+    Sets this on the flask config for later use. Also redirects to the default game (LoL),
+    if no game is given in the URL, but the current page requires one.
     """
     base_url = flask.request.base_url
     if base_url[-1] == "/":

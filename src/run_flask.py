@@ -98,7 +98,7 @@ def run_app(
 
     app_name = "intfar"
 
-    app.util.socket_io = SocketIOPatcher()
+    app.util.socket_io = SocketIOPatcher(cors_allowed_origins="*")
 
     # Create Flask app.
     web_app = init.create_app(
@@ -124,6 +124,7 @@ def run_app(
         jeopardy_data={"contestants": {}, "state": None},
         jeopardy_buzz_lock=Lock(),
         jeopardy_join_lock=Lock(),
+        jeopardy_power_lock=Lock(),
         bingo_events={},
         league_events=[],
         league_events_lock=Lock(),

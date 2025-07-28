@@ -3,8 +3,7 @@ PRAGMA journal_mode = 'wal';
 CREATE TABLE [users] (
     [disc_id] INTEGER NOT NULL,
     [player_name] NVARCHAR(64) NOT NULL,
-    [player_id] NVARCHAR(64) NOT NULL,
-    [puuid] NVARCHAR(78) NOT NULL,
+    [player_id] NVARCHAR(78) NOT NULL,
     [main] INTEGER(1),
     [active] INTEGER DEFAULT(1),
     PRIMARY KEY (disc_id, player_id)

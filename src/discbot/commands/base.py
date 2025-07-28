@@ -96,12 +96,13 @@ class Command:
     MANDATORY_PARAMS: List[CommandParam] = []
     OPTIONAL_PARAMS: List[CommandParam] = []
     ALIASES: List[str] = []
-    GUILDS: List[str] = None
+    GUILDS: List[str] | None = None
     COMMANDS_DICT: Dict[str, "Command"] = commands_util.COMMANDS
 
-    def __init__(self, client: DiscordClient, message: Message):
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
         self.client = client
         self.message = message
+        self.called_name = called_name
 
     @abstractmethod
     async def handle(self, *args):
@@ -292,7 +293,7 @@ def get_handler(cmd: str, client: DiscordClient, message: Message) -> Command:
     else:
         handler = commands_util.COMMANDS[cmd_name]
 
-    return handler(client, message)
+    return handler(client, message, cmd)
 
 def is_command_valid(message: Message, cmd: str, args: List[str]) -> Tuple[bool, bool]:
     """

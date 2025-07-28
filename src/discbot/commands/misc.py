@@ -1,3 +1,4 @@
+import asyncio
 import random
 
 from discord import Message
@@ -114,8 +115,8 @@ class ReportsCommand(Command):
 class BaseFlirtCommand(Command):
     COMMANDS_DICT = commands_util.CUTE_COMMANDS
 
-    def __init__(self, client: DiscordClient, message: Message, language: str):
-        super().__init__(client, message)
+    def __init__(self, client: DiscordClient, message: Message, called_name: str, language: str):
+        super().__init__(client, message, called_name)
         self.language = language
 
     async def handle(self):
@@ -128,15 +129,15 @@ class FlirtEnglishCommand(BaseFlirtCommand):
     NAME = "intdaddy"
     DESCRIPTION = "Flirt with Int-Far."
 
-    def __init__(self, client: DiscordClient, message: Message):
-        super().__init__(client, message, "english")
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name, "english")
 
 class FlirtSpanishCommand(BaseFlirtCommand):
     NAME = "intpapi"
     DESCRIPTION = "Flirt with Int-Far (in spanish)."
 
     def __init__(self, client: DiscordClient, message: Message):
-        super().__init__(client, message, "spanish")
+        super().__init__(client, message, called_name, "spanish")
 
 class SummaryCommand(Command):
     NAME = "summary"
@@ -171,7 +172,7 @@ class SummaryCommand(Command):
 
         playable_name = "champions" if game == "lol" else "maps"
 
-        response = (
+        response_1 = (
             f"{nickname} has played a total of **{games_played}** games " +
             f"(**{total_winrate:.1f}%** was won).\n" +
             f"They have played **{num_played_ids}**/**{total_ids}** different {playable_name}.\n\n"
@@ -182,23 +183,25 @@ class SummaryCommand(Command):
         if game == "lol":
             rank_solo, rank_flex = database.get_current_rank(target_id)
             fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_solo)
-            response += f"Their current rank in {fmt_stat_names['rank_solo']} is **{fmt_rank}**.\n"
+            response_1 += f"Their current rank in {fmt_stat_names['rank_solo']} is **{fmt_rank}**.\n"
 
             fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_flex)
-            response += f"Their current rank in {fmt_stat_names['rank_flex']} is **{fmt_rank}**.\n\n"
+            response_1 += f"Their current rank in {fmt_stat_names['rank_flex']} is **{fmt_rank}**.\n\n"
 
-        response += f"Their longest winning streak was **{longest_win_streak}** games.\n"
-        response += f"Their longest loss streak was **{longest_loss_streak}** games.\n"
+        response_1 += f"Their longest winning streak was **{longest_win_streak}** games.\n"
+        response_1 += f"Their longest loss streak was **{longest_loss_streak}** games.\n"
 
         if game == "cs2":
             ot_games, ot_winrate = database.get_overtime_winrate(target_id)
-            response += f"Their winrate in overtime is **{ot_winrate}%** in **{ot_games}** games.\n\n"
+            response_1 += f"Their winrate in overtime is **{ot_winrate}%** in **{ot_games}** games.\n\n"
+
+        response_2 = ""
 
         # If person has not played a minimum of 5 games with any champions/on any map, skip winrate stats.
         if best_playable_wr is not None and worst_playable_wr is not None and best_playable_id != worst_playable_id:
             best_playable_name = self.client.api_clients[game].get_playable_name(best_playable_id)
             worst_playable_name = self.client.api_clients[game].get_playable_name(worst_playable_id)
-            response += (
+            response_2 += (
                 f"They perform best on **{best_playable_name}** (won " +
                 f"**{best_playable_wr:.1f}%** of **{best_playable_games}** games).\n" +
                 f"They perform worst on **{worst_playable_name}** (won " +
@@ -215,7 +218,7 @@ class SummaryCommand(Command):
         if best_person_wr is not None and worst_person_wr is not None and best_person_id != worst_person_id:
             best_person_name = self.client.get_discord_nick(best_person_id, self.message.guild.id)
             worst_person_name = self.client.get_discord_nick(worst_person_id, self.message.guild.id)
-            response += (
+            response_2 += (
                 f"They perform best when playing with **{best_person_name}** (won " +
                 f"**{best_person_wr:.1f}%** of **{best_person_games}** games).\n" +
                 f"They perform worst when playing with **{worst_person_name}** (won " +
@@ -225,25 +228,30 @@ class SummaryCommand(Command):
         if game == "lol":
             role_stats = database.get_role_winrate(target_id)
 
-            response += "Their winrate playing different roles:\n"
+            response_2 += "Their winrate playing different roles:\n"
 
             for winrate, games, role in role_stats:
                 role_name = get_formatted_stat_value(game, "role", role)
-                response += (
+                response_2 += (
                     f"- **{role_name}**: won **{winrate:.1f}%** of **{games}** games\n"
                 )
 
-            response += "\n"
+            response_2 += "\n"
 
         # Get performance score for person.
         score, rank, num_scores = database.get_performance_score(target_id)()
 
-        response += (
+        response_2 += (
             f"The *Personally Evaluated Normalized Int-Far Score* for {nickname} is " +
             f"**{score:.2f}**/**10**\nThis ranks them at **{rank}**/**{num_scores}**."
         )
 
-        await self.message.channel.send(response)
+        if len(response_1) + len(response_2) < 4000:
+            await self.message.channel.send(response_1 + response_2)
+        else:
+            await self.message.channel.send(response_1)
+            await asyncio.sleep(1)
+            await self.message.channel.send(response_2)
 
 class PerformanceCommand(Command):
     NAME = "performance"
@@ -284,7 +292,11 @@ class PerformanceCommand(Command):
         await self.message.channel.send(response)
 
 def get_winrate(client: DiscordClient, champ_or_map: str, game: str, target_id: int, role: str=None):
-    winrate, games = client.game_databases[game].get_played_winrate(target_id, champ_or_map, role)
+    args = [target_id, champ_or_map]
+    if role is not None:
+        args.append(role)
+
+    winrate, games = client.game_databases[game].get_played_winrate(*args)
     qualified_name = client.api_clients[game].get_playable_name(champ_or_map)
 
     return qualified_name, winrate, games

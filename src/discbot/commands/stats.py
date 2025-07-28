@@ -48,8 +48,10 @@ class AverageCommand(Command):
     ALIASES = ["avg"]
 
     async def handle(self, stat: str, game: str, playable_id: int | str = None, disc_id: int = None):
-        quantity_descs = get_stat_quantity_descriptions(game)
-        if stat not in quantity_descs: # Check if the requested stat is a valid stat.
+        stat_quantity_descs = get_stat_quantity_descriptions(game)
+        stat_name_descs = get_formatted_stat_names(game, False)
+
+        if stat not in stat_quantity_descs: # Check if the requested stat is a valid stat.
             emote = "{emote_carole_fucking_baskin}"
             response = f"Not a valid stat: '{stat}' {emote}. See `!stats` for a list of valid stats."
             await self.message.channel.send(self.client.insert_emotes(response))
@@ -63,7 +65,7 @@ class AverageCommand(Command):
         values = self.client.game_databases[game].get_average_stat(stat, disc_id, playable_id, min_games=minimum_games)()
 
         for_all = disc_id is None
-        readable_stat = stat.replace("_", " ")
+        readable_stat = stat_name_descs[stat]        
 
         response = ""
 
@@ -123,8 +125,8 @@ class BestOrWorstStatCommand(Command):
     MANDATORY_PARAMS = [CommandParam("stat")]
     OPTIONAL_PARAMS = [GameParam("game"), TargetParam("person")]
 
-    def __init__(self, client: DiscordClient, message: Message, best: bool):
-        super().__init__(client, message)
+    def __init__(self, client: DiscordClient, message: Message, called_name, best: bool):
+        super().__init__(client, message, called_name)
         self.best = best
 
     async def handle(self, stat: str, game: str, target_id: int):
@@ -133,28 +135,36 @@ class BestOrWorstStatCommand(Command):
         and write it to Discord. If target_id is None, instead gets the highest/lowest
         value of all time for the given stat.
         """
-        stat_descs = get_stat_quantity_descriptions(game)
-        if stat not in stat_descs: # Check if the requested stat is a valid stat.
+        stat_quant_descs = get_stat_quantity_descriptions(game)
+        stat_name_descs = get_formatted_stat_names(game, False)
+
+        if stat not in stat_quant_descs: # Check if the requested stat is a valid stat.
             emote = "{emote_carole_fucking_baskin}"
             response = f"Not a valid stat: '{stat}' {emote}. See `!stats` for a list of valid stats."
             await self.message.channel.send(self.client.insert_emotes(response))
             return
 
-        quantity_type = 0 if self.best else 1
-
         # Check whether to find the max or min of some value, when returning
         # 'his most/lowest [stat] ever was ... Usually highest is best,
         # lowest is worse, except with deaths, where the opposite is the case.
-        maximize = not ((stat != "deaths") ^ self.best)
+        if (
+            stat == "deaths"
+            and (
+                (self.best and self.called_name != "best") or
+                (not self.best and self.called_name != "worst")
+            )
+        ):
+            self.best = not self.best
+
+        maximize = self.best if stat != "deaths" else not self.best
+        quantity_type = 0 if self.best else 1
 
         # Get a readable description, such as 'most deaths' or 'lowest kp'.
-        quantifier = stat_descs[stat][quantity_type]
+        quantifier = stat_quant_descs[stat][quantity_type]
         if quantifier is not None:
-            readable_stat = quantifier + " " + stat
+            readable_stat = quantifier + " " + stat_name_descs[stat]
         else:
-            readable_stat = stat
-
-        readable_stat = readable_stat.replace("_", " ")
+            readable_stat = stat_name_descs[stat]
 
         response = ""
         check_all = target_id is None
@@ -213,7 +223,7 @@ class BestOrWorstStatCommand(Command):
             )
             if min_or_max_value is not None:
                 # The target user has gotten most/fewest of 'stat' in at least one game.
-                response += f"His {readable_stat} ever was "
+                response += f"Their {readable_stat} ever was "
                 response += f"**{min_or_max_value}** when playing {game_summary}"
 
         await self.message.channel.send(response)
@@ -242,8 +252,8 @@ class BestStatCommand(BestOrWorstStatCommand):
     )
     ALIASES = ["most", "highest"]
 
-    def __init__(self, client: DiscordClient, message: Message):
-        super().__init__(client, message, True)
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name, True)
 
 class WorstStatCommand(BestOrWorstStatCommand):
     NAME = "worst"
@@ -255,8 +265,8 @@ class WorstStatCommand(BestOrWorstStatCommand):
     )
     ALIASES = ["least", "lowest", "fewest"]
 
-    def __init__(self, client: DiscordClient, message: Message):
-        super().__init__(client, message, False)
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name, False)
 
 class MatchHistoryCommand(Command):
     NAME = "match_history"

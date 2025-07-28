@@ -44,7 +44,7 @@ async def download_missing_demos(config, database, steam_api, sharecode):
     auth_code = user.match_auth_code[0]
 
     while sharecode is not None:
-        download_single_demo(config, steam_api, sharecode)
+        await download_single_demo(config, steam_api, sharecode)
 
         sharecode = await steam_api.get_next_sharecode(steam_id, auth_code, sharecode)
 
@@ -111,10 +111,7 @@ if __name__ == "__main__":
     database = get_database_client("cs2", config)
     steam_api = SteamAPIClient("cs2", config)
 
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
+    loop = asyncio.new_event_loop()
 
     if args.task == "download_one":
         coroutine = download_single_demo(config, steam_api, args.sharecode)

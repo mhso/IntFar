@@ -152,7 +152,7 @@ class UsageCommand(Command):
             return
 
         # Get main command (if it is an alias)
-        cmd_obj: Command = commands_util.get_main_command(command)(self.client, self.message)
+        cmd_obj: Command = commands_util.get_main_command(command)(self.client, self.message, self.called_name)
         response = f"Usage: `{cmd_obj}`\n"
         response += cmd_obj.DESCRIPTION
 

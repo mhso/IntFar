@@ -192,7 +192,7 @@ class TestFuncs:
 
     async def cs_sharecode(self):
         api_client = SteamAPIClient("cs2", self.config)
-        user = self.game_databases["cs2"].game_users[219497453374668815]
+        user = self.game_databases["cs2"].game_users[ADMIN_DISC_ID]
         sharecode = user.latest_match_token[0]
         print("Now:", sharecode)
         while (sharecode := await api_client.get_next_sharecode(user.player_id[0], user.match_auth_code[0], sharecode)) is not None:
@@ -341,7 +341,7 @@ class TestFuncs:
             print(f"{arg}: {annotations[arg].__name__}")
 
     def insert_bingo_challenges(self):
-        insert_bingo_challenges(self.game_databases["lol"], "february_25")
+        insert_bingo_challenges(self.game_databases["lol"], "april_25")
 
     async def active_game(self):
         user = self.game_databases["lol"].game_users[219497453374668815]

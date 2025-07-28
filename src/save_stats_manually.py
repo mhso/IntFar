@@ -10,7 +10,6 @@ from api.config import Config
 from api.meta_database import MetaDatabase
 from api.util import GUILD_IDS, SUPPORTED_GAMES
 from discbot.discord_bot import DiscordClient
-from api.game_stats import GameStats
 
 GUILDS = {
     "nibs": GUILD_IDS[0],
@@ -77,7 +76,7 @@ class TestMock(DiscordClient):
 
         for participant in game_info["participants"]:
             for disc_id in all_users.keys():
-                if participant["summonerId"] in all_users[disc_id].player_id:
+                if participant["puuid"] in all_users[disc_id].player_id:
                     users_in_game[disc_id] = all_users[disc_id]
                     break
 
@@ -89,8 +88,8 @@ class TestMock(DiscordClient):
 
         player_ranks = {}
         for disc_id in users_in_game:
-            summ_id = users_in_game[disc_id].player_id[0]
-            rank_info = await self.api_clients["lol"].get_player_rank(summ_id)
+            puuid = users_in_game[disc_id].player_id[0]
+            rank_info = await self.api_clients["lol"].get_player_rank(puuid)
             if rank_info is not None:
                 player_ranks[disc_id] = rank_info
 
@@ -192,9 +191,9 @@ meta_database = MetaDatabase(conf)
 
 logger.info("Starting Discord Client...")
 
-game_databases = {game: get_database_client(game, conf) for game in SUPPORTED_GAMES}
-betting_handlers = {game: get_betting_handler(game, conf, meta_database, game_databases[game]) for game in SUPPORTED_GAMES}
-api_clients = {game: get_api_client(game, conf) for game in SUPPORTED_GAMES}
+game_databases = {args.game: get_database_client(args.game, conf)}
+betting_handlers = {args.game: get_betting_handler(args.game, conf, meta_database, game_databases[args.game])}
+api_clients = {args.game: get_api_client(args.game, conf)}
 
 client = TestMock(args, conf, meta_database, game_databases, betting_handlers, api_clients)
 

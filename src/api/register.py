@@ -34,8 +34,6 @@ async def register_for_lol(
     elif (puuid := await api_client.get_puuid(game_name, tag)) is None:
         return 0, "Riot ID does not exist (acording to Rito)."
 
-    summ_id = await api_client.get_player_data_from_puuid(puuid)["id"]
-
     # Add user to Int-Far base users if they are new
     meta_database.add_user(disc_id)
 
