@@ -148,7 +148,7 @@ class DiscordClient(discord.Client):
             # Send error message to Discord to indicate things went bad.
             await self.send_error_msg(post_game_stats.guild_id)
 
-        elif post_game_stats.status_code == GameMonitor.POSTGAME_STATUS_MISSING:
+        elif post_game_stats.status_code == GameMonitor.POSTGAME_STATUS_MISSING and post_game_stats.game == "lol":
             # Send message pinging me about the error.
             mention_me = self.get_mention_str(commands_util.ADMIN_DISC_ID, post_game_stats.guild_id)
             game_name = api_util.SUPPORTED_GAMES[post_game_stats.game]
@@ -160,9 +160,14 @@ class DiscordClient(discord.Client):
             await self.send_message_unprompted(message_str, post_game_stats.guild_id)
 
         elif post_game_stats.status_code == GameMonitor.POSTGAME_STATUS_SOLO:
-            response = "Only one person in that game. "
-            response += "no Int-Far will be crowned "
-            response += "and no stats will be saved."
+            if self.get_users_in_voice()[post_game_stats.guild_id][post_game_stats.game] == {}:
+                return
+
+            response = (
+                "Only one person in that game. "
+                "no Int-Far will be crowned "
+                "and no stats will be saved."
+            )
             await self.channels_to_write[post_game_stats.guild_id].send(response)
 
         else:
@@ -1471,6 +1476,7 @@ class DiscordClient(discord.Client):
                 try:
                     player_names = await self.api_clients[game].get_player_names_for_user(user)
                     for player_id, old_name, new_name in zip(user.player_id, user.player_name, player_names):
+                        logger.info(f"Got username for user with player ID {player_id}: {new_name}", flush=True)
                         if new_name is not None and new_name != old_name:
                             logger.info(f"Updated username from {old_name} to {new_name} in {game}")
                             database.set_user_name(disc_id, player_id, new_name)
@@ -1491,8 +1497,8 @@ class DiscordClient(discord.Client):
         all_reset = True
         for disc_id in database.game_users.keys():
             curr_rank_solo, curr_rank_flex = database.get_current_rank(disc_id)
-            summ_id = database.game_users[disc_id].player_id[0]
-            rank_data = await self.api_clients["lol"].get_player_rank(summ_id, now - offset_secs)
+            puuid = database.game_users[disc_id].player_id[0]
+            rank_data = await self.api_clients["lol"].get_player_rank(puuid, now - offset_secs)
             new_rank_solo, new_rank_flex = parse_player_rank(rank_data)
 
             if all(rank is None for rank in (curr_rank_solo, curr_rank_flex, new_rank_solo, new_rank_flex)):

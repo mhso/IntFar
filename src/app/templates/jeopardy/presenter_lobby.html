@@ -47,8 +47,17 @@
         addPlayerDiv("{{ player['disc_id'] }}", "{{ player['index'] }}", "{{ player['name'] }}", "{{ player['avatar'] }}", "{{ player['color'] }}");
         {% endfor %}
 
+        let showAlert = true;
+
+        setTimeout(function() {
+            if (showAlert) {
+                alert("HUSK AT RESETTE SPØRGSMÅL OG START MUSIKKEN!!!!")
+            }
+        }, 5000);
+
         window.onkeydown = function(e) {
             if (e.code == PRESENTER_ACTION_KEY) {
+                showAlert = false;
                 let audio = document.getElementById("menu-lobby-music");
                 audio.volume = 0.1;
                 audio.play();

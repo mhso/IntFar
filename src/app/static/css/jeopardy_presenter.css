@@ -398,6 +398,10 @@ h3 {
 
 }
 
+.wager-answer-skipped {
+    color: gray;
+}
+
 #finale-category-header {
     color: gold;
 }
@@ -702,7 +706,7 @@ h3 {
 .question-tip-wrapper {
     position: absolute;
     text-align: center;
-    bottom: 300px;
+    bottom: 200px;
     opacity: 0;
     transition: opacity 1s;
     pointer-events: none;

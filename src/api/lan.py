@@ -101,16 +101,24 @@ if not TESTING:
             803987403932172359 # Core Nibs
         ),
         "april_25": LANInfo(
-            datetime(2025, 4, 26, 11, 0, 0).timestamp(),
-            datetime(2025, 4, 27, 12, 0, 0).timestamp()
+            datetime(2025, 4, 26, 9, 0, 0).timestamp(),
+            datetime(2025, 4, 27, 12, 0, 0).timestamp(),
+            {
+                115142485579137029: "Dave",
+                172757468814770176: "Murt",
+                267401734513491969: "Gual",
+                331082926475182081: "Muds",
+                347489125877809155: "Nønø"
+            },
+            803987403932172359 # Core Nibs
         )
     }
 
 else: # Use old data for testing.
     LAN_PARTIES = {
-        "february_25": LANInfo(
-            datetime(2025, 2, 8, 10, 0, 0).timestamp(),
-            datetime(2025, 2, 9, 12, 0, 0).timestamp(),
+        "april_25": LANInfo(
+            datetime(2025, 4, 26, 9, 0, 0).timestamp(),
+            datetime(2025, 4, 27, 12, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
                 172757468814770176: "Murt",
@@ -178,7 +186,7 @@ def get_tilt_value(recent_games):
     # Convert to percent.
     return int((tilt_value / max_value) * 100), color
 
-def get_average_stats(database: LoLGameDatabase, lan_info):
+def get_average_stats(database: LoLGameDatabase, lan_info: LANInfo):
     game = "lol"
     stat_quantity_desc = get_stat_quantity_descriptions(game)
     stats_to_get = list(stat_quantity_desc)
@@ -243,6 +251,7 @@ class BingoSolver:
         self.completed_by = None
         self.parsed_data: LoLGameStats = post_game_data.parsed_game_stats
 
+        # Dynamically call function that resolves challenge with 'challenge_id'
         getattr(self, challenge_id)()
 
     def big_lead(self):
@@ -293,7 +302,7 @@ class BingoSolver:
                     event["type"] == "ELITE_MONSTER_KILL"
                     and event["monsterType"] == "BARON_NASHOR"
                     and event.get("teamId", None) == self.parsed_data.team_id
-                    and event["timestamp"] / 1000 / 60 < 24
+                    and event["timestamp"] / 1000 / 60 < 28
                 ):
                     self.progress = 1
                     return
@@ -304,13 +313,14 @@ class BingoSolver:
                 if (
                     event["type"] == "ELITE_MONSTER_KILL"
                     and event.get("teamId") == self.parsed_data.team_id
-                    and event["monsterType"] == "ELDER_DRAGON"
+                    and event["monsterType"] == "DRAGON"
+                    and event["monsterSubType"] == "ELDER_DRAGON"
                 ):
                     self.progress = 1
                     return
 
     def fast_win(self):
-        if self.parsed_data.win == 1 and self.parsed_data.duration <= 20 * 60:
+        if self.parsed_data.win == 1 and self.parsed_data.duration <= 22 * 60:
             self.progress = 1
 
     def flawless_ace(self):
@@ -376,7 +386,7 @@ class BingoSolver:
 BINGO_WIDTH = 5
 BINGO_CHALLENGE_NAMES = {
     "big_lead": ("Win With 8K Lead", 1),
-    "bounty_gold": ("Shutdown Gold", 3000),
+    "bounty_gold": ("Shutdown Gold", 4000),
     "buff_steals": ("Buffs Stolen", 10),
     "damage_dealt": ("Damage Dealt", 1_000_000),
     "dives": ("Dive Kills", 5),

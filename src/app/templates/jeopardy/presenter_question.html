@@ -10,7 +10,7 @@
             {% include 'jeopardy/logo.html' %}
 
             <!-- Category header -->
-            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if jeopardy_round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', _external=True, filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
+            <h2 id="question-category-header"><span id="question-category-span">{{ category_name }}</span>{% if jeopardy_round < total_rounds %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', _external=True, filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
 
             {% if daily_double %}
             {% set max_wager = [player_data[player_turn]["score"], 500 * jeopardy_round] | max %}
@@ -117,7 +117,7 @@
     {% endfor %}
 
     <!-- Correct/wrong answers sounds -->
-    {% if jeopardy_round < 3 %}
+    {% if jeopardy_round < total_rounds %}
     <audio id="question-sound-correct">
         <source src="{{ url_for('static', _external=True, filename='sounds/' + correct_sound + '.mp3') }}" type="audio/mpeg">
     </audio>
@@ -135,12 +135,14 @@
     <script>
         setVariables(
             {{ jeopardy_round }},
+            {{ total_rounds }},
             {{ player_data | tojson }},
             {{ player_turn }},
             {{ question_num }},
             "{{ question['answer'] }}",
             {{ question_value }},
             {{ question['id'] }},
+            {{ buzz_time }},
             {{ daily_double | tojson }}
         );
 
@@ -153,7 +155,12 @@
             socket.on("daily_wager_made", function(amount) {
                 afterDailyDoubleWager(amount);
             });
-            {% elif jeopardy_round == 3 %}
+            {% elif jeopardy_round == total_rounds %}
+            {% for data in player_data %}
+                {% if data["finale_wager"] == 0 %}
+                setPlayerReady({{ data["index"] }});
+                {% endif %}
+            {% endfor %}
             socket.on("contestant_ready", setPlayerReady);
             {% endif %}
         });
@@ -164,7 +171,7 @@
         window.onkeydown = function(e) {
             if (e.code == PRESENTER_ACTION_KEY) {
                 showQuestion();
-                {% if jeopardy_round == 3 %}
+                {% if jeopardy_round == total_rounds %}
                 setTimeout(function() {
                     socket.emit("reveal_finale_category");
                 }, 2000);

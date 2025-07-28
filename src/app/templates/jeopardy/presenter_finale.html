@@ -27,7 +27,7 @@
                 <ul>
                     {% for data in player_data %}
                     <li class="finale-result-name">
-                        <span>{{ data["name"] }}</span> svarede '{{ data["answer"] }}' <span class="finale-result-desc"></span>
+                        <span>{{ data["name"] }}</span> svarede {{ data["answer"] }} <span class="finale-result-desc"></span>
                     </li>
                     {% endfor %}
                 </ul>
@@ -39,7 +39,8 @@
 
     <script>
         setVariables(
-            3,
+            {{ total_rounds }},
+            {{ total_rounds }},
             {{ player_data | tojson }},
             null,
             1

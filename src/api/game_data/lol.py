@@ -83,8 +83,8 @@ class LoLPlayerStats(PlayerStats):
         return stat_quantities
 
     @classmethod
-    def formatted_stat_names(cls):
-        formatted = dict(super().formatted_stat_names())
+    def formatted_stat_names(cls, capitalize=True):
+        formatted = dict(super().formatted_stat_names(capitalize))
         for stat in cls.stats_to_save():
             if stat in formatted or stat == "champ_id":
                 continue
@@ -94,11 +94,11 @@ class LoLPlayerStats(PlayerStats):
             elif stat == "cs_per_min":
                 fmt_stat = "CS Per Min"
             elif stat == "rank_solo":
-                fmt_stat = "Solo/Duo"
+                fmt_stat = "Solo/Duo" if capitalize else "solo/duo"
             elif stat == "rank_flex":
-                fmt_stat = "Flex"
+                fmt_stat = "Flex" if capitalize else "flex"
             else:
-                fmt_stat = " ".join(map(lambda s: s.capitalize(), stat.split("_")))
+                fmt_stat = " ".join(map(lambda s: s.capitalize() if capitalize else s, stat.split("_")))
 
             formatted[stat] = fmt_stat
 
@@ -217,9 +217,9 @@ class LoLGameStats(GameStats):
 
         for stats in self.filtered_player_stats:
             for participant_data in self.timeline_data["participants"]:
-                if participant_data["puuid"] == stats.puuid:
+                if participant_data["puuid"] == stats.player_id:
                     our_team_lower = participant_data["participantId"] <= 5
-                    puuid_map[stats.puuid] = stats.disc_id
+                    puuid_map[stats.player_id] = stats.disc_id
                     break
 
         self.timeline_data["puuid_map"] = puuid_map
@@ -408,7 +408,6 @@ class LoLGameStatsParser(GameStatsParser):
             players_in_game = []
             for disc_id in player_stats:
                 player_stats[disc_id]["champ_name"] = self.api_client.get_champ_name(player_stats[disc_id]["champ_id"])
-                player_stats[disc_id]["puuid"] = database.game_users[disc_id].puuid[0]
                 all_player_stats.append(LoLPlayerStats(**player_stats[disc_id]))
 
                 user_game_info = self.all_users[disc_id]
@@ -589,7 +588,7 @@ class LoLGameStatsParser(GameStatsParser):
         our_team = 100
         for participant in self.raw_data["participants"]:
             for disc_id in self.all_users.keys():
-                if participant["summonerId"] in self.all_users[disc_id].player_id:
+                if participant["puuid"] in self.all_users[disc_id].player_id:
                     our_team = participant["teamId"]
                     break
 
@@ -602,7 +601,7 @@ class LoLGameStatsParser(GameStatsParser):
                 player_disc_id = None
 
                 for disc_id in self.all_users.keys():
-                    if participant["summonerId"] in self.all_users[disc_id].player_id:
+                    if participant["puuid"] in self.all_users[disc_id].player_id:
                         player_disc_id = disc_id
                         break
 
@@ -620,7 +619,7 @@ class LoLGameStatsParser(GameStatsParser):
                 stats_for_player = LoLPlayerStats(
                     game_id=self.raw_data["gameId"],
                     disc_id=player_disc_id,
-                    player_id=participant["summonerId"],
+                    player_id=participant["puuid"],
                     kills=participant["kills"],
                     deaths=participant["deaths"],
                     assists=participant["assists"],
@@ -639,7 +638,6 @@ class LoLGameStatsParser(GameStatsParser):
                     role=_ROLE_MAP[participant["teamPosition"]],
                     rank_solo=solo_rank,
                     rank_flex=flex_rank,
-                    puuid=participant["puuid"],
                     quadrakills=participant["quadraKills"],
                     pentakills=participant["pentaKills"],
                     total_time_dead=participant["totalTimeSpentDead"],
@@ -657,7 +655,7 @@ class LoLGameStatsParser(GameStatsParser):
                     summ_data = {
                         "disc_id": player_disc_id,
                         "player_name": [participant["summonerName"]],
-                        "player_id": [participant["summonerId"]],
+                        "player_id": [participant["puuid"]],
                         "champ_id": [participant["championId"]]
                     }
                     active_users.append(summ_data)
@@ -737,8 +735,8 @@ class LoLGameStatsParser(GameStatsParser):
             for disc_id in self.all_users.keys():
                 user = self.all_users[disc_id]
                 active_name = None
-                for summ_id, summ_name in zip(user.player_id, user.player_name):
-                    if summ_id == participant["summonerId"]:
+                for puuid, summ_name in zip(user.player_id, user.player_name):
+                    if puuid == participant["puuid"]:
                         active_name = summ_name
                         break
 
@@ -750,7 +748,7 @@ class LoLGameStatsParser(GameStatsParser):
                 if champ_played is None:
                     champ_played = "Unknown Champ (Rito pls)"
 
-                champions[participant["summonerId"]] = (active_name, champ_played)
+                champions[participant["puuid"]] = (active_name, champ_played)
 
         game_start = self.raw_data["gameStartTime"] / 1000
         if game_start > 0:

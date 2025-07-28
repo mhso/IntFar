@@ -536,20 +536,20 @@ class CS2PlayerStats(PlayerStats):
         return stat_quantities
 
     @classmethod
-    def formatted_stat_names(cls):
-        formatted = dict(super().formatted_stat_names())
+    def formatted_stat_names(cls, capitalize=True):
+        formatted = dict(super().formatted_stat_names(capitalize))
         for stat in cls.stats_to_save():
             if stat in formatted:
                 continue
 
-            if stat == "cs":
+            if stat == "mvps":
                 fmt_stat = "MVPs"
             elif stat == "adr":
                 fmt_stat = stat.upper()
             elif stat == "team_kills":
-                fmt_stat = "Teamkills"
+                fmt_stat = "Teamkills" if capitalize else "teamkills"
             else:
-                fmt_stat = " ".join(map(lambda s: s.capitalize(), stat.split("_")))
+                fmt_stat = " ".join(map(lambda s: s.capitalize() if capitalize else s, stat.split("_")))
 
             formatted[stat] = fmt_stat
 
@@ -773,8 +773,8 @@ class CS2GameStatsParser(GameStatsParser):
             rounds_t = round_data["teamScores"][0]
             rounds_ct = round_data["teamScores"][1]
 
-            rounds_us_then = rounds_t if started_t else rounds_ct
-            rounds_them_then = rounds_ct if started_t else rounds_t
+            rounds_them_then = rounds_t if started_t else rounds_ct
+            rounds_us_then = rounds_ct if started_t else rounds_t
 
             lead = rounds_us_then - rounds_them_then
             deficit = rounds_them_then - rounds_us_then

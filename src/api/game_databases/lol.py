@@ -8,10 +8,6 @@ class LoLGameDatabase(GameDatabase):
     def __init__(self, game: str, config: Config):
         super().__init__(game, config)
 
-    @property
-    def game_user_params(self):
-        return ["puuid"]
-
     def get_played_count(self, disc_id, playable_id):
         query = """
             SELECT COUNT(*)

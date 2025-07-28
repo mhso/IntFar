@@ -1,4 +1,4 @@
-const socket = io({"transports": ["polling"]});
+const socket = io({"transports": ["websocket", "polling"]});
 var pingActive = true;
 
 function setRandomColor() {

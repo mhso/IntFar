@@ -1,5 +1,6 @@
 import asyncio
 from time import time
+from typing import Dict
 
 from mhooge_flask.logging import logger
 
@@ -8,10 +9,9 @@ from api.game_monitor import GameMonitor
 
 class CS2GameMonitor(GameMonitor):
     POSTGAME_STATUS_CUSTOM_GAME = 4
-    POSTGAME_STATUS_DUPLICATE = 5
-    POSTGAME_STATUS_SURRENDER = 6
-    POSTGAME_STATUS_DEMO_MISSING = 7
-    POSTGAME_STATUS_DEMO_MALFORMED = 8
+    POSTGAME_STATUS_SURRENDER = 5
+    POSTGAME_STATUS_DEMO_MISSING = 6
+    POSTGAME_STATUS_DEMO_MALFORMED = 7
 
     @property
     def min_game_minutes(self):
@@ -52,7 +52,7 @@ class CS2GameMonitor(GameMonitor):
 
     async def get_active_game_info(self, guild_id):
         # Create a bunch of maps for different ID representations
-        user_dict = (
+        user_dict: Dict[int, User] = (
             self.users_in_voice.get(guild_id, {})
             if self.users_in_game.get(guild_id) is None
             else self.users_in_game[guild_id]
@@ -65,8 +65,10 @@ class CS2GameMonitor(GameMonitor):
 
         active_users = []
         for steam_id in steam_id_map:  
-            if await self.api_client.is_person_ingame(steam_id):
+            in_game = await self.api_client.is_person_ingame(steam_id)
+            if in_game or (in_game is None and steam_id_map[steam_id] in user_dict):
                 active_users.append(steam_id)
+                await asyncio.sleep(5)
 
         users_in_current_game = {}
 
@@ -146,21 +148,25 @@ class CS2GameMonitor(GameMonitor):
         else:
             next_code = list(self.users_in_game[guild_id].values())[0].latest_match_token[0]
 
+        logger.info(f"Users missing: {users_missing}")
+        logger.info(f"Next code: {next_code}")
+
         if next_code is None:
             logger.bind(sharecodes=list(users_missing.values()), guild_id=guild_id).error(
                 "Next match sharecode STILL not received for everyone after game ended! Saving to missing games..."
             )
-            game_info = None
+            game_info = {"gameId": None}
             status_code = self.POSTGAME_STATUS_MISSING
 
         else:
             game_info, status_code = await self.try_get_finished_game_info(next_code, guild_id)
-            if game_info is None and status_code not in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO):
-                logger.bind(game_id=next_code, guild_id=guild_id).error(
-                    "Game info is STILL None after 5 retries! Saving to missing games..."
-                )
+            if game_info is None and status_code != self.POSTGAME_STATUS_DUPLICATE:
                 game_info = {"gameId": next_code}
-                status_code = self.POSTGAME_STATUS_MISSING
+                if status_code != self.POSTGAME_STATUS_SOLO:
+                    logger.bind(game_id=next_code, guild_id=guild_id).error(
+                        "Game info is STILL None after 5 retries! Saving to missing games..."
+                    )
+                    status_code = self.POSTGAME_STATUS_MISSING
 
         return game_info, status_code
 
@@ -170,9 +176,12 @@ class CS2GameMonitor(GameMonitor):
         if post_game_data.status_code not in (
             self.POSTGAME_STATUS_ERROR,
             self.POSTGAME_STATUS_MISSING,
-            self.POSTGAME_STATUS_DUPLICATE
+            self.POSTGAME_STATUS_DUPLICATE,
         ):
-            if post_game_data.status_code != self.POSTGAME_STATUS_OK:
+            if (
+                post_game_data.status_code != self.POSTGAME_STATUS_OK
+                and post_game_data.status_code != self.POSTGAME_STATUS_SOLO
+            ):
                 # Parse only basic stats if CS2 demo is missing or malformed
                 post_game_data.parsed_game_stats = self.parse_stats(game_info, guild_id)
                 self.save_stats(post_game_data.parsed_game_stats)

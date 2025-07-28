@@ -66,16 +66,19 @@ class SteamAPIClient(GameAPIClient):
 
         self.get_latest_data()
 
+        self._init_clients()
+        self.login()
+
+    def _init_clients(self):
         self.steam_client = SteamClient()
         self.cs_client = CSGOClient(self.steam_client)
+        self.cs_client.on("notready", self._handle_cs_disconnect)
 
         self.steam_client.on("logged_on", self._handle_steam_start)
         self.steam_client.on("error", self._handle_steam_error)
         self.steam_client.on("channel_secured", self._handle_channel_secured)
         self.steam_client.on("disconnected", self._handle_steam_disconnect)
         self.steam_client.on("auth_code_required", self._handle_2fa_code)
-
-        self.login()
 
     @property
     def playable_count(self):
@@ -322,16 +325,14 @@ class SteamAPIClient(GameAPIClient):
     async def get_player_names_for_user(self, user: User) -> list[str]:
         names = []
         for steam_id in user.player_id:
-            logger.info(f"Getting username for Steam ID {steam_id}", flush=True)
             player_name = await self.get_player_name(steam_id)
-            logger.info(f"Name: {player_name}", flush=True)
             names.append(player_name)
 
             await asyncio.sleep(1)
 
         return names
 
-    async def is_person_ingame(self, steam_id: str):
+    async def is_person_ingame(self, steam_id: str, do_retry: bool = True):
         """
         Returns a boolean indicating whether the user with the given Steam ID is in a game of CS.
         """
@@ -345,6 +346,15 @@ class SteamAPIClient(GameAPIClient):
             response = await self.httpx_client.get(url, timeout=20)
         except httpx.TimeoutException:
             return False
+
+        if response.status_code == 429:
+            if not do_retry:
+                return None
+
+            # We're sending requests too fast, try again
+            await asyncio.sleep(10)
+
+            return await self.is_person_ingame(steam_id, False)
 
         if response.status_code != 200:
             return False
@@ -436,6 +446,11 @@ class SteamAPIClient(GameAPIClient):
                 logger.info("Reconnect failed, logging in again.")
                 self.login()
 
+    def _handle_cs_disconnect(self):
+        logger.warning("CS2 disconnected!")
+        self.login()
+        self.cs_client.launch()
+
     def _handle_2fa_code(self, is_2fa, status_code):
         self.login()
 
@@ -446,19 +461,10 @@ class SteamAPIClient(GameAPIClient):
         p = subprocess.Popen(["steamguard"], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return p.communicate()[0]
 
-    def login(self):
-        if self._logging_on or self.is_logged_in():
-            return
-
-        logger.info(f"Logging in to Steam...")
-
-        self._logging_on = True
-        self.logged_on_once = False
-
-        self.close()
-
-        attempts = 3
+    def _retry_login(self, attempts=3):
         success = False
+        status_code = None
+
         for _ in range(attempts):
             try:
                 status_code = self.steam_client.login(
@@ -479,9 +485,36 @@ class SteamAPIClient(GameAPIClient):
             logger.warning("Could not login to Steam client! Retrying...")
             sleep(5)
 
+        return success, status_code
+
+    def login(self):
+        if self._logging_on or self.is_logged_in():
+            return
+
+        logger.info(f"Logging in to Steam...")
+
+        self._logging_on = True
+        self.logged_on_once = False
+
+        self.close()
+
+        attempts = 3
+        success, status_code = self._retry_login(attempts)
+
         if not success:
-            logger.error(
-                f"Could not login to Steam client after {attempts} attempts! Error code: {status_code.value} ({status_code.name})"
+            # Try to re-initialize Steam and CS clients
+            self._init_clients()
+            success = self._retry_login(attempts)
+
+        if not success:
+            extra_info = ""
+            bound_logger = logger
+            if status_code is not None:
+                extra_info = f" Error code: {status_code.value} ({status_code.name})"
+                bound_logger = logger.bind(event="steam_login_failed", error_code=status_code.value, error_name=status_code.name)
+
+            bound_logger.error(
+                f"Could not login to Steam client after {attempts} attempts!{extra_info}"
             )
 
         while not self.logged_on_once:

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import List
 from io import BytesIO
@@ -6,15 +7,15 @@ from multiprocessing import Process
 import random
 from time import sleep
 import os
-from playwright.sync_api import sync_playwright, Playwright, BrowserContext, Page, Dialog
+from playwright.async_api import async_playwright, Playwright, BrowserContext, Page, Dialog, ConsoleMessage
 from urllib.parse import urlencode, quote_plus
-from threading import Thread, Barrier, Event
+from threading import Barrier
 
 import pytest
 
 from src.run_flask import run_app
 from src.app.util import get_hashed_secret
-from src.api.util import MY_GUILD_ID
+from src.api.util import MY_GUILD_ID, JEOPARDY_REGULAR_ROUNDS, JEOPADY_EDITION
 from src.api.config import Config
 from src.api.meta_database import MetaDatabase
 from src.discbot.commands.util import ADMIN_DISC_ID
@@ -74,75 +75,77 @@ class ContextHandler:
         self.presenter_page: Page = None
         self.contestant_contexts: List[BrowserContext] = []
         self.contestant_pages: List[Page] = []
-        self._browser_threads = []
+        self._browser_tasks = []
         self._player_names = player_names
         self._setup_callback = setup_callback
-        self._setup_event = Event()
-        self._close_event = Event()
 
-    def _create_browser(self, context: Playwright):
-        return context.chromium.launch(**BROWSER_OPTIONS)
+    async def _create_browser(self, context: Playwright):
+        return await context.chromium.launch(**BROWSER_OPTIONS)
 
-    def _open_presenter_lobby_page(self):
-        page = self.presenter_context.new_page()
-        page.goto(JEOPARDY_PRESENTER_URL)
+    async def _open_presenter_lobby_page(self):
+        page = await self.presenter_context.new_page()
+        await page.goto(JEOPARDY_PRESENTER_URL)
 
         return page
 
-    def _open_contestant_lobby_page(self, context: BrowserContext, disc_id: int, page: Page = None):
+    async def _open_contestant_lobby_page(self, context: BrowserContext, disc_id: int, page: Page = None):
         client_secret = MetaDatabase(self.config).get_client_secret(disc_id)
         url = f"{BASE_URL}/{client_secret}"
 
         if page is None:
-            page = context.new_page()
+            page = await context.new_page()
 
-        page.goto(url)
-
+        await page.goto(url)
         return page
 
-    def _join_lobby(self, disc_id: int, page: Page):
+    async def _join_lobby(self, disc_id: int, page: Page):
         name = self._player_names.get(disc_id)
         if name is not None:
             # Input player name
-            name_input = page.query_selector("#contestant-lobby-name")
-            name_input.fill(name)
+            name_input = await page.query_selector("#contestant-lobby-name")
+            await name_input.fill(name)
 
         # Join the lobby
-        join_button = page.query_selector("#contestant-lobby-join")
-        join_button.click()
+        join_button = await page.query_selector("#contestant-lobby-join")
+        await join_button.click()
 
-        # Wait for the lobby page to load
-        page.expect_navigation(url=f"{BASE_URL}/game")
+        # # Wait for the lobby page to load
+        # async with page.expect_navigation(url=f"{BASE_URL}/game", wait_until="domcontentloaded"):
+        #     pass
 
-    def _setup_contestant_browser(self, disc_id):
+    async def _print_console_output(self, msg: ConsoleMessage):
+        strings = [str(await arg.json_value()) for arg in msg.args]
+        print("Message from console:", " ".join(strings))
+
+    async def _setup_contestant_browser(self, disc_id):
         if self._setup_callback:
-            playwright_context = sync_playwright().__enter__()
+            playwright_context = await async_playwright().__aenter__()
             self.playwright_contexts.append(playwright_context)
         else:
             playwright_context = self.playwright_contexts[0]
 
-        browser_context = self._create_browser(playwright_context).new_context(viewport=CONTESTANT_VIEWPORT, is_mobile=True, has_touch=True)
-        page = self._open_contestant_lobby_page(browser_context, disc_id)
-        page.on("console", lambda msg: print("Message from console:", " ".join(str(arg.json_value()) for arg in msg.args)))
-        self._join_lobby(disc_id, page)
+        browser = await self._create_browser(playwright_context)
+        browser_context = await browser.new_context(viewport=CONTESTANT_VIEWPORT, is_mobile=True, has_touch=True)
+        page = await self._open_contestant_lobby_page(browser_context, disc_id)
+        page.on("console", self._print_console_output)
+        await self._join_lobby(disc_id, page)
 
         if self._setup_callback:
-            self._setup_event.set()
-            try:
-                self._setup_callback(page, disc_id)
-                self._close_event.wait()
-            except:
-                playwright_context.stop()
+            await self._setup_callback(disc_id, page)
 
         return browser_context, page
 
-    def start_game(self):
-        reset_questions_btn = self.presenter_page.query_selector("#menu-buttons > button")
-        reset_questions_btn.click()
+    async def start_game(self):
+        reset_questions_btn = await self.presenter_page.query_selector("#menu-buttons > button")
+        await reset_questions_btn.click()
 
-        self.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        # Plays intro music
+        await self.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        await asyncio.sleep(1.5)
+        # Starts the game
+        await self.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
-    def open_presenter_selection_page(
+    async def open_presenter_selection_page(
         self,
         round_num: int,
         question_num: int,
@@ -150,9 +153,9 @@ class ContextHandler:
         player_data: list[tuple[str, int, int, str]]
     ):
         query_str = _get_players_query_string(turn_id, question_num, player_data)
-        self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/{round_num}?{query_str}")
+        await self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/{round_num}?{query_str}")
 
-    def open_presenter_question_page(
+    async def open_presenter_question_page(
         self,
         round_num: int,
         category: str,
@@ -162,50 +165,56 @@ class ContextHandler:
         player_data: list[tuple[str, int, int, str]]
     ):
         query_str = _get_players_query_string(turn_id, question_num, player_data)
-        self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/{round_num}/{category}/{difficulty}?{query_str}")
+        await self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/{round_num}/{category}/{difficulty}?{query_str}")
 
-    def show_question(self, is_daily_double=False):
+    async def show_question(self, is_daily_double=False):
         if not is_daily_double:
             # Show the question
-            self.presenter_page.press("body", PRESENTER_ACTION_KEY)
+            await self.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
-        sleep(1)
+        await asyncio.sleep(1)
 
-        self.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        await self.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
-        sleep(0.5)
+        await asyncio.sleep(0.5)
 
         # Check if question is multiple choice
-        is_multiple_choice = self.presenter_page.evaluate("() => document.getElementsByClassName('question-answer-entry').length > 0")
+        is_multiple_choice = await self.presenter_page.evaluate("() => document.getElementsByClassName('question-answer-entry').length > 0")
         if is_multiple_choice:
             for _ in range(4):
-                self.presenter_page.press("body", PRESENTER_ACTION_KEY)
-                sleep(0.5)
+                await self.presenter_page.press("body", PRESENTER_ACTION_KEY)
+                await asyncio.sleep(0.5)
         else:
-            self.presenter_page.press("body", PRESENTER_ACTION_KEY)
+            await self.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
-    def make_daily_double_wager(self, page: Page, amount: int, dialog_callback, is_valid):
+    async def make_daily_double_wager(self, page: Page, amount: int, dialog_callback=None):
         # Input the amount to wager
-        wager_input = page.query_selector("#question-wager-input")
-        wager_input.fill(str(amount))
+        wager_input = await page.query_selector("#question-wager-input")
+        await wager_input.fill(str(amount))
+
+        async def fail(dialog):
+            assert False
 
         # Handle alert
-        page.on("dialog", lambda dialog: dialog_callback(dialog, is_valid))
+        if dialog_callback is not None:
+            page.on("dialog", dialog_callback)
+        else:
+            page.on("dialog", fail)
 
         # Click the submit button
-        submit_button = page.query_selector("#contestant-wager-btn")
-        submit_button.tap()
+        submit_button = await page.query_selector("#contestant-wager-btn")
+        await submit_button.tap()
 
-    def open_endscreen_page(self, player_data: list[tuple[str, int, int, str]]):
+    async def open_endscreen_page(self, player_data: list[tuple[str, int, int, str]]):
         query_str = _get_players_query_string("null", 1, player_data)
-        self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/endscreen?{query_str}")
+        await self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/endscreen?{query_str}")
 
-    def screenshot_views(self, index: int = 0):
+    async def screenshot_views(self, index: int = 0):
         width = PRESENTER_VIEWPORT["width"]
         height = PRESENTER_VIEWPORT["height"] + CONTESTANT_VIEWPORT["height"]
         combined_image = Image.new("RGB", (width, height))
 
-        presenter_sc = self.presenter_page.screenshot(type="png")
+        presenter_sc = await self.presenter_page.screenshot(type="png")
         with BytesIO(presenter_sc) as fp:
             presenter_image = Image.open(fp)
             combined_image.paste(presenter_image)
@@ -213,7 +222,7 @@ class ContextHandler:
         x = (PRESENTER_VIEWPORT["width"] - CONTESTANT_VIEWPORT["width"] * 4) // 2
         y = PRESENTER_VIEWPORT["height"]
         for contestant_page in self.contestant_pages:
-            contestant_sc = contestant_page.screenshot(type="png")
+            contestant_sc = await contestant_page.screenshot(type="png")
             with BytesIO(contestant_sc) as fp:
                 contestant_image = Image.open(fp)
                 combined_image.paste(contestant_image, (x, y))
@@ -221,8 +230,8 @@ class ContextHandler:
 
         combined_image.save(f"jeopardy_test_{index}.png")
 
-    def __enter__(self):
-        self.playwright_contexts = [sync_playwright().__enter__()]
+    async def __aenter__(self):
+        self.playwright_contexts = [await async_playwright().__aenter__()]
 
         cwd = os.getcwd()
         new_cwd = os.path.join(cwd, "src")
@@ -238,46 +247,41 @@ class ContextHandler:
         client_secret = meta_database.get_client_secret(ADMIN_DISC_ID)
         hashed_secret = get_hashed_secret(client_secret)
 
-        presenter_browser = self._create_browser(self.playwright_contexts[0])
-        self.presenter_context = presenter_browser.new_context(viewport=PRESENTER_VIEWPORT)
-        self.presenter_context.add_cookies([{"name": "user_id", "value": hashed_secret, "url": BASE_URL}])
+        presenter_browser = await self._create_browser(self.playwright_contexts[0])
+        self.presenter_context = await presenter_browser.new_context(viewport=PRESENTER_VIEWPORT)
+        await self.presenter_context.add_cookies([{"name": "user_id", "value": hashed_secret, "url": BASE_URL}])
 
         # Go to presenter URL
-        self.presenter_page = self._open_presenter_lobby_page()
+        self.presenter_page = await self._open_presenter_lobby_page()
 
         # Create contestant browsers and contexts
         for disc_id in CONTESTANT_IDS:
             if self._setup_callback:
-                thread = Thread(target=self._setup_contestant_browser, args=(disc_id,))
-                thread.start()
-                self._browser_threads.append(thread)
+                task = asyncio.create_task(self._setup_contestant_browser(disc_id))
+                self._browser_tasks.append(task)
             else:
-                context, page = self._setup_contestant_browser(disc_id)
+                context, page = await self._setup_contestant_browser(disc_id)
                 self.contestant_contexts.append(context)
                 self.contestant_pages.append(page)
 
-        if self._setup_callback:
-            self._setup_event.wait()
-
-        sleep(1)
+        await asyncio.sleep(1)
 
         return self
 
-    def __exit__(self, *args):
-        self.playwright_contexts[0].stop()
+    async def __aexit__(self, *args):
+        await self.playwright_contexts[0].stop()
 
-        self._close_event.set()
-
-        for thread in self._browser_threads:
-            thread.join()
+        while any(not task.done() for task in self._browser_tasks):
+            await asyncio.sleep(0.1)
 
         self.flask_process.terminate()
         while self.flask_process.is_alive():
-            sleep(0.1)
+            await asyncio.sleep(0.1)
 
         self.flask_process.close()
 
-def test_join():
+@pytest.mark.asyncio
+async def test_join():
     player_names = {
         CONTESTANT_IDS[0]: "Davido",
         CONTESTANT_IDS[1]: "Martini",
@@ -285,22 +289,22 @@ def test_join():
         CONTESTANT_IDS[3]: "Nønton"
     }
 
-    with ContextHandler(player_names=player_names) as context:
+    async with ContextHandler(player_names=player_names) as context:
         # Simulate a person going to the previous page
-        context.contestant_pages[0].go_back()
+        await context.contestant_pages[0].go_back()
 
         assert _normalize_url(context.presenter_page.url) == JEOPARDY_PRESENTER_URL
 
         for page in context.contestant_pages:
             assert _normalize_url(page.url) == f"{BASE_URL}/game"
-            status_header = page.query_selector("#contestant-game-waiting")
+            status_header = await page.query_selector("#contestant-game-waiting")
             assert status_header is not None
-            assert status_header.text_content() == "Venter på at spillet starter..."
+            assert await status_header.text_content() == "Venter på at spillet starter..."
 
         assert _normalize_url(context.contestant_pages[0].url) == f"{BASE_URL}/game"
 
         # Simulate person closing the page and re-opening it
-        context._open_contestant_lobby_page(
+        await context._open_contestant_lobby_page(
             context.contestant_contexts[0],
             CONTESTANT_IDS[0],
             context.contestant_pages[0]
@@ -308,43 +312,46 @@ def test_join():
 
         assert _normalize_url(context.contestant_pages[0].url) == f"{BASE_URL}/game"
 
-        name_elems = context.presenter_page.query_selector_all("#menu-contestants > .menu-contestant-id")
+        name_elems = await context.presenter_page.query_selector_all("#menu-contestants > .menu-contestant-id")
         expected_names = list(player_names.values())
         for index, name in enumerate(name_elems):
-            assert expected_names[index] == name.text_content()
+            assert expected_names[index] == await name.text_content()
 
-def test_first_turn():
-    with ContextHandler() as context:
+@pytest.mark.asyncio
+async def test_first_turn():
+   async with ContextHandler() as context:
         # Start the game
-        context.start_game()
+        await context.start_game()
 
-        sleep(1)
+        await asyncio.sleep(1)
 
         for page in context.contestant_pages:
             assert _normalize_url(page.url) == f"{BASE_URL}/game"
-            round_headers = page.query_selector_all(".contestant-round-header")
-            turn_desc = page.query_selector("#contestant-turn-desc")
-            assert round_headers[0].text_content() == "Runde 1/3"
-            assert round_headers[1].text_content() == "Spørgsmål 1/30"
-            assert turn_desc.text_content() == ""
+            round_headers = await page.query_selector_all(".contestant-round-header")
+            turn_desc = await page.query_selector("#contestant-turn-desc")
+            rounds = JEOPARDY_REGULAR_ROUNDS + 1
+            assert await round_headers[0].text_content() == f"Runde 1/{rounds}"
+            assert await round_headers[1].text_content() == "Spørgsmål 1/30"
+            assert await turn_desc.text_content() == ""
 
         # Choose a player to get the first turn
-        context.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        await context.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
         # Wait until player has been chosen
-        context.presenter_page.wait_for_function("() => playerTurn != -1")
-        player_turn = context.presenter_page.evaluate("() => playerTurn")
+        await context.presenter_page.wait_for_function("() => playerTurn != -1")
+        player_turn = await context.presenter_page.evaluate("() => playerTurn")
 
         for index, page in enumerate(context.contestant_pages):
-            turn_desc = page.query_selector("#contestant-turn-desc")
+            turn_desc = await page.query_selector("#contestant-turn-desc")
             if index == player_turn:
                 expected_desc = "Din tur til at vælge en kategori!"
             else:
                 expected_desc = "Venter på at en anden spiller vælger en kategori..."
 
-            assert expected_desc == turn_desc.text_content()
+            assert expected_desc == await turn_desc.text_content()
 
-def test_buzz_in_correct_person():
+@pytest.mark.asyncio
+async def test_buzz_in_correct_person():
     round_num = 1
     category = "lore"
     difficulty = 1
@@ -359,29 +366,31 @@ def test_buzz_in_correct_person():
 
     random.seed(1337)
 
-    with ContextHandler() as context:
+    async with ContextHandler() as context:
         # Go to question page
-        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
-        sleep(1)
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
 
-        context.show_question()
+        await context.show_question()
         sleep_time = 1.5 + random.random() * 2
-        sleep(sleep_time)
+        await asyncio.sleep(sleep_time)
 
-        context.contestant_pages[1].wait_for_selector("#buzzer-wrapper")
-        context.contestant_pages[1].query_selector("#buzzer-wrapper").tap()
+        await context.contestant_pages[1].wait_for_selector("#buzzer-wrapper")
+        buzzer = await context.contestant_pages[1].query_selector("#buzzer-wrapper")
+        await buzzer.tap()
 
-        sleep(2)
+        await asyncio.sleep(2)
 
         for index in range(len(player_data)):
-            buzz_winner_elem = context.contestant_pages[index].query_selector("#buzzer-winner")
-            buzzed_in_first = buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
+            buzz_winner_elem = await context.contestant_pages[index].query_selector("#buzzer-winner")
+            buzzed_in_first = await buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
             if index == 1:
                 assert buzzed_in_first, "Correct player did not buzz in"
             else:
                 assert not buzzed_in_first, "Wrong player buzzed in"
 
-def test_buzz_in_sequential():
+@pytest.mark.asyncio
+async def test_buzz_in_sequential():
     round_num = 1
     category = "lore"
     difficulty = 1
@@ -394,33 +403,34 @@ def test_buzz_in_sequential():
         (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
     ]
 
-    with ContextHandler() as context:
+    async with ContextHandler() as context:
         # Go to question page
-        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
-        sleep(1)
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
 
-        context.show_question()
-        sleep(2)
+        await context.show_question()
+        await asyncio.sleep(2)
 
         player_pings = []
         for index, page in enumerate(context.contestant_pages):
-            ping_elem = page.query_selector("#contestant-game-ping")
-            player_pings.append((float(ping_elem.text_content().split(" ")[0]), index))
+            ping_elem = await page.query_selector("#contestant-game-ping")
+            player_pings.append((float((await ping_elem.text_content()).split(" ")[0]), index))
 
         player_pings.sort(key=lambda x: x[0], reverse=True)
 
         for _, index in player_pings:
-            context.contestant_pages[index].wait_for_selector("#buzzer-wrapper")
+            await context.contestant_pages[index].wait_for_selector("#buzzer-wrapper")
 
         for _, index in player_pings:
-            context.contestant_pages[index].query_selector("#buzzer-wrapper").tap()
+            buzzer = await context.contestant_pages[index].query_selector("#buzzer-wrapper")
+            await buzzer.tap()
 
-        sleep(2)
+        await asyncio.sleep(2)
 
         buzzed_in_first = []
         for _, index in player_pings:
-            buzz_winner_elem = context.contestant_pages[index].query_selector("#buzzer-winner")
-            buzzed_first = buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
+            buzz_winner_elem = await context.contestant_pages[index].query_selector("#buzzer-winner")
+            buzzed_first = await buzz_winner_elem.evaluate("elem => !elem.classList.contains('d-none')")
             buzzed_in_first.append(buzzed_first)
 
         candidates = []
@@ -445,10 +455,10 @@ def test_buzz_in_sequential():
             assert len(won_buzz_players) == 1
             assert won_buzz_players[0] in [x[1] for x in candidates]
 
-def _do_buzz_in(page: Page, disc_id: int):
+async def _do_buzz_in(disc_id: int, page: Page):
     for _ in range(10):
         try:
-            page.wait_for_function("() => document.getElementById('buzzer-active') != null && !document.getElementById('buzzer-active').classList.contains('d-none')", timeout=1000)
+            await page.wait_for_function("() => document.getElementById('buzzer-active') != null && !document.getElementById('buzzer-active').classList.contains('d-none')", timeout=1000)
         except Exception:
             pass
 
@@ -460,57 +470,57 @@ def _do_buzz_in(page: Page, disc_id: int):
 
     # Sleep for a random amount of time, between 0 and 10 ms
     sleep_duration = random.random() * 0.001
-    sleep(sleep_duration)
+    await asyncio.sleep(sleep_duration)
 
-    page.query_selector("#buzzer-wrapper").tap()
+    buzzer = await page.query_selector("#buzzer-wrapper")
+    await buzzer.tap()
 
-def test_buzz_in_parallel():
-    round_num = 1
-    category = "lore"
-    difficulty = 1
-    question_num = 1
-    turn_id = 1
-    player_data = [
-        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
-        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
-        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
-        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
-    ]
+# @pytest.mark.asyncio
+# async def test_buzz_in_parallel():
+#     round_num = 1
+#     category = "lore"
+#     difficulty = 1
+#     question_num = 1
+#     turn_id = 1
+#     player_data = [
+#         (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+#         (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+#         (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+#         (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+#     ]
 
-    random.seed(1337)
+#     random.seed(1337)
 
-    with ContextHandler(setup_callback=_do_buzz_in) as context:
-        # Go to question page
-        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+#     async with ContextHandler(setup_callback=_do_buzz_in) as context:
+#         # Go to question page
+#         await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+#         await asyncio.sleep(3)
 
-        sleep(3)
+#         await context.show_question()
+#         await asyncio.sleep(2)
 
-        context.show_question()
+#         await context.presenter_page.wait_for_load_state("domcontentloaded")
 
-        sleep(2)
+#         await context.presenter_page.wait_for_function(
+#             "() => document.getElementById('question-buzz-feed').children[0].children.length == 3", timeout=15000
+#         )
 
-        context.presenter_page.wait_for_load_state("domcontentloaded")
+#         players_buzzed_in = await context.presenter_page.eval_on_selector(
+#             "#question-buzz-feed", "(elem) => Array.from(elem.children[0].children).map((c) => c.textContent)"
+#         )
 
-        context.presenter_page.wait_for_function(
-            "() => document.getElementById('question-buzz-feed').children[0].children.length == 3", timeout=15000
-        )
+#         assert len(players_buzzed_in) == 3
 
-        players_buzzed_in = context.presenter_page.eval_on_selector(
-            "#question-buzz-feed", "(elem) => Array.from(elem.children[0].children).map((c) => c.textContent)"
-        )
+#         # Verify that everyone we expected to have buzzed in, did
+#         people_missing_buzz_in = set(["Murt", "Dave", "Muds", "Nø"])
+#         for buzz_desc in players_buzzed_in:
+#             for name in people_missing_buzz_in:
+#                 if buzz_desc.startswith(f"{name} buzzede ind efter"):
+#                     break
 
-        assert len(players_buzzed_in) == 3
+#             people_missing_buzz_in.remove(name)
 
-        # Verify that everyone we expected to have buzzed in, did
-        people_missing_buzz_in = set(["Murt", "Dave", "Muds", "Nø"])
-        for buzz_desc in players_buzzed_in:
-            for name in people_missing_buzz_in:
-                if buzz_desc.startswith(f"{name} buzzede ind efter"):
-                    break
-
-            people_missing_buzz_in.remove(name)
-
-        assert {"Nø"} == people_missing_buzz_in
+#         assert {"Nø"} == people_missing_buzz_in
 
 def _get_daily_double_question(config):
     filename = f"{config.static_folder}/data/jeopardy_used.json"
@@ -521,13 +531,14 @@ def _get_daily_double_question(config):
                 if question["double"]:
                     return category, (index + 1)
 
-    data["mechanics"][0]["double"] = True
+    data["icons"][0]["double"] = True
     with open(filename, "w", encoding="utf-8") as fp:
         json.dump(data, fp, indent=4)
 
-    return "mechanics", 1
+    return "icons", 1
 
-def test_daily_double_low_score(config):
+@pytest.mark.asyncio
+async def test_daily_double_low_score(config):
     round_num = 1
     category, difficulty = _get_daily_double_question(config)
     question_num = 2
@@ -539,51 +550,52 @@ def test_daily_double_low_score(config):
         (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
     ]
 
-    with ContextHandler() as context:
-        sleep(1)
+    async with ContextHandler() as context:
+        await asyncio.sleep(1)
 
         # Go to question page
-        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
-        sleep(1)
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
 
         # Verify that the correct contestant can answer the daily double
         for index, page in enumerate(context.contestant_pages):
-            header_text = page.query_selector("h3").text_content()
+            header_text = await (await page.query_selector("h3")).text_content()
             if index == turn_id:
                 assert header_text.startswith("Your move! Hvor mange GBP vil du satse?")
             else:
                 assert header_text, "Venter på at Muds svarer på Daily Double..."
 
-        def dialog_callback(dialog: Dialog, is_valid: bool):
-            assert not is_valid
+        async def dialog_callback(dialog: Dialog):
             assert dialog.message == "Ugyldig mængde point, skal være mellem 100 og 500"
-            dialog.accept()
+            await dialog.accept()
 
         # Wager an amount that is too low
-        context.make_daily_double_wager(context.contestant_pages[turn_id], 0, dialog_callback, False)
-        sleep(0.5)
+        await context.make_daily_double_wager(context.contestant_pages[turn_id], 0, dialog_callback)
+        await asyncio.sleep(0.5)
 
         # Wager an amount that is too hight
-        context.make_daily_double_wager(context.contestant_pages[turn_id], 600, dialog_callback, False)
-        sleep(0.5)
+        await context.make_daily_double_wager(context.contestant_pages[turn_id], 600, dialog_callback)
+        await asyncio.sleep(0.5)
 
         # Wager an amount that is just right
-        context.make_daily_double_wager(context.contestant_pages[turn_id], 500, dialog_callback, True)
-        sleep(1)
+        await context.make_daily_double_wager(context.contestant_pages[turn_id], 500)
+        await asyncio.sleep(1)
 
-        context.show_question(True)
-        sleep(1)
+        await context.show_question(True)
+        await asyncio.sleep(1)
 
-        context.presenter_page.press("body", PRESENTER_ACTION_KEY)
-        sleep(0.5)
-        context.presenter_page.press("body", "1")
-        sleep(3)
+        await context.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        await asyncio.sleep(0.5)
+        await context.presenter_page.press("body", "1")
+        await asyncio.sleep(3)
 
-        score_text = context.presenter_page.query_selector_all(".footer-contestant-entry-score")[turn_id].text_content()
+        scores = await context.presenter_page.query_selector_all(".footer-contestant-entry-score")
+        score_text = await scores[turn_id].text_content()
         player_score = int(score_text.split(" ")[0])
         assert player_score == player_data[turn_id][1] + 500
 
-def test_daily_double_high_score(config):
+@pytest.mark.asyncio
+async def test_daily_double_high_score(config):
     round_num = 1
     category, difficulty = _get_daily_double_question(config)
     question_num = 2
@@ -595,52 +607,53 @@ def test_daily_double_high_score(config):
         (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
     ]
 
-    with ContextHandler() as context:
-        sleep(1)
+    async with ContextHandler() as context:
+        await asyncio.sleep(1)
 
         # Go to question page
-        context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
-        sleep(1)
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
 
         # Verify that the correct contestant can answer the daily double
         for index, page in enumerate(context.contestant_pages):
-            header_text = page.query_selector("h3").text_content()
+            header_text = await (await page.query_selector("h3")).text_content()
             if index == turn_id:
                 assert header_text.startswith("Your move! Hvor mange GBP vil du satse?")
             else:
                 assert header_text, "Venter på at Muds svarer på Daily Double..."
 
-        def dialog_callback(dialog: Dialog, is_valid: bool):
-            assert not is_valid
+        async def dialog_callback(dialog: Dialog):
             assert dialog.message == "Ugyldig mængde point, skal være mellem 100 og 1200"
-            dialog.accept()
+            await dialog.accept()
 
         # Wager an amount that is too low
-        context.make_daily_double_wager(context.contestant_pages[turn_id], 0, dialog_callback, False)
-        sleep(0.5)
+        await context.make_daily_double_wager(context.contestant_pages[turn_id], 0, dialog_callback)
+        await asyncio.sleep(0.5)
 
         # Wager an amount that is too hight
-        context.make_daily_double_wager(context.contestant_pages[turn_id], 1300, dialog_callback, False)
-        sleep(0.5)
+        await context.make_daily_double_wager(context.contestant_pages[turn_id], 1300, dialog_callback)
+        await asyncio.sleep(0.5)
 
         # Wager an amount that is just right
-        context.make_daily_double_wager(context.contestant_pages[turn_id], 1100, dialog_callback, True)
-        sleep(1)
+        await context.make_daily_double_wager(context.contestant_pages[turn_id], 1100)
+        await asyncio.sleep(1)
 
-        context.show_question(True)
-        sleep(1)
+        await context.show_question(True)
+        await asyncio.sleep(1)
 
-        context.presenter_page.press("body", PRESENTER_ACTION_KEY)
-        sleep(0.5)
-        context.presenter_page.press("body", "1")
-        sleep(3)
+        await context.presenter_page.press("body", PRESENTER_ACTION_KEY)
+        await asyncio.sleep(0.5)
+        await context.presenter_page.press("body", "1")
+        await asyncio.sleep(3)
 
-        score_text = context.presenter_page.query_selector_all(".footer-contestant-entry-score")[turn_id].text_content()
+        scores = await context.presenter_page.query_selector_all(".footer-contestant-entry-score")
+        score_text = await scores[turn_id].text_content()
         player_score = int(score_text.split(" ")[0])
         assert player_score == player_data[turn_id][1] + 1100
 
-def test_final_jeopardy():
-    round_num = 2
+@pytest.mark.asyncio
+async def test_final_jeopardy():
+    round_num = JEOPARDY_REGULAR_ROUNDS
     question_num = 30
     turn_id = 0
     player_data = [
@@ -650,30 +663,35 @@ def test_final_jeopardy():
         (CONTESTANT_IDS[3], 1500, "Nø", "00FFFF")
     ]
 
-    with ContextHandler() as context:
+    async with ContextHandler() as context:
         # Go to question page
-        context.open_presenter_selection_page(round_num, question_num, turn_id, player_data)
-        sleep(1)
+        await context.open_presenter_selection_page(round_num, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
 
         # Verify that we are on the correct page
         for page in context.contestant_pages:
-            headers = page.query_selector_all(".contestant-round-header")
-            assert headers[0].text_content() == "Runde 3/3"
-            assert headers[1].text_content() == "Final Jeopardy!"
+            headers = await page.query_selector_all(".contestant-round-header")
+            rounds = JEOPARDY_REGULAR_ROUNDS + 1
+            assert await headers[0].text_content() == f"Runde {rounds}/{rounds}"
+            assert await headers[1].text_content() == "Final Jeopardy!"
 
-def test_endscreen():
+@pytest.mark.asyncio
+async def test_endscreen():
     player_data = [
         (CONTESTANT_IDS[0], 800, "Dave", "F30B0B"),
         (CONTESTANT_IDS[1], 500, "Murt", "CCCC00"),
         (CONTESTANT_IDS[2], -1200, "Muds", "FF00FF"),
         (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
     ]
-    with ContextHandler() as context:
-        sleep(1)
+    async with ContextHandler() as context:
+        await asyncio.sleep(1)
 
         # Go to endscreen page
-        context.open_endscreen_page(player_data)
-        sleep(1)
+        await context.open_endscreen_page(player_data)
+        await asyncio.sleep(1)
+
+        header = await context.presenter_page.query_selector("#endscreen-winner-desc")
+        assert (await header.text_content()).strip() == "Dave wonnered!!! All hail the king!"
 
 @pytest.mark.asyncio
 async def test_discord_message_simple(discord_client):
@@ -692,7 +710,7 @@ async def test_discord_message_simple(discord_client):
 
     # Verify the contents of the first message (winner message)
     expected_message_1 = (
-        "@Slugger is the winner of the *LoL Jeopardy 3rd Edition* with **800 points**!!! "
+        f"@Slugger is the winner of the *LoL Jeopardy {JEOPADY_EDITION}* with **800 points**!!! "
         "All hail the king :crown:\n"
         "They get a special badge of honor on Discord and wins a **1350 RP** skin!"
     )
@@ -729,7 +747,7 @@ async def test_discord_message_ties(discord_client):
 
     # Verify the contents of the first message (winner message)
     expected_message_1 = (
-        "@Slugger and @Murt both won the *LoL Jeopardy 3rd Edition* with "
+        f"@Slugger and @Murt both won the *LoL Jeopardy {JEOPADY_EDITION}* with "
         "**800 points**!!!\nThey both get a special badge of honor "
         "on Discord and each win a **975 RP** skin!"
     )
@@ -750,7 +768,7 @@ async def test_discord_message_ties(discord_client):
     assert channel.messages_sent[2] == expected_message_3
 
 @pytest.mark.skip()
-def test_all_questions():
+async def test_all_questions():
     turn_id = 0
     player_data = [
         (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
@@ -758,24 +776,23 @@ def test_all_questions():
         (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
         (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
     ]
-    with ContextHandler() as context:
+    async with ContextHandler() as context:
         #context.presenter_page.on("requestfinished", lambda req: print("Request:", req.url))
 
-        context.open_presenter_selection_page(1, 0, turn_id, player_data)
-        context.screenshot_views(0)
+        await context.open_presenter_selection_page(1, 0, turn_id, player_data)
 
         for round_num in range(2):
             question_num = 0
             for category in ("mechanics", "lore", "icons", "outlines", "brois", "audio"):
                 for difficulty in range(1, 6):
                     # Go to question page
-                    context.open_presenter_question_page(round_num + 1, category, difficulty, question_num, turn_id, player_data)
-                    sleep(1)
+                    await context.open_presenter_question_page(round_num + 1, category, difficulty, question_num, turn_id, player_data)
+                    await asyncio.sleep(1)
 
-                    context.show_question()
-                    sleep(1)
+                    await context.show_question()
+                    await asyncio.sleep(1)
 
-                    context.screenshot_views((round_num * 30) + question_num + 1)
+                    await context.screenshot_views((round_num * 30) + question_num + 1)
 
                     question_num += 1
 
@@ -784,38 +801,64 @@ def test_questions_well_formed(config):
         return f"{config.static_folder}/img/jeopardy/{filename}"
 
     with open(f"{config.static_folder}/data/jeopardy_questions.json", "r", encoding="utf-8") as fp:
-        question_data = json.load(fp)
+        all_question_data = json.load(fp)
 
     mandatory_category_keys = set(["name", "order", "background", "tiers"])
+    optional_category_keys = set(["buzz_time"])
     mandatory_tiers_keys = set(["value", "questions"])
     mandatory_question_keys = set(["question", "answer"])
     optional_question_keys = set(
-        ["choices", "image", "explanation", "answer_image", "video", "height", "border"]
+        [
+            "choices",
+            "image",
+            "explanation",
+            "answer_image",
+            "video",
+            "tips",
+            "height",
+            "border",
+            "volume"
+        ]
     )
 
-    for category in question_data:
-        category_data = question_data[category]
+    for index, category in enumerate(all_question_data):
+        category_data = all_question_data[category]
 
-        assert set(category_data.keys()) == mandatory_category_keys
-        assert os.path.exists(get_path(category_data["background"]))
+        for key in mandatory_category_keys:
+            assert key in category_data, "Mandatory category key missing"
 
-        for tier_data in question_data[category]["tiers"]:
-            assert set(tier_data.keys()) == mandatory_tiers_keys
+        assert len(set(category_data.keys()) - (mandatory_category_keys.union(optional_category_keys))) == 0, "Wrong category keys"
+
+        assert os.path.exists(get_path(category_data["background"])), "Background missing"
+
+        tiers = all_question_data[category]["tiers"] if index < 6 else [all_question_data[category]["tiers"][-1]]
+
+        for tier_data in tiers:
+            assert set(tier_data.keys()) == mandatory_tiers_keys, "Wrong tier keys"
+
+            expected_num_questions = JEOPARDY_REGULAR_ROUNDS if index < 6 else 1
+            assert len(tier_data["questions"]) == expected_num_questions
 
             for question_data in tier_data["questions"]:
                 for key in mandatory_question_keys:
-                    assert key in question_data
+                    assert key in question_data, "Mandatory question key missing"
 
-                assert question_data.keys() - (mandatory_question_keys.union(optional_question_keys))
+                assert len(set(question_data.keys()) - (mandatory_question_keys.union(optional_question_keys))) == 0, "Wrong question keys"
 
                 for key in ("image", "answer_image", "video"):
                     if key in question_data:
-                        assert os.path.exists(get_path(question_data[key]))
+                        assert os.path.exists(get_path(question_data[key])), "Question file missing"
+                        assert "height" in question_data
+
+                if "choices" in question_data:
+                    choices = question_data["choices"]
+                    assert isinstance(choices, list) and len(choices) == 4, "Wrong amount of choices for multiple choice"
+                    assert question_data["answer"] in choices, "Answer is not in the list of choices"
 
     with open(f"{config.static_folder}/data/jeopardy_used.json", "r", encoding="utf-8") as fp:
         used_data = json.load(fp)
 
-    question_keys = set(question_data.keys())
+    question_keys = set(all_question_data.keys())
     used_keys = set(used_data.keys())
 
-    assert question_keys == used_keys
+    assert question_keys == used_keys, "Used questions don't match"

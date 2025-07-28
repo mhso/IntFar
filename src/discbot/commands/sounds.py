@@ -9,11 +9,11 @@ class SetEventSoundCommand(Command):
     ACCESS_LEVEL = "all"
     OPTIONAL_PARAMS = [GameParam("game"), CommandParam("sound")]
 
-    def __init__(self, client: DiscordClient, message: Message, event: str):
-        super().__init__(client, message)
+    def __init__(self, client: DiscordClient, message: Message, called_name: str, event: str):
+        super().__init__(client, message, called_name)
         self.event = event
 
-    async def handle(self, game: str, sound: str):
+    async def handle(self, game: str, sound: str | None = None):
         database = self.client.game_databases[game]
         game_name = SUPPORTED_GAMES[game]
         response = ""
@@ -57,15 +57,15 @@ class SetDoinkSoundCommand(SetEventSoundCommand):
     NAME = "doinks_sound"
     DESCRIPTION = "Set a sound to trigger when you are awarded Doinks in game."
 
-    def __init__(self, client: DiscordClient, message: Message):
-        super().__init__(client, message, "doinks")
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name, "doinks")
 
 class SetIntfarSoundCommand(SetEventSoundCommand):
     NAME = "intfar_sound"
     DESCRIPTION = "Set a sound to trigger when you are awarded Int-Far in a game."
 
-    def __init__(self, client: DiscordClient, message: Message):
-        super().__init__(client, message, "intfar")
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name, "intfar")
 
 class SetJoinSoundCommand(Command):
     NAME = "join_sound"

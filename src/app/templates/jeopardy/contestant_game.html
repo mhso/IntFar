@@ -25,7 +25,7 @@
 
                 <h2 id="contestant-game-waiting">Venter på at spillet starter...</h2>
 
-            {% elif jeopardy_round == 4 %}
+            {% elif jeopardy_round == total_rounds + 1 %}
 
             <!-- Endscreen -->
             {% if active_player in winner_ids %}
@@ -35,8 +35,8 @@
             {% endif %}
 
             {% else %}
-                <h2 class="contestant-round-header">Runde {{ jeopardy_round }}/3</h2>
-                {% if jeopardy_round < 3 %}
+                <h2 class="contestant-round-header">Runde {{ jeopardy_round }}/{{ total_rounds }}</h2>
+                {% if jeopardy_round < total_rounds %}
                 {% set has_turn = turn_id == player_turn %}
                 <h2 class="contestant-round-header">Spørgsmål {{ question_num }}/30</h2>
                 {% else %}
@@ -45,12 +45,13 @@
 
                 {% if question %}
 
-                    {% if jeopardy_round == 3 %}
+                    {% if jeopardy_round == total_rounds %}
     
                     <!-- Final Jeopardy answer -->
                     <h2 id="question-category-name">{{ category_name }}</h2>
                     <h3 id="finale-wager-header">Du har satset <strong>{{ finale_wager }}</strong> GBP</h3>
 
+                    {% if finale_wager > 0 %}
                     <div id="finale-question-wrapper" class="d-none">
                         <h3 id="finale-question-header">{{ question["question"] }}</h3>
                         <h4>Skriv svaret herunder</h4>
@@ -58,10 +59,14 @@
                         <input id="finale-answer">
                         <button id="contestant-wager-btn" onclick="giveFinalJeopardyAnswer('{{ active_player }}');">OK</button>
                     </div>
+                    {% else %}
+                    <h4>Du kan ikke svare, da du ikke har satset noget.</h4>
+
+                    {% endif %}
 
                     {% else %}
                     <!-- Question screen -->
-                    <h2 id="question-category-header"><span id="question-category-name">{{ category_name }}</span>{% if jeopardy_round < 3 %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', _external=True, filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
+                    <h2 id="question-category-header"><span id="question-category-name">{{ category_name }}</span>{% if jeopardy_round < total_rounds %}<br>{% if daily_double %}Daily Double!{% else %}til <span id="question-reward-span">{{ question_value }} GBP</span>{% endif %}{% if "choices" in question %} <img src="{{ url_for('static', _external=True, filename='img/list.png') }}" id="question-choices-indicator">{% endif %}{% endif %}</h2>
 
                     {% if daily_double %}
 
@@ -96,15 +101,15 @@
 
                 {% else %}
     
-                {% if jeopardy_round == 3 %}
-
+                {% if jeopardy_round == total_rounds %}
+                
                 <!-- Final Jeopardy wager -->
-                {% set max_wager = [score, 1000] | max %}
-
                 <h2 id="finale-category-header">{{ category_name }}</h2>
-                <h3>Hvor mange GBP tør du satse?!</h3>
 
-                <input id="finale-wager-amount" type="number" min="0" max="max_wager" disabled>
+                {% set max_wager = [score, 500] | max %}
+                <h3>Hvor mange GBP tør du satse?!<br>(Min. 0, max. {{ max_wager }})</h3>
+
+                <input id="finale-wager-amount" type="number" min="0" max="{{ max_wager }}" disabled>
                 <button id="contestant-wager-btn" onclick="makeFinalJeopardyWager('{{ active_player }}');" disabled>OK</button>
 
                 {% else %}
@@ -126,11 +131,22 @@
 
                 {% endif %}
 
+                <!-- Power Ups -->
+                <!-- <div id="contestant-power-ups">
+                    {% for power_up in power_ups %}
+                    <button {% if not power_up['used'] %}onclick="usePowerUp('{{ power_up['power_id'] }}'){% else %}disabled{% endif %}">
+                        <img src="{{ url_for('static', filename='img/power_' + power_up['power_id'] + '.png') }}">
+                    </button>
+                    {% endfor %}
+
+                    <div></div>
+                </div> -->
+
                 {% endif %}
 
             {% endif %}
 
-            {% if jeopardy_round < 4 %}
+            {% if jeopardy_round < total_rounds + 1 %}
             <script>
                 socket.on("connect", function() {
                     pingActive = true;
@@ -150,7 +166,7 @@
                             elem.textContent = "Venter på at en anden spiller vælger en kategori...";
                         }
                     });
-                    {% elif jeopardy_round == 3 %}
+                    {% elif jeopardy_round == total_rounds %}
                         {% if question %}
                         socket.on("finale_category_revealed", function() {
                             document.getElementById("finale-question-wrapper").classList.remove("d-none");

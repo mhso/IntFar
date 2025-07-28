@@ -42,9 +42,10 @@ MONTH_NAMES = [
     "August", "September", "October", "November", "December"
 ]
 
-JEOPARDY_ITERATION = 4
+JEOPARDY_ITERATION = 5
 _suffix = ["st", "nd", "rd", "th"]
 JEOPADY_EDITION = f"{JEOPARDY_ITERATION}{_suffix[min(len(_suffix) - 1, JEOPARDY_ITERATION - 1)]} Edition"
+JEOPARDY_REGULAR_ROUNDS = 1
 
 def load_flavor_texts(config: Config, filename, game=None):
     path = f"{config.resources_folder}/flavor_texts"
@@ -282,7 +283,7 @@ def get_closest_match(search_str: str, possible_matches: list[str], max_score: i
     closest_match = None
     closest_match_distance = max_score or math.inf
     for possible_match in possible_matches:
-        if possible_match.startswith(search_str) or possible_match.endswith(search_str): # type: ignore
+        if possible_match.startswith(search_str) or possible_match.endswith(search_str):
             return possible_match
 
         distance = Levenshtein.distance(search_str, possible_match)

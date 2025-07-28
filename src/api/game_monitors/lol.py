@@ -17,11 +17,10 @@ class LoLGameMonitor(GameMonitor):
     def get_users_in_game(self, user_dict: dict[int, User], game_data: dict):
         users_in_game = {}
         for disc_id in user_dict:
-            puuids = user_dict[disc_id].puuid
-            player_stats = get_player_stats(game_data, puuids)
+            player_stats = get_player_stats(game_data, user_dict[disc_id].player_id)
             if player_stats is not None:
                 active_summ_name = None
-                for puuid, summ_name in zip(user_dict[disc_id].puuid, user_dict[disc_id].player_name):
+                for puuid, summ_name in zip(user_dict[disc_id].player_id, user_dict[disc_id].player_name):
                     if puuid == player_stats["puuid"]:
                         active_summ_name = summ_name
                         break
@@ -30,8 +29,7 @@ class LoLGameMonitor(GameMonitor):
                     disc_id,
                     user_dict[disc_id].secret,
                     [active_summ_name],
-                    [player_stats["summonerId"]],
-                    puuid=[player_stats["puuid"]],
+                    [player_stats["puuid"]],
                     champ_id=player_stats["championId"],
                 )
 
@@ -143,8 +141,8 @@ class LoLGameMonitor(GameMonitor):
             await asyncio.sleep(2)
 
             for disc_id in self.users_in_game[guild_id]:
-                summ_id = self.users_in_game[guild_id][disc_id].player_id[0]
-                rank_info = await self.api_client.get_player_rank(summ_id)
+                puuid = self.users_in_game[guild_id][disc_id].player_id[0]
+                rank_info = await self.api_client.get_player_rank(puuid)
                 if rank_info is not None:
                     player_ranks[disc_id] = rank_info
 

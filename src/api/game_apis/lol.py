@@ -290,12 +290,9 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()["puuid"]
 
-    async def get_player_data(self, player_id: str, puuid: bool):
-        endpoint = "/lol/summoner/v4/summoners"
-        route = API_PLATFORM
-        if puuid:
-            endpoint = f"{endpoint}/by-puuid"
-            route = API_REGION
+    async def get_player_data(self, player_id: str):
+        endpoint = f"/lol/summoner/v4/summoners/by-puuid"
+        route = API_REGION
         endpoint = endpoint + "/" + "{0}"
 
         response = await self.make_request(endpoint, route, player_id)
@@ -304,13 +301,7 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()
 
-    async def get_player_data_from_summ_id(self, summ_id):
-        return await self.get_player_data(summ_id, False)
-
-    async def get_player_data_from_puuid(self, puuid):
-        return await self.get_player_data(puuid, True)
-
-    async def get_player_name(self, puuid):
+    async def get_player_name(self, puuid: str):
         endpoint = "/riot/account/v1/accounts/by-puuid/{0}"
         response = await self.make_request(endpoint, API_REGION, puuid)
         if response.status_code != 200:
@@ -321,7 +312,7 @@ class RiotAPIClient(GameAPIClient):
 
     async def get_player_names_for_user(self, user: User) -> list[str]:
         names = []
-        for puuid in user.puuid:
+        for puuid in user.player_id:
             player_name = await self.get_player_name(puuid)
             names.append(player_name)
 
@@ -342,7 +333,7 @@ class RiotAPIClient(GameAPIClient):
         return response.json()
 
     async def get_active_game_for_user(self, user: User):
-        for puuid in user.puuid:
+        for puuid in user.player_id:
             game_info = await self.get_active_game(puuid)
 
             if game_info is not None:
@@ -365,10 +356,10 @@ class RiotAPIClient(GameAPIClient):
 
         return response.json()["info"]
 
-    async def get_player_rank(self, summ_id):
-        endpoint = "/lol/league/v4/entries/by-summoner/{0}"
+    async def get_player_rank(self, puuid):
+        endpoint = "/lol/league/v4/entries/by-puuid/{0}"
 
-        response = await self.make_request(endpoint, API_PLATFORM, summ_id)
+        response = await self.make_request(endpoint, API_PLATFORM, puuid)
         if response.status_code != 200:
             return None
 
