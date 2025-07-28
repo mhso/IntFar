@@ -1,21 +1,23 @@
-const TIME_FOR_BUZZING = 10;
 const TIME_FOR_ANSWERING = 6;
 const TIME_FOR_DOUBLE_ANSWER = 10;
 const TIME_FOR_WAGERING = 60;
 const TIME_FOR_FINAL_ANSWER = 40;
 const TIME_BEFORE_FIRST_TIP = 4;
 const TIME_BEFORE_EXTRA_TIPS = 4;
+const IMG_MAX_HEIGHT = 420;
 const PRESENTER_ACTION_KEY = "Space"
-const socket = io({"transports": ["polling"]});
+const socket = io({"transports": ["websocket", "polling"]});
 
 var countdownInterval = null;
 var activeRound;
+var totalRounds;
 var activeQuestionId;
 var activeAnswer;
 var activeValue = null;
 var answeringPlayer = null;
 var activePlayers = [];
 var questionAnswered = false;
+var buzzInTime = 10;
 var isDailyDouble = false;
 
 let playerTurn = 0;
@@ -27,7 +29,7 @@ let playerColors = [];
 let playersBuzzedIn = [];
 
 function canPlayersBuzzIn() {
-    return activeRound < 3 && !isDailyDouble;
+    return activeRound < totalRounds && !isDailyDouble;
 }
 
 function getBaseURL() {
@@ -230,7 +232,7 @@ function correctAnswer() {
     afterAnswer();
 }
 
-function wrongAnswer(reason) {
+function wrongAnswer(reason, questionOver=false) {
     let elem = document.getElementById("question-answer-wrong");
     let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
     let coinElem = elem.getElementsByClassName("question-result-gbp").item(0);
@@ -257,15 +259,15 @@ function wrongAnswer(reason) {
         socket.emit("wrong_answer", answeringPlayer);
     }
 
-    let outOfTime = reason == "Ikke mere tid" && answeringPlayer == null;
+    let outOfTime = questionOver && answeringPlayer == null;
 
     if (activePlayers.every(v => !v) || outOfTime) {
+        // No players are eligible to answer, go to next question
         if (outOfTime && !coinElem.classList.contains("d-none")) {
             valueElem.textContent = "";
             coinElem.classList.add("d-none");
         }
 
-        // No players are eligible to answer, go to next question
         revealAnswerImageIfPresent();
 
         let answerElem = document.getElementById("question-actual-answer");
@@ -324,7 +326,7 @@ function answerQuestion(event) {
                 }
                 else {
                     elem.classList.add("question-answered-wrong");
-                    wrongAnswer("Forkert...");
+                    wrongAnswer("Forkert...", false);
                 }
             }, delay);
         }
@@ -333,7 +335,7 @@ function answerQuestion(event) {
                 correctAnswer();
             }
             else {
-                wrongAnswer("Forkert...");
+                wrongAnswer("Forkert...", false);
             }
         }
     }
@@ -393,7 +395,7 @@ function startCountdown(duration, callback=null) {
                 callback();
             }
             else {
-                wrongAnswer("Ikke mere tid");
+                wrongAnswer("Ikke mere tid", true);
             }
         }
     }, delay);
@@ -408,7 +410,7 @@ function pauseVideo() {
 }
 
 function startAnswerCountdown(duration) {
-    startCountdown(duration, () => wrongAnswer("Ikke mere tid"));
+    startCountdown(duration, () => wrongAnswer("Ikke mere tid", true));
 
     // Action key has to be pressed before an answer can be given (for safety)
     window.onkeydown = function(e) {
@@ -519,7 +521,17 @@ function questionAsked(countdownDelay) {
         if (answeringPlayer == null && canPlayersBuzzIn()) {
             hideAnswerIndicator();
             showTip(0);
-            startCountdown(TIME_FOR_BUZZING);
+            if (buzzInTime == 0) {
+                // Question has no timer, contestants can take their time
+                window.onkeydown = function(e) {
+                    if (e.code == PRESENTER_ACTION_KEY) {
+                        wrongAnswer("Ingen kan/tør svare");
+                    }
+                };
+            }
+            else {
+                startCountdown(buzzInTime);
+            }
         }
         else if (isDailyDouble) {
             startAnswerCountdown(TIME_FOR_DOUBLE_ANSWER);
@@ -570,6 +582,14 @@ function afterShowQuestion() {
     }
 }
 
+function showImageOrVideo(elem) {
+    if (elem.offsetHeight > IMG_MAX_HEIGHT) {
+        document.getElementById("question-category-header").style.display = "none";
+        document.getElementById("question-question-header").style.display = "none";
+    }
+    elem.style.opacity = 1;
+}
+
 function showQuestion() {
     for (let i = 0; i < playerIds.length; i++) {
         activePlayers.push(!isDailyDouble);
@@ -591,11 +611,11 @@ function showQuestion() {
         window.onkeydown = function(e) {
             if (e.code == PRESENTER_ACTION_KEY) {
                 if (questionImage != null) {
-                    questionImage.style.opacity = 1;
+                    showImageOrVideo(questionImage);
                     afterShowQuestion();
                 }
                 else {
-                    videoElem.style.opacity = 1;
+                    showImageOrVideo(videoElem);
                     videoElem.play();
                     videoElem.onended = afterShowQuestion;
 
@@ -610,13 +630,13 @@ function showQuestion() {
     else {
         if (isQuestionMultipleChoice()) {
             if (questionImage != null) {
-                questionImage.style.opacity = 1;
+                showImageOrVideo(questionImage);
             }
             afterShowQuestion();
         }
         else {
             if (questionImage != null) {
-                questionImage.style.opacity = 1;
+                showImageOrVideo(questionImage);
             }
             window.onkeydown = function(e) {
                 if (e.code == PRESENTER_ACTION_KEY) {
@@ -654,8 +674,9 @@ function scaleAnswerChoices() {
     }
 }
 
-function setVariables(round, playerData, turn, question, answer=null, value=null, questionId=null, dailyDouble=false) {
+function setVariables(round, maxRounds, playerData, turn, question, answer=null, value=null, questionId=null, buzzTime=10, dailyDouble=false) {
     activeRound = round;
+    totalRounds = maxRounds;
     playerData.forEach((data) => {
         playerIds.push(data["disc_id"]);
         playerScores.push(data["score"]);
@@ -667,6 +688,7 @@ function setVariables(round, playerData, turn, question, answer=null, value=null
     activeAnswer = answer;
     activeValue = value;
     activeQuestionId = questionId;
+    buzzInTime = buzzTime;
     isDailyDouble = dailyDouble;
 }
 
@@ -909,7 +931,7 @@ function setPlayerReady(index) {
     }
 }
 
-function showFinaleCategory(category) {
+function showFinaleCategory(final_round, category) {
     window.onkeydown = function(e) {
         if (e.code == PRESENTER_ACTION_KEY) {
             let header1 = document.getElementById("selection-finale-header1");
@@ -929,7 +951,7 @@ function showFinaleCategory(category) {
 
                 window.onkeydown = function(e) {
                     if (e.code == PRESENTER_ACTION_KEY) {
-                        window.location.href = getQuestionURL(3, category, 5);
+                        window.location.href = getQuestionURL(final_round, category, 5);
                     }
                 }
             }, 3000);
@@ -961,21 +983,34 @@ function showFinaleResult() {
     
             window.onkeydown = function(e) {
                 let descElem = wagerDescElems.item(player);
-                let amount = parseInt(wagerInputElems.item(player).textContent);
-    
-                if (e.key == 1) {
-                    // Current player answered correctly
-                    descElem.style.opacity = 1;
-                    descElem.classList.add("wager-answer-correct");
-                    descElem.innerHTML = `og <strong>vinder ${amount} GBP</strong>!`;
-                    updatePlayerScore(player, amount);
+
+                let amountRaw = wagerInputElems.item(player).textContent;
+                let amount = 0;
+                if (amountRaw != "intet") {
+                    amount = parseInt(amountRaw);
                 }
-                else if (e.key == 2) {
-                    // Current player answered incorrectly
+
+                if (e.key == 1 || e.key == 2) {
                     descElem.style.opacity = 1;
-                    descElem.classList.add("wager-answer-wrong");
-                    descElem.innerHTML = `og <strong>taber ${amount} GBP</strong>!`;
-                    updatePlayerScore(player, -amount);
+                    let className = null;
+                    let desc = null;
+
+                    if (amount == 0) { // Current player did not answer
+                        className = "wager-answer-skipped";
+                        desc = "og intet ændrer sig"
+                    }
+                    else if (e.key == 1) { // Current player answered correctly
+                        className = "wager-answer-correct";
+                        desc = `og <strong>vinder ${amount} GBP</strong>!`;
+                    }
+                    else if (e.key == 2) { // Current player answered incorrectly
+                        className = "wager-answer-wrong";
+                        desc = `og <strong>taber ${amount} GBP</strong>!`;
+                    }
+
+                    descElem.classList.add(className);
+                    descElem.innerHTML = desc;
+                    updatePlayerScore(player, amount);
                 }
                 else if (e.code == PRESENTER_ACTION_KEY) {
                     showNextResult(player + 1);

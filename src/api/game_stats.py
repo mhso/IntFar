@@ -51,13 +51,13 @@ class PlayerStats(ABC):
         }
 
     @classmethod
-    def formatted_stat_names(cls) -> dict[str, str]:
+    def formatted_stat_names(cls, capitalize=True) -> dict[str, str]:
         formatted = {}
         for stat in PlayerStats.stats_to_save():
             if stat in ("kda", "kp"):
                 fmt_stat = stat.upper()
             else:
-                fmt_stat = stat.capitalize()
+                fmt_stat = stat.capitalize() if capitalize else stat
 
             formatted[stat] = fmt_stat
 
@@ -293,7 +293,7 @@ def are_unfiltered_stats_well_formed(game_info):
     team_stat_keys = [
         "riftHeraldKills", "firstBlood", "dragonKills", "baronKills", "teamId", "win"
     ]
-    player_keys = ["summonerName", "summonerId"]
+    player_keys = ["summonerName", "puuid"]
 
     all_keys = [
         ("Game key", game_keys, []), ("Participant key", participant_keys, ["participants", 0]),

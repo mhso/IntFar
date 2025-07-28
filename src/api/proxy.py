@@ -3,7 +3,7 @@ import subprocess
 import asyncio
 from time import sleep
 from multiprocessing import Pipe
-from multiprocessing.connection import wait
+from multiprocessing.connection import Connection, wait
 from threading import Thread, Event
 from typing import Dict, Type
 
@@ -15,7 +15,7 @@ from api.meta_database import MetaDatabase
 _DEFAULT_TIMEOUT = 60
 
 class Proxy(object):
-    def __init__(self, conn, target_cls: Type[object], func_timeouts: Dict[str, int]):
+    def __init__(self, conn: Connection, target_cls: Type[object], func_timeouts: Dict[str, int]):
         self.conn = conn
         self.target_cls = target_cls
         self.func_timeouts = func_timeouts
@@ -41,10 +41,10 @@ class Proxy(object):
         return self._call_proxy(name)
 
     def __getstate__(self):
-        return {"conn": self.conn, "target_cls": self.target_cls}
+        return {"conn": self.conn, "target_cls": self.target_cls, "func_timeouts": self.func_timeouts}
 
     def __setstate__(self, state):
-        self.__dict__ = {"conn": state["conn"], "target_cls": state["target_cls"]}
+        self.__dict__ = {"conn": state["conn"], "target_cls": state["target_cls"], "func_timeouts": state["func_timeouts"]}
         self._set_attributes()
 
     def _call_proxy(self, command, *args):

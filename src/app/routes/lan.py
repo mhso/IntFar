@@ -418,6 +418,21 @@ def get_data(lan_info, lan_date):
 
     data["bingo_challenges"] = bingo_data
 
+    # Check if bingo is completed
+    bingo_completed = True
+    for bingo_row in bingo_data:
+        all_bingo = True
+        for row_data in bingo_row:
+            if not row_data["bingo"]:
+                all_bingo = False
+                break
+
+        if not all_bingo:
+            bingo_completed = False
+            break
+
+    data["bingo_completed"] = bingo_completed
+
     return data
 
 def _allowed_access(lan_info, user_id):

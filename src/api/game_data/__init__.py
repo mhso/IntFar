@@ -21,8 +21,8 @@ def get_stats_for_player(game) -> list[str]:
 def get_stat_quantity_descriptions(game) -> dict[str, tuple[str, str]]:
     return _PLAYER_STATS_HOLDERS[game].stat_quantity_desc()
 
-def get_formatted_stat_names(game) -> dict[str,  str]:
-    return _PLAYER_STATS_HOLDERS[game].formatted_stat_names()
+def get_formatted_stat_names(game, capitalize=True) -> dict[str,  str]:
+    return _PLAYER_STATS_HOLDERS[game].formatted_stat_names(capitalize)
 
 def get_formatted_stat_value(game, stat, value) -> str:
     return _PLAYER_STATS_HOLDERS[game].get_formatted_stat_value(stat, value)

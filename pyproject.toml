@@ -31,7 +31,7 @@ dependencies = [
     "steam @ file:///${PROJECT_ROOT}/../../steam",
     "random-user-agent>=1.0.1",
 ]
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.11,<3.12"
 readme = "README.md"
 license = {text = "MIT"}
 

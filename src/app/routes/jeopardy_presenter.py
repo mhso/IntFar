@@ -3,13 +3,14 @@ import random
 from datetime import datetime
 from time import time
 from dataclasses import dataclass, field
+from typing import Dict, List, Set
 from gevent import sleep
 
 import flask
 from flask_socketio import join_room, leave_room, emit
 from mhooge_flask.logging import logger
 
-from api.util import JEOPADY_EDITION, MONTH_NAMES, GUILD_MAP
+from api.util import JEOPADY_EDITION, JEOPARDY_REGULAR_ROUNDS, MONTH_NAMES, GUILD_MAP
 from api.lan import is_lan_ongoing
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
@@ -18,11 +19,9 @@ TRACK_UNUSED = True
 DO_DAILY_DOUBLE = True
 
 QUESTIONS_PER_ROUND = 30
-ROUND_NAMES = [
-    "Jeopardy!",
-    "Double Jeopardy!",
-    "Final Jeopardy!"
-]
+# Round when Final Jeopardy is played
+FINALE_ROUND = JEOPARDY_REGULAR_ROUNDS + 1
+ROUND_NAMES = ["Jeopardy!"] + (["Double Jeopardy!"] * (JEOPARDY_REGULAR_ROUNDS - 1)) + ["Final Jeopardy!"]
 
 FINALE_CATEGORY = "history"
 
@@ -112,6 +111,29 @@ BUZZ_IN_SOUNDS = {
 }
 
 @dataclass
+class PowerUp:
+    power_id: str
+    name: str
+    used: bool = False
+    available_targets: Set[int] = field(default_factory=lambda: set(PLAYER_INDEXES), init=False)
+
+    def to_json(self):
+        return json.dumps(self.__dict__, default=lambda o: list(o))
+
+    def __eq__(self, other: object) -> bool:
+        return self.power_id == other.power_id
+
+    def __hash__(self) -> int:
+        return hash(self.power_id)
+
+def _init_powerups():
+    return [
+        PowerUp("steal", "Steal"),
+        PowerUp("freeze", "Freeze"),
+        PowerUp("rewind", "Rewind"),
+    ]
+
+@dataclass
 class Contestant:
     disc_id: int
     index: int
@@ -126,6 +148,7 @@ class Contestant:
     sid: int = field(default=None, init=False)
     n_ping_samples: int = field(default=10, init=False)
     latest_buzz: int = field(default=None, init=False)
+    power_ups: List[PowerUp] = field(default_factory=_init_powerups, init=False)
     finale_wager: int = field(default=0, init=False)
     finale_answer: int = field(default=None, init=False)
     _ping_samples: list[float] = field(default=None, init=False)
@@ -149,11 +172,19 @@ class Contestant:
     def to_json(self):
         return json.dumps(self.__dict__)
 
+    def get_power(self, power_id: str) -> PowerUp:
+        for power_up in self.power_ups:
+            if power_up.power_id == power_id:
+                return power_up
+
+        return None
+
 @dataclass
 class State:
     jeopardy_round: int
     round_name: str
     player_data: list[dict]
+    total_rounds: int = field(init=False, default=FINALE_ROUND)
 
     @classmethod
     def from_json(cls, json_str: str):
@@ -163,6 +194,9 @@ class State:
 
     def to_json(self):
         return json.dumps(self.__dict__)
+
+    def __post_init__(self):
+        self.__dict__["total_rounds"] = self.total_rounds
 
 @dataclass
 class RoundState(State):
@@ -180,6 +214,7 @@ class QuestionState(RoundState):
     bg_image: str
     question: dict
     question_value: int
+    buzz_time: int
     daily_double: bool
     question_asked_time: float = field(default=None, init=False)
     buzz_winner_decided: bool = field(default=False, init=False)
@@ -254,15 +289,21 @@ def get_round_data(request_args):
             buzzes = 0
             hits = 0
             misses = 0
+            finale_wager = 0
             score = int(request_args.get(score_key, 0))
+            power_ups = []
+
             if disc_id in contestants:
                 avatar = contestants[disc_id].avatar
                 buzzes = contestants[disc_id].buzzes
                 hits = contestants[disc_id].hits
                 misses = contestants[disc_id].misses
+                finale_wager = contestants[disc_id].finale_wager
 
                 if contestants[disc_id].score != score:
                     contestants[disc_id].score = score
+
+                power_ups = contestants[disc_id].power_ups
             else:
                 avatar = app_util.discord_request(
                     "func", "get_discord_avatar", (disc_id, 128)
@@ -281,7 +322,9 @@ def get_round_data(request_args):
                 "buzzes": buzzes,
                 "hits": hits,
                 "misses": misses,
+                "finale_wager": finale_wager,
                 "color": request_args[color_key],
+                "power_ups": power_ups,
             })
 
     try:
@@ -311,13 +354,14 @@ def question_view(jeopardy_round, category, tier):
     with open(USED_QUESTIONS_FILE, encoding="utf-8") as fp:
         used_questions = json.load(fp)
 
-    if jeopardy_round < 3:
+    if jeopardy_round < FINALE_ROUND:
         question = questions[category]["tiers"][tier]["questions"][jeopardy_round - 1]
     else:
         # If we are at Final Jeopardy, choose a random question from the relevant category
         question = random.choice(questions[category]["tiers"][tier]["questions"])
 
     question["id"] = jeopardy_round - 1
+    buzz_time = questions[category].get("buzz_time", 10)
 
     if TRACK_UNUSED:
         used_questions[category][tier]["used"].append(question["id"])
@@ -346,6 +390,7 @@ def question_view(jeopardy_round, category, tier):
             questions[category]["background"],
             question,
             questions[category]["tiers"][tier]["value"] * jeopardy_round,
+            buzz_time,
             is_daily_double
         )
         flask.current_app.config["JEOPARDY_DATA"]["state"] = question_state
@@ -379,12 +424,12 @@ def active_jeopardy(jeopardy_round):
         player_data, player_turn, question_num = get_round_data(flask.request.args)        
 
         if question_num == QUESTIONS_PER_ROUND:
-            # Round 1 done, onwards to next one
+            # Round done, onwards to next one
             jeopardy_round += 1
             question_num = 0
 
-            if jeopardy_round == 2:
-                # The player with the lowest score at the start of round 2 gets the turn
+            if 1 < jeopardy_round < FINALE_ROUND:
+                # The player with the lowest score at the start of a new regular round gets the turn
                 lowest_score = player_data[0]["score"]
                 lowers_score_index = 0
 
@@ -401,7 +446,7 @@ def active_jeopardy(jeopardy_round):
         with open(USED_QUESTIONS_FILE, encoding="utf-8") as fp:
             used_questions = json.load(fp)
 
-        if jeopardy_round == 3:
+        if jeopardy_round == FINALE_ROUND:
             ordered_categories = ["history"]
         else:
             ordered_categories = [None] * 6
@@ -415,6 +460,11 @@ def active_jeopardy(jeopardy_round):
                     for tier_info in used_questions[category]:
                         tier_info["active"] = True
                         tier_info["double"] = False
+
+                # Reset used power-ups
+                contestants: Dict[int, Contestant] = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+                for contestant in contestants.values():
+                    contestant.power_ups = _init_powerups()
 
                 if DO_DAILY_DOUBLE:
                     # Choose 1 or 2 random category/tier combination to be daily double
@@ -475,15 +525,14 @@ def final_jeopardy(question_id):
     contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
     for data in player_data:
         disc_id = int(data["disc_id"])
-        data["wager"] = contestants[disc_id].finale_wager
+        wager = contestants[disc_id].finale_wager
+        data["wager"] = wager if wager > 0 else "intet"
         answer = contestants[disc_id].finale_answer
         data["answer"] = "ikke" if answer is None else f"'{answer}'"
 
-    jeopardy_round = 3
-
     finale_state = FinaleState(
-        jeopardy_round,
-        ROUND_NAMES[jeopardy_round-1], 
+        FINALE_ROUND,
+        ROUND_NAMES[FINALE_ROUND-1], 
         player_data,
         question,
         category_name
@@ -627,7 +676,7 @@ def enable_buzz(active_players_str: str):
     active_player_ids = json.loads(active_players_str)
     jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
     contestants = jeopardy_data["contestants"]
-    state = jeopardy_data["state"]
+    state: QuestionState = jeopardy_data["state"]
 
     active_ids = []
     for contestant in contestants.values():
@@ -708,15 +757,40 @@ def wrong_answer(turn_id: int):
 def disable_buzz():
     state = flask.current_app.config["JEOPARDY_DATA"]["state"]
 
-    flask.current_app.config["JEOPARDY_BUZZ_LOCK"].acquire()
-    state.buzz_winner_decided = True
-    flask.current_app.config["JEOPARDY_BUZZ_LOCK"].release()
+    with flask.current_app.config["JEOPARDY_BUZZ_LOCK"]:
+        state.buzz_winner_decided = True
 
     emit("buzz_disabled", to="contestants")
 
 @app_util.socket_io.event
 def first_turn(turn_id: int):
     emit("turn_chosen", int(turn_id), to="contestants")
+
+@app_util.socket_io.event
+def use_power_up(disc_id: str, power_id: str, target_id: str):
+    disc_id = int(disc_id)
+    target_id = int(target_id)
+
+    contestants: Dict[int, Contestant] = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+    contestant = contestants[disc_id]
+
+    with flask.current_app.config["JEOPARDY_POWER_LOCK"]:
+        power_up = contestant.get_power(power_id)
+        if power_up.used: # Contestant has already used this power_up
+            return
+
+        if power_id == "steal":
+            # For 'steal', check if targetted player has already been targetted before
+            for contestant in contestants.values():
+                for power in contestant.power_ups:
+                    if power.power_id == "steal" and target_id not in power_up.available_targets:
+                        return
+
+            power_up.available_targets.remove(target_id)
+
+        power_up.used = True
+
+        emit("power_up_used", power_id, to="presenter")
 
 @app_util.socket_io.event
 def enable_finale_wager():

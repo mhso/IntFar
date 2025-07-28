@@ -48,3 +48,12 @@ class GameAPIClient(ABC):
     @abstractmethod
     async def get_player_names_for_user(self, user: User) -> list[str]:
         ...
+
+    def __getstate__(self):
+        state = dict(self.__dict__)
+        del state["httpx_client"]
+        return state
+    
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self.httpx_client = AsyncClient()

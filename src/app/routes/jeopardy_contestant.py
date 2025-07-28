@@ -70,7 +70,7 @@ def game_view():
 
     active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
     disc_id = int(flask.request.cookies["jeopardy_user_id"])
-    contestant = active_contestants[disc_id]
+    contestant: Contestant = active_contestants[disc_id]
 
     state_dict = state.__dict__
     for data in state.player_data:
@@ -79,6 +79,7 @@ def game_view():
             contestant.buzzes = data["buzzes"]
             contestant.hits = data["hits"]
             contestant.misses = data["misses"]
+            contestant.power_ups = data["power_ups"]
             break
 
     return app_util.make_template_context(
@@ -93,6 +94,7 @@ def game_view():
         hits=contestant.hits,
         misses=contestant.misses,
         ping=contestant.ping,
+        power_ups=[power_up.__dict__ for power_up in contestant.power_ups],
         finale_wager=contestant.finale_wager,
         player_bg_img=PLAYER_BACKGROUNDS[contestant.disc_id],
         **state_dict
@@ -176,7 +178,7 @@ def make_finale_wager(disc_id: str, amount: str):
         emit("invalid_wager", max_wager)
         return
 
-    if 100 <= amount <= max_wager:
+    if 0 <= amount <= max_wager:
         print(f"Made finale wager for {disc_id} (#{contestant.index}) for {amount} points")
         contestant.finale_wager = amount
         emit("finale_wager_made")

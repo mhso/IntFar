@@ -23,7 +23,7 @@ from discbot.discord_bot import DiscordClient
 from api.data_schema import generate_schema
 
 class TestFuncs:
-    def __init__(self, config, meta_database: MetaDatabase, game_databases: dict[str, GameDatabase], riot_api):
+    def __init__(self, config, meta_database: MetaDatabase, game_databases: dict[str, GameDatabase], riot_api: RiotAPIClient):
         self.config = config
         self.meta_database = meta_database
         self.game_databases = game_databases
@@ -359,6 +359,12 @@ class TestFuncs:
                     summ_data = await self.riot_api.get_player_data_from_summ_id(summ_id)
                     database.execute_query(query, summ_data["puuid"], summ_id)
                     await asyncio.sleep(2)
+
+    async def get_raw_lol_data(self):
+        game_id = "7451201570"
+        data = await self.riot_api.get_game_details(game_id)
+        with open("../resources/lol_data.json", "w", encoding="utf-8") as fp:
+            json.dump(data, fp)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

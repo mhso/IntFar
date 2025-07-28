@@ -16,7 +16,7 @@ from api.game_data import get_stat_parser
 from api.game_stats import PostGameStats, GameStats
 from api.awards import AwardQualifiers, get_awards_handler
 from api.game_api_client import GameAPIClient
-
+from api.util import get_website_link
 
 class GameMonitor(ABC):
     GAME_STATUS_NOCHANGE = 0
@@ -384,7 +384,7 @@ class GameMonitor(ABC):
         Called when a game is over. Combines all the necessary post game data
         into one object that is returned and passed to any listeners via a callback.
         """
-        if status_code in (self.POSTGAME_STATUS_ERROR, self.POSTGAME_STATUS_MISSING):
+        if status_code in (self.POSTGAME_STATUS_ERROR, self.POSTGAME_STATUS_MISSING) and game_info["gameId"] is not None:
             self.game_database.save_missed_game(game_info["gameId"], guild_id, int(time()))
 
         if status_code == self.POSTGAME_STATUS_OK:
@@ -437,6 +437,7 @@ class GameMonitor(ABC):
 
                 game_info = {"gameId": game_id}
                 status_code = self.POSTGAME_STATUS_ERROR
+
             finally:
                 # Send update to Int-Far website that the game is over.
                 req_data = {
@@ -445,6 +446,8 @@ class GameMonitor(ABC):
                     "game_id": game_id
                 }
                 self._send_game_update("game_ended", self.game, req_data)
+
+                logger.info(f"Game status: {status_code}")
 
                 post_game_data = self.handle_game_over(game_info, status_code, guild_id)
                 if self.game_over_callback is not None:
@@ -472,6 +475,7 @@ class GameMonitor(ABC):
 
     def _send_game_update(self, endpoint, game, data):
         try:
-            return httpx.post(f"https://mhooge.com:5000/intfar/{game}/{endpoint}", data=data)
+            base_url = get_website_link(game)
+            return httpx.post(f"{base_url}/{endpoint}", data=data)
         except httpx.RequestError:
             logger.bind(endpoint=endpoint, data=data).exception(f"Error ignored in send_game_update for {self.game}")

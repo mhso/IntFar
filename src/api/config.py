@@ -34,7 +34,6 @@ class Config:
 
         # ===== Betting =====
         self.betting_tokens = "*good-boi points*"
-        self.starting_tokens = 100
         self.betting_tokens_for_win = 8
         self.betting_tokens_for_loss = 3
         self.betting_tokens_for_doinks = 15

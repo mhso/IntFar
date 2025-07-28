@@ -43,8 +43,7 @@ async def register_for_lol(
     status_code, status = game_database.add_user(
         disc_id,
         player_name=summ_name_joined,
-        player_id=summ_id,
-        puuid=puuid
+        player_id=puuid,
     )
 
     return status_code, status

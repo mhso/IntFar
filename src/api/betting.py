@@ -60,9 +60,10 @@ class BetResolver(ABC):
         doinks = {
             player_stats.disc_id: player_stats.doinks
             for player_stats in self.game_stats.filtered_player_stats
+            if player_stats.doinks
         }
         if self.target_id is None:
-            return any(doink_str for doink_str in doinks.values())
+            return doinks != {}
 
         return self.target_id in doinks
 
