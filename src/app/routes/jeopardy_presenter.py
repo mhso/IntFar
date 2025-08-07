@@ -115,7 +115,6 @@ class PowerUp:
     power_id: str
     name: str
     used: bool = False
-    available_targets: Set[int] = field(default_factory=lambda: set(PLAYER_INDEXES), init=False)
 
     def to_json(self):
         return json.dumps(self.__dict__, default=lambda o: list(o))
@@ -128,7 +127,7 @@ class PowerUp:
 
 def _init_powerups():
     return [
-        PowerUp("steal", "Steal"),
+        PowerUp("hijack", "Hijack"),
         PowerUp("freeze", "Freeze"),
         PowerUp("rewind", "Rewind"),
     ]
@@ -778,15 +777,6 @@ def use_power_up(disc_id: str, power_id: str, target_id: str):
         power_up = contestant.get_power(power_id)
         if power_up.used: # Contestant has already used this power_up
             return
-
-        if power_id == "steal":
-            # For 'steal', check if targetted player has already been targetted before
-            for contestant in contestants.values():
-                for power in contestant.power_ups:
-                    if power.power_id == "steal" and target_id not in power_up.available_targets:
-                        return
-
-            power_up.available_targets.remove(target_id)
 
         power_up.used = True
 

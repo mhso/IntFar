@@ -628,6 +628,8 @@ function showQuestion() {
         }
     }
     else {
+        // If there is no answer image, either show answer choices
+        // if question is multiple choice, otherwise show question image/video
         if (isQuestionMultipleChoice()) {
             if (questionImage != null) {
                 showImageOrVideo(questionImage);
