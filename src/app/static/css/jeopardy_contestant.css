@@ -15,7 +15,7 @@ h1 {
 }
 
 #bg-image {
-    position: absolute;
+    position: fixed;
     z-index: -1;
     background-size: cover;
     backdrop-filter: blur(5px);
@@ -42,6 +42,7 @@ h1 {
 }
 
 #contestant-game-wrapper {
+    position: relative;
     padding: 0 10px;
 }
 
@@ -196,6 +197,34 @@ h1 {
     top: calc(50% - 45vw);
 }
 
+#contestant-power-ups {
+    position: absolute;
+    bottom: -75px;
+    width: 100%;
+}
+
+#contestant-power-ups > button {
+    width: 75px;
+    margin: 0 5px;
+    background-color: transparent;
+    border: none;
+}
+
+.contestant-power-icon, .contestant-power-used {
+    width: 70px;
+    border-radius: 35px;
+    border: 2px solid white;
+}
+
+.contestant-power-used {
+    position: absolute;
+    z-index: 10;
+}
+
+.contestant-power-icon.power-disabled {
+    filter: grayscale(100%);
+}
+
 #question-category-header {
     color: white;
     font-family: league;
@@ -216,8 +245,10 @@ h1 {
 }
 
 #question-choices-indicator {
+    position: relative;
     height: 32px;
-    vertical-align: baseline;
+    vertical-align: top;
+    top: 1.5vw;
 }
 
 #question-wager-input, #finale-wager-input {

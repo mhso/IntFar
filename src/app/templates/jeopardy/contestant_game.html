@@ -85,6 +85,7 @@
                     
                     {% else %}
 
+                    <!-- Buzzer -->
                     <div id="buzzer-wrapper" onclick="pressBuzzer('{{ active_player }}');">
                         <img id="buzzer-active" src="{{ url_for('static', _external=True, filename='img/jeopardy/buzzer_active.png') }}" class="d-none">
                         <img id="buzzer-inactive" src="{{ url_for('static', _external=True, filename='img/jeopardy/buzzer_inactive.png') }}">
@@ -94,6 +95,16 @@
                     <div id="contestant-buzzer-status" class="d-none">
                         <img id="buzzer-winner" src="{{ url_for('static', _external=True, filename='img/check.png') }}" class="d-none">
                         <img id="buzzer-loser" src="{{ url_for('static', _external=True, filename='img/wrong.png') }}" class="d-none">
+                    </div>
+
+                    <!-- Power-Ups -->
+                    <div id="contestant-power-ups">
+                        {% for power_up in power_ups %}
+                        <button id="contestant-power-btn-{{ power_up['power_id'] }}" {% if not power_up['used'] and power_up['enabled'] %}onclick="usePowerUp('{{ active_player }}', '{{ power_up['power_id'] }}')"{% else %}disabled{% endif %}>
+                            <img src="{{ url_for('static', _external=True, filename='img/forbidden.png') }}" class="contestant-power-used {% if not power_up['used'] %}d-none{% endif %}">
+                            <img src="{{ url_for('static', _external=True, filename='img/jeopardy/power_' + power_up['power_id'] + '.png') }}" class="contestant-power-icon {% if not power_up['enabled'] or power_up['used'] %}power-disabled{% endif %}">
+                        </button>
+                        {% endfor %}
                     </div>
 
                     {% endif %}
@@ -131,17 +142,6 @@
 
                 {% endif %}
 
-                <!-- Power Ups -->
-                <!-- <div id="contestant-power-ups">
-                    {% for power_up in power_ups %}
-                    <button {% if not power_up['used'] %}onclick="usePowerUp('{{ power_up['power_id'] }}'){% else %}disabled{% endif %}">
-                        <img src="{{ url_for('static', filename='img/power_' + power_up['power_id'] + '.png') }}">
-                    </button>
-                    {% endfor %}
-
-                    <div></div>
-                </div> -->
-
                 {% endif %}
 
             {% endif %}
@@ -153,7 +153,7 @@
                     sendPingMessage("{{ active_player }}");
                     socket.emit("join_lobby", "{{ active_player }}", "{{ nickname }}", "{{ avatar }}", "{{ color }}");
                     animateWaitingText();
-                    monitorGame({{ turn_id }});
+                    monitorGame("{{ active_player }}", {{ turn_id }});
 
                     {% if jeopardy_round == 1 and player_turn == -1 %}
                     socket.on("turn_chosen", function(turnId) {

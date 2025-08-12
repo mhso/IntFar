@@ -31,7 +31,7 @@
             </div>
 
             {% if first_round %}
-            <audio id="selection-start-sound" loop="false">
+            <audio id="selection-start-sound">
                 <source src="{{ url_for('static', _external=True, filename='data/its_happening.mp3') }}" type="audio/mpeg">
             </audio>
             {% endif %}
@@ -47,7 +47,7 @@
             </div>
 
             <!-- Jeopardy theme music -->
-            <audio id="selection-jeopardy-theme" loop="false">
+            <audio id="selection-jeopardy-theme">
                 <source src="{{ url_for('static', _external=True, filename='img/jeopardy/jeopardy_theme.mp3') }}" type="audio/mpeg">
             </audio>
             {% endif %}

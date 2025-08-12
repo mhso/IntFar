@@ -599,6 +599,33 @@ h3 {
     text-align: left;
 }
 
+#question-power-up-splash {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    text-align: center;
+    z-index: 99;
+}
+
+#question-power-up-splash > video {
+    position: relative;
+    height: 100vh;
+    top: 0
+}
+
+.question-power-up-icons {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+
+    border: 3px solid white;
+    border-radius: 100px;
+
+    top: calc(50% + 110px);
+    left: calc(50% - 100px);
+}
+
 #question-answer-wrong, #question-answer-correct {
     font-size: 2.5rem;
     text-align: center;

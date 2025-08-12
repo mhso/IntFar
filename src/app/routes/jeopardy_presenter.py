@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 from time import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Set
+from typing import Dict, List
 from gevent import sleep
 
 import flask
@@ -15,7 +15,7 @@ from api.lan import is_lan_ongoing
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
-TRACK_UNUSED = True
+TRACK_UNUSED = False
 DO_DAILY_DOUBLE = True
 
 QUESTIONS_PER_ROUND = 30
@@ -114,8 +114,8 @@ BUZZ_IN_SOUNDS = {
 class PowerUp:
     power_id: str
     name: str
+    enabled: bool = False
     used: bool = False
-    available_targets: Set[int] = field(default_factory=lambda: set(PLAYER_INDEXES), init=False)
 
     def to_json(self):
         return json.dumps(self.__dict__, default=lambda o: list(o))
@@ -128,10 +128,12 @@ class PowerUp:
 
 def _init_powerups():
     return [
-        PowerUp("steal", "Steal"),
+        PowerUp("hijack", "Hijack"),
         PowerUp("freeze", "Freeze"),
         PowerUp("rewind", "Rewind"),
     ]
+
+POWER_UP_IDS = [power.power_id for power in _init_powerups()]
 
 @dataclass
 class Contestant:
@@ -145,7 +147,7 @@ class Contestant:
     hits: int = 0
     misses: int = 0
     ping: int = field(default=30, init=False)
-    sid: int = field(default=None, init=False)
+    sid: str = field(default=None, init=False)
     n_ping_samples: int = field(default=10, init=False)
     latest_buzz: int = field(default=None, init=False)
     power_ups: List[PowerUp] = field(default_factory=_init_powerups, init=False)
@@ -218,6 +220,7 @@ class QuestionState(RoundState):
     daily_double: bool
     question_asked_time: float = field(default=None, init=False)
     buzz_winner_decided: bool = field(default=False, init=False)
+    power_use_decided: Dict[str, bool] = field(default_factory=lambda: {power_up.power_id: False for power_up in _init_powerups()}, init=False)
 
 @dataclass
 class FinaleState(State):
@@ -313,6 +316,8 @@ def get_round_data(request_args):
                 else:
                     avatar = flask.url_for("static", _external=True, filename="img/questionmark.png")
 
+                power_ups = _init_powerups()
+
             player_data.append({
                 "disc_id": str(disc_id),
                 "name": request_args[name_key],
@@ -380,6 +385,11 @@ def question_view(jeopardy_round, category, tier):
         # Get player names and scores from query parameters
         player_data, player_turn, question_num = get_round_data(flask.request.args)
 
+        # Reset used power-ups
+        contestants: Dict[int, Contestant] = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+        for contestant in contestants.values():
+            contestant.power_ups = _init_powerups()
+
         question_state = QuestionState(
             jeopardy_round,
             ROUND_NAMES[jeopardy_round - 1],
@@ -408,6 +418,7 @@ def question_view(jeopardy_round, category, tier):
         buzz_sounds=BUZZ_IN_SOUNDS,
         correct_sound=correct_sound,
         wrong_sounds=wrong_sounds,
+        power_ups=POWER_UP_IDS,
         **question_state.__dict__
     )
 
@@ -460,11 +471,6 @@ def active_jeopardy(jeopardy_round):
                     for tier_info in used_questions[category]:
                         tier_info["active"] = True
                         tier_info["double"] = False
-
-                # Reset used power-ups
-                contestants: Dict[int, Contestant] = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
-                for contestant in contestants.values():
-                    contestant.power_ups = _init_powerups()
 
                 if DO_DAILY_DOUBLE:
                     # Choose 1 or 2 random category/tier combination to be daily double
@@ -690,11 +696,66 @@ def enable_buzz(active_players_str: str):
     emit("buzz_enabled", active_ids, to="contestants")
 
 @app_util.socket_io.event
+def enable_powerup(disc_id: str, power_id: str):
+    if disc_id is not None:
+        disc_id = int(disc_id)
+
+    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
+    state: QuestionState = jeopardy_data["state"]
+    contestants: Dict[str, Contestant] = jeopardy_data["contestants"]
+
+    if disc_id is not None:
+        player_ids = [disc_id]
+
+    else:
+        player_ids = list(contestants.keys())
+
+    for player_id in player_ids:
+        power_up = contestants[player_id].get_power(power_id)
+        if power_up.used:
+            continue
+
+        power_up.enabled = True
+
+    state.power_use_decided[power_id] = False
+
+    send_to = contestants[disc_id].sid if disc_id is not None else "contestants"
+    emit("power_up_enabled", power_id, to=send_to)
+
+@app_util.socket_io.event
+def disable_powerup(disc_id: str | None, power_id: str | None):
+    if disc_id is not None:
+        disc_id = int(disc_id)
+
+    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
+    state: QuestionState = jeopardy_data["state"]
+    contestants: Dict[str, Contestant] = jeopardy_data["contestants"]
+
+    if disc_id is not None:
+        player_ids = [disc_id]
+
+    else:
+        player_ids = list(contestants.keys())
+
+    power_ids = [power_id] if power_id is not None else list(POWER_UP_IDS)
+    for player_id in player_ids:
+        contestant = contestants[player_id]
+        for pow_id in power_ids:
+            power = contestant.get_power(pow_id)
+            power.enabled = False
+
+    for pow_id in power_ids:
+        state.power_use_decided[pow_id] = True
+
+    send_to = contestants[disc_id].sid if disc_id is not None else "contestants"
+    emit("power_ups_disabled", power_ids, to=send_to)
+
+@app_util.socket_io.event
 def buzzer_pressed(disc_id: str):
     disc_id = int(disc_id)
     jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
     contestants = jeopardy_data["contestants"]
-    state = jeopardy_data["state"]
+    state: QuestionState = jeopardy_data["state"]
 
     contestant = contestants.get(disc_id)
 
@@ -735,7 +796,7 @@ def buzzer_pressed(disc_id: str):
 @app_util.socket_io.event
 def correct_answer(turn_id: int, value: int):
     disc_id = PLAYER_INDEXES[turn_id]
-    contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(disc_id)
+    contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(disc_id)
 
     if contestant is None:
         return
@@ -746,7 +807,7 @@ def correct_answer(turn_id: int, value: int):
 @app_util.socket_io.event
 def wrong_answer(turn_id: int):
     disc_id = PLAYER_INDEXES[turn_id]
-    contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(disc_id)
+    contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(disc_id)
 
     if contestant is None:
         return
@@ -767,30 +828,31 @@ def first_turn(turn_id: int):
     emit("turn_chosen", int(turn_id), to="contestants")
 
 @app_util.socket_io.event
-def use_power_up(disc_id: str, power_id: str, target_id: str):
+def use_power_up(disc_id: str, power_id: str):
     disc_id = int(disc_id)
-    target_id = int(target_id)
 
-    contestants: Dict[int, Contestant] = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
-    contestant = contestants[disc_id]
+    jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
+    state: QuestionState = jeopardy_data["state"]
+    contestant: Contestant = jeopardy_data["contestants"].get(disc_id)
+
+    if contestant is None or power_id not in state.power_use_decided:
+        print("ERROR: contestant or power_up does not exist", disc_id, power_id)
+        return
 
     with flask.current_app.config["JEOPARDY_POWER_LOCK"]:
+        if state.power_use_decided[power_id]:
+            return
+
+        state.power_use_decided[power_id] = True
+
         power_up = contestant.get_power(power_id)
         if power_up.used: # Contestant has already used this power_up
             return
 
-        if power_id == "steal":
-            # For 'steal', check if targetted player has already been targetted before
-            for contestant in contestants.values():
-                for power in contestant.power_ups:
-                    if power.power_id == "steal" and target_id not in power_up.available_targets:
-                        return
-
-            power_up.available_targets.remove(target_id)
-
         power_up.used = True
 
-        emit("power_up_used", power_id, to="presenter")
+        emit("power_ups_disabled", list(POWER_UP_IDS), to="contestants")
+        emit("power_up_used", (contestant.index, power_id), to="presenter")
 
 @app_util.socket_io.event
 def enable_finale_wager():

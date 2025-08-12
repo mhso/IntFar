@@ -90,9 +90,48 @@ function handleBuzzInResult(imageToShow) {
     buzzerStatus.style.opacity = 1;
     imageToShow.classList.remove("d-none");
     imageToShow.style.animationName = "showBuzzerStatus";
+
+    setTimeout(function() {
+        let buzzerWinnerImg = document.getElementById("buzzer-winner");
+        let buzzerLoserImg = document.getElementById("buzzer-loser");
+
+        // Reset and hide buzzer status after a delay
+        resetBuzzerStatusImg(buzzerWinnerImg);
+        resetBuzzerStatusImg(buzzerLoserImg);
+
+        buzzerStatus.classList.add("d-none");
+        buzzerStatus.style.opacity = 0;
+    }, 1600);
 }
 
-function monitorGame(turnId) {
+function usePowerUp(playerId, powerId) {
+    let btn = document.getElementById(`contestant-power-btn-${powerId}`);
+    let usedIcon = btn.getElementsByClassName("contestant-power-used").item(0);
+    usedIcon.classList.remove("d-none");
+    
+    btn.disabled = true;
+
+    socket.emit("use_power_up", playerId, powerId);
+}
+
+function togglePowerUpsEnabled(playerId, powerIds, enabled) {
+    powerIds.forEach((powerId) => {
+        let btn = document.getElementById(`contestant-power-btn-${powerId}`);
+        let powerIcon = btn.getElementsByClassName("contestant-power-icon").item(0);
+
+        if (enabled && powerIcon.classList.contains("power-disabled")) {
+            powerIcon.classList.remove("power-disabled");
+            btn.onclick = () => usePowerUp(playerId, powerId);
+        }
+        else if (!enabled && !powerIcon.classList.contains("power-disabled")) {
+            powerIcon.classList.add("power-disabled");
+        }
+
+        btn.disabled = !enabled;
+    });
+}
+
+function monitorGame(playerId, turnId) {
     let buzzerActive = document.getElementById("buzzer-active");
     let buzzerInactive = document.getElementById("buzzer-inactive");
     let buzzerPressed = document.getElementById("buzzer-pressed");
@@ -107,22 +146,13 @@ function monitorGame(turnId) {
 
     // Called when question has been asked and buzzing has been enabled.
     socket.on("buzz_enabled", function(activeIds) {
-        resetBuzzerStatusImg(buzzerWinnerImg);
-        resetBuzzerStatusImg(buzzerLoserImg);
-
         if (activeIds.includes(turnId)) {
-            buzzerStatus.classList.add("d-none");
-            buzzerStatus.style.opacity = 0;
-
             buzzerInactive.classList.add("d-none");
             buzzerActive.classList.remove("d-none");
         }
     });
 
     socket.on("buzz_disabled", function() {
-        resetBuzzerStatusImg(buzzerWinnerImg);
-        resetBuzzerStatusImg(buzzerLoserImg);
-
         buzzerActive.classList.add("d-none");
         buzzerPressed.classList.add("d-none");
         buzzerInactive.classList.remove("d-none");
@@ -146,6 +176,16 @@ function monitorGame(turnId) {
         }
 
         handleBuzzInResult(buzzerLoserImg);
+    });
+
+    // Called whenever a powerup is available to use
+    socket.on("power_up_enabled", function(powerId) {
+        togglePowerUpsEnabled(playerId, [powerId], true);
+    });
+
+    // Called whenever a powerup is no longer available to use
+    socket.on("power_ups_disabled", function(powerIds) {
+        togglePowerUpsEnabled(playerId, powerIds, false);
     });
 
     // Called whenever the server has received our ping request.
@@ -215,3 +255,15 @@ function animateWaitingText() {
     //     }
     // }, 1000);
 }
+
+window.addEventListener("DOMContentLoaded", function() {
+    let questionHeader = document.getElementById("question-category-header");
+    if (questionHeader != null) {
+        let size = (window.innerWidth / questionHeader.textContent.length * 2.2);
+        questionHeader.style.fontSize = size + "px";
+        let questionChoices = document.getElementById("question-choices-indicator");
+        if (questionChoices != null) {
+            questionChoices.style.height = (size - 5) + "px";
+        }
+    }
+});

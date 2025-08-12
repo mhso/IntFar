@@ -19,6 +19,7 @@ var activePlayers = [];
 var questionAnswered = false;
 var buzzInTime = 10;
 var isDailyDouble = false;
+var activePowerUp = null;
 
 let playerTurn = 0;
 var questionNum = 0;
@@ -130,9 +131,22 @@ function listenForBuzzIn() {
     }
 }
 
+function disableBuzzIn() {
+    socket.emit("disable_buzz");
+}
+
+function enablePowerUp(playerId, powerId) {
+    socket.emit("enable_powerup", playerId, powerId);
+}
+
+function disablePowerUp(playerId=null, powerId=null) {
+    socket.emit("disable_powerup", playerId, powerId);
+}
+
 function afterQuestion() {
     activeAnswer = null;
     hideTips();
+
     window.onkeydown = function(e) {
         if (e.code == PRESENTER_ACTION_KEY) {
             window.location.href = getSelectionURL(activeRound);
@@ -152,7 +166,7 @@ function afterAnswer() {
     if (activeAnswer == null) {
         // Question has been answered or time ran out
         if (!isDailyDouble) {
-            socket.emit("disable_buzz");
+            disableBuzzIn();
         }
         return;
     }
@@ -189,6 +203,10 @@ function updatePlayerScore(player, delta) {
 }
 
 function correctAnswer() {
+    // Disable all power-ups after question has been answered correctly
+    disablePowerUp();
+    activePowerUp = null;
+
     let elem = document.getElementById("question-answer-correct");
 
     let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
@@ -233,6 +251,14 @@ function correctAnswer() {
 }
 
 function wrongAnswer(reason, questionOver=false) {
+    let outOfTime = questionOver && answeringPlayer == null;
+
+    if (outOfTime) {
+        // Disable all power-ups if time ran out
+        disablePowerUp();
+        activePowerUp = null;
+    }
+
     let elem = document.getElementById("question-answer-wrong");
     let valueElem = elem.getElementsByClassName("question-answer-value").item(0);
     let coinElem = elem.getElementsByClassName("question-result-gbp").item(0);
@@ -257,9 +283,12 @@ function wrongAnswer(reason, questionOver=false) {
 
         // Send update to server
         socket.emit("wrong_answer", answeringPlayer);
-    }
 
-    let outOfTime = questionOver && answeringPlayer == null;
+        // Disable the use of 'freeze' power up, enable the use of 'rewind'
+        activePowerUp = null;
+        disablePowerUp(playerIds[answeringPlayer], "freeze");
+        enablePowerUp(playerIds[answeringPlayer], "rewind");
+    }
 
     if (activePlayers.every(v => !v) || outOfTime) {
         // No players are eligible to answer, go to next question
@@ -300,8 +329,10 @@ function keyIsNumeric(key, min, max) {
 function stopCountdown() {
     clearInterval(countdownInterval);
     let countdownElem = document.getElementById("question-countdown-wrapper");
-    countdownElem.classList.add("d-none");
-    countdownElem.style.opacity = 0;
+    if (!countdownElem.classList.contains("d-none")) {
+        countdownElem.classList.add("d-none");
+        countdownElem.style.opacity = 0;
+    }
 }
 
 function isQuestionMultipleChoice() {
@@ -415,6 +446,9 @@ function startAnswerCountdown(duration) {
     // Action key has to be pressed before an answer can be given (for safety)
     window.onkeydown = function(e) {
         if (e.code == PRESENTER_ACTION_KEY) {
+            // Disable 'hijack' power-up after an answer has been given
+            disablePowerUp(null, "hijack");
+
             // Pause video if one is playing
             pauseVideo();
 
@@ -428,38 +462,41 @@ function startAnswerCountdown(duration) {
     }
 }
 
-function addToBuzzFeed(playerId, timeTaken) {
-    if (playersBuzzedIn.includes(playerId)) {
-        return;
-    }
-
+function getPlayerNameAndColor(playerId) {
     let playerFooterElem = document.getElementsByClassName("footer-contestant-entry").item(playerId);
     let color = playerFooterElem.style.backgroundColor;
     let name = playerFooterElem.getElementsByClassName("footer-contestant-entry-name").item(0).textContent;
 
+    return [name, color];
+}
+
+function addToGameFeed(text) {
     let wrapper = document.getElementById("question-buzz-feed");
     wrapper.classList.remove("d-none");
+
     let listParent = wrapper.getElementsByTagName("ul").item(0);
+
     let listElem = document.createElement("li");
-    listElem.innerHTML = `<span style="color: ${color}; font-weight: 800">${name}</span> buzzede ind efter ${timeTaken} sekunder`;
+    listElem.innerHTML = text;
+
     listParent.appendChild(listElem);
 }
 
-function playerBuzzedFirst(playerId) {
-    playersBuzzedIn.push(playerId);
-
-    if (!activePlayers[playerId] || answeringPlayer != null) {
+function addBuzzToFeed(playerId, timeTaken) {
+    if (playersBuzzedIn.includes(playerId)) {
         return;
     }
 
-    // Buzzer has been hit, let the player answer.
-    answeringPlayer = playerId;
-    activePlayers[playerId] = false;
-    document.getElementById("question-buzzer-sound").play();
-    setTimeout(function() {
-        document.getElementById("question-buzzer-" + playerIds[playerId]).play();
-    }, 600);
+    let [name, color] = getPlayerNameAndColor(playerId);
+    addToGameFeed(`<span style="color: ${color}; font-weight: 800">${name}</span> buzzede ind efter ${timeTaken} sekunder`);
+}
 
+function addPowerUseToFeed(playerId, powerId) {
+    let [name, color] = getPlayerNameAndColor(playerId);
+    addToGameFeed(`<span color='${color}'>${name}</span> brugte sin <strong>${powerId}</strong> power-up!`);
+}
+
+function afterBuzzIn(playerId) {
     // Pause video if one is playing
     pauseVideo();
 
@@ -475,7 +512,105 @@ function playerBuzzedFirst(playerId) {
     // Start new countdown for answering after small delay
     setTimeout(function() {
         startAnswerCountdown(TIME_FOR_ANSWERING);
+
+        // Enable 'freeze' for player who buzzed
+        enablePowerUp(playerIds[playerId], "freeze");
     }, 500);
+}
+
+function playerBuzzedFirst(playerId) {
+    if (activePowerUp != null) {
+        return;
+    }
+
+    playersBuzzedIn.push(playerId);
+
+    if (!activePlayers[playerId] || answeringPlayer != null) {
+        return;
+    }
+
+    // Buzzer has been hit, let the player answer.
+    answeringPlayer = playerId;
+    activePlayers[playerId] = false;
+    document.getElementById("question-buzzer-sound").play();
+    setTimeout(function() {
+        document.getElementById("question-buzzer-" + playerIds[playerId]).play();
+    }, 600);
+
+    afterBuzzIn(playerId);
+}
+
+function showPowerUpSplashImage(powerId, playerId, callback=null) {
+    let wrapper = document.getElementById("question-power-up-splash");
+    wrapper.classList.remove("d-none");
+
+    let video = wrapper.getElementsByTagName("video").item(0);
+
+    video.onended = function() {
+        wrapper.classList.add("d-none");
+        if (callback != null) {
+            callback(playerId);
+        }
+    };
+
+    video.play();
+
+    let powerUpIcon = document.getElementById(`question-power-up-${powerId}`);
+    powerUpIcon.classList.remove("d-none");
+
+    setTimeout(function() {
+        powerUpIcon.classList.add("d-none");
+    }, 3000);
+}
+
+function freezeUsed() {
+    stopCountdown();
+}
+
+function rewindUsed(playerId) {
+    // Refund the score the player lost on the previous answer
+    updatePlayerScore(answeringPlayer, activeValue);
+
+    afterBuzzIn(playerId);
+}
+
+function hijackUsed(playerId) {
+    // If question has not been asked yet, hijack gives bonus points
+    let beforeQuestionAsked = activePlayers.length == 0
+    let afterBuzzIn = answeringPlayer != null;
+    activePlayers = [];
+
+    for (let i = 0; i < playerIds.length; i++) {
+        activePlayers.push(false);
+    }
+
+    answeringPlayer = playerId;
+
+    if (!beforeQuestionAsked) {
+        if (afterBuzzIn) {
+            stopCountdown();
+        }
+        afterBuzzIn(playerId);
+    }
+}
+
+function powerUpUsed(playerId, powerId) {
+    activePowerUp = powerId;
+    window.onkeydown = null;
+
+    console.log(`Player ${playerId} used power '${powerId}'`);
+
+    callback = null;
+    if (powerId == "freeze") {
+        freezeUsed();
+    }
+    else {
+        disableBuzzIn();
+        callback = powerId == "rewind" ? rewindUsed : hijackUsed;
+    }
+
+    showPowerUpSplashImage(powerId, playerId, callback);
+    addPowerUseToFeed(playerId, powerId);
 }
 
 function hideTips() {
@@ -533,8 +668,9 @@ function questionAsked(countdownDelay) {
                 startCountdown(buzzInTime);
             }
         }
-        else if (isDailyDouble) {
-            startAnswerCountdown(TIME_FOR_DOUBLE_ANSWER);
+        else if (isDailyDouble || activePowerUp == "hijack") {
+            let timeToAnswer = isDailyDouble ? TIME_FOR_DOUBLE_ANSWER : buzzInTime;
+            startAnswerCountdown(timeToAnswer);
         }
         else {
             // Go to finale screen after countdown is finished if it's round 3
@@ -628,6 +764,8 @@ function showQuestion() {
         }
     }
     else {
+        // If there is no answer image, either show answer choices if question
+        // is multiple choice, otherwise show question image/video
         if (isQuestionMultipleChoice()) {
             if (questionImage != null) {
                 showImageOrVideo(questionImage);

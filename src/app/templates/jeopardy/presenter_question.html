@@ -87,19 +87,30 @@
             <div id="question-buzz-feed" class="d-none">
                 <ul></ul>
             </div>
-
+            
             <!-- Correct answer -->
             <div id="question-answer-correct" class="d-none">
                 <div id="question-correct-reason">Korrekt!{% if "explanation" in question %} ({{ question["explanation"] }}){% endif %} <img class="question-result-avatar" src="{{ url_for('static', _external=True, filename='img/happy_nono.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', _external=True, filename='img/gbp_coin.png') }}"></div>
             </div>
-
+            
             <!-- Wrong answer -->
             <div id="question-answer-wrong" class="d-none">
                 <div id="question-wrong-reason"><span id="question-wrong-reason-text"></span> <img class="question-result-avatar" src="{{ url_for('static', _external=True, filename='img/nat_fine.png') }}"> <span class="question-answer-value"></span><img class="question-result-gbp d-none" src="{{ url_for('static', _external=True, filename='img/gbp_coin.png') }}"></div>
                 <p id="question-actual-answer" class="d-none">Rigtige svar var <span class="question-emph">'{{ question["answer"] }}'{% if "explanation" in question %} ({{ question["explanation"] }}){% endif %}</span></p>
             </div>
         </div>
-    
+
+        <!-- Power Up splash video -->
+        <div id="question-power-up-splash" class="d-none">
+            <video>
+                <source src="{{ url_for('static', _external=True, filename='img/jeopardy/power_up_used.webm') }}" type="video/webm">
+            </video>
+
+            {% for power_id in power_ups %}
+            <img id="question-power-up-{{ power_id }}" src="{{ url_for('static', _external=True, filename='img/jeopardy/power_' + power_id + '.png') }}" class="question-power-up-icons d-none">
+            {% endfor %}
+        </div>
+        
         <!-- Contestants -->
         {% include 'jeopardy/contestants_footer.html' %}
     </body>
@@ -148,8 +159,9 @@
 
         socket.on("connect", function() {
             socket.emit("presenter_joined");
-            socket.on("buzz_received", addToBuzzFeed);
+            socket.on("buzz_received", addBuzzToFeed);
             socket.on("buzz_winner", playerBuzzedFirst);
+            socket.on("power_up_used", powerUpUsed);
 
             {% if daily_double %}
             socket.on("daily_wager_made", function(amount) {
@@ -162,6 +174,8 @@
                 {% endif %}
             {% endfor %}
             socket.on("contestant_ready", setPlayerReady);
+            {% else %}
+            enablePowerUp(null, "hijack");
             {% endif %}
         });
 

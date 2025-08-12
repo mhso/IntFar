@@ -56,7 +56,7 @@ def _normalize_url(url):
 def _get_players_query_string(turn_id, question_num, player_data):
     query_params = {}
     for index, (disc_id, score, name, color) in enumerate(player_data, start=1):
-        query_params[f"i{index}"] = disc_id
+        query_params[f"i{index}"] = str(disc_id)
         query_params[f"s{index}"] = score
         query_params[f"n{index}"] = name
         query_params[f"c{index}"] = color
@@ -150,7 +150,7 @@ class ContextHandler:
         round_num: int,
         question_num: int,
         turn_id: int,
-        player_data: list[tuple[str, int, int, str]]
+        player_data: list[tuple[int, int, int, str]]
     ):
         query_str = _get_players_query_string(turn_id, question_num, player_data)
         await self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/{round_num}?{query_str}")
@@ -162,7 +162,7 @@ class ContextHandler:
         difficulty: int,
         question_num: int,
         turn_id: int,
-        player_data: list[tuple[str, int, int, str]]
+        player_data: list[tuple[int, int, str, str]]
     ):
         query_str = _get_players_query_string(turn_id, question_num, player_data)
         await self.presenter_page.goto(f"{JEOPARDY_PRESENTER_URL}/{round_num}/{category}/{difficulty}?{query_str}")
@@ -692,6 +692,80 @@ async def test_endscreen():
 
         header = await context.presenter_page.query_selector("#endscreen-winner-desc")
         assert (await header.text_content()).strip() == "Dave wonnered!!! All hail the king!"
+
+@pytest.mark.asyncio
+async def test_freeze_power_up_simple():
+    round_num = 1
+    category = "lore"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+    power_ids = ["hijack", "freeze", "rewind"]
+
+    async with ContextHandler() as context:
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
+
+        await context.show_question()
+
+        await asyncio.sleep(1)
+
+        contestant_page = context.contestant_pages[2]
+        power_ups = [await contestant_page.query_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids]
+
+        for attempt in range(10):
+            if attempt == 9:
+                raise TimeoutError("RIP 1")
+
+            freeze_enabled = await power_ups[0].is_enabled()
+            if freeze_enabled:
+                break
+
+            await asyncio.sleep(1)
+
+        # Assert that only the 'hijack' power-up is available to use
+        enabled_powers = [await power_up.is_enabled() for power_up in power_ups]
+        assert enabled_powers == [True, False, False]
+
+        # Someone buzzes in
+        buzzer = await contestant_page.query_selector("#buzzer-wrapper")
+        await buzzer.tap()
+
+        buzz_winner_elem = await contestant_page.query_selector("#buzzer-winner")
+        await buzz_winner_elem.wait_for_element_state("visible")
+
+        for attempt in range(10):
+            if attempt == 9:
+                raise TimeoutError("RIP 2")
+
+            freeze_enabled = await power_ups[1].is_enabled()
+            if freeze_enabled:
+                break
+
+            await asyncio.sleep(1)
+
+        # Assert that the 'freeze' power-up is now available to use
+        enabled_powers = [await power_up.is_enabled() for power_up in power_ups]
+        assert enabled_powers == [True, True, False]
+
+        countdown_elem = await context.presenter_page.query_selector("#question-countdown-wrapper")
+        visible = await countdown_elem.is_visible()
+        assert visible, "Countdown is visible after buzz"
+
+        # Person uses 'freeze' power-up to freeze countdown
+        power_up = await contestant_page.query_selector("#contestant-power-btn-freeze")
+        await power_up.tap()
+
+        await asyncio.sleep(1)
+
+        visible = await countdown_elem.is_visible()
+        assert not visible, "Countdown is not visible after freeze"
 
 @pytest.mark.asyncio
 async def test_discord_message_simple(discord_client):
