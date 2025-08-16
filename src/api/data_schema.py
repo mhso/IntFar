@@ -14,7 +14,8 @@ def _iterate_recursively(data):
             output_list.append(_iterate_recursively(val))
         return output_list
 
-    return type(data).__name__
+    else:
+        return type(data).__name__
 
 def generate_schema(game_data: dict, filename: str, game: str, config: Config):
     output_file = f"{config.resources_folder}/game_data_schemas/{game}/{filename}"

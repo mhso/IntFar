@@ -28,7 +28,6 @@ class MetaDatabase(SQLiteDatabase):
             FROM users AS u
             LEFT JOIN default_game AS dg
             ON dg.disc_id = u.disc_id
-            GROUP BY u.disc_id
         """
         with self:
             return {x[0]: User(x[0], x[1], default_game=x[2] or DEFAULT_GAME) for x in self.execute_query(query).fetchall()}
@@ -46,7 +45,7 @@ class MetaDatabase(SQLiteDatabase):
             self.execute_query(query, discord_id, secret, 0, commit=False)
 
             query = "INSERT INTO betting_balance VALUES (?, ?)"
-            self.execute_query(query, discord_id, self.config.starting_tokens)
+            self.execute_query(query, discord_id, 100)
 
             self.all_users[discord_id] = User(discord_id, secret)
 
