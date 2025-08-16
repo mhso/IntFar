@@ -106,9 +106,6 @@ function handleBuzzInResult(imageToShow) {
 
 function usePowerUp(playerId, powerId) {
     let btn = document.getElementById(`contestant-power-btn-${powerId}`);
-    let usedIcon = btn.getElementsByClassName("contestant-power-used").item(0);
-    usedIcon.classList.remove("d-none");
-    
     btn.disabled = true;
 
     socket.emit("use_power_up", playerId, powerId);
@@ -186,6 +183,21 @@ function monitorGame(playerId, turnId) {
     // Called whenever a powerup is no longer available to use
     socket.on("power_ups_disabled", function(powerIds) {
         togglePowerUpsEnabled(playerId, powerIds, false);
+    });
+
+    // Called whenever we have successfully used a power-up
+    socket.on("power_up_used", function(powerId) {
+        let usedIcon = document.querySelector(`#contestant-power-btn-${powerId} > .contestant-power-used`);
+        usedIcon.classList.remove("d-none");
+
+        if (powerId != "rewind") {
+            return;
+        }
+
+        if (!buzzerStatus.classList.contains("d-none")) {
+            buzzerStatus.classList.add("d-none");
+            buzzerStatus.style.opacity = 0;
+        }
     });
 
     // Called whenever the server has received our ping request.

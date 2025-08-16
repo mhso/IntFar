@@ -540,56 +540,68 @@ function playerBuzzedFirst(playerId) {
     afterBuzzIn(playerId);
 }
 
-function showPowerUpSplashImage(powerId, playerId, callback=null) {
-    let wrapper = document.getElementById("question-power-up-splash");
-    wrapper.classList.remove("d-none");
-
-    let video = wrapper.getElementsByTagName("video").item(0);
-
-    video.onended = function() {
-        wrapper.classList.add("d-none");
-        if (callback != null) {
-            callback(playerId);
-        }
-    };
-
-    video.play();
-
-    let powerUpIcon = document.getElementById(`question-power-up-${powerId}`);
-    powerUpIcon.classList.remove("d-none");
-
-    setTimeout(function() {
-        powerUpIcon.classList.add("d-none");
-    }, 3000);
+function showPowerUpVideo(powerId) {
+    return new Promise((resolve) => {
+        let wrapper = document.getElementById("question-power-up-splash");
+        wrapper.classList.remove("d-none");
+    
+        let video = wrapper.getElementsByTagName("video").item(0);
+    
+        video.onended = function() {
+            wrapper.classList.add("d-none");
+            resolve();
+        };
+    
+        video.play();
+    
+        let powerUpIcon = document.getElementById(`question-power-up-${powerId}`);
+        powerUpIcon.classList.remove("d-none");
+    
+        setTimeout(function() {
+            powerUpIcon.classList.add("d-none");
+        }, 3000);
+    });
 }
 
-function freezeUsed() {
+function onFreezeUsed() {
     stopCountdown();
 }
 
-function rewindUsed(playerId) {
-    // Refund the score the player lost on the previous answer
-    updatePlayerScore(answeringPlayer, activeValue);
+function onRewindUsed(playerId) {
+    if (answeringPlayer != null) {
+        stopCountdown();
+    }
 
+    // Refund the score the player lost on the previous answer
+    answeringPlayer = playerId;
+    updatePlayerScore(answeringPlayer, activeValue);
+}
+
+function afterRewindUsed(playerId) {
     afterBuzzIn(playerId);
 }
 
-function hijackUsed(playerId) {
+function onHijackUsed() {
     // If question has not been asked yet, hijack gives bonus points
     let beforeQuestionAsked = activePlayers.length == 0
     let afterBuzzIn = answeringPlayer != null;
+
+    if (!beforeQuestionAsked && afterBuzzIn) {
+        stopCountdown();
+    }
+
+    return [beforeQuestionAsked, afterBuzzIn];
+}
+
+function afterHijackUsed(playerId, beforeQuestionAsked, afterBuzzIn) {
+    answeringPlayer = playerId;
     activePlayers = [];
 
     for (let i = 0; i < playerIds.length; i++) {
         activePlayers.push(false);
     }
 
-    answeringPlayer = playerId;
-
     if (!beforeQuestionAsked) {
-        if (afterBuzzIn) {
-            stopCountdown();
-        }
         afterBuzzIn(playerId);
     }
 }
@@ -602,15 +614,21 @@ function powerUpUsed(playerId, powerId) {
 
     callback = null;
     if (powerId == "freeze") {
-        freezeUsed();
+        onFreezeUsed();
+    }
+    else if (powerId == "rewind") {
+        onRewindUsed(playerId);
+        callback = () => afterRewindUsed(playerId);
     }
     else {
-        disableBuzzIn();
-        callback = powerId == "rewind" ? rewindUsed : hijackUsed;
+        let [beforeQuestionAsked, afterBuzzIn] = onHijackUsed();
+        callback = () => afterHijackUsed(playerId, beforeQuestionAsked, afterBuzzIn);
     }
 
-    showPowerUpSplashImage(powerId, playerId, callback);
     addPowerUseToFeed(playerId, powerId);
+    showPowerUpVideo(powerId, playerId).then(() => {
+        if (callback) callback();
+    });
 }
 
 function hideTips() {

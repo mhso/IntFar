@@ -187,6 +187,18 @@ class ContextHandler:
         else:
             await self.presenter_page.press("body", PRESENTER_ACTION_KEY)
 
+    async def get_player_scores(self):
+        point_elems = await self.presenter_page.query_selector_all(".footer-contestant-entry-score")
+        points_text = [await elem.text_content() for elem in point_elems]
+        points_values = await self.presenter_page.evaluate("playerScores")
+
+        points_contestants = []
+        for page in self.contestant_pages:
+            elem = await page.query_selector("#contestant-game-score")
+            points_contestants.append(await elem.text_content())
+
+        return points_text, points_values, points_contestants
+
     async def make_daily_double_wager(self, page: Page, amount: int, dialog_callback=None):
         # Input the amount to wager
         wager_input = await page.query_selector("#question-wager-input")
@@ -375,11 +387,10 @@ async def test_buzz_in_correct_person():
         sleep_time = 1.5 + random.random() * 2
         await asyncio.sleep(sleep_time)
 
-        await context.contestant_pages[1].wait_for_selector("#buzzer-wrapper")
-        buzzer = await context.contestant_pages[1].query_selector("#buzzer-wrapper")
+        buzzer = await context.contestant_pages[1].wait_for_selector("#buzzer-wrapper")
         await buzzer.tap()
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(0.5)
 
         for index in range(len(player_data)):
             buzz_winner_elem = await context.contestant_pages[index].query_selector("#buzzer-winner")
@@ -693,8 +704,32 @@ async def test_endscreen():
         header = await context.presenter_page.query_selector("#endscreen-winner-desc")
         assert (await header.text_content()).strip() == "Dave wonnered!!! All hail the king!"
 
+async def _wait_for_event(callback, condition=None, attemps=10):
+    for _ in range(attemps):
+        result = await callback()
+        if (condition is None and result) or (condition is not None and result == condition):
+            return
+
+        await asyncio.sleep(1)
+
+    raise TimeoutError("Event never happened!")
+
+async def _assert_scores(
+    points_text: List[str],
+    points_values: List[int],
+    points_contestants: List[str],
+    expected_points: List[int],
+    assert_contestants: bool = False
+):
+    expected_text = [f"{points} GBP" for points in expected_points]
+
+    assert points_values == expected_points
+    assert points_text == expected_text
+    if assert_contestants:
+        assert points_contestants == expected_text
+
 @pytest.mark.asyncio
-async def test_freeze_power_up_simple():
+async def test_freeze():
     round_num = 1
     category = "lore"
     difficulty = 1
@@ -714,24 +749,17 @@ async def test_freeze_power_up_simple():
 
         await context.show_question()
 
-        await asyncio.sleep(1)
-
         contestant_page = context.contestant_pages[2]
-        power_ups = [await contestant_page.query_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids]
+        power_up_buttons = {power_id: await contestant_page.wait_for_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids}
 
-        for attempt in range(10):
-            if attempt == 9:
-                raise TimeoutError("RIP 1")
+        async def callback_hijack():
+            return await power_up_buttons["hijack"].is_enabled()
 
-            freeze_enabled = await power_ups[0].is_enabled()
-            if freeze_enabled:
-                break
-
-            await asyncio.sleep(1)
+        await _wait_for_event(callback_hijack)
 
         # Assert that only the 'hijack' power-up is available to use
-        enabled_powers = [await power_up.is_enabled() for power_up in power_ups]
-        assert enabled_powers == [True, False, False]
+        enabled_powers = {power_up: await power_up_buttons[power_up].is_enabled() for power_up in power_up_buttons}
+        assert enabled_powers == {"hijack": True, "freeze": False, "rewind": False}
 
         # Someone buzzes in
         buzzer = await contestant_page.query_selector("#buzzer-wrapper")
@@ -740,19 +768,14 @@ async def test_freeze_power_up_simple():
         buzz_winner_elem = await contestant_page.query_selector("#buzzer-winner")
         await buzz_winner_elem.wait_for_element_state("visible")
 
-        for attempt in range(10):
-            if attempt == 9:
-                raise TimeoutError("RIP 2")
+        async def callback_freeze():
+            return await power_up_buttons["freeze"].is_enabled()
 
-            freeze_enabled = await power_ups[1].is_enabled()
-            if freeze_enabled:
-                break
-
-            await asyncio.sleep(1)
+        await _wait_for_event(callback_freeze)
 
         # Assert that the 'freeze' power-up is now available to use
-        enabled_powers = [await power_up.is_enabled() for power_up in power_ups]
-        assert enabled_powers == [True, True, False]
+        enabled_powers = {power_up: await power_up_buttons[power_up].is_enabled() for power_up in power_up_buttons}
+        assert enabled_powers == {"hijack": True, "freeze": True, "rewind": False}
 
         countdown_elem = await context.presenter_page.query_selector("#question-countdown-wrapper")
         visible = await countdown_elem.is_visible()
@@ -766,6 +789,385 @@ async def test_freeze_power_up_simple():
 
         visible = await countdown_elem.is_visible()
         assert not visible, "Countdown is not visible after freeze"
+
+@pytest.mark.asyncio
+async def test_rewind_simple():
+    round_num = 1
+    category = "outlines"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+    power_ids = ["hijack", "freeze", "rewind"]
+
+    async with ContextHandler() as context:
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
+
+        await context.show_question()
+
+        contestant_page = context.contestant_pages[2]
+        power_up_buttons = {power_id: await contestant_page.wait_for_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids}
+
+        async def callback_hijack():
+            return await power_up_buttons["hijack"].is_enabled()
+
+        await _wait_for_event(callback_hijack)
+
+        # Assert that only the 'hijack' power-up is available to use
+        enabled_powers = {power_up: await power_up_buttons[power_up].is_enabled() for power_up in power_up_buttons}
+        assert enabled_powers == {"hijack": True, "freeze": False, "rewind": False}
+
+        # Player buzzes in
+        buzzer = await contestant_page.query_selector("#buzzer-wrapper")
+        await buzzer.tap()
+
+        buzz_winner_elem = await contestant_page.query_selector("#buzzer-winner")
+        await buzz_winner_elem.wait_for_element_state("visible")
+
+        await asyncio.sleep(1)
+
+        # Assert that the 'freeze' power-up is now available to use
+        enabled_powers = {power_up: await power_up_buttons[power_up].is_enabled() for power_up in power_up_buttons}
+        assert enabled_powers == {"hijack": True, "freeze": True, "rewind": False}
+
+        # Assert that player 2 now has the turn
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [False, False, True, False]
+
+        # Answer the question wrong
+        await context.presenter_page.press("body", "Space")
+        await asyncio.sleep(0.5)
+        await context.presenter_page.press("body", "2")
+
+        async def callback_rewind():
+            return await power_up_buttons["rewind"].is_enabled()
+
+        await _wait_for_event(callback_rewind)
+
+        # Assert that the player lost points
+        player_scores = await context.get_player_scores()
+        await _assert_scores(*player_scores, [0, 0, -100, 0])
+
+        # Assert that the 'rewind' power-up is now available to use
+        enabled_powers = {power_up: await power_up_buttons[power_up].is_enabled() for power_up in power_up_buttons}
+        assert enabled_powers == {"hijack": False, "freeze": False, "rewind": True}
+
+        # Assert that no one has the turn now
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [False, False, False, False]
+
+        # Person uses 'rewind' power-up to rewind and answer again
+        power_up = await contestant_page.query_selector("#contestant-power-btn-rewind")
+        await power_up.tap()
+
+        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
+
+        async def callback_video_started():
+            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
+
+        await _wait_for_event(callback_video_started)
+
+        async def callback_video_ended():
+            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
+
+        await _wait_for_event(callback_video_ended)
+
+        await asyncio.sleep(1)
+
+        # Assert that player 2 has the turn again
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [False, False, True, False]
+
+        # Assert that the player was refunded the lost points
+        player_scores = await context.get_player_scores()
+        await _assert_scores(*player_scores, [0, 0, 0, 0])
+
+        # Answer the question correctly this time
+        await context.presenter_page.press("body", "Space")
+        await asyncio.sleep(0.5)
+        await context.presenter_page.press("body", "1")
+
+        await asyncio.sleep(0.5)
+
+        # Assert that the player gained points
+        point_elems = await context.presenter_page.query_selector_all(".footer-contestant-entry-score")
+        points_text = await point_elems[2].text_content()
+        points = await context.presenter_page.evaluate("playerScores[2]")
+
+        assert points_text == "100 GBP"
+        assert points == 100
+
+@pytest.mark.asyncio
+async def test_rewind_complex():
+    round_num = 1
+    category = "outlines"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+    power_ids = ["hijack", "freeze", "rewind"]
+
+    async with ContextHandler() as context:
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
+
+        await context.show_question()
+
+        contestant_page_1 = context.contestant_pages[0]
+        contestant_page_2 = context.contestant_pages[1]
+        power_up_buttons_1 = {power_id: await contestant_page_1.wait_for_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids}
+        power_up_buttons_2 = {power_id: await contestant_page_2.wait_for_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids}
+
+        async def callback_hijack():
+            return await power_up_buttons_1["hijack"].is_enabled()
+
+        await _wait_for_event(callback_hijack)
+
+        # Player 1 buzzes in
+        buzzer = await contestant_page_1.query_selector("#buzzer-wrapper")
+        await buzzer.tap()
+
+        buzz_winner_elem = await contestant_page_1.query_selector("#buzzer-winner")
+        await buzz_winner_elem.wait_for_element_state("visible")
+
+        await asyncio.sleep(1)
+
+        # Assert that the 'freeze' power-up is now available to use for player 1
+        enabled_powers = {power_up: await power_up_buttons_1[power_up].is_enabled() for power_up in power_up_buttons_1}
+        assert enabled_powers == {"hijack": True, "freeze": True, "rewind": False}
+
+        # Assert that player 1 now has the turn
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [True, False, False, False]
+
+        # Answer the question wrong
+        await context.presenter_page.press("body", "Space")
+        await asyncio.sleep(0.5)
+        await context.presenter_page.press("body", "2")
+
+        async def callback_rewind():
+            return await power_up_buttons_1["rewind"].is_enabled()
+
+        await _wait_for_event(callback_rewind)
+
+        # Assert that the player lost points
+        player_scores = await context.get_player_scores()
+        await _assert_scores(*player_scores, [-100, 0, 0, 0])
+
+        # Assert that the 'rewind' power-up is now available to use
+        enabled_powers = {power_up: await power_up_buttons_1[power_up].is_enabled() for power_up in power_up_buttons_1}
+        assert enabled_powers == {"hijack": False, "freeze": False, "rewind": True}
+
+        # Assert that no one has the turn now
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [False, False, False, False]
+
+        # Player 2 buzzes in
+        buzzer = await contestant_page_2.query_selector("#buzzer-wrapper")
+        await buzzer.tap()
+
+        buzz_winner_elem = await contestant_page_2.query_selector("#buzzer-winner")
+        await buzz_winner_elem.wait_for_element_state("visible")
+
+        await asyncio.sleep(1)
+
+        # Assert that the 'freeze' power-up is now available to use for player 2
+        enabled_powers = {power_up: await power_up_buttons_2[power_up].is_enabled() for power_up in power_up_buttons_2}
+        assert enabled_powers == {"hijack": False, "freeze": True, "rewind": False}
+
+        # Assert that player 2 now has the turn
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [False, True, False, False]
+
+        # Player 1 uses 'rewind' power-up to rewind and answer again
+        power_up = await contestant_page_1.query_selector("#contestant-power-btn-rewind")
+        await power_up.tap()
+
+        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
+
+        async def callback_video_started():
+            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
+
+        await _wait_for_event(callback_video_started)
+
+        async def callback_video_ended():
+            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
+
+        await _wait_for_event(callback_video_ended)
+
+        await asyncio.sleep(1)
+
+        # Assert that player 1 has the turn again
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [True, False, False, False]
+
+        # Assert that the player was refunded the lost points
+        player_scores = await context.get_player_scores()
+        await _assert_scores(*player_scores, [0, 0, 0, 0])
+
+        # Answer the question correctly this time
+        await context.presenter_page.press("body", "Space")
+        await asyncio.sleep(0.5)
+        await context.presenter_page.press("body", "1")
+
+        await asyncio.sleep(0.5)
+
+        # Assert that the player gained points
+        player_scores = await context.get_player_scores()
+        await _assert_scores(*player_scores, [100, 0, 0, 0])
+
+@pytest.mark.asyncio
+async def test_powers_contest():
+    round_num = 1
+    category = "outlines"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+    power_ids = ["hijack", "freeze", "rewind"]
+
+    async with ContextHandler() as context:
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
+
+        await context.show_question()
+
+        contestant_page_1 = context.contestant_pages[0]
+        contestant_page_2 = context.contestant_pages[1]
+        power_up_buttons_1 = {power_id: await contestant_page_1.wait_for_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids}
+        power_up_buttons_2 = {power_id: await contestant_page_2.wait_for_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids}
+
+        async def callback_hijack():
+            return await power_up_buttons_1["hijack"].is_enabled()
+
+        await _wait_for_event(callback_hijack)
+
+        # Player 1 buzzes in
+        buzzer = await contestant_page_1.query_selector("#buzzer-wrapper")
+        await buzzer.tap()
+
+        buzz_winner_elem = await contestant_page_1.query_selector("#buzzer-winner")
+        await buzz_winner_elem.wait_for_element_state("visible")
+
+        await asyncio.sleep(1)
+
+        # Assert that the 'freeze' power-up is now available to use for player 1
+        enabled_powers = {power_up: await power_up_buttons_1[power_up].is_enabled() for power_up in power_up_buttons_1}
+        assert enabled_powers == {"hijack": True, "freeze": True, "rewind": False}
+
+        # Assert that player 1 now has the turn
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [True, False, False, False]
+
+        # Answer the question wrong
+        await context.presenter_page.press("body", "Space")
+        await asyncio.sleep(0.5)
+        await context.presenter_page.press("body", "2")
+
+        async def callback_rewind():
+            return await power_up_buttons_1["rewind"].is_enabled()
+
+        await _wait_for_event(callback_rewind)
+
+        # Assert that the player lost points
+        player_scores = await context.get_player_scores()
+        await _assert_scores(*player_scores, [-100, 0, 0, 0])
+
+        # Assert that the 'rewind' power-up is now available to use
+        enabled_powers = {power_up: await power_up_buttons_1[power_up].is_enabled() for power_up in power_up_buttons_1}
+        assert enabled_powers == {"hijack": False, "freeze": False, "rewind": True}
+
+        # Assert that no one has the turn now
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [False, False, False, False]
+
+        # Player 2 buzzes in
+        buzzer = await contestant_page_2.query_selector("#buzzer-wrapper")
+        await buzzer.tap()
+
+        buzz_winner_elem = await contestant_page_2.query_selector("#buzzer-winner")
+        await buzz_winner_elem.wait_for_element_state("visible")
+
+        await asyncio.sleep(1)
+
+        # Assert that the 'freeze' power-up is now available to use for player 2
+        enabled_powers = {power_up: await power_up_buttons_2[power_up].is_enabled() for power_up in power_up_buttons_2}
+        assert enabled_powers == {"hijack": False, "freeze": True, "rewind": False}
+
+        # Assert that player 2 now has the turn
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == [False, True, False, False]
+
+        # Assert that buzz countdown is visible
+        countdown_elem = await context.presenter_page.query_selector("#question-countdown-wrapper")
+        visible = await countdown_elem.is_visible()
+        assert visible, "Countdown is visible after buzz"
+
+        # Player 1 uses 'rewind' power-up at almost the same time as player 2 uses 'freeze'
+        rewind_power_up = await contestant_page_1.query_selector("#contestant-power-btn-rewind")
+        freeze_power_up = await contestant_page_2.query_selector("#contestant-power-btn-freeze")
+
+        try:
+            task_1 = asyncio.create_task(freeze_power_up.tap(timeout=1000))
+            task_2 = asyncio.create_task(rewind_power_up.tap(timeout=1000))
+            await asyncio.tasks.gather(task_1, task_2)
+        except TimeoutError:
+            pass
+
+        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
+
+        async def callback_video_started():
+            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
+
+        await _wait_for_event(callback_video_started)
+
+        async def callback_video_ended():
+            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
+
+        await _wait_for_event(callback_video_ended)
+
+        # Ensure only one power-up use was accepted
+        rewind_used = await rewind_power_up.eval_on_selector(".contestant-power-used", "img => !img.classList.contains('d-none')")
+        freeze_used = await freeze_power_up.eval_on_selector(".contestant-power-used", "img => !img.classList.contains('d-none')")
+
+        assert not (await rewind_power_up.is_enabled())
+        assert not (await freeze_power_up.is_enabled())
+
+        if rewind_used:
+            assert not freeze_used
+
+            expected_turns = [True, False, False, False]
+            freeze_power_up = await contestant_page_1.query_selector("#contestant-power-btn-freeze")
+
+            assert (await freeze_power_up.is_enabled())
+        else:
+            assert not rewind_used
+
+            expected_turns = [False, True, False, False]
+
+            countdown_elem = await context.presenter_page.query_selector("#question-countdown-wrapper")
+            visible = await countdown_elem.is_visible()
+            assert not visible, "Countdown is not visible after freeze"
+
+        # Assert that expected player has the turn
+        contestant_pips_active = await context.presenter_page.eval_on_selector_all(".footer-contestant-entry", "(divs) => divs.map((d) => d.classList.contains('active-contestant-entry'))")
+        assert contestant_pips_active == expected_turns
 
 @pytest.mark.asyncio
 async def test_discord_message_simple(discord_client):

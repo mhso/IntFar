@@ -45,7 +45,7 @@ MONTH_NAMES = [
 JEOPARDY_ITERATION = 5
 _suffix = ["st", "nd", "rd", "th"]
 JEOPADY_EDITION = f"{JEOPARDY_ITERATION}{_suffix[min(len(_suffix) - 1, JEOPARDY_ITERATION - 1)]} Edition"
-JEOPARDY_REGULAR_ROUNDS = 1
+JEOPARDY_REGULAR_ROUNDS = 2
 
 def load_flavor_texts(config: Config, filename, game=None):
     path = f"{config.resources_folder}/flavor_texts"

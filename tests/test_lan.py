@@ -39,10 +39,10 @@ def _update_and_validate_bingo(
     if tabula_rasa:
         for challenge in lan.get_current_bingo_challenges(game_database, LAN_DATE):
             assert challenge["progress"] == 0
-            assert challenge["new_progress"] == False
-            assert challenge["completed"] == False
-            assert challenge["completed_by"] == None
-            assert challenge["notification_sent"] == False
+            assert not challenge["new_progress"]
+            assert not challenge["completed"]
+            assert challenge["completed_by"] is None
+            assert not challenge["notification_sent"]
 
     lan.update_bingo_progress(game_database, post_game_data)
 
@@ -241,7 +241,8 @@ def test_bingo_elder_dragon(game_monitors, game_databases):
             "timeline.frames.21.events.0": DataSpec(
                 {
                     "type": "ELITE_MONSTER_KILL",
-                    "monsterType": "ELDER_DRAGON",
+                    "monsterType": "DRAGON",
+                    "monsterSubType": "ELDER_DRAGON",
                     "teamId": 100
                 }
             )

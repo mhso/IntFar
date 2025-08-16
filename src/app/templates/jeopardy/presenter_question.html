@@ -174,8 +174,6 @@
                 {% endif %}
             {% endfor %}
             socket.on("contestant_ready", setPlayerReady);
-            {% else %}
-            enablePowerUp(null, "hijack");
             {% endif %}
         });
 

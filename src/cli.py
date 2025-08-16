@@ -360,6 +360,17 @@ class TestFuncs:
                     database.execute_query(query, summ_data["puuid"], summ_id)
                     await asyncio.sleep(2)
 
+    def jeopardy_progress(self):
+        total = util.JEOPARDY_REGULAR_ROUNDS * 30 + 1
+        done = 0
+        with open("app/static/data/jeopardy_questions.json", "r") as fp:
+            data = json.load(fp)
+            for category in data:
+                for tier in data[category]["tiers"]:
+                    done += len(tier["questions"])
+
+        print(f"Done with {done}/{total} ({int((done / total) * 100)}%)")
+
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
 

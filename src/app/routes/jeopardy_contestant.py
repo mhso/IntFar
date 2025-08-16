@@ -49,8 +49,7 @@ def join_lobby():
     turn_id = PLAYER_INDEXES.index(disc_id)
     with flask.current_app.config["JEOPARDY_JOIN_LOCK"]:
         active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
-        contestant = Contestant(disc_id, turn_id, name, avatar, color)
-        active_contestants[disc_id] = contestant
+        active_contestants[disc_id] = Contestant(disc_id, turn_id, name, avatar, color)
 
     response = flask.redirect(flask.url_for(".game_view", _external=True))
     max_age = 60 * 60 * 6 # 6 hours
@@ -73,14 +72,6 @@ def game_view():
     contestant: Contestant = active_contestants[disc_id]
 
     state_dict = state.__dict__
-    for data in state.player_data:
-        if data["disc_id"] == str(contestant.disc_id):
-            contestant.score = data["score"]
-            contestant.buzzes = data["buzzes"]
-            contestant.hits = data["hits"]
-            contestant.misses = data["misses"]
-            contestant.power_ups = data["power_ups"]
-            break
 
     return app_util.make_template_context(
         "jeopardy/contestant_game.html",

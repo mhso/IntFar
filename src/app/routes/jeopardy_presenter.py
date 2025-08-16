@@ -220,7 +220,7 @@ class QuestionState(RoundState):
     daily_double: bool
     question_asked_time: float = field(default=None, init=False)
     buzz_winner_decided: bool = field(default=False, init=False)
-    power_use_decided: Dict[str, bool] = field(default_factory=lambda: {power_up.power_id: False for power_up in _init_powerups()}, init=False)
+    power_use_decided: bool = field(default=False, init=False)
 
 @dataclass
 class FinaleState(State):
@@ -277,6 +277,12 @@ def reset_questions():
 
     return app_util.make_text_response("Questions reset", 200)
 
+def _sync_contestants(player_data, contestants):
+    for data in player_data:
+        disc_id = data["disc_id"]
+        if disc_id not in contestants:
+            contestants[disc_id] = Contestant(disc_id, data["index"], data["name"], data["avatar"], data["color"])
+
 def get_round_data(request_args):
     player_data = []
     contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
@@ -295,6 +301,11 @@ def get_round_data(request_args):
             finale_wager = 0
             score = int(request_args.get(score_key, 0))
             power_ups = []
+
+            # Args from URL
+            name = request_args[name_key]
+            turn_id = PLAYER_INDEXES.index(disc_id)
+            color = request_args[color_key]
 
             if disc_id in contestants:
                 avatar = contestants[disc_id].avatar
@@ -316,19 +327,17 @@ def get_round_data(request_args):
                 else:
                     avatar = flask.url_for("static", _external=True, filename="img/questionmark.png")
 
-                power_ups = _init_powerups()
-
             player_data.append({
                 "disc_id": str(disc_id),
-                "name": request_args[name_key],
-                "index": PLAYER_INDEXES.index(disc_id),
+                "name": name,
+                "index": turn_id,
                 "avatar": avatar,
                 "score": score,
                 "buzzes": buzzes,
                 "hits": hits,
                 "misses": misses,
                 "finale_wager": finale_wager,
-                "color": request_args[color_key],
+                "color": color,
                 "power_ups": power_ups,
             })
 
@@ -384,11 +393,12 @@ def question_view(jeopardy_round, category, tier):
     with flask.current_app.config["JEOPARDY_JOIN_LOCK"]:
         # Get player names and scores from query parameters
         player_data, player_turn, question_num = get_round_data(flask.request.args)
-
-        # Reset used power-ups
         contestants: Dict[int, Contestant] = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+        _sync_contestants(player_data, contestants)
+
+        # Disable hijack if question is daily double
         for contestant in contestants.values():
-            contestant.power_ups = _init_powerups()
+            contestant.get_power("hijack").enabled = not is_daily_double
 
         question_state = QuestionState(
             jeopardy_round,
@@ -432,7 +442,9 @@ def active_jeopardy(jeopardy_round):
 
     with flask.current_app.config["JEOPARDY_JOIN_LOCK"]:
         # Get player names and scores from query parameters
-        player_data, player_turn, question_num = get_round_data(flask.request.args)        
+        player_data, player_turn, question_num = get_round_data(flask.request.args)
+        contestants: Dict[int, Contestant] = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
+        _sync_contestants(player_data, contestants)
 
         if question_num == QUESTIONS_PER_ROUND:
             # Round done, onwards to next one
@@ -471,6 +483,10 @@ def active_jeopardy(jeopardy_round):
                     for tier_info in used_questions[category]:
                         tier_info["active"] = True
                         tier_info["double"] = False
+
+                # Reset used power-ups
+                for contestant in contestants.values():
+                    contestant.power_ups = _init_powerups()
 
                 if DO_DAILY_DOUBLE:
                     # Choose 1 or 2 random category/tier combination to be daily double
@@ -527,6 +543,7 @@ def final_jeopardy(question_id):
     category_name = questions[FINALE_CATEGORY]["name"]
 
     player_data = get_round_data(flask.request.args)[0]
+    _sync_contestants(player_data, flask.current_app.config["JEOPARDY_DATA"]["contestants"])
 
     contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
     for data in player_data:
@@ -658,15 +675,12 @@ def join_lobby(disc_id: str, nickname: str, avatar: str, color: str):
         active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
 
         turn_id = PLAYER_INDEXES.index(disc_id)
-        contestant = active_contestants.get(disc_id)
-        if contestant is None:
-            contestant = Contestant(disc_id, turn_id, nickname, avatar, color)
-        else:
-            # Check if attributes for contestant has changed
-            attributes = [("index", turn_id), ("name", nickname), ("color", color)]
-            for attr_name, value in attributes:
-                if getattr(contestant, attr_name) != value:
-                    setattr(contestant, attr_name, value)
+        contestant = active_contestants[disc_id]
+        # Check if attributes for contestant has changed
+        attributes = [("index", turn_id), ("name", nickname), ("color", color)]
+        for attr_name, value in attributes:
+            if getattr(contestant, attr_name) != value:
+                setattr(contestant, attr_name, value)
 
         emit("player_joined", (str(disc_id), turn_id, nickname, avatar, color), to="presenter")
 
@@ -717,7 +731,7 @@ def enable_powerup(disc_id: str, power_id: str):
 
         power_up.enabled = True
 
-    state.power_use_decided[power_id] = False
+    state.power_use_decided = False
 
     send_to = contestants[disc_id].sid if disc_id is not None else "contestants"
     emit("power_up_enabled", power_id, to=send_to)
@@ -744,8 +758,7 @@ def disable_powerup(disc_id: str | None, power_id: str | None):
             power = contestant.get_power(pow_id)
             power.enabled = False
 
-    for pow_id in power_ids:
-        state.power_use_decided[pow_id] = True
+    state.power_use_decided = True
 
     send_to = contestants[disc_id].sid if disc_id is not None else "contestants"
     emit("power_ups_disabled", power_ids, to=send_to)
@@ -835,15 +848,14 @@ def use_power_up(disc_id: str, power_id: str):
     state: QuestionState = jeopardy_data["state"]
     contestant: Contestant = jeopardy_data["contestants"].get(disc_id)
 
-    if contestant is None or power_id not in state.power_use_decided:
-        print("ERROR: contestant or power_up does not exist", disc_id, power_id)
+    if contestant is None:
         return
 
     with flask.current_app.config["JEOPARDY_POWER_LOCK"]:
-        if state.power_use_decided[power_id]:
+        if state.power_use_decided:
             return
 
-        state.power_use_decided[power_id] = True
+        state.power_use_decided = True
 
         power_up = contestant.get_power(power_id)
         if power_up.used: # Contestant has already used this power_up
@@ -851,8 +863,12 @@ def use_power_up(disc_id: str, power_id: str):
 
         power_up.used = True
 
+        if power_id in ("hijack", "rewind"):
+            emit("buzz_disabled", to="contestants")
+
         emit("power_ups_disabled", list(POWER_UP_IDS), to="contestants")
         emit("power_up_used", (contestant.index, power_id), to="presenter")
+        emit("power_up_used", power_id, to=contestant.sid)
 
 @app_util.socket_io.event
 def enable_finale_wager():
