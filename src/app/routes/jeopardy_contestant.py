@@ -112,9 +112,6 @@ def lobby(client_secret):
     if state is None:
         return app_util.make_template_context("jeopardy/contestant_nogame.html")
 
-    if "jeopardy_user_id" in flask.request.cookies:
-        return flask.redirect(flask.url_for(".game_view", _external=True))
-
     return app_util.make_template_context(
         "jeopardy/contestant_lobby.html",
         user_id=str(disc_id),

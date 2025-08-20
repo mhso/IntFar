@@ -112,6 +112,8 @@ function usePowerUp(playerId, powerId) {
 }
 
 function togglePowerUpsEnabled(playerId, powerIds, enabled) {
+    console.log(`${enabled ? "Enabled" : "Disabled"} '${powerIds}' power-up(s) for ${playerId}`);
+
     powerIds.forEach((powerId) => {
         let btn = document.getElementById(`contestant-power-btn-${powerId}`);
         let powerIcon = btn.getElementsByClassName("contestant-power-icon").item(0);
@@ -190,7 +192,7 @@ function monitorGame(playerId, turnId) {
         let usedIcon = document.querySelector(`#contestant-power-btn-${powerId} > .contestant-power-used`);
         usedIcon.classList.remove("d-none");
 
-        if (powerId != "rewind") {
+        if (powerId == "freeze") {
             return;
         }
 

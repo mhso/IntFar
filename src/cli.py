@@ -341,7 +341,7 @@ class TestFuncs:
             print(f"{arg}: {annotations[arg].__name__}")
 
     def insert_bingo_challenges(self):
-        insert_bingo_challenges(self.game_databases["lol"], "april_25")
+        insert_bingo_challenges(self.game_databases["lol"], "august_25")
 
     async def active_game(self):
         user = self.game_databases["lol"].game_users[219497453374668815]

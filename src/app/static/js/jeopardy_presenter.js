@@ -20,6 +20,8 @@ var questionAnswered = false;
 var buzzInTime = 10;
 var isDailyDouble = false;
 var activePowerUp = null;
+var hijackBonus = false;
+var freezeTimeout = null;
 
 let playerTurn = 0;
 var questionNum = 0;
@@ -219,6 +221,10 @@ function correctAnswer() {
     let wrongAnswers = document.getElementsByClassName("question-answered-wrong").length;
     activeValue *= (1 / 2 ** wrongAnswers);
 
+    if (hijackBonus) {
+        activeValue *= 2;
+    }
+
     valueElem.textContent = "+" + activeValue;
 
     let coinElem = elem.getElementsByClassName("question-result-gbp").item(0);
@@ -273,6 +279,11 @@ function wrongAnswer(reason, questionOver=false) {
     }, 100);
 
     if (answeringPlayer != null) {
+        if (freezeTimeout != null) {
+            clearTimeout(freezeTimeout);
+            disablePowerUp(playerIds[answeringPlayer], "freeze");
+        }
+
         // Deduct points from player if someone buzzed in
         valueElem.textContent = "-" + activeValue;
         updatePlayerScore(answeringPlayer, -activeValue);
@@ -286,7 +297,6 @@ function wrongAnswer(reason, questionOver=false) {
 
         // Disable the use of 'freeze' power up, enable the use of 'rewind'
         activePowerUp = null;
-        disablePowerUp(playerIds[answeringPlayer], "freeze");
         enablePowerUp(playerIds[answeringPlayer], "rewind");
     }
 
@@ -326,12 +336,15 @@ function keyIsNumeric(key, min, max) {
     return keys.includes(key);
 }
 
-function stopCountdown() {
+function stopCountdown(hide=true) {
     clearInterval(countdownInterval);
-    let countdownElem = document.getElementById("question-countdown-wrapper");
-    if (!countdownElem.classList.contains("d-none")) {
-        countdownElem.classList.add("d-none");
-        countdownElem.style.opacity = 0;
+
+    if (hide) {
+        let countdownElem = document.getElementById("question-countdown-wrapper");
+        if (!countdownElem.classList.contains("d-none")) {
+            countdownElem.classList.add("d-none");
+            countdownElem.style.opacity = 0;
+        }
     }
 }
 
@@ -443,6 +456,12 @@ function pauseVideo() {
 function startAnswerCountdown(duration) {
     startCountdown(duration, () => wrongAnswer("Ikke mere tid", true));
 
+    // Disable 'freeze' power-up one second before time expires
+    freezeTimeout = setTimeout(function() {
+        freezeTimeout = null;
+        disablePowerUp(playerIds[answeringPlayer], "freeze");
+    }, (duration - 1) * 1000);
+
     // Action key has to be pressed before an answer can be given (for safety)
     window.onkeydown = function(e) {
         if (e.code == PRESENTER_ACTION_KEY) {
@@ -534,7 +553,7 @@ function playerBuzzedFirst(playerId) {
     activePlayers[playerId] = false;
     document.getElementById("question-buzzer-sound").play();
     setTimeout(function() {
-        document.getElementById("question-buzzer-" + playerIds[playerId]).play();
+        document.getElementById(`question-buzzer-${playerIds[playerId]}`).play();
     }, 600);
 
     afterBuzzIn(playerId);
@@ -544,71 +563,66 @@ function showPowerUpVideo(powerId) {
     return new Promise((resolve) => {
         let wrapper = document.getElementById("question-power-up-splash");
         wrapper.classList.remove("d-none");
-    
-        let video = wrapper.getElementsByTagName("video").item(0);
-    
+
+        let video = document.getElementById(`question-power-up-video-${powerId}`);
+        video.classList.remove("d-none");
+
         video.onended = function() {
             wrapper.classList.add("d-none");
+            video.classList.add("d-none");
             resolve();
         };
-    
+
         video.play();
-    
-        let powerUpIcon = document.getElementById(`question-power-up-${powerId}`);
-        powerUpIcon.classList.remove("d-none");
-    
-        setTimeout(function() {
-            powerUpIcon.classList.add("d-none");
-        }, 3000);
     });
 }
 
 function onFreezeUsed() {
-    stopCountdown();
+    stopCountdown(false);
 }
 
 function onRewindUsed(playerId) {
-    if (answeringPlayer != null) {
-        stopCountdown();
-    }
+    stopCountdown();
 
     // Refund the score the player lost on the previous answer
     answeringPlayer = playerId;
     updatePlayerScore(answeringPlayer, activeValue);
 }
 
-function afterRewindUsed(playerId) {
-    afterBuzzIn(playerId);
+function afterRewindUsed() {
+    afterBuzzIn(answeringPlayer);
 }
 
-function onHijackUsed() {
+function onHijackUsed(playerId) {
     // If question has not been asked yet, hijack gives bonus points
-    let beforeQuestionAsked = activePlayers.length == 0
-    let afterBuzzIn = answeringPlayer != null;
+    hijackBonus = activePlayers.length == 0
+    let usedAfterBuzzIn = answeringPlayer != null;
+    answeringPlayer = playerId;
 
-    if (!beforeQuestionAsked && afterBuzzIn) {
+    if (!hijackBonus && usedAfterBuzzIn) {
         stopCountdown();
     }
 
-    return [beforeQuestionAsked, afterBuzzIn];
+    return usedAfterBuzzIn;
 }
 
-function afterHijackUsed(playerId, beforeQuestionAsked, afterBuzzIn) {
-    answeringPlayer = playerId;
+function afterHijackUsed(usedAfterBuzzIn) {
     activePlayers = [];
 
     for (let i = 0; i < playerIds.length; i++) {
         activePlayers.push(false);
     }
 
-    if (!beforeQuestionAsked) {
-        afterBuzzIn(playerId);
+    if (!hijackBonus && usedAfterBuzzIn) {
+        afterBuzzIn(answeringPlayer);
+    }
+    else {
+        setPlayerTurn(answeringPlayer, false);
     }
 }
 
 function powerUpUsed(playerId, powerId) {
     activePowerUp = powerId;
-    window.onkeydown = null;
 
     console.log(`Player ${playerId} used power '${powerId}'`);
 
@@ -618,11 +632,11 @@ function powerUpUsed(playerId, powerId) {
     }
     else if (powerId == "rewind") {
         onRewindUsed(playerId);
-        callback = () => afterRewindUsed(playerId);
+        callback = () => afterRewindUsed();
     }
     else {
-        let [beforeQuestionAsked, afterBuzzIn] = onHijackUsed();
-        callback = () => afterHijackUsed(playerId, beforeQuestionAsked, afterBuzzIn);
+        let usedAfterBuzzIn = onHijackUsed(playerId);
+        callback = () => afterHijackUsed(usedAfterBuzzIn);
     }
 
     addPowerUseToFeed(playerId, powerId);

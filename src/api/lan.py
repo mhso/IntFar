@@ -113,7 +113,7 @@ if not TESTING:
             803987403932172359 # Core Nibs
         ),
         "august_25": LANInfo(
-            datetime(2025, 8, 23, 10, 0, 0).timestamp(),
+            datetime(2025, 8, 23, 8, 0, 0).timestamp(),
             datetime(2025, 8, 24, 14, 0, 0).timestamp(),
             {
                 115142485579137029: "Dave",
@@ -242,18 +242,7 @@ def get_average_stats(database: LoLGameDatabase, lan_info: LANInfo):
         reverse = False if key == "deaths" else True
         all_avg_stats[key].sort(key=lambda x: x[1], reverse=reverse)
 
-    all_ranks = {}
-
-    for stat_name in all_avg_stats:
-        stats = all_avg_stats[stat_name]
-
-        for index, (disc_id, _) in enumerate(stats):
-            all_ranks[disc_id] = all_ranks.get(disc_id, 0) + (index + 1)
-
-    all_ranks_list = [(k, v) for k, v in all_ranks.items()]
-    all_ranks_list.sort(key=lambda x: x[1])
-
-    return all_avg_stats, all_ranks_list
+    return all_avg_stats
 
 # BINGO SOLVER FUNCS
 class BingoSolver:

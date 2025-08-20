@@ -201,6 +201,8 @@ h1 {
     position: absolute;
     bottom: -75px;
     width: 100%;
+    margin-top: 10px;
+    margin-bottom: 20px;
 }
 
 #contestant-power-ups > button {

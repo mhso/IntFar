@@ -495,13 +495,12 @@ h3 {
 
 .footer-contestant-entry {
     width: 200px;
-    height: 60%;
+    height: 65%;
     position: relative;
     border: 2px solid black;
     border-bottom: none;
     margin: 0 5px;
-    padding: 5px;
-    font-size: 1.5rem;
+    padding: 0 8px;
 }
 
 .footer-contestant-entry.active-contestant-entry {
@@ -509,16 +508,67 @@ h3 {
     box-shadow: 0px 0px 15px white;
 }
 
-.footer-contestant-entry > p {
-    margin-bottom: 0;
+.footer-contestant-buzzes {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
+.footer-contestant-entry-hits {
+    color: rgb(0, 173, 0);
+}
+
+.footer-contestant-entry-misses {
+    color: red;
+    text-align: right;
+}
+
+.footer-contestant-header {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    margin-top: 5px;
 }
 
 .footer-contestant-entry-name {
-    margin-top: 1.4rem;
+    font-size: 1.3rem;
+    line-height: 1;
+    font-weight: 1000;
+    margin-right: 15px;
+    margin-top: 8px;
+    max-width: 42%;
+    overflow: hidden;
 }
 
 .footer-contestant-entry-score {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
+    text-align: right;
+    line-height: 1;
+}
+
+.footer-contestant-entry-score > img {
+    width: 22px;
+    height: 22px;
+    vertical-align: sub;
+    margin-left: 3px;
+}
+
+.footer-contestant-entry-powers {
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.footer-contestant-entry-powers > img {
+    width: 32px;
+    border-radius: 16px;
+    border: 2px solid white;
+    margin: 0 2px;
+}
+
+.footer-contestant-entry-power-used {
+    position: absolute;
 }
 
 .footer-contestant-entry-avatar {
@@ -612,18 +662,6 @@ h3 {
     position: relative;
     height: 100vh;
     top: 0
-}
-
-.question-power-up-icons {
-    position: absolute;
-    width: 200px;
-    height: 200px;
-
-    border: 3px solid white;
-    border-radius: 100px;
-
-    top: calc(50% + 110px);
-    left: calc(50% - 100px);
 }
 
 #question-answer-wrong, #question-answer-correct {

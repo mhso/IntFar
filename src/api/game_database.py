@@ -1261,7 +1261,7 @@ class GameDatabase(SQLiteDatabase):
         with self:
             return self.execute_query(query).fetchone()[0]
 
-    def get_performance_score(self, disc_id=None):
+    def get_performance_score(self, disc_id: int | None = None):
         intfar_weight = 1
         doinks_weight = 1
         winrate_weight = 2

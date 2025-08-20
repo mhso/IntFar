@@ -1243,7 +1243,8 @@ async def test_discord_message_ties(discord_client):
     )
     assert channel.messages_sent[2] == expected_message_3
 
-@pytest.mark.skip()
+#@pytest.mark.skip()
+@pytest.mark.asyncio
 async def test_all_questions():
     turn_id = 0
     player_data = [
@@ -1259,7 +1260,7 @@ async def test_all_questions():
 
         for round_num in range(2):
             question_num = 0
-            for category in ("mechanics", "lore", "icons", "outlines", "brois", "audio"):
+            for category in ("mechanics", "lore", "icons", "outlines", "wrong", "audio"):
                 for difficulty in range(1, 6):
                     # Go to question page
                     await context.open_presenter_question_page(round_num + 1, category, difficulty, question_num, turn_id, player_data)
@@ -1323,7 +1324,7 @@ def test_questions_well_formed(config):
 
                 for key in ("image", "answer_image", "video"):
                     if key in question_data:
-                        assert os.path.exists(get_path(question_data[key])), "Question file missing"
+                        assert os.path.exists(get_path(question_data[key])), "Question image/video missing"
                         assert "height" in question_data
 
                 if "choices" in question_data:

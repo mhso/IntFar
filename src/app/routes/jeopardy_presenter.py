@@ -15,7 +15,7 @@ from api.lan import is_lan_ongoing
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
-TRACK_UNUSED = False
+TRACK_UNUSED = True
 DO_DAILY_DOUBLE = True
 
 QUESTIONS_PER_ROUND = 30
@@ -279,7 +279,7 @@ def reset_questions():
 
 def _sync_contestants(player_data, contestants):
     for data in player_data:
-        disc_id = data["disc_id"]
+        disc_id = int(data["disc_id"])
         if disc_id not in contestants:
             contestants[disc_id] = Contestant(disc_id, data["index"], data["name"], data["avatar"], data["color"])
 
@@ -398,7 +398,8 @@ def question_view(jeopardy_round, category, tier):
 
         # Disable hijack if question is daily double
         for contestant in contestants.values():
-            contestant.get_power("hijack").enabled = not is_daily_double
+            for power_up in contestant.power_ups:
+                power_up.enabled = power_up.power_id == "hijack" and not is_daily_double
 
         question_state = QuestionState(
             jeopardy_round,
@@ -724,17 +725,23 @@ def enable_powerup(disc_id: str, power_id: str):
     else:
         player_ids = list(contestants.keys())
 
+    skip_contestants = []
     for player_id in player_ids:
-        power_up = contestants[player_id].get_power(power_id)
+        contestant = contestants[player_id]
+        power_up = contestant.get_power(power_id)
         if power_up.used:
+            skip_contestants.append(contestant.sid)
             continue
 
         power_up.enabled = True
 
     state.power_use_decided = False
 
+    if skip_contestants != [] and disc_id is not None:
+        return
+
     send_to = contestants[disc_id].sid if disc_id is not None else "contestants"
-    emit("power_up_enabled", power_id, to=send_to)
+    emit("power_up_enabled", power_id, to=send_to, skip_sid=skip_contestants)
 
 @app_util.socket_io.event
 def disable_powerup(disc_id: str | None, power_id: str | None):
@@ -864,7 +871,7 @@ def use_power_up(disc_id: str, power_id: str):
         power_up.used = True
 
         if power_id in ("hijack", "rewind"):
-            emit("buzz_disabled", to="contestants")
+            emit("buzz_disabled", to="contestants", skip_sid=contestant.sid)
 
         emit("power_ups_disabled", list(POWER_UP_IDS), to="contestants")
         emit("power_up_used", (contestant.index, power_id), to="presenter")

@@ -6,7 +6,7 @@
         <div id="bg-image" style="background-image: url({{ url_for('static', _external=True, filename='img/jeopardy/' + player_bg_img) }});"></div>
 
         <div id="contestant-game-wrapper">
-            <h1>Jeopardy!</h1>
+            <h1{% if question and jeopardy_round > 0 and jeopardy_round < total_rounds + 1 %} class="d-none"{% endif %}>Jeopardy!</h1>
 
             <div id="contestant-game-header" style="border: 2px solid {{ color }};">
                 <div>

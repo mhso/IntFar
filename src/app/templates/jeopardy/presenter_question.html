@@ -102,12 +102,10 @@
 
         <!-- Power Up splash video -->
         <div id="question-power-up-splash" class="d-none">
-            <video>
-                <source src="{{ url_for('static', _external=True, filename='img/jeopardy/power_up_used.webm') }}" type="video/webm">
-            </video>
-
             {% for power_id in power_ups %}
-            <img id="question-power-up-{{ power_id }}" src="{{ url_for('static', _external=True, filename='img/jeopardy/power_' + power_id + '.png') }}" class="question-power-up-icons d-none">
+            <video id="question-power-up-video-{{ power_id }}" class="d-none">
+                <source src="{{ url_for('static', _external=True, filename='img/jeopardy/' + power_id + '_used.webm') }}" type="video/webm">
+            </video>
             {% endfor %}
         </div>
         
@@ -150,7 +148,7 @@
             {{ player_data | tojson }},
             {{ player_turn }},
             {{ question_num }},
-            "{{ question['answer'] }}",
+            "{{ question['answer'] | safe }}",
             {{ question_value }},
             {{ question['id'] }},
             {{ buzz_time }},

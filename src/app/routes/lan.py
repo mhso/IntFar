@@ -8,6 +8,7 @@ import numpy as np
 import app.util as app_util
 import api.util as api_util
 import api.lan as lan_api
+from api.game_databases.lol import LoLGameDatabase
 from api.game_data import get_formatted_stat_names, get_formatted_stat_value
 from api.awards import get_doinks_reasons, get_intfar_reasons
 from api.user import User
@@ -200,7 +201,7 @@ def get_bingo_data(database, lan_date, face_images={}):
 
 def get_data(lan_info, lan_date):
     config = flask.current_app.config["APP_CONFIG"]
-    database = flask.current_app.config["GAME_DATABASES"]["lol"]
+    database: LoLGameDatabase = flask.current_app.config["GAME_DATABASES"]["lol"]
     riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
     try:
@@ -314,7 +315,7 @@ def get_data(lan_info, lan_date):
         )[1]
 
         # Performance of all players.
-        all_avg_stats, all_ranks = lan_api.get_average_stats(database, lan_info)
+        all_avg_stats = lan_api.get_average_stats(database, lan_info)
 
         # Get average stat value for each player.
         all_player_stats = {}
@@ -327,15 +328,13 @@ def get_data(lan_info, lan_date):
 
                 all_player_stats[disc_id].append(fmt_value)
 
-        # Get total rank for each player.
+        # Get total rank for each player
+        performance_scores = database.get_performance_score()
         all_player_ranks = {}
         for disc_id in lan_info.participants:
-            player_rank = 0
-            for index, rank_info in enumerate(all_ranks):
-                if rank_info[0] == disc_id:
-                    player_rank = index
-                    break
-            all_player_ranks[disc_id] = player_rank
+            for score_id, score in performance_scores():
+                if score_id == disc_id:
+                    all_player_ranks[disc_id] = score
 
         # Organize and sort stats by total rank.
         all_player_stats = [
