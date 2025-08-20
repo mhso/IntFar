@@ -32,7 +32,7 @@ PLAYER_NAMES = {
     115142485579137029: "Dave",
     172757468814770176: "Murt",
     331082926475182081: "Muds",
-    347489125877809155: "Nø"
+    219497453374668815: "Thommy"
 }
 
 PLAYER_INDEXES = list(PLAYER_NAMES.keys())
@@ -41,7 +41,7 @@ PLAYER_BACKGROUNDS = {
     115142485579137029: "coven_nami.png",
     172757468814770176: "pentakill_olaf.png", 
     331082926475182081: "crime_city_tf.png",
-    347489125877809155: "gladiator_draven.png"
+    219497453374668815: "bard_splash.png"
 }
 
 # Sounds for answering questions correctly/wrong.
@@ -109,7 +109,7 @@ BUZZ_IN_SOUNDS = {
     115142485579137029: "buzz_dave",
     172757468814770176: "buzz_murt",
     331082926475182081: "buzz_muds",
-    347489125877809155: "buzz_no",
+    219497453374668815: "buzz_thommy",
 }
 
 @dataclass

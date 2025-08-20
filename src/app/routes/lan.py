@@ -223,7 +223,7 @@ def get_data(lan_info, lan_date):
             if fp.readline().strip() in ("0", "1"):
                 games_stats = []
 
-    names = ["david", "martin", "mikkel", "mads", "anton"]
+    names = ["david", "martin", "mikkel", "mads", "thommy"]
 
     face_images = {
         disc_id: flask.url_for("static", _external=True, filename=f"img/lan_{name}.png")

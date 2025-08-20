@@ -5,7 +5,6 @@ from io import BytesIO
 from PIL import Image
 from multiprocessing import Process
 import random
-from time import sleep
 import os
 from playwright.async_api import async_playwright, Playwright, BrowserContext, Page, Dialog, ConsoleMessage
 from urllib.parse import urlencode, quote_plus
