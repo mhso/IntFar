@@ -145,6 +145,16 @@ function disablePowerUp(playerId=null, powerId=null) {
     socket.emit("disable_powerup", playerId, powerId);
 }
 
+function disableFreeze(playerId) {
+    disablePowerUp(playerId, "freeze");
+
+    let freezeWrapper = document.getElementById("question-countdown-frozen");
+    freezeWrapper.style.opacity = 0;
+    setTimeout(function() {
+        freezeWrapper.classList.add("d-none");
+    }, 1000);
+}
+
 function afterQuestion() {
     activeAnswer = null;
     hideTips();
@@ -281,7 +291,7 @@ function wrongAnswer(reason, questionOver=false) {
     if (answeringPlayer != null) {
         if (freezeTimeout != null) {
             clearTimeout(freezeTimeout);
-            disablePowerUp(playerIds[answeringPlayer], "freeze");
+            disableFreeze(playerIds[answeringPlayer]);
         }
 
         // Deduct points from player if someone buzzed in
@@ -338,6 +348,7 @@ function keyIsNumeric(key, min, max) {
 
 function stopCountdown(hide=true) {
     clearInterval(countdownInterval);
+    countdownInterval = null;
 
     if (hide) {
         let countdownElem = document.getElementById("question-countdown-wrapper");
@@ -459,7 +470,7 @@ function startAnswerCountdown(duration) {
     // Disable 'freeze' power-up one second before time expires
     freezeTimeout = setTimeout(function() {
         freezeTimeout = null;
-        disablePowerUp(playerIds[answeringPlayer], "freeze");
+        disableFreeze(playerIds[answeringPlayer]);
     }, (duration - 1) * 1000);
 
     // Action key has to be pressed before an answer can be given (for safety)
@@ -581,6 +592,12 @@ function onFreezeUsed() {
     stopCountdown(false);
 }
 
+function afterFreezeUsed() {
+    let freezeWrapper = document.getElementById("question-countdown-frozen");
+    freezeWrapper.classList.remove("d-none");
+    freezeWrapper.style.opacity = 0.85;
+}
+
 function onRewindUsed(playerId) {
     stopCountdown();
 
@@ -629,10 +646,11 @@ function powerUpUsed(playerId, powerId) {
     callback = null;
     if (powerId == "freeze") {
         onFreezeUsed();
+        callback = afterFreezeUsed;
     }
     else if (powerId == "rewind") {
         onRewindUsed(playerId);
-        callback = () => afterRewindUsed();
+        callback = afterRewindUsed;
     }
     else {
         let usedAfterBuzzIn = onHijackUsed(playerId);

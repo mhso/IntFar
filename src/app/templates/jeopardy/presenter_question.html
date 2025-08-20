@@ -79,6 +79,9 @@
 
             <!-- Countdown wrapper -->
             <div id="question-countdown-wrapper">
+                <div id="question-countdown-frozen" class="d-none">
+                    <img src="{{ url_for('static', filename='img/jeopardy/frozen.png') }}">
+                </div>
                 <div id="question-countdown-filled"></div>
                 <div id="question-countdown-text">30</div>
             </div>

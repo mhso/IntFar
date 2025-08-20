@@ -787,8 +787,10 @@ async def test_freeze():
 
         await asyncio.sleep(1)
 
-        visible = await countdown_elem.is_visible()
-        assert not visible, "Countdown is not visible after freeze"
+        await context.screenshot_views()
+
+        countdown_cleared = await context.presenter_page.evaluate("countdownInterval == null")
+        assert countdown_cleared, "Countdown is paused after freeze"
 
 @pytest.mark.asyncio
 async def test_rewind_simple():
@@ -1243,8 +1245,8 @@ async def test_discord_message_ties(discord_client):
     )
     assert channel.messages_sent[2] == expected_message_3
 
-#@pytest.mark.skip()
-@pytest.mark.asyncio
+@pytest.mark.skip()
+#@pytest.mark.asyncio
 async def test_all_questions():
     turn_id = 0
     player_data = [

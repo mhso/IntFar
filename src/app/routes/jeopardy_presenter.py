@@ -71,7 +71,8 @@ ANSWER_SOUNDS = [
         "porn",
         "package_boy",
         "skorpion",
-        "goblin"
+        "goblin",
+        "ngh",
     ],
     [
         "mmnonono",
@@ -98,7 +99,8 @@ ANSWER_SOUNDS = [
         "nej",
         "wilhelm",
         "migjuana",
-        "ah_nej"
+        "ah_nej",
+        "dave_angy",
     ]
 ]
 

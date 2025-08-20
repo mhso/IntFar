@@ -494,7 +494,7 @@ h3 {
 }
 
 .footer-contestant-entry {
-    width: 200px;
+    width: 220px;
     height: 65%;
     position: relative;
     border: 2px solid black;
@@ -537,7 +537,7 @@ h3 {
     font-weight: 1000;
     margin-right: 15px;
     margin-top: 8px;
-    max-width: 42%;
+    max-width: 50%;
     overflow: hidden;
 }
 
@@ -551,7 +551,7 @@ h3 {
     width: 22px;
     height: 22px;
     vertical-align: sub;
-    margin-left: 3px;
+    display: inline-block;
 }
 
 .footer-contestant-entry-powers {
@@ -890,6 +890,21 @@ h3 {
     background-color: rgb(136, 255, 0);
     height: 100%;
     z-index: -1;
+}
+
+#question-countdown-frozen {
+    position: absolute;
+    width: 100%;
+    z-index: 1;
+
+    opacity: 0;
+    transition: all 1s;
+}
+
+#question-countdown-frozen > img {
+    width: 110%;
+    margin-left: -20px;
+    margin-top: -10px;
 }
 
 #question-out-of-questions {
