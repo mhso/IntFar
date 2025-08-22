@@ -142,7 +142,7 @@ else: # Use old data for testing.
         )
     }
 
-LATEST_LAN_PARTY = max(LAN_PARTIES.keys(), key=lambda k: LAN_PARTIES[k].start_time)
+LATEST_LAN_PARTY: str = max(LAN_PARTIES.keys(), key=lambda k: LAN_PARTIES[k].start_time)
 
 def is_lan_ongoing(timestamp: int, guild_id=None):
     lan_data = list(filter(

@@ -45,7 +45,7 @@ CONTESTANT_IDS = [
     115142485579137029,
     172757468814770176,
     331082926475182081,
-    347489125877809155
+    219497453374668815
 ]
 BARRIER = Barrier(len(CONTESTANT_IDS))
 
@@ -738,7 +738,7 @@ async def test_freeze():
         (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
         (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
         (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
-        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+        (CONTESTANT_IDS[3], 0, "Thommy", "00FFFF")
     ]
     power_ids = ["hijack", "freeze", "rewind"]
 
@@ -784,12 +784,25 @@ async def test_freeze():
         power_up = await contestant_page.query_selector("#contestant-power-btn-freeze")
         await power_up.tap()
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(6)
 
         await context.screenshot_views()
 
-        countdown_cleared = await context.presenter_page.evaluate("countdownInterval == null")
-        assert countdown_cleared, "Countdown is paused after freeze"
+        countdown_paused = await context.presenter_page.evaluate("countdownPaused")
+        assert countdown_paused, "Countdown is paused after freeze"
+
+async def _wait_for_power_up_video(context: ContextHandler):
+    splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
+
+    async def callback_video_started():
+        return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
+
+    await _wait_for_event(callback_video_started)
+
+    async def callback_video_ended():
+        return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
+
+    await _wait_for_event(callback_video_ended)
 
 @pytest.mark.asyncio
 async def test_rewind_simple():
@@ -867,17 +880,7 @@ async def test_rewind_simple():
         power_up = await contestant_page.query_selector("#contestant-power-btn-rewind")
         await power_up.tap()
 
-        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
-
-        async def callback_video_started():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
-
-        await _wait_for_event(callback_video_started)
-
-        async def callback_video_ended():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
-
-        await _wait_for_event(callback_video_ended)
+        await _wait_for_power_up_video(context)
 
         await asyncio.sleep(1)
 
@@ -995,18 +998,7 @@ async def test_rewind_complex():
         power_up = await contestant_page_1.query_selector("#contestant-power-btn-rewind")
         await power_up.tap()
 
-        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
-
-        async def callback_video_started():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
-
-        await _wait_for_event(callback_video_started)
-
-        async def callback_video_ended():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
-
-        await _wait_for_event(callback_video_ended)
-
+        await _wait_for_power_up_video(context)
         await asyncio.sleep(1)
 
         # Assert that player 1 has the turn again
@@ -1131,17 +1123,7 @@ async def test_powers_contest():
         except TimeoutError:
             pass
 
-        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
-
-        async def callback_video_started():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
-
-        await _wait_for_event(callback_video_started)
-
-        async def callback_video_ended():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
-
-        await _wait_for_event(callback_video_ended)
+        await _wait_for_power_up_video(context)
 
         # Ensure only one power-up use was accepted
         rewind_used = await rewind_power_up.eval_on_selector(".contestant-power-used", "img => !img.classList.contains('d-none')")
@@ -1171,6 +1153,43 @@ async def test_powers_contest():
         assert contestant_pips_active == expected_turns
 
 @pytest.mark.asyncio
+async def test_hijack_before_question():
+    round_num = 1
+    category = "wrong"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+    power_ids = ["hijack", "freeze", "rewind"]
+
+    async with ContextHandler() as context:
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
+
+        await context.show_question()
+
+        contestant_page = context.contestant_pages[0]
+        power_up_buttons = {power_id: await contestant_page.wait_for_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids}
+
+        async def callback_hijack():
+            return await power_up_buttons["hijack"].is_enabled()
+
+        await _wait_for_event(callback_hijack)
+
+        # Use hijack power-up before question is asked
+        await power_up_buttons["hijack"].tap()
+
+        await _wait_for_power_up_video(context)
+
+        
+
+
+@pytest.mark.asyncio
 async def test_discord_message_simple(discord_client):
     player_data = [
         {"disc_id": 2, "name": "Dave", "avatar": None, "score": 800, "buzzes": 4, "hits": 2, "misses": 2, "color": "F30B0B"},
@@ -1179,7 +1198,7 @@ async def test_discord_message_simple(discord_client):
         {"disc_id": 5, "name": "Nø", "avatar": None, "score": -200, "buzzes": 1, "hits": 0, "misses": 1, "color": "00FFFF"},
     ]
 
-    await discord_client.announce_jeopardy_winner(player_data)
+    await discord_client.announce_jeopardy_winner(player_data, MY_GUILD_ID)
 
     channel = discord_client.channels_to_write[MY_GUILD_ID]
 
@@ -1216,7 +1235,7 @@ async def test_discord_message_ties(discord_client):
         {"disc_id": 5, "name": "Nø", "avatar": None, "score": 200, "buzzes": 6, "hits": 5, "misses": 1, "color": "00FFFF"},
     ]
 
-    await discord_client.announce_jeopardy_winner(player_data)
+    await discord_client.announce_jeopardy_winner(player_data, MY_GUILD_ID)
 
     channel = discord_client.channels_to_write[MY_GUILD_ID]
 

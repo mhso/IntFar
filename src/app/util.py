@@ -2,6 +2,7 @@ import json
 from time import time
 from datetime import datetime
 from hashlib import sha256
+from typing import Any, List, Literal, Tuple
 
 from mhooge_flask.logging import logger
 import flask
@@ -99,7 +100,12 @@ def before_request():
     create_session_id()
     ensure_https()
 
-def discord_request(command_types, commands, params, pipe=None):
+def discord_request(
+    command_types: Literal["func", "bot_command"] | List[Literal["func", "bot_command"]],
+    commands: str | List[str],
+    params: Any | Tuple[Any] | List[Any] | List[Tuple[Any]],
+    pipe=None
+):
     """
     Request some information from the Discord API.
     This is done by using a pipe to the separate process hosting the Discord Bot.

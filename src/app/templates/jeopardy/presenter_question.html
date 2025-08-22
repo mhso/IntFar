@@ -63,18 +63,12 @@
 
             <!-- Question tips -->
             {% if 'tips' in question %}
-                {% set tips = question['tips'] %}
-                <div id="question-tip-1" class="question-tip-wrapper">
-                    <h3 class="question-tip-header">Tip 1</h3>
-                    <div class="question-tip-content">{{ tips[0] }}</div>
+                {% for tip in question['tips'] %}
+                <div id="question-tip-{{ loop.index1 }}" class="question-tip-wrapper">
+                    <h3 class="question-tip-header">Tip {{ loop.index1 }}</h3>
+                    <div class="question-tip-content">{{ tip }}</div>
                 </div>
-    
-                {% if tips | length > 1 %}
-                <div id="question-tip-2" class="question-tip-wrapper">
-                    <h3 class="question-tip-header">Tip 2</h3>
-                    <div class="question-tip-content">{{ tips[1] }}</div>
-                </div>
-                {% endif %}
+                {% endfor %}
             {% endif %}
 
             <!-- Countdown wrapper -->

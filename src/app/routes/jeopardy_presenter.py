@@ -10,8 +10,8 @@ import flask
 from flask_socketio import join_room, leave_room, emit
 from mhooge_flask.logging import logger
 
-from api.util import JEOPADY_EDITION, JEOPARDY_REGULAR_ROUNDS, MONTH_NAMES, GUILD_MAP
-from api.lan import is_lan_ongoing
+from api.util import JEOPADY_EDITION, JEOPARDY_REGULAR_ROUNDS, MONTH_NAMES
+from api.lan import is_lan_ongoing, LAN_PARTIES, LATEST_LAN_PARTY
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
@@ -340,7 +340,7 @@ def get_round_data(request_args):
                 "misses": misses,
                 "finale_wager": finale_wager,
                 "color": color,
-                "power_ups": power_ups,
+                "power_ups": [power_up.__dict__ for power_up in power_ups],
             })
 
     try:
@@ -488,8 +488,11 @@ def active_jeopardy(jeopardy_round):
                         tier_info["double"] = False
 
                 # Reset used power-ups
-                for contestant in contestants.values():
-                    contestant.power_ups = _init_powerups()
+                for data in player_data:
+                    contestant = contestants[int(data["disc_id"])]
+                    fresh_power_ups = _init_powerups()
+                    contestant.power_ups = fresh_power_ups
+                    data["power_ups"] = [power_up.__dict__ for power_up in fresh_power_ups]
 
                 if DO_DAILY_DOUBLE:
                     # Choose 1 or 2 random category/tier combination to be daily double
@@ -641,10 +644,10 @@ def jeopardy_endscreen():
         )
 
         jeopardy_data["state"] = endscreen_state
-        guild_id = GUILD_MAP["core"]
+        guild_id = LAN_PARTIES[LATEST_LAN_PARTY].guild_id
 
         if TRACK_UNUSED and flask.current_app.config["APP_ENV"] == "production" and is_lan_ongoing(time(), guild_id):
-            app_util.discord_request("func", "announce_jeopardy_winner", (player_data,))
+            app_util.discord_request("func", "announce_jeopardy_winner", (player_data, guild_id))
 
         app_util.socket_io.emit("state_changed", to="contestants")
 
@@ -859,6 +862,8 @@ def use_power_up(disc_id: str, power_id: str):
 
     if contestant is None:
         return
+
+    print(f"Power up '{power_id}' used by {contestant.name}", flush=True)
 
     with flask.current_app.config["JEOPARDY_POWER_LOCK"]:
         if state.power_use_decided:

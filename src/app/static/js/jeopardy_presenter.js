@@ -9,6 +9,7 @@ const PRESENTER_ACTION_KEY = "Space"
 const socket = io({"transports": ["websocket", "polling"]});
 
 var countdownInterval = null;
+var countdownPaused = false;
 var activeRound;
 var totalRounds;
 var activeQuestionId;
@@ -346,17 +347,20 @@ function keyIsNumeric(key, min, max) {
     return keys.includes(key);
 }
 
-function stopCountdown(hide=true) {
+function stopCountdown() {
     clearInterval(countdownInterval);
     countdownInterval = null;
+    countdownPaused = false;
 
-    if (hide) {
-        let countdownElem = document.getElementById("question-countdown-wrapper");
-        if (!countdownElem.classList.contains("d-none")) {
-            countdownElem.classList.add("d-none");
-            countdownElem.style.opacity = 0;
-        }
+    let countdownElem = document.getElementById("question-countdown-wrapper");
+    if (!countdownElem.classList.contains("d-none")) {
+        countdownElem.classList.add("d-none");
+        countdownElem.style.opacity = 0;
     }
+}
+
+function pauseCountdown(paused) {
+    countdownPaused = paused;
 }
 
 function isQuestionMultipleChoice() {
@@ -428,7 +432,13 @@ function startCountdown(duration, callback=null) {
     setCountdownText(countdownText, secs, duration);
     setCountdownBar(countdownBar, (secs * 1000) + (iteration * delay), green, red, duration * 1000);
 
+    countdownPaused = false;
+
     countdownInterval = setInterval(function() {
+        if (countdownPaused) {
+            return;
+        }
+
         iteration += 1;
         if (iteration * delay == 1000) {
             iteration = 0;
@@ -549,13 +559,13 @@ function afterBuzzIn(playerId) {
 }
 
 function playerBuzzedFirst(playerId) {
-    if (activePowerUp != null) {
+    if (activePowerUp != null && activePowerUp != "hijack") {
         return;
     }
 
     playersBuzzedIn.push(playerId);
 
-    if (!activePlayers[playerId] || answeringPlayer != null) {
+    if (!activePlayers[playerId] || (answeringPlayer != null && activePowerUp != "hijack")) {
         return;
     }
 
@@ -589,7 +599,7 @@ function showPowerUpVideo(powerId) {
 }
 
 function onFreezeUsed() {
-    stopCountdown(false);
+    pauseCountdown(true);
 }
 
 function afterFreezeUsed() {
@@ -610,32 +620,35 @@ function afterRewindUsed() {
     afterBuzzIn(answeringPlayer);
 }
 
-function onHijackUsed(playerId) {
+function onHijackUsed() {
+    pauseCountdown(true);
+
     // If question has not been asked yet, hijack gives bonus points
     hijackBonus = activePlayers.length == 0
-    let usedAfterBuzzIn = answeringPlayer != null;
-    answeringPlayer = playerId;
 
-    if (!hijackBonus && usedAfterBuzzIn) {
+    if (!hijackBonus && answeringPlayer != null) {
         stopCountdown();
     }
-
-    return usedAfterBuzzIn;
 }
 
-function afterHijackUsed(usedAfterBuzzIn) {
+function afterHijackUsed(playerId) {
     activePlayers = [];
-
+    
     for (let i = 0; i < playerIds.length; i++) {
         activePlayers.push(false);
     }
 
-    if (!hijackBonus && usedAfterBuzzIn) {
-        afterBuzzIn(answeringPlayer);
+    activePlayers[playerId] = true;
+
+    if (!hijackBonus && answeringPlayer != null) {
+        answeringPlayer = playerId;
+        afterBuzzIn(playerId);
     }
     else {
-        setPlayerTurn(answeringPlayer, false);
+        setPlayerTurn(playerId, false);
     }
+
+    pauseCountdown(false);
 }
 
 function powerUpUsed(playerId, powerId) {
@@ -653,8 +666,8 @@ function powerUpUsed(playerId, powerId) {
         callback = afterRewindUsed;
     }
     else {
-        let usedAfterBuzzIn = onHijackUsed(playerId);
-        callback = () => afterHijackUsed(usedAfterBuzzIn);
+        onHijackUsed();
+        callback = () => afterHijackUsed(playerId);
     }
 
     addPowerUseToFeed(playerId, powerId);
