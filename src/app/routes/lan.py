@@ -138,11 +138,17 @@ def get_active_game_data(face_images, lan_info):
 def get_bingo_data(database, lan_date, face_images={}):
     bingo_challenges = lan_api.get_current_bingo_challenges(database, lan_date)
 
+    if bingo_challenges == []:
+        return []
+
     bingo_data = []
     curr_row = []
     for data in bingo_challenges:
         if data["completed_by"]:
             data["completed_by"] = face_images.get(data["completed_by"])
+
+        if data["id"] == "bounty_gold":
+            data["progress"] = int(data["progress"])
 
         curr_row.append(data)
 
@@ -223,11 +229,9 @@ def get_data(lan_info, lan_date):
             if fp.readline().strip() in ("0", "1"):
                 games_stats = []
 
-    names = ["david", "martin", "mikkel", "mads", "thommy"]
-
     face_images = {
-        disc_id: flask.url_for("static", _external=True, filename=f"img/lan_{name}.png")
-        for disc_id, name in zip(lan_info.participants, names)
+        disc_id: flask.url_for("static", _external=True, filename=f"img/lan_{lan_info.participants[disc_id].lower()}.png")
+        for disc_id in lan_info.participants
     }
 
     data = get_active_game_data(face_images, lan_info)
@@ -329,12 +333,16 @@ def get_data(lan_info, lan_date):
                 all_player_stats[disc_id].append(fmt_value)
 
         # Get total rank for each player
-        performance_scores = database.get_performance_score()
+        performance_scores = database.get_performance_score(time_after=lan_info.start_time, time_before=lan_info.end_time, minimum_games=1)()
         all_player_ranks = {}
         for disc_id in lan_info.participants:
-            for score_id, score in performance_scores():
+            player_score = 5
+            for score_id, score in performance_scores:
                 if score_id == disc_id:
-                    all_player_ranks[disc_id] = score
+                    player_score = score
+                    break
+
+            all_player_ranks[disc_id] = float(f"{player_score:.2f}")
 
         # Organize and sort stats by total rank.
         all_player_stats = [
@@ -344,10 +352,9 @@ def get_data(lan_info, lan_date):
                 all_player_stats[disc_id]
             ) for disc_id in all_player_stats
         ]
-        all_player_stats.sort(key=lambda x: x[0])
-        all_player_stats = [x[1:] for x in all_player_stats]
+        all_player_stats.sort(key=lambda x: x[0], reverse=True)
         formatted_stat_names_dict = get_formatted_stat_names(_GAME)
-        stat_names = [
+        stat_names = ["Score"] + [
             formatted_stat_names_dict[stat]
             for stat in all_avg_stats
         ]

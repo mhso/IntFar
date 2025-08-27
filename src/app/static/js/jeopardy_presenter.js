@@ -77,8 +77,8 @@ function getQuestionURL(round, category, difficulty) {
     return `${getBaseURL()}/${round}/${category}/${difficulty}?${getQueryParams()}`;
 }
 
-function getFinaleURL(question_id) {
-    return `${getBaseURL()}/finale/${question_id}?${getQueryParams()}`;
+function getFinaleURL() {
+    return `${getBaseURL()}/finale?${getQueryParams()}`;
 }
 
 function getEndscreenURL() {
@@ -150,6 +150,7 @@ function disableFreeze(playerId) {
     disablePowerUp(playerId, "freeze");
 
     let freezeWrapper = document.getElementById("question-countdown-frozen");
+    freezeWrapper.style.transition = "opacity 2s";
     freezeWrapper.style.opacity = 0;
     setTimeout(function() {
         freezeWrapper.classList.add("d-none");
@@ -235,6 +236,8 @@ function correctAnswer() {
     if (hijackBonus) {
         activeValue *= 2;
     }
+
+    activeValue = Math.ceil(activeValue);
 
     valueElem.textContent = "+" + activeValue;
 
@@ -360,7 +363,9 @@ function stopCountdown() {
 }
 
 function pauseCountdown(paused) {
-    countdownPaused = paused;
+    if (countdownInterval != null) {
+        countdownPaused = paused;
+    }
 }
 
 function isQuestionMultipleChoice() {
@@ -599,13 +604,29 @@ function showPowerUpVideo(powerId) {
 }
 
 function onFreezeUsed() {
+    clearInterval(freezeTimeout);
     pauseCountdown(true);
 }
 
 function afterFreezeUsed() {
+    let opacity = 0.85;
+
     let freezeWrapper = document.getElementById("question-countdown-frozen");
     freezeWrapper.classList.remove("d-none");
-    freezeWrapper.style.opacity = 0.85;
+    freezeWrapper.style.transition = "opacity 2s";
+    freezeWrapper.style.opacity = opacity;
+
+    let duration = 38;
+
+    freezeWrapper.style.transition = `opacity ${delay}s`;
+    freezeWrapper.style.opacity = 0;
+
+    setTimeout(function() {
+        if (answeringPlayer != null) {
+            freezeWrapper.classList.add("d-none");
+            pauseCountdown(false);
+        }
+    }, duration * 1000)
 }
 
 function onRewindUsed(playerId) {
@@ -738,7 +759,7 @@ function questionAsked(countdownDelay) {
         else {
             // Go to finale screen after countdown is finished if it's round 3
             document.getElementById("question-finale-suspense").play();
-            startCountdown(TIME_FOR_FINAL_ANSWER, () => window.location.href = getFinaleURL(activeQuestionId));
+            startCountdown(TIME_FOR_FINAL_ANSWER, () => window.location.href = getFinaleURL());
         }
     }, countdownDelay);
 
@@ -790,8 +811,10 @@ function showImageOrVideo(elem) {
 }
 
 function showQuestion() {
-    for (let i = 0; i < playerIds.length; i++) {
-        activePlayers.push(!isDailyDouble);
+    if (activePlayers.length == 0) {
+        for (let i = 0; i < playerIds.length; i++) {
+            activePlayers.push(!isDailyDouble);
+        }
     }
 
     // Show the question, if it exists

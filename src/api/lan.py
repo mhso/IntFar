@@ -1,150 +1,175 @@
 from datetime import datetime
+from typing import Dict
 
 from api.game_stats import PostGameStats
 from api.game_data import get_stat_quantity_descriptions
 from api.game_data.lol import LoLGameStats
 from api.game_databases.lol import LoLGameDatabase
+from api.util import GUILD_MAP
 
 TESTING = False
 
 class LANInfo:
-    def __init__(self, start_time, end_time, participants, guild_id):
+    def __init__(self, start_time: float, end_time: float, participants: Dict[int, str], guild_name: str):
         self.start_time = start_time
         self.end_time = end_time
         self.participants = participants
-        self.guild_id = guild_id
+        match guild_name:
+            case "core": self.guild_name = "CoreNibbas"
+            case "nibs": self.guild_name = "LeagueNibbas"
+            case "circus": self.guild_name = "DanishCircus"
 
-if not TESTING:
-    LAN_PARTIES = {
-        "october_21": LANInfo(
-            datetime(2021, 10, 30, 14, 0, 0).timestamp(),
-            datetime(2021, 10, 31, 12, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "april_22": LANInfo(
-            datetime(2022, 4, 15, 14, 0, 0).timestamp(),
-            datetime(2022, 4, 16, 12, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "september_23": LANInfo(
-            datetime(2023, 9, 9, 14, 0, 0).timestamp(),
-            datetime(2023, 9, 10, 18, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "december_23": LANInfo(
-            datetime(2023, 12, 30, 13, 0, 0).timestamp(),
-            datetime(2023, 12, 31, 3, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "april_24": LANInfo(
-            datetime(2024, 4, 27, 10, 0, 0).timestamp(),
-            datetime(2024, 4, 28, 10, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "august_24": LANInfo(
-            datetime(2024, 8, 17, 10, 0, 0).timestamp(),
-            datetime(2024, 8, 18, 10, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "february_25": LANInfo(
-            datetime(2025, 2, 8, 11, 0, 0).timestamp(),
-            datetime(2025, 2, 9, 12, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "april_25": LANInfo(
-            datetime(2025, 4, 26, 9, 0, 0).timestamp(),
-            datetime(2025, 4, 27, 12, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        ),
-        "august_25": LANInfo(
-            datetime(2025, 8, 23, 8, 0, 0).timestamp(),
-            datetime(2025, 8, 24, 14, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                219497453374668815: "Thommy"
-            },
-            619073595561213953 # League Nibs
-        )
-    }
+        self.guild_id = GUILD_MAP[guild_name]
 
-else: # Use old data for testing.
-    LAN_PARTIES = {
-        "april_25": LANInfo(
-            datetime(2025, 4, 26, 9, 0, 0).timestamp(),
-            datetime(2025, 4, 27, 12, 0, 0).timestamp(),
-            {
-                115142485579137029: "Dave",
-                172757468814770176: "Murt",
-                267401734513491969: "Gual",
-                331082926475182081: "Muds",
-                347489125877809155: "Nønø"
-            },
-            803987403932172359 # Core Nibs
-        )
-    }
-
+LAN_PARTIES = {
+    # "october_19": LANInfo(
+    #     datetime(2019, 4, 12, 12, 0, 0).timestamp(),
+    #     datetime(2019, 4, 13, 12, 0, 0).timestamp(),
+    #     {
+    #         115142485579137029: "Dave",
+    #         274654800182902785: "Mogens",
+    #         267401734513491969: "Gual",
+    #         331082926475182081: "Muds",
+    #         347489125877809155: "Nønø"
+    #     },
+    #     "nibs"
+    # ),
+    "august_20": LANInfo(
+        datetime(2020, 8, 3, 14, 0, 0).timestamp(),
+        datetime(2020, 8, 4, 12, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "nibs"
+    ),
+    "march_21": LANInfo(
+        datetime(2021, 3, 31, 12, 0, 0).timestamp(),
+        datetime(2021, 4, 1, 12, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "october_21": LANInfo(
+        datetime(2021, 10, 30, 14, 0, 0).timestamp(),
+        datetime(2021, 10, 31, 12, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "april_22": LANInfo(
+        datetime(2022, 4, 15, 14, 0, 0).timestamp(),
+        datetime(2022, 4, 16, 12, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "september_23": LANInfo(
+        datetime(2023, 9, 9, 14, 0, 0).timestamp(),
+        datetime(2023, 9, 10, 18, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "december_23": LANInfo(
+        datetime(2023, 12, 30, 13, 0, 0).timestamp(),
+        datetime(2023, 12, 31, 3, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "april_24": LANInfo(
+        datetime(2024, 4, 27, 10, 0, 0).timestamp(),
+        datetime(2024, 4, 28, 10, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "august_24": LANInfo(
+        datetime(2024, 8, 17, 10, 0, 0).timestamp(),
+        datetime(2024, 8, 18, 10, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "february_25": LANInfo(
+        datetime(2025, 2, 8, 11, 0, 0).timestamp(),
+        datetime(2025, 2, 9, 12, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "april_25": LANInfo(
+        datetime(2025, 4, 26, 9, 0, 0).timestamp(),
+        datetime(2025, 4, 27, 12, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
+    ),
+    "august_25": LANInfo(
+        datetime(2025, 8, 23, 8, 0, 0).timestamp(),
+        datetime(2025, 8, 24, 14, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            219497453374668815: "Thommy"
+        },
+        "nibs"
+    )
+}
 LATEST_LAN_PARTY: str = max(LAN_PARTIES.keys(), key=lambda k: LAN_PARTIES[k].start_time)
 
-def is_lan_ongoing(timestamp: int, guild_id=None):
+def is_lan_ongoing(timestamp: float, guild_id=None):
     lan_data = list(filter(
         lambda x: timestamp > LAN_PARTIES[x].start_time and timestamp < LAN_PARTIES[x].end_time,
         LAN_PARTIES
@@ -157,6 +182,9 @@ def is_lan_ongoing(timestamp: int, guild_id=None):
 
     # Check if guild_id matches, if given.
     return guild_id is None or guild_id == latest_lan_info.guild_id
+
+def get_latest_lan_info():
+    return LAN_PARTIES[LATEST_LAN_PARTY]
 
 def get_tilt_value(recent_games):
     # Tilt value ranges from 0-12
@@ -217,7 +245,7 @@ def get_average_stats(database: LoLGameDatabase, lan_info: LANInfo):
     stats_to_get.remove("disc_id")
 
     if all_stats == []:
-        return None, None
+        return None
 
     grouped_by_player = {}
     for stats in all_stats:

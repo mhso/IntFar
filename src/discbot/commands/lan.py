@@ -1,17 +1,28 @@
 from datetime import datetime
 from time import time
 
+from discord import Message
+
 import api.lan as lan_api
 import api.util as api_util
 from api.awards import get_intfar_reasons, get_doinks_reasons, organize_intfar_stats, organize_doinks_stats
+from api.game_data import get_formatted_stat_names, get_formatted_stat_value
 from discbot.commands.base import *
+from discbot.discord_bot import DiscordClient
 
 _GAME = "lol"
 
 class BaseLANCommand(Command):
+    GUILDS = [api_util.GUILD_MAP["core"]]
+
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name)
+
+        self.lan_party = lan_api.get_latest_lan_info()
+
     async def send_lan_not_started_msg(self):
         now_dt = datetime.now()
-        lan_start = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY].start_time
+        lan_start = self.lan_party.start_time
         lan_dt = datetime.fromtimestamp(lan_start)
         duration = api_util.format_duration(now_dt, lan_dt)
         response = f"LAN is starting in `{duration}`! Check back then for cool stats " + "{emote_nazi}"
@@ -30,11 +41,12 @@ class LANCommand(BaseLANCommand):
     NAME = "lan"
     DESCRIPTION = "Show information about how the current LAN is going."
     ACCESS_LEVEL = "all"
-    GUILDS = [api_util.GUILD_MAP["core"]]
 
     async def handle(self):
-        lan_party = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY]
-        if time() < lan_party.start_time:
+        if self.message.author.id not in self.lan_party.participants:
+            return
+
+        if time() < self.lan_party.start_time:
             await self.send_lan_not_started_msg()
             return
 
@@ -42,7 +54,7 @@ class LANCommand(BaseLANCommand):
 
         # General info about how the current LAN is going.
         games_stats = database.get_games_count(
-            time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
+            time_after=self.lan_party.start_time, time_before=self.lan_party.end_time, guild_id=self.lan_party.guild_id
         )
 
         if games_stats is None:
@@ -53,26 +65,26 @@ class LANCommand(BaseLANCommand):
 
             dt_start = datetime.fromtimestamp(first_game_timestamp)
             dt_now = datetime.now()
-            if dt_now.timestamp() > lan_party.end_time:
+            if dt_now.timestamp() > self.lan_party.end_time:
                 dt_now = datetime.fromtimestamp(last_game_timestamp)
 
             duration = api_util.format_duration(dt_start, dt_now)
 
             champs_played = len(
                 database.get_played_ids(
-                    time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
+                    time_after=self.lan_party.start_time, time_before=self.lan_party.end_time, guild_id=self.lan_party.guild_id
                 )
             )
 
             intfars = database.get_intfar_count(
-                time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
+                time_after=self.lan_party.start_time, time_before=self.lan_party.end_time, guild_id=self.lan_party.guild_id
             )
             doinks = database.get_doinks_count(
-                time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
+                time_after=self.lan_party.start_time, time_before=self.lan_party.end_time, guild_id=self.lan_party.guild_id
             )[1]
 
             longest_game_duration, longest_game_time = database.get_longest_game(
-                time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
+                time_after=self.lan_party.start_time, time_before=self.lan_party.end_time, guild_id=self.lan_party.guild_id
             )
             longest_game_start = datetime.fromtimestamp(longest_game_time)
             longest_game_end = datetime.fromtimestamp(longest_game_time + longest_game_duration)
@@ -95,16 +107,19 @@ class LANPerformanceCommand(BaseLANCommand):
     DESCRIPTION = "Show the performance of you (or someone else) at the current LAN."
     ACCESS_LEVEL = "all"
     OPTIONAL_PARAMS = [TargetParam("person")]
-    GUILDS = [api_util.GUILD_MAP["core"]]
 
     async def handle(self, target_id: int):
-        lan_party = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY]
-        if time() < lan_party.start_time:
+        if target_id not in self.lan_party.participants:
+            await self.message.channel.send("That person is not a member of this LAN :)")
+            return
+
+        if time() < self.lan_party.start_time:
             await self.send_lan_not_started_msg()
             return
 
         # Info about various stats for a person at the current LAN.
-        all_avg_stats, all_ranks = lan_api.get_average_stats(self.client.game_databases[_GAME], lan_party)
+        database = self.client.game_databases[_GAME]
+        all_avg_stats = lan_api.get_average_stats(database, self.lan_party)
 
         if all_avg_stats is None:
             response = "No games have yet been played at this LAN."
@@ -112,31 +127,25 @@ class LANPerformanceCommand(BaseLANCommand):
             return
 
         name = self.client.get_discord_nick(target_id, self.message.guild.id)
+        stat_names = get_formatted_stat_names(_GAME)
 
         response = f"At this LAN, {name} has the following average stats:"
 
         for stat_name in all_avg_stats:
             stats = all_avg_stats[stat_name]
+            readable_name = stat_names[stat_name]
 
             user_value = None
-            user_rank = 0
-            for index, (disc_id, stat_value) in enumerate(stats):
+            for disc_id, stat_value in stats:
                 if disc_id == target_id:
-                    if stat_name in ("Damage to champs", "Gold earned"):
-                        stat_value = int(stat_value)
                     user_value = api_util.round_digits(stat_value)
-                    user_rank = index + 1
 
-            response += f"\n{stat_name}: **{user_value}** (rank **{user_rank}**/**5**)"
+            response += f"\n{readable_name}: **{get_formatted_stat_value(_GAME, stat_name, user_value)}**"
 
-        user_total_rank = 0
-        for index, rank_data in enumerate(all_ranks):
-            if rank_data[0] == target_id:
-                user_total_rank = index + 1
-                break
-
-        response += "\n---------------------------------------------"
-        response += f"\nTotal rank: **{user_total_rank}**/**5**"
+        score, rank, _ = database.get_performance_score(target_id, self.lan_party.start_time, self.lan_party.end_time, 1)()
+        if score is not None:
+            response += "\n---------------------------------------------"
+            response += f"\nTotal rank: **{rank}**/**{len(self.lan_party.participants)}** (score: **{score:.2f}**/**10**)"
 
         await self.message.channel.send(response)
 
@@ -149,15 +158,13 @@ class LANIntfarCommand(BaseLANCommand):
     TARGET_ALL = True
     ACCESS_LEVEL = "all"
     OPTIONAL_PARAMS = [TargetParam("person")]
-    GUILDS = [api_util.GUILD_MAP["core"]]
 
     def _format_intfar(self, disc_id: int, expanded: bool):
         database = self.client.game_databases[_GAME]
-        lan_party = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY]
         person_to_check = self.client.get_discord_nick(disc_id, self.message.guild.id)
 
         games_played, intfar_reason_ids = database.get_intfar_stats(
-            disc_id, time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
+            disc_id, time_after=self.lan_party.start_time, time_before=self.lan_party.end_time, guild_id=self.lan_party.guild_id
         )
         games_played, intfars, intfar_counts, pct_intfar = organize_intfar_stats(_GAME, games_played, intfar_reason_ids)
 
@@ -181,12 +188,15 @@ class LANIntfarCommand(BaseLANCommand):
         return msg, intfars, pct_intfar
 
     async def handle(self, target_id: int = None):
-        lan_party = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY]
-        if time() < lan_party.start_time:
+        if target_id not in self.lan_party.participants:
+            await self.message.channel.send("That person is not a member of this LAN :)")
+            return
+
+        if time() < self.lan_party.start_time:
             await self.send_lan_not_started_msg()
             return
 
-        targets = lan_party.participants if target_id is None else [target_id]
+        targets = self.lan_party.participants if target_id is None else [target_id]
         messages = []
         for target in targets:
             resp_str, intfars, pct = self._format_intfar(target, target_id is not None)
@@ -204,18 +214,16 @@ class LANDoinksCommand(BaseLANCommand):
     TARGET_ALL = True
     ACCESS_LEVEL = "all"
     OPTIONAL_PARAMS = [TargetParam("person")]
-    GUILDS = [api_util.GUILD_MAP["core"]]
 
     def _format_doinks(self, disc_id: int, expanded: bool):
         database = self.client.game_databases[_GAME]
-        lan_party = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY]
         person_to_check = self.client.get_discord_nick(disc_id, self.message.guild.id)
 
         doinks_reason_ids = database.get_doinks_stats(
-            disc_id, time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
+            disc_id, time_after=self.lan_party.start_time, time_before=self.lan_party.end_time, guild_id=self.lan_party.guild_id
         )
         total_doinks = database.get_doinks_count(
-            disc_id, time_after=lan_party.start_time, time_before=lan_party.end_time, guild_id=lan_party.guild_id
+            disc_id, time_after=self.lan_party.start_time, time_before=self.lan_party.end_time, guild_id=self.lan_party.guild_id
         )[1]
         doinks_counts = organize_doinks_stats(_GAME, doinks_reason_ids)
 
@@ -236,12 +244,15 @@ class LANDoinksCommand(BaseLANCommand):
         return msg, total_doinks
 
     async def handle(self, target_id: int = None):
-        lan_party = lan_api.LAN_PARTIES[lan_api.LATEST_LAN_PARTY]
-        if time() < lan_party.start_time:
+        if target_id not in self.lan_party.participants:
+            await self.message.channel.send("That person is not a member of this LAN :)")
+            return
+
+        if time() < self.lan_party.start_time:
             await self.send_lan_not_started_msg()
             return
 
-        targets = lan_party.participants if target_id is None else [target_id]
+        targets = self.lan_party.participants if target_id is None else [target_id]
         messages = []
         for target in targets:
             resp_str, doinks = self._format_doinks(target, target_id is not None)
@@ -255,12 +266,10 @@ class JeopardyJoinCommand(BaseLANCommand):
     NAME = "jeopardy"
     DESCRIPTION = "Join Jeopardy."
     ACCESS_LEVEL = "all"
-    GUILDS = [api_util.GUILD_MAP["core"]]
 
     async def handle(self):
         author_id = self.message.author.id
-
-        if not lan_api.is_lan_ongoing(datetime.now().timestamp(), self.message.guild.id):
+        if not lan_api.is_lan_ongoing(datetime.now().timestamp(), self.message.guild.id) or author_id not in self.lan_party.participants:
             return
 
         client_secret = self.client.meta_database.get_client_secret(author_id)

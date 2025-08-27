@@ -1,22 +1,10 @@
-# Jeopardy v5
-## Ideer til power-ups
+# LAN
+Lav et script der automatisk laver scaffolding. Følgende ting kan scaffoldes:
 
-### Hijack
-- Hijack et spørgsmål, så kun den person kan svare på spørgsmålet
-- Hvis den bruges før spørgsmålet er stillet doubles point der kan vindes
-- Overrider andre buzz-ins på samme spørgsmål
-- Kan kun bruges en gang per spørgsmål, spørgsmålet er slut efter personen svarer (ligesom daily double)
-- Kan kun bruges en gang per spiller, per runde
+## LAN stuff
+- Indsæt ny entry i `LAN_PARTIES ` i `api/lan.py`
 
-### Freeze
-- Frys tiden mens der svares på et spørgsmål (efter buzz-in)
-- Kan kun bruges hvis personen der fryser er den der er i gang med at svare
-- Kan bruges flere gange på samme spørgsmål (af forskellige spillere)
-- Kan kun bruges en gang per spiller, per runde
-
-### Rewind
-- Buzz in igen umiddelbart efter at have svaret forkert på et spørgsmål
-- Overrider alle andre buzz-ins der kom siden da
-- Virker indtil en anden person har svaret på samme spørgsmål
-- Kan bruges flere gange på samme spørgsmål (af forskellige spillere)
-- Kan kun bruges en gang per spiller, per runde
+## Jeopardy stuff
+- Bump `JEOPARDY_ITERATION` i `api/util.py`
+- Opret mappe med ny version i `app/static/img/jeopardy`
+- Opret nye tomme filer for `jeopardy_questions_{JEOPARDY_ITERATION}.json` og `jeopardy_used_{JEOPARDY_ITERATION}.json` i `app/static/data`

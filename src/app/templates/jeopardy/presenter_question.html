@@ -27,9 +27,9 @@
             <!-- Question images -->
             {% if "image" in question %}
             <div id="question-question-image-wrapper">
-                <img id="question-question-image"{% if "border" in question %} class="image-border"{% endif %} src="{{ url_for('static', _external=True, filename='img/jeopardy/' + question['image'] ) }}" style="height: {{ question['height'] }}px; {% if "border" in question %}border-color: {{ question['border'] }};{% endif %}">
+                <img id="question-question-image"{% if "border" in question %} class="image-border"{% endif %} src="{{ url_for('static', _external=True, filename=base_folder + question['image'] ) }}" style="height: {{ question['height'] }}px; {% if "border" in question %}border-color: {{ question['border'] }};{% endif %}">
                 {% if "answer_image" in question %}
-                <img id="question-answer-image"{% if "border" in question %} class="image-border"{% endif %} src="{{ url_for('static', _external=True, filename='img/jeopardy/' + question['answer_image'] ) }}" style="height: {{ question['height'] }}px; {% if "border" in question %}border-color: {{ question['border'] }};{% endif %}">
+                <img id="question-answer-image"{% if "border" in question %} class="image-border"{% endif %} src="{{ url_for('static', _external=True, filename=base_folder + question['answer_image'] ) }}" style="height: {{ question['height'] }}px; {% if "border" in question %}border-color: {{ question['border'] }};{% endif %}">
                 {% endif %}
             </div>
             {% endif %}
@@ -43,7 +43,7 @@
             {% endif %}
             <div id="question-question-image-wrapper">
                 <video id="question-question-video" style="height: {{ question['height'] }}px;"{% if 'volume' in question %} class="volume-{{ question['volume'] }}"{% endif %}>
-                    <source src="{{ url_for('static', _external=True, filename='img/jeopardy/' + question['video']) }}" type="video/{{ video_type }}">
+                    <source src="{{ url_for('static', _external=True, filename=base_folder + question['video']) }}" type="video/{{ video_type }}">
                 </video>
             </div>
             {% endif %}
