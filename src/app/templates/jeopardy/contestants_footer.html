@@ -8,14 +8,18 @@
             </div>
             <div class="footer-contestant-header">
                 <div class="footer-contestant-entry-name">{{ player_dict["name"] }}</div>
-                <div class="footer-contestant-entry-score">{{ player_dict["score"] }} <img src="{{ url_for('static', _external=True, filename='img/gbp_coin.png') }}"></div>
+                <div class="footer-contestant-entry-score">{{ player_dict["score"] }} GBP</div>
             </div>
             <img class="footer-contestant-entry-avatar" src="{{ player_dict['avatar'] }}">
             <img class="footer-contestant-entry-ready" src="{{ url_for('static', _external=True, filename='img/check.png') }}">
             <div class="footer-contestant-entry-powers">
                 {% for power in player_dict['power_ups'] %}
-                <img src="{{ url_for('static', _external=True, filename='img/forbidden.png') }}" class="footer-contestant-entry-power-used {% if not power['used'] %}d-none{% endif %}">
-                <img src="{{ url_for('static', _external=True, filename='img/jeopardy/power_' + power['power_id'] + '.png') }}" class="footer-contestant-entry-power-icon">
+                <div>
+                    {% if power['used'] %}
+                    <img src="{{ url_for('static', _external=True, filename='img/forbidden.png') }}" class="footer-contestant-entry-power-used">
+                    {% endif %}
+                    <img src="{{ url_for('static', _external=True, filename='img/jeopardy/power_' + power['power_id'] + '.png') }}" class="footer-contestant-entry-power-icon">
+                </div>
                 {% endfor %}
             </div>
         </div>

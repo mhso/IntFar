@@ -44,41 +44,45 @@
                 {% endif %}
 
                 <div id="lan-bingo-wrapper" class="container-flex">
-                    {% for row in bingo_challenges %}
-                    <div class="row">
-                        {% for bingo_entry in row %}
-                        <div class="lan-bingo-entry{% if bingo_entry['bingo'] %} bingo-bingo{% elif bingo_entry['completed'] %} bingo-completed{% endif %}"{% if bingo_entry['progress'] %} data-progress="{{ bingo_entry['progress'] }}" data-total="{{ bingo_entry['total'] }}"{% endif %}>
-                            {%- if bingo_entry['completed_by'] %}
-                            <div class="lan-bingo-person"><img src="{{ bingo_entry['completed_by'] }}"></div>
-                            {% endif %}
+                    {% if bingo_challenges %}
+                        {% for row in bingo_challenges %}
+                        <div class="row">
+                            {% for bingo_entry in row %}
+                            <div class="lan-bingo-entry{% if bingo_entry['bingo'] %} bingo-bingo{% elif bingo_entry['completed'] %} bingo-completed{% endif %}"{% if bingo_entry['progress'] %} data-progress="{{ bingo_entry['progress'] }}" data-total="{{ bingo_entry['total'] }}"{% endif %}>
+                                {%- if bingo_entry['completed_by'] %}
+                                <div class="lan-bingo-person"><img src="{{ bingo_entry['completed_by'] }}"></div>
+                                {% endif %}
 
-                            <div class="lan-bingo-desc">
-                                {{ bingo_entry['name'] }}
+                                <div class="lan-bingo-desc">
+                                    {{ bingo_entry['name'] }}
+                                </div>
+
+                                {% if bingo_entry['new_progress'] %}
+                                <div class="lan-bingo-updated">
+                                    <img src="{{ url_for('static', filename='img/bingo_progress.png', _external=True) }}"><img src="{{ url_for('static', filename='img/bingo_progress.png', _external=True) }}">
+                                </div>
+                                {% endif %}
+
+                                {%- if bingo_entry['total'] > 1 %}
+                                <div class="lan-bingo-desc-progress">{{ bingo_entry['progress'] }}/{%- if bingo_entry['id'] == 'damage_dealt' %}1M{% else %}{{ bingo_entry['total'] }}{% endif %}</div>
+                                {% endif %}
+                                {% if bingo_entry['total'] > 1 and not bingo_entry['completed'] and not bingo_entry['bingo'] %}
+                                <div class="lan-bingo-progress-bar"></div>
+                                {% endif %}
                             </div>
-
-                            {% if bingo_entry['new_progress'] %}
-                            <div class="lan-bingo-updated">
-                                <img src="{{ url_for('static', filename='img/bingo_progress.png', _external=True) }}"><img src="{{ url_for('static', filename='img/bingo_progress.png', _external=True) }}">
-                            </div>
-                            {% endif %}
-
-                            {%- if bingo_entry['total'] > 1 %}
-                            <div class="lan-bingo-desc-progress">{{ bingo_entry['progress'] }}/{%- if bingo_entry['id'] == 'damage_dealt' %}1M{% else %}{{ bingo_entry['total'] }}{% endif %}</div>
-                            {% endif %}
-                            {% if bingo_entry['total'] > 1 and not bingo_entry['completed'] and not bingo_entry['bingo'] %}
-                            <div class="lan-bingo-progress-bar"></div>
-                            {% endif %}
+                            {% endfor %}
                         </div>
                         {% endfor %}
-                    </div>
-                    {% endfor %}
 
-                    <!-- Bingo plate is all filled out -->
-                    {% if bingo_completed %}
-                    <h3>
-                        BINGO BANGO BONGO<br>
-                        GG WP!
-                    </h3>
+                        <!-- Bingo plate is all filled out -->
+                        {% if bingo_completed %}
+                        <h3>
+                            BINGO BANGO BONGO<br>
+                            GG WP!
+                        </h3>
+                        {% endif %}
+                    {% else %}
+                    No Bingo this LAN :)
                     {% endif %}
                 </div>
             </div>
@@ -140,11 +144,12 @@
                             <th class="lan-perform-entry lan-perform-entry-{{ loop.index }}">{{ stat_name }}</th>
                             {% endfor %}
                         </tr>
-                        {% for player_avatar, player_stats in all_player_stats %}
+                        {% for player_score, player_avatar, player_stats in all_player_stats %}
                         <tr>
                             <td class="lan-perform-entry lan-perform-entry-0"><img class="lan-performance-avatar" src="{{ player_avatar }}"></td>
+                            <td class="lan-perform-entry lan-perform-entry-1">{{ player_score }}</td>
                             {% for stat_value in player_stats %}
-                            <td class="lan-perform-entry lan-perform-entry-{{ loop.index }}">{{ stat_value }}</td>
+                            <td class="lan-perform-entry lan-perform-entry-{{ loop.index + 1 }}">{{ stat_value }}</td>
                             {% endfor %}
                         </tr>
                         {% endfor %}
@@ -179,7 +184,7 @@
             <div id="lan-no-games-wrapper" class="col-lg-12">
                 <h1>WAITING FOR<br>LAN TO BEGIN</h1>
                 <video autoplay muted loop>
-                    <source src="{{ url_for('static', _external=True, filename='img/login_screens.mp4') }}" type="video/mp4">
+                    <source src="{{ url_for('static', _external=True, filename='img/login_screens_thommy.mp4') }}" type="video/mp4">
                 </video>
             </div>
             {% endif %}

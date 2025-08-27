@@ -259,17 +259,17 @@ class GameDatabase(SQLiteDatabase):
 
             return self.execute_query(query).fetchone()
 
-    def get_best_or_worst_stat(self, stat, disc_id=None, maximize=True):
+    def get_best_or_worst_stat(self, stat, disc_id=None, maximize=True, time_after: int = None, time_before: int = None):
+        delim_str, params = self.get_delimeter(time_after, time_before, prefix="AND")
         aggregator = "MAX" if maximize else "MIN"
 
         min_condition = f"AND {stat} <> 0" if stat != "deaths" else ""
         player_select = ""
-        params = []
 
         if stat == "first_blood":
             if disc_id is not None:
                 player_condition = "AND u.disc_id = ?"
-                params = [disc_id]
+                params.append(disc_id)
             else:
                 player_select = "u.disc_id,"
                 player_condition = "GROUP BY u.disc_id"
@@ -299,12 +299,14 @@ class GameDatabase(SQLiteDatabase):
                 ON games.player_id = p.player_id
                 WHERE
                     u.active = 1
+                    {delim_str}
                     {player_condition}
             """
         else:
+            params = params * 2
             if disc_id is not None:
                 player_condition = "WHERE best.disc_id = ?"
-                params = [disc_id]
+                params.append(disc_id)
             else:
                 player_select = "best.disc_id,"
                 player_condition = "GROUP BY best.disc_id"
@@ -328,27 +330,33 @@ class GameDatabase(SQLiteDatabase):
                             p.game_id,
                             u.disc_id
                         FROM participants AS p
+                        INNER JOIN games AS g
+                            ON g.game_id = p.game_id
                         JOIN users AS u
-                        ON u.player_id = p.player_id
+                            ON u.player_id = p.player_id
                         WHERE
                             u.active = 1
                             AND {stat} IS NOT NULL
+                            {delim_str}
                             {min_condition}
-                        GROUP BY game_id
+                        GROUP BY p.game_id
                     ) sub
                     GROUP BY sub.disc_id
                 ) best
                 INNER JOIN (
                     SELECT
-                        COUNT(DISTINCT game_id) AS c,
+                        COUNT(DISTINCT p.game_id) AS c,
                         p.game_id,
                         u.disc_id
                     FROM participants AS p
+                    INNER JOIN games AS g
+                        ON g.game_id = p.game_id
                     JOIN users AS u
-                    ON u.player_id = p.player_id
+                        ON u.player_id = p.player_id
                     WHERE
                         u.active = 1
                         AND {stat} IS NOT NULL
+                        {delim_str}
                     GROUP BY u.disc_id
                 ) AS games
                 ON games.disc_id = best.disc_id
@@ -1243,7 +1251,9 @@ class GameDatabase(SQLiteDatabase):
 
             return games_with_person, doinks_with_person
 
-    def get_max_games_count(self):
+    def get_max_games_count(self, time_after: int = None, time_before: int = None):
+        delim_str, params = self.get_delimeter(time_after, time_before, prefix="AND")
+
         query = f"""
             SELECT MAX(counts.c)
             FROM (
@@ -1251,17 +1261,20 @@ class GameDatabase(SQLiteDatabase):
                 FROM (
                     SELECT u.disc_id
                     FROM participants AS p
+                    INNER JOIN games AS g
+                        ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
                     WHERE u.active = 1
+                    {delim_str}
                 ) games
                 GROUP BY games.disc_id
             ) counts
         """
         with self:
-            return self.execute_query(query).fetchone()[0]
+            return self.execute_query(query, *params).fetchone()[0]
 
-    def get_performance_score(self, disc_id: int | None = None):
+    def get_performance_score(self, disc_id: int | None = None, time_after: int = None, time_before: int = None, minimum_games: int = None):
         intfar_weight = 1
         doinks_weight = 1
         winrate_weight = 2
@@ -1270,12 +1283,27 @@ class GameDatabase(SQLiteDatabase):
         stat_keys = get_stat_quantity_descriptions(self.game)
         stat_joins = []
 
+        time_clause = ""
+        params = []
+        if time_after is not None:
+            time_clause = "AND g.timestamp > ?"
+            params.append(time_after)
+        if time_before is not None:
+            time_clause += " AND g.timestamp < ?"
+            params.append(time_before)
+
+        if params != []:
+            params = params * 4
+
         prev_join = "doinks.disc_id"
         for stat in stat_keys:
-            query_best = self.get_best_or_worst_stat(stat, maximize=stat != "deaths").query
+            query_best = self.get_best_or_worst_stat(stat, maximize=stat != "deaths", time_after=time_after, time_before=time_before).query
 
             stat_joins.append(f"LEFT JOIN ({query_best}) {stat}_best\nON {stat}_best.disc_id = {prev_join}")
             prev_join = f"{stat}_best.disc_id"
+
+        if time_after is not None and time_before is not None:
+            params.extend([time_after, time_before] * ((len(stat_keys) * 2) - 1))
 
         stat_join_queries = "\n".join(stat_joins)
 
@@ -1285,7 +1313,7 @@ class GameDatabase(SQLiteDatabase):
 
         stat_equations_str = " + ".join(stat_equations)
 
-        most_games = self.get_max_games_count()
+        most_games = self.get_max_games_count(time_after, time_before) or 1
         games_weight = 0.25
 
         total = (intfar_weight + doinks_weight + winrate_weight + games_weight + (len(stat_keys) * stats_weight)) / 2
@@ -1298,7 +1326,7 @@ class GameDatabase(SQLiteDatabase):
             f"(played.c / {most_games}) * {games_weight} + "
             f"{stat_equations_str}) / {total}) * {performance_range}"
         )
-        min_games = self.config.performance_mimimum_games
+        min_games = self.config.performance_mimimum_games if minimum_games is None else minimum_games
 
         query = f"""
             SELECT
@@ -1318,6 +1346,8 @@ class GameDatabase(SQLiteDatabase):
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
+                    WHERE 1=1
+                    {time_clause}
                     GROUP BY u.disc_id
                 ) played
                 LEFT JOIN (
@@ -1330,6 +1360,7 @@ class GameDatabase(SQLiteDatabase):
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
                     WHERE win = 1
+                    {time_clause}
                     GROUP BY u.disc_id
                 ) wins
                 ON wins.disc_id = played.disc_id
@@ -1347,7 +1378,9 @@ class GameDatabase(SQLiteDatabase):
                             CAST(COUNT(*) AS real) AS c,
                             intfar_id
                         FROM games AS g
-                        WHERE intfar_id IS NOT NULL
+                        WHERE
+                            intfar_id IS NOT NULL
+                            {time_clause}
                         GROUP BY intfar_id
                     ) sub
                     ON u.disc_id = sub.intfar_id
@@ -1364,9 +1397,13 @@ class GameDatabase(SQLiteDatabase):
                             p.doinks,
                             u.disc_id
                         FROM participants AS p
+                        INNER JOIN games AS g
+                            ON g.game_id = p.game_id
                         INNER JOIN users AS u
                             ON u.player_id = p.player_id
-                        WHERE doinks IS NOT NULL
+                        WHERE
+                            doinks IS NOT NULL
+                            {time_clause}
                     ) doinks_sub
                     GROUP BY doinks_sub.disc_id
                 ) doinks
@@ -1396,7 +1433,7 @@ class GameDatabase(SQLiteDatabase):
 
             return score, rank + 1, len(performance_scores)
 
-        return self.query(query, format_func=format_result)
+        return self.query(query, *params, format_func=format_result)
 
     def get_stat_data(self, parsed_game_stats: GameStats, stat: str, reverse_order=False):
         (

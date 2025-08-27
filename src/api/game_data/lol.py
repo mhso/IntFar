@@ -656,7 +656,7 @@ class LoLGameStatsParser(GameStatsParser):
                         "disc_id": player_disc_id,
                         "player_name": [participant["summonerName"]],
                         "player_id": [participant["puuid"]],
-                        "champ_id": [participant["championId"]]
+                        "champ_id": participant["championId"]
                     }
                     active_users.append(summ_data)
 

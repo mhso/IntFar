@@ -5,7 +5,6 @@ from io import BytesIO
 from PIL import Image
 from multiprocessing import Process
 import random
-from time import sleep
 import os
 from playwright.async_api import async_playwright, Playwright, BrowserContext, Page, Dialog, ConsoleMessage
 from urllib.parse import urlencode, quote_plus
@@ -15,7 +14,7 @@ import pytest
 
 from src.run_flask import run_app
 from src.app.util import get_hashed_secret
-from src.api.util import MY_GUILD_ID, JEOPARDY_REGULAR_ROUNDS, JEOPADY_EDITION
+from src.api.util import MY_GUILD_ID, JEOPARDY_REGULAR_ROUNDS, JEOPADY_EDITION, JEOPARDY_ITERATION
 from src.api.config import Config
 from src.api.meta_database import MetaDatabase
 from src.discbot.commands.util import ADMIN_DISC_ID
@@ -46,7 +45,7 @@ CONTESTANT_IDS = [
     115142485579137029,
     172757468814770176,
     331082926475182081,
-    347489125877809155
+    219497453374668815
 ]
 BARRIER = Barrier(len(CONTESTANT_IDS))
 
@@ -739,7 +738,7 @@ async def test_freeze():
         (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
         (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
         (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
-        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+        (CONTESTANT_IDS[3], 0, "ThommyZalami", "00FFFF")
     ]
     power_ids = ["hijack", "freeze", "rewind"]
 
@@ -785,12 +784,21 @@ async def test_freeze():
         power_up = await contestant_page.query_selector("#contestant-power-btn-freeze")
         await power_up.tap()
 
-        await asyncio.sleep(1)
+        countdown_paused = await context.presenter_page.evaluate("countdownPaused")
+        assert countdown_paused, "Countdown is paused after freeze"
 
-        await context.screenshot_views()
+async def _wait_for_power_up_video(context: ContextHandler):
+    splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
 
-        countdown_cleared = await context.presenter_page.evaluate("countdownInterval == null")
-        assert countdown_cleared, "Countdown is paused after freeze"
+    async def callback_video_started():
+        return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
+
+    await _wait_for_event(callback_video_started)
+
+    async def callback_video_ended():
+        return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
+
+    await _wait_for_event(callback_video_ended)
 
 @pytest.mark.asyncio
 async def test_rewind_simple():
@@ -868,17 +876,7 @@ async def test_rewind_simple():
         power_up = await contestant_page.query_selector("#contestant-power-btn-rewind")
         await power_up.tap()
 
-        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
-
-        async def callback_video_started():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
-
-        await _wait_for_event(callback_video_started)
-
-        async def callback_video_ended():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
-
-        await _wait_for_event(callback_video_ended)
+        await _wait_for_power_up_video(context)
 
         await asyncio.sleep(1)
 
@@ -996,18 +994,7 @@ async def test_rewind_complex():
         power_up = await contestant_page_1.query_selector("#contestant-power-btn-rewind")
         await power_up.tap()
 
-        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
-
-        async def callback_video_started():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
-
-        await _wait_for_event(callback_video_started)
-
-        async def callback_video_ended():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
-
-        await _wait_for_event(callback_video_ended)
-
+        await _wait_for_power_up_video(context)
         await asyncio.sleep(1)
 
         # Assert that player 1 has the turn again
@@ -1132,17 +1119,7 @@ async def test_powers_contest():
         except TimeoutError:
             pass
 
-        splash_wrapper = await context.presenter_page.wait_for_selector("#question-power-up-splash")
-
-        async def callback_video_started():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.currentTime > 0")
-
-        await _wait_for_event(callback_video_started)
-
-        async def callback_video_ended():
-            return await splash_wrapper.eval_on_selector("video", "(video) => video.ended")
-
-        await _wait_for_event(callback_video_ended)
+        await _wait_for_power_up_video(context)
 
         # Ensure only one power-up use was accepted
         rewind_used = await rewind_power_up.eval_on_selector(".contestant-power-used", "img => !img.classList.contains('d-none')")
@@ -1172,6 +1149,43 @@ async def test_powers_contest():
         assert contestant_pips_active == expected_turns
 
 @pytest.mark.asyncio
+async def test_hijack_before_question():
+    round_num = 1
+    category = "wrong"
+    difficulty = 1
+    question_num = 1
+    turn_id = 1
+    player_data = [
+        (CONTESTANT_IDS[0], 0, "Dave", "F30B0B"),
+        (CONTESTANT_IDS[1], 0, "Murt", "CCCC00"),
+        (CONTESTANT_IDS[2], 0, "Muds", "FF00FF"),
+        (CONTESTANT_IDS[3], 0, "Nø", "00FFFF")
+    ]
+    power_ids = ["hijack", "freeze", "rewind"]
+
+    async with ContextHandler() as context:
+        await context.open_presenter_question_page(round_num, category, difficulty, question_num, turn_id, player_data)
+        await asyncio.sleep(1)
+
+        await context.show_question()
+
+        contestant_page = context.contestant_pages[0]
+        power_up_buttons = {power_id: await contestant_page.wait_for_selector(f"#contestant-power-btn-{power_id}") for power_id in power_ids}
+
+        async def callback_hijack():
+            return await power_up_buttons["hijack"].is_enabled()
+
+        await _wait_for_event(callback_hijack)
+
+        # Use hijack power-up before question is asked
+        await power_up_buttons["hijack"].tap()
+
+        await _wait_for_power_up_video(context)
+
+        
+
+
+@pytest.mark.asyncio
 async def test_discord_message_simple(discord_client):
     player_data = [
         {"disc_id": 2, "name": "Dave", "avatar": None, "score": 800, "buzzes": 4, "hits": 2, "misses": 2, "color": "F30B0B"},
@@ -1180,7 +1194,7 @@ async def test_discord_message_simple(discord_client):
         {"disc_id": 5, "name": "Nø", "avatar": None, "score": -200, "buzzes": 1, "hits": 0, "misses": 1, "color": "00FFFF"},
     ]
 
-    await discord_client.announce_jeopardy_winner(player_data)
+    await discord_client.announce_jeopardy_winner(player_data, MY_GUILD_ID)
 
     channel = discord_client.channels_to_write[MY_GUILD_ID]
 
@@ -1217,7 +1231,7 @@ async def test_discord_message_ties(discord_client):
         {"disc_id": 5, "name": "Nø", "avatar": None, "score": 200, "buzzes": 6, "hits": 5, "misses": 1, "color": "00FFFF"},
     ]
 
-    await discord_client.announce_jeopardy_winner(player_data)
+    await discord_client.announce_jeopardy_winner(player_data, MY_GUILD_ID)
 
     channel = discord_client.channels_to_write[MY_GUILD_ID]
 
@@ -1276,10 +1290,13 @@ async def test_all_questions():
                     question_num += 1
 
 def test_questions_well_formed(config):
-    def get_path(filename):
+    def get_base_path(filename):
         return f"{config.static_folder}/img/jeopardy/{filename}"
 
-    with open(f"{config.static_folder}/data/jeopardy_questions.json", "r", encoding="utf-8") as fp:
+    def get_question_path(filename):
+        return f"{config.static_folder}/img/jeopardy/{JEOPARDY_ITERATION}/{filename}"
+
+    with open(f"{config.static_folder}/data/jeopardy_questions_{JEOPARDY_ITERATION}.json", "r", encoding="utf-8") as fp:
         all_question_data = json.load(fp)
 
     mandatory_category_keys = set(["name", "order", "background", "tiers"])
@@ -1308,7 +1325,7 @@ def test_questions_well_formed(config):
 
         assert len(set(category_data.keys()) - (mandatory_category_keys.union(optional_category_keys))) == 0, "Wrong category keys"
 
-        assert os.path.exists(get_path(category_data["background"])), "Background missing"
+        assert os.path.exists(get_base_path(category_data["background"])), "Background missing"
 
         tiers = all_question_data[category]["tiers"] if index < 6 else [all_question_data[category]["tiers"][-1]]
 
@@ -1326,7 +1343,7 @@ def test_questions_well_formed(config):
 
                 for key in ("image", "answer_image", "video"):
                     if key in question_data:
-                        assert os.path.exists(get_path(question_data[key])), "Question image/video missing"
+                        assert os.path.exists(get_question_path(question_data[key])), "Question image/video missing"
                         assert "height" in question_data
 
                 if "choices" in question_data:
@@ -1334,7 +1351,7 @@ def test_questions_well_formed(config):
                     assert isinstance(choices, list) and len(choices) == 4, "Wrong amount of choices for multiple choice"
                     assert question_data["answer"] in choices, "Answer is not in the list of choices"
 
-    with open(f"{config.static_folder}/data/jeopardy_used.json", "r", encoding="utf-8") as fp:
+    with open(f"{config.static_folder}/data/jeopardy_used_{JEOPARDY_ITERATION}.json", "r", encoding="utf-8") as fp:
         used_data = json.load(fp)
 
     question_keys = set(all_question_data.keys())

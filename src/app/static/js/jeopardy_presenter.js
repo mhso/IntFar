@@ -9,6 +9,7 @@ const PRESENTER_ACTION_KEY = "Space"
 const socket = io({"transports": ["websocket", "polling"]});
 
 var countdownInterval = null;
+var countdownPaused = false;
 var activeRound;
 var totalRounds;
 var activeQuestionId;
@@ -76,8 +77,8 @@ function getQuestionURL(round, category, difficulty) {
     return `${getBaseURL()}/${round}/${category}/${difficulty}?${getQueryParams()}`;
 }
 
-function getFinaleURL(question_id) {
-    return `${getBaseURL()}/finale/${question_id}?${getQueryParams()}`;
+function getFinaleURL() {
+    return `${getBaseURL()}/finale?${getQueryParams()}`;
 }
 
 function getEndscreenURL() {
@@ -149,6 +150,7 @@ function disableFreeze(playerId) {
     disablePowerUp(playerId, "freeze");
 
     let freezeWrapper = document.getElementById("question-countdown-frozen");
+    freezeWrapper.style.transition = "opacity 2s";
     freezeWrapper.style.opacity = 0;
     setTimeout(function() {
         freezeWrapper.classList.add("d-none");
@@ -234,6 +236,8 @@ function correctAnswer() {
     if (hijackBonus) {
         activeValue *= 2;
     }
+
+    activeValue = Math.ceil(activeValue);
 
     valueElem.textContent = "+" + activeValue;
 
@@ -346,16 +350,21 @@ function keyIsNumeric(key, min, max) {
     return keys.includes(key);
 }
 
-function stopCountdown(hide=true) {
+function stopCountdown() {
     clearInterval(countdownInterval);
     countdownInterval = null;
+    countdownPaused = false;
 
-    if (hide) {
-        let countdownElem = document.getElementById("question-countdown-wrapper");
-        if (!countdownElem.classList.contains("d-none")) {
-            countdownElem.classList.add("d-none");
-            countdownElem.style.opacity = 0;
-        }
+    let countdownElem = document.getElementById("question-countdown-wrapper");
+    if (!countdownElem.classList.contains("d-none")) {
+        countdownElem.classList.add("d-none");
+        countdownElem.style.opacity = 0;
+    }
+}
+
+function pauseCountdown(paused) {
+    if (countdownInterval != null) {
+        countdownPaused = paused;
     }
 }
 
@@ -428,7 +437,13 @@ function startCountdown(duration, callback=null) {
     setCountdownText(countdownText, secs, duration);
     setCountdownBar(countdownBar, (secs * 1000) + (iteration * delay), green, red, duration * 1000);
 
+    countdownPaused = false;
+
     countdownInterval = setInterval(function() {
+        if (countdownPaused) {
+            return;
+        }
+
         iteration += 1;
         if (iteration * delay == 1000) {
             iteration = 0;
@@ -549,13 +564,13 @@ function afterBuzzIn(playerId) {
 }
 
 function playerBuzzedFirst(playerId) {
-    if (activePowerUp != null) {
+    if (activePowerUp != null && activePowerUp != "hijack") {
         return;
     }
 
     playersBuzzedIn.push(playerId);
 
-    if (!activePlayers[playerId] || answeringPlayer != null) {
+    if (!activePlayers[playerId] || (answeringPlayer != null && activePowerUp != "hijack")) {
         return;
     }
 
@@ -589,13 +604,29 @@ function showPowerUpVideo(powerId) {
 }
 
 function onFreezeUsed() {
-    stopCountdown(false);
+    clearInterval(freezeTimeout);
+    pauseCountdown(true);
 }
 
 function afterFreezeUsed() {
+    let opacity = 0.85;
+
     let freezeWrapper = document.getElementById("question-countdown-frozen");
     freezeWrapper.classList.remove("d-none");
-    freezeWrapper.style.opacity = 0.85;
+    freezeWrapper.style.transition = "opacity 2s";
+    freezeWrapper.style.opacity = opacity;
+
+    let duration = 38;
+
+    freezeWrapper.style.transition = `opacity ${delay}s`;
+    freezeWrapper.style.opacity = 0;
+
+    setTimeout(function() {
+        if (answeringPlayer != null) {
+            freezeWrapper.classList.add("d-none");
+            pauseCountdown(false);
+        }
+    }, duration * 1000)
 }
 
 function onRewindUsed(playerId) {
@@ -610,32 +641,35 @@ function afterRewindUsed() {
     afterBuzzIn(answeringPlayer);
 }
 
-function onHijackUsed(playerId) {
+function onHijackUsed() {
+    pauseCountdown(true);
+
     // If question has not been asked yet, hijack gives bonus points
     hijackBonus = activePlayers.length == 0
-    let usedAfterBuzzIn = answeringPlayer != null;
-    answeringPlayer = playerId;
 
-    if (!hijackBonus && usedAfterBuzzIn) {
+    if (!hijackBonus && answeringPlayer != null) {
         stopCountdown();
     }
-
-    return usedAfterBuzzIn;
 }
 
-function afterHijackUsed(usedAfterBuzzIn) {
+function afterHijackUsed(playerId) {
     activePlayers = [];
-
+    
     for (let i = 0; i < playerIds.length; i++) {
         activePlayers.push(false);
     }
 
-    if (!hijackBonus && usedAfterBuzzIn) {
-        afterBuzzIn(answeringPlayer);
+    activePlayers[playerId] = true;
+
+    if (!hijackBonus && answeringPlayer != null) {
+        answeringPlayer = playerId;
+        afterBuzzIn(playerId);
     }
     else {
-        setPlayerTurn(answeringPlayer, false);
+        setPlayerTurn(playerId, false);
     }
+
+    pauseCountdown(false);
 }
 
 function powerUpUsed(playerId, powerId) {
@@ -653,8 +687,8 @@ function powerUpUsed(playerId, powerId) {
         callback = afterRewindUsed;
     }
     else {
-        let usedAfterBuzzIn = onHijackUsed(playerId);
-        callback = () => afterHijackUsed(usedAfterBuzzIn);
+        onHijackUsed();
+        callback = () => afterHijackUsed(playerId);
     }
 
     addPowerUseToFeed(playerId, powerId);
@@ -725,7 +759,7 @@ function questionAsked(countdownDelay) {
         else {
             // Go to finale screen after countdown is finished if it's round 3
             document.getElementById("question-finale-suspense").play();
-            startCountdown(TIME_FOR_FINAL_ANSWER, () => window.location.href = getFinaleURL(activeQuestionId));
+            startCountdown(TIME_FOR_FINAL_ANSWER, () => window.location.href = getFinaleURL());
         }
     }, countdownDelay);
 
@@ -777,8 +811,10 @@ function showImageOrVideo(elem) {
 }
 
 function showQuestion() {
-    for (let i = 0; i < playerIds.length; i++) {
-        activePlayers.push(!isDailyDouble);
+    if (activePlayers.length == 0) {
+        for (let i = 0; i < playerIds.length; i++) {
+            activePlayers.push(!isDailyDouble);
+        }
     }
 
     // Show the question, if it exists

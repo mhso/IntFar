@@ -1580,10 +1580,10 @@ class DiscordClient(discord.Client):
         await asyncio.sleep(3600) # Sleep for an hour before resetting.
         asyncio.create_task(self.polling_loop())
 
-    async def announce_jeopardy_winner(self, player_data):
+    async def announce_jeopardy_winner(self, player_data, guild_id):
         iteration = api_util.JEOPARDY_ITERATION
         edition = api_util.JEOPADY_EDITION
-        guild_id = api_util.GUILD_MAP["core"] if self.config.env == "production" else api_util.MY_GUILD_ID
+        guild_id = guild_id if self.config.env == "production" else api_util.MY_GUILD_ID
 
         ties = 0
         for index, data in enumerate(player_data[1:], start=1):

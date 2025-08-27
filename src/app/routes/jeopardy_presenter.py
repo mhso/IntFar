@@ -10,8 +10,8 @@ import flask
 from flask_socketio import join_room, leave_room, emit
 from mhooge_flask.logging import logger
 
-from api.util import JEOPADY_EDITION, JEOPARDY_REGULAR_ROUNDS, MONTH_NAMES, GUILD_MAP
-from api.lan import is_lan_ongoing
+from api.util import JEOPARDY_ITERATION, JEOPADY_EDITION, JEOPARDY_REGULAR_ROUNDS, MONTH_NAMES
+from api.lan import is_lan_ongoing, get_latest_lan_info
 import app.util as app_util
 from discbot.commands.util import ADMIN_DISC_ID
 
@@ -25,14 +25,14 @@ ROUND_NAMES = ["Jeopardy!"] + (["Double Jeopardy!"] * (JEOPARDY_REGULAR_ROUNDS -
 
 FINALE_CATEGORY = "history"
 
-QUESTIONS_FILE = "app/static/data/jeopardy_questions.json"
-USED_QUESTIONS_FILE = "app/static/data/jeopardy_used.json"
+QUESTIONS_FILE = f"app/static/data/jeopardy_questions_{JEOPARDY_ITERATION}.json"
+USED_QUESTIONS_FILE = f"app/static/data/jeopardy_used_{JEOPARDY_ITERATION}.json"
 
 PLAYER_NAMES = {
     115142485579137029: "Dave",
     172757468814770176: "Murt",
     331082926475182081: "Muds",
-    347489125877809155: "Nø"
+    219497453374668815: "Tommy"
 }
 
 PLAYER_INDEXES = list(PLAYER_NAMES.keys())
@@ -41,7 +41,7 @@ PLAYER_BACKGROUNDS = {
     115142485579137029: "coven_nami.png",
     172757468814770176: "pentakill_olaf.png", 
     331082926475182081: "crime_city_tf.png",
-    347489125877809155: "gladiator_draven.png"
+    219497453374668815: "bard_splash.png"
 }
 
 # Sounds for answering questions correctly/wrong.
@@ -109,7 +109,7 @@ BUZZ_IN_SOUNDS = {
     115142485579137029: "buzz_dave",
     172757468814770176: "buzz_murt",
     331082926475182081: "buzz_muds",
-    347489125877809155: "buzz_no",
+    219497453374668815: "buzz_thommy",
 }
 
 @dataclass
@@ -189,6 +189,7 @@ class State:
     round_name: str
     player_data: list[dict]
     total_rounds: int = field(init=False, default=FINALE_ROUND)
+    base_folder: str = field(init=False, default=f"img/jeopardy/{JEOPARDY_ITERATION}/")
 
     @classmethod
     def from_json(cls, json_str: str):
@@ -201,6 +202,7 @@ class State:
 
     def __post_init__(self):
         self.__dict__["total_rounds"] = self.total_rounds
+        self.__dict__["base_folder"] = self.base_folder
 
 @dataclass
 class RoundState(State):
@@ -245,6 +247,9 @@ def home():
 
     active_contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
     joined_players = [contestant.__dict__ for contestant in active_contestants.values()]
+    guild_name = "CoreNibbas"
+    if is_lan_ongoing(time()):
+        guild_name = get_latest_lan_info().guild_name
 
     pregame_state = State(0, "Lobby", joined_players)
     now = datetime.now()
@@ -256,7 +261,8 @@ def home():
         "jeopardy/presenter_lobby.html",
         **pregame_state.__dict__,
         edition=JEOPADY_EDITION,
-        date=date
+        date=date,
+        guild_name=guild_name
     )
 
 @jeopardy_presenter_page.route("/reset_questions", methods=["POST"])
@@ -340,7 +346,7 @@ def get_round_data(request_args):
                 "misses": misses,
                 "finale_wager": finale_wager,
                 "color": color,
-                "power_ups": power_ups,
+                "power_ups": [power_up.__dict__ for power_up in power_ups],
             })
 
     try:
@@ -488,8 +494,11 @@ def active_jeopardy(jeopardy_round):
                         tier_info["double"] = False
 
                 # Reset used power-ups
-                for contestant in contestants.values():
-                    contestant.power_ups = _init_powerups()
+                for data in player_data:
+                    contestant = contestants[int(data["disc_id"])]
+                    fresh_power_ups = _init_powerups()
+                    contestant.power_ups = fresh_power_ups
+                    data["power_ups"] = [power_up.__dict__ for power_up in fresh_power_ups]
 
                 if DO_DAILY_DOUBLE:
                     # Choose 1 or 2 random category/tier combination to be daily double
@@ -531,13 +540,13 @@ def active_jeopardy(jeopardy_round):
 
     return app_util.make_template_context("jeopardy/presenter_selection.html", **selection_state.__dict__)
 
-@jeopardy_presenter_page.route("/finale/<question_id>")
+@jeopardy_presenter_page.route("/finale")
 def final_jeopardy(question_id):
     logged_in_user = app_util.get_user_details()[0]
     if logged_in_user != ADMIN_DISC_ID and flask.current_app.config["APP_ENV"] != "dev":
         return flask.abort(404)
 
-    question_id = int(question_id) - 1
+    question_id = 0
 
     with open(QUESTIONS_FILE, encoding="utf-8") as fp:
         questions = json.load(fp)
@@ -641,10 +650,10 @@ def jeopardy_endscreen():
         )
 
         jeopardy_data["state"] = endscreen_state
-        guild_id = GUILD_MAP["core"]
+        guild_id = get_current_lan_info().guild_id
 
         if TRACK_UNUSED and flask.current_app.config["APP_ENV"] == "production" and is_lan_ongoing(time(), guild_id):
-            app_util.discord_request("func", "announce_jeopardy_winner", (player_data,))
+            app_util.discord_request("func", "announce_jeopardy_winner", (player_data, guild_id))
 
         app_util.socket_io.emit("state_changed", to="contestants")
 
@@ -859,6 +868,8 @@ def use_power_up(disc_id: str, power_id: str):
 
     if contestant is None:
         return
+
+    print(f"Power up '{power_id}' used by {contestant.name}", flush=True)
 
     with flask.current_app.config["JEOPARDY_POWER_LOCK"]:
         if state.power_use_decided:
