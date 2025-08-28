@@ -295,7 +295,7 @@ def get_round_data(request_args):
     player_data = []
     contestants = flask.current_app.config["JEOPARDY_DATA"]["contestants"]
 
-    for index in range(1, len(PLAYER_NAMES) + 1):
+    for index in range(1, 5):
         id_key = f"i{index}"
         name_key = f"n{index}"
         score_key = f"s{index}"

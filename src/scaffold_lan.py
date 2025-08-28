@@ -92,6 +92,9 @@ def bump_jeopardy_version():
 
     return new_version
 
+def set_jeopardy_player_names():
+    pass
+
 def create_jeopardy_folder(version: int, config: Config):
     os.mkdir(os.path.join(config.static_folder, f"img/jeopardy/{version}"))
 
