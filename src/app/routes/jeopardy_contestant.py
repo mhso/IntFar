@@ -2,6 +2,7 @@ import flask
 from flask_socketio import emit
 
 import app.util as app_util
+from mhooge_flask.routing import socket_io
 
 from app.routes.jeopardy_presenter import PLAYER_NAMES, PLAYER_INDEXES, PLAYER_BACKGROUNDS, Contestant
 
@@ -119,11 +120,11 @@ def lobby(client_secret):
         avatar=avatar,
     )
 
-@app_util.socket_io.event
+@socket_io.event
 def ping_request(disc_id: str, timestamp: float):
     emit("ping_response", (disc_id, timestamp))
 
-@app_util.socket_io.event
+@socket_io.event
 def calculate_ping(disc_id: str, timestamp_sent: float, timestamp_received: float):
     contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(int(disc_id))
 
@@ -132,7 +133,7 @@ def calculate_ping(disc_id: str, timestamp_sent: float, timestamp_received: floa
 
         emit("ping_calculated", f"{min(999.0, max(contestant.ping, 1.0)):.1f}")
 
-@app_util.socket_io.event
+@socket_io.event
 def make_daily_wager(disc_id: str, amount: str):
     jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
     contestant: Contestant = jeopardy_data["contestants"][int(disc_id)]
@@ -152,7 +153,7 @@ def make_daily_wager(disc_id: str, amount: str):
     else:
         emit("invalid_wager", max_wager)
 
-@app_util.socket_io.event
+@socket_io.event
 def make_finale_wager(disc_id: str, amount: str):
     disc_id = int(disc_id)
     jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
@@ -174,7 +175,7 @@ def make_finale_wager(disc_id: str, amount: str):
     else:
         emit("invalid_wager", max_wager)
 
-@app_util.socket_io.event
+@socket_io.event
 def give_finale_answer(disc_id: str, answer: str):
     contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"][int(disc_id)]
     contestant.finale_answer = answer

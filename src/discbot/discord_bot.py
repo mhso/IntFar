@@ -553,7 +553,11 @@ class DiscordClient(discord.Client):
                 for member in members_in_voice:
                     for game in api_util.SUPPORTED_GAMES:
                         member_id = int(member.id)
-                        user_info = self.game_databases[game].game_user_data_from_discord_id(member_id)
+                        database = self.game_databases.get(game)
+                        if database is None:
+                            continue
+
+                        user_info = database.game_user_data_from_discord_id(member_id)
                         if user_info is not None:
                             users_in_voice[guild.id][game][member_id] = user_info
 
@@ -1313,7 +1317,10 @@ class DiscordClient(discord.Client):
         for game in users_in_voice:
             user_game_info = self.game_databases[game].game_user_data_from_discord_id(disc_id)
             if user_game_info is not None:
-                game_monitor = self.game_monitors[game]
+                game_monitor = self.game_monitors.get(game)
+                if game_monitor is None:
+                    continue
+
                 game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
                 logger.debug(f"Game user joined voice: {user_game_info.player_name}")
 
@@ -1340,7 +1347,10 @@ class DiscordClient(discord.Client):
 
         users_in_voice = self.get_users_in_voice()[guild_id]
         for game in users_in_voice:
-            game_monitor = self.game_monitors[game]
+            game_monitor = self.game_monitors.get(game)
+            if game_monitor is None:
+                continue
+
             game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
             if game_monitor.should_stop_polling(guild_id):
                 game_monitor.stop_polling(guild_id)

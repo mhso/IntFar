@@ -13,6 +13,10 @@ class LoLGameMonitor(GameMonitor):
     POSTGAME_STATUS_URF = 5
     POSTGAME_STATUS_INVALID_MAP = 6
     POSTGAME_STATUS_REMAKE = 7
+    
+    @property
+    def polling_enabled(self):
+        return False
 
     def get_users_in_game(self, user_dict: dict[int, User], game_data: dict):
         users_in_game = {}
@@ -153,9 +157,9 @@ class LoLGameMonitor(GameMonitor):
         return game_info, status_code
 
     def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
-        if game_info is not None:
+        if game_info is not None and "queueId" in game_info:
             self.active_game[guild_id]["queue_id"] = game_info["queueId"]
-        
+
         post_game_data = super().handle_game_over(game_info, status_code, guild_id)
 
         if post_game_data is not None and lan.is_lan_ongoing(time(), guild_id):

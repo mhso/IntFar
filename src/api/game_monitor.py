@@ -62,6 +62,10 @@ class GameMonitor(ABC):
         self.users_in_voice: dict[int, dict[int, User]] = {}
 
     @property
+    def polling_enabled(self):
+        return True
+
+    @property
     def min_game_minutes(self):
         """
         Minimum amount of minutes for a game to be valid.
@@ -471,7 +475,7 @@ class GameMonitor(ABC):
         return len(self.users_in_voice.get(guild_id, [])) < 2 and self.polling_active.get(guild_id, False)
 
     def should_poll(self, guild_id):
-        return len(self.users_in_voice.get(guild_id, [])) > 1 and not self.polling_active.get(guild_id, False)
+        return self.polling_enabled and len(self.users_in_voice.get(guild_id, [])) > 1 and not self.polling_active.get(guild_id, False)
 
     def _send_game_update(self, endpoint, game, data):
         try:

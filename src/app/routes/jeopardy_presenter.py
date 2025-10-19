@@ -9,6 +9,7 @@ from gevent import sleep
 import flask
 from flask_socketio import join_room, leave_room, emit
 from mhooge_flask.logging import logger
+from mhooge_flask.routing import socket_io
 
 from api.util import JEOPARDY_ITERATION, JEOPADY_EDITION, JEOPARDY_REGULAR_ROUNDS, MONTH_NAMES
 from api.lan import is_lan_ongoing, get_latest_lan_info
@@ -430,7 +431,7 @@ def question_view(jeopardy_round, category, tier):
         random.shuffle(possible_wrong_sounds)
         wrong_sounds = possible_wrong_sounds[:4]
 
-        app_util.socket_io.emit("state_changed", to="contestants")
+        socket_io.emit("state_changed", to="contestants")
 
     return app_util.make_template_context(
         "jeopardy/presenter_question.html",
@@ -536,12 +537,12 @@ def active_jeopardy(jeopardy_round):
         )
         flask.current_app.config["JEOPARDY_DATA"]["state"] = selection_state
 
-        app_util.socket_io.emit("state_changed", to="contestants")
+        socket_io.emit("state_changed", to="contestants")
 
     return app_util.make_template_context("jeopardy/presenter_selection.html", **selection_state.__dict__)
 
 @jeopardy_presenter_page.route("/finale")
-def final_jeopardy(question_id):
+def final_jeopardy():
     logged_in_user = app_util.get_user_details()[0]
     if logged_in_user != ADMIN_DISC_ID and flask.current_app.config["APP_ENV"] != "dev":
         return flask.abort(404)
@@ -650,12 +651,12 @@ def jeopardy_endscreen():
         )
 
         jeopardy_data["state"] = endscreen_state
-        guild_id = get_current_lan_info().guild_id
+        guild_id = get_latest_lan_info().guild_id
 
         if TRACK_UNUSED and flask.current_app.config["APP_ENV"] == "production" and is_lan_ongoing(time(), guild_id):
             app_util.discord_request("func", "announce_jeopardy_winner", (player_data, guild_id))
 
-        app_util.socket_io.emit("state_changed", to="contestants")
+        socket_io.emit("state_changed", to="contestants")
 
     return app_util.make_template_context("jeopardy/presenter_endscreen.html", **endscreen_state.__dict__)
 
@@ -675,11 +676,11 @@ def cheatsheet():
 
     return app_util.make_template_context("jeopardy/cheat_sheet.html", questions=questions)
 
-@app_util.socket_io.event
+@socket_io.event
 def presenter_joined():
     join_room("presenter")
 
-@app_util.socket_io.event
+@socket_io.event
 def join_lobby(disc_id: str, nickname: str, avatar: str, color: str):
     disc_id = int(disc_id)
 
@@ -703,7 +704,7 @@ def join_lobby(disc_id: str, nickname: str, avatar: str, color: str):
         contestant.sid = flask.request.sid
         active_contestants[disc_id] = contestant
 
-@app_util.socket_io.event
+@socket_io.event
 def enable_buzz(active_players_str: str):
     active_player_ids = json.loads(active_players_str)
     jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
@@ -721,7 +722,7 @@ def enable_buzz(active_players_str: str):
 
     emit("buzz_enabled", active_ids, to="contestants")
 
-@app_util.socket_io.event
+@socket_io.event
 def enable_powerup(disc_id: str, power_id: str):
     if disc_id is not None:
         disc_id = int(disc_id)
@@ -754,7 +755,7 @@ def enable_powerup(disc_id: str, power_id: str):
     send_to = contestants[disc_id].sid if disc_id is not None else "contestants"
     emit("power_up_enabled", power_id, to=send_to, skip_sid=skip_contestants)
 
-@app_util.socket_io.event
+@socket_io.event
 def disable_powerup(disc_id: str | None, power_id: str | None):
     if disc_id is not None:
         disc_id = int(disc_id)
@@ -781,7 +782,7 @@ def disable_powerup(disc_id: str | None, power_id: str | None):
     send_to = contestants[disc_id].sid if disc_id is not None else "contestants"
     emit("power_ups_disabled", power_ids, to=send_to)
 
-@app_util.socket_io.event
+@socket_io.event
 def buzzer_pressed(disc_id: str):
     disc_id = int(disc_id)
     jeopardy_data = flask.current_app.config["JEOPARDY_DATA"]
@@ -824,7 +825,7 @@ def buzzer_pressed(disc_id: str):
         emit("buzz_winner", earliest_buzz_player.index, to="presenter")
         emit("buzz_loser", to="contestants", skip_sid=earliest_buzz_player.sid)
 
-@app_util.socket_io.event
+@socket_io.event
 def correct_answer(turn_id: int, value: int):
     disc_id = PLAYER_INDEXES[turn_id]
     contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(disc_id)
@@ -835,7 +836,7 @@ def correct_answer(turn_id: int, value: int):
     contestant.hits += 1
     contestant.score += value
 
-@app_util.socket_io.event
+@socket_io.event
 def wrong_answer(turn_id: int):
     disc_id = PLAYER_INDEXES[turn_id]
     contestant: Contestant = flask.current_app.config["JEOPARDY_DATA"]["contestants"].get(disc_id)
@@ -845,7 +846,7 @@ def wrong_answer(turn_id: int):
 
     contestant.misses += 1
 
-@app_util.socket_io.event
+@socket_io.event
 def disable_buzz():
     state = flask.current_app.config["JEOPARDY_DATA"]["state"]
 
@@ -854,11 +855,11 @@ def disable_buzz():
 
     emit("buzz_disabled", to="contestants")
 
-@app_util.socket_io.event
+@socket_io.event
 def first_turn(turn_id: int):
     emit("turn_chosen", int(turn_id), to="contestants")
 
-@app_util.socket_io.event
+@socket_io.event
 def use_power_up(disc_id: str, power_id: str):
     disc_id = int(disc_id)
 
@@ -890,10 +891,10 @@ def use_power_up(disc_id: str, power_id: str):
         emit("power_up_used", (contestant.index, power_id), to="presenter")
         emit("power_up_used", power_id, to=contestant.sid)
 
-@app_util.socket_io.event
+@socket_io.event
 def enable_finale_wager():
     emit("finale_wager_enabled", to="contestants")
 
-@app_util.socket_io.event
+@socket_io.event
 def reveal_finale_category():
     emit("finale_category_revealed", to="contestants")

@@ -195,9 +195,12 @@ class Command:
                 )
                 return
 
-            parsed_args = await self.parse_args(args)
-            # If an error happened, or we are not authorized to use this command, return.
-            if parsed_args is None: 
+            try:
+                parsed_args = await self.parse_args(args)
+                # If an error happened, or we are not authorized to use this command, return.
+                if parsed_args is None: 
+                    return
+            except ValueError:
                 return
 
             await self.handle(*parsed_args) # Execute command using handler.

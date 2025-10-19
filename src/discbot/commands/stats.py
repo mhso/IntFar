@@ -480,7 +480,7 @@ class ChampionCommand(Command):
 
                 if show_best:
                     best_name = self.client.get_discord_nick(best_at_champ, self.message.guild.id)
-                    row.append(best_name)
+                    row.append(best_name or "Unknown")
 
                 text_rows.append(row)
 
