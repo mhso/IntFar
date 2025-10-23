@@ -90,7 +90,7 @@ def main():
         game_database.game_users = sync_manager.dict(game_database.game_users)
 
     logger.info("Initializing game API clients...")
-    proxy_manager = ProxyManager(SteamAPIClient, "cs2", meta_database, config)
+    proxy_manager = ProxyManager(SteamAPIClient, "cs2", meta_database)
 
     api_clients = {
         "lol": RiotAPIClient("lol", config),

@@ -1,5 +1,6 @@
 import asyncio
 import random
+from typing import Literal
 
 from discord import Message
 import requests
@@ -76,41 +77,111 @@ class GameCommand(Command):
 
         await self.message.channel.send(response)
 
-class ReportCommand(Command):
-    NAME = "report"
-    DESCRIPTION = "Report someone, f.x. if they are being a poon."
+class CommendCommand(Command):
     ACCESS_LEVEL = "all"
     MANDATORY_PARAMS = [TargetParam("person")]
 
+    def __init__(self, client: DiscordClient, message: Message, called_name, commend_type: Literal["report", "honor"]):
+        super().__init__(client, message, called_name)
+        self.commend_type = commend_type
+        self.commend_flavor = f"{self.commend_type}ed"
+
     async def handle(self, target_id: int):
+        commender = self.message.author.id
+        commender_name = self.client.get_discord_nick(commender, self.message.guild.id)
         target_name = self.client.get_discord_nick(target_id, self.message.guild.id)
         mention = self.client.get_mention_str(target_id, self.message.guild.id)
 
-        reports = self.client.meta_database.report_user(target_id)
+        total_commends, commends_from_user = self.client.meta_database.commend_user(self.commend_type, target_id, commender)
 
-        response = f"{self.message.author.name} reported {mention} " + "{emote_woahpikachu}\n"
-        response += f"{target_name} has been reported {reports} time"
-        if reports > 1:
+        emote = "{emote_woahpikachu}" if self.commend_type == "report" else "{emote_nazi}"
+
+        response = f"{self.message.author.name} {self.commend_flavor} {mention} {emote}\n"
+        response += f"{target_name} has been {self.commend_flavor} {total_commends} time"
+        if total_commends > 1:
             response += "s"
-        response += "."
+
+        response += f" ({commends_from_user} time"
+        if commends_from_user > 1:
+            response += "s"
+
+        response += f" by {commender_name})."
 
         await self.message.channel.send(self.client.insert_emotes(response))
 
-class ReportsCommand(Command):
-    NAME = "reports"
-    DESCRIPTION = "See how many times someone (or yourself) has been reported."
-    TARGET_ALL = True
-    ACCESS_LEVEL = "self"
-    OPTIONAL_PARAMS = [TargetParam("person")]
+class ReportCommand(CommendCommand):
+    NAME = "report"
+    DESCRIPTION = "Report someone, f.x. if they are being a poon."
 
-    async def handle(self, target_id: int):
-        report_data = self.client.meta_database.get_reports(target_id)
+    def __init__(self, client: DiscordClient, message: Message, called_name):
+        super().__init__(client, message, called_name, "report")
+
+class HonorCommand(CommendCommand):
+    NAME = "honor"
+    DESCRIPTION = "Honor someone if they did the big nice."
+
+    def __init__(self, client: DiscordClient, message: Message, called_name):
+        super().__init__(client, message, called_name, "honor")
+
+class CommendsCommand(Command):
+    TARGET_ALL = True
+    ACCESS_LEVEL = "all"
+    MANDATORY_PARAMS = [TargetParam("person")]
+
+    def __init__(self, client: DiscordClient, message: Message, called_name, commend_type: Literal["report", "honor"]):
+        super().__init__(client, message, called_name)
+        self.commend_type = commend_type
+        self.commend_flavor = f"{self.commend_type}ed"
+
+    async def handle(self, target_id: int | None):
+        report_data = self.client.meta_database.get_commendations(self.commend_type, target_id)
+
         response = ""
-        for disc_id, reports in report_data:
+        grouped_by_user = {}
+        for disc_id, commends, _ in report_data:
+            if disc_id not in grouped_by_user:
+                grouped_by_user[disc_id] = []
+
+            grouped_by_user[disc_id].append(commends)
+
+        for disc_id in grouped_by_user:
+            data = grouped_by_user[disc_id]
+            num_commenders = len(data)
+            total_commends = sum(data)
+
             name = self.client.get_discord_nick(disc_id, self.message.guild.id)
-            response += f"{name} has been reported {reports} times.\n"
+            time_desc = "time"
+            if total_commends > 1:
+                time_desc += "s"
+
+            person_desc = "person" if total_commends == 1 else "people"
+
+            response += f"{name} has been {self.commend_flavor} {total_commends} {time_desc} by {num_commenders} {person_desc}.\n"
+
+        if response == "":
+            if target_id is None:
+                flavor = "good bois" if self.commend_flavor == "report" else "toxic skanks"
+                response = f"No one has been {self.commend_flavor}, we're all {flavor}!"
+            else:
+                name = self.client.get_discord_nick(target_id, self.message.guild.id)
+                flavor = "a goodie-two-shoes" if self.commend_flavor == "report" else "very dishonorable"
+                response = f"{name} is {flavor} and has never been {self.commend_flavor} by anyone"
 
         await self.message.channel.send(response)
+
+class ReportsCommand(CommendsCommand):
+    NAME = "reports"
+    DESCRIPTION = "See how many times someone (or yourself) has been reported."
+
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name, "report")
+
+class HonorsCommand(CommendsCommand):
+    NAME = "honors"
+    DESCRIPTION = "See how many times someone (or yourself) has been honored."
+
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name, "honor")
 
 class BaseFlirtCommand(Command):
     COMMANDS_DICT = commands_util.CUTE_COMMANDS

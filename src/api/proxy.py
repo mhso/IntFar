@@ -62,18 +62,16 @@ class Proxy(object):
         return self.conn.recv()
 
 class ProxyManager(object):
-    def __init__(self, target_cls, game: str, meta_database: MetaDatabase, config: Config):
+    def __init__(self, target_cls, game: str, meta_database: MetaDatabase):
         self.proxies = []
         self.database = meta_database
 
         self.target_cls = target_cls
         self.target_name = self.target_cls.__name__
 
-        executable = "/bin/bash" if config.env == "production" else "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-
         self.steam_process = subprocess.Popen(
             f"pdm run run_steam.py {game}",
-            executable=executable,
+            executable="/bin/bash",
             shell=True,
             text=True
         )

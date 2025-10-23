@@ -14,6 +14,10 @@ class CS2GameMonitor(GameMonitor):
     POSTGAME_STATUS_DEMO_MALFORMED = 7
 
     @property
+    def polling_enabled(self):
+        return False
+
+    @property
     def min_game_minutes(self):
         return 10
 

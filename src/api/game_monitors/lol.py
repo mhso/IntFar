@@ -13,7 +13,7 @@ class LoLGameMonitor(GameMonitor):
     POSTGAME_STATUS_URF = 5
     POSTGAME_STATUS_INVALID_MAP = 6
     POSTGAME_STATUS_REMAKE = 7
-    
+
     @property
     def polling_enabled(self):
         return False

@@ -1,5 +1,6 @@
 import asyncio
 from io import BytesIO
+import re
 from threading import Thread
 from time import time
 from math import ceil
@@ -9,7 +10,6 @@ import discord
 from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
 
 from mhooge_flask.logging import logger
-from mhooge_flask.database import DBException
 from streamscape import Streamscape
 
 from discbot.montly_intfar import MonthlyIntfar
@@ -591,7 +591,7 @@ class DiscordClient(discord.Client):
 
         return results
 
-    def try_get_user_data(self, name, guild_id):
+    def try_get_user_data(self, name: str, guild_id: int) -> int | None:
         if name.startswith("<@"): # Mention string
             start_index = 3 if name[2] == "!" else 2
             return int(name[start_index:-1])
@@ -1722,23 +1722,52 @@ class DiscordClient(discord.Client):
         await self.channels_to_write[guild_id].send(self.insert_emotes(message))
 
     async def get_all_messages(self, channel):
+        if channel.id == TEST_CHANNLEL_ID:
+            return
+
+        if (channel.guild.name, channel.name) not in [
+            ("The Danish Circus", "der-sladres"),
+            ("LeagueNibbas", "generel"),
+            ("LeagueNibbas", "int-far-spam"),
+            ("CoreNibbas", "generel"),
+            ("CoreNibbas", "int-papi"),
+        ]:
+            return
+
         counter = 0
         with self.meta_database:
             try:
                 print(f"Retrieving messages from guild {channel.guild.name}, channel {channel.name}")
+                print()
+                reports = []
+                reporter = None
                 async for message in channel.history(limit=None, oldest_first=True):
-                    if message.content.startswith("!play"):
-                        split = message.content.split(" ")
-                        if len(split) > 1 and self.audio_handler.is_valid_sound(split[1].strip()):
-                            self.meta_database.add_sound_hit(split[1].strip(), message.created_at)
+                    if message.author != self.user and message.content.startswith("!report") and len(message.content.split(" ")) > 1:
+                        reporter = message.author.id
 
-                            counter += 1
-                            if counter % 100 == 0:
-                                print(f"Saved {counter} plays.", flush=True)
+                    elif message.author == self.user and (match := re.match(r".+ reported (\S+)", message.content)):
+                        if "has been reported" in match[0]:
+                            continue
+
+                        target_id = self.try_get_user_data(match[1], message.guild.id)
+                        if target_id is None:
+                            print("Target ID is None!", message.content, reporter)
+                            continue
+
+                        reports.append((target_id, "report", reporter))
+
+                        counter += 1
+                        print(f"Found {counter} reports...", end="\r", flush=True)
+
+                if reports:
+                    self.meta_database.connection.executemany("INSERT INTO commendations VALUES (?, ?, ?)", reports)
+                    self.meta_database.connection.commit()
+
             except discord.errors.Forbidden:
                 print(f"Can't retrieve messages, insufficient permissions")
 
-        print(f"Done getting {counter} plays!", flush=True)
+        print()
+        print(f"Done getting reports!", flush=True)
 
     def get_main_channel(self):
         return (
@@ -1767,6 +1796,9 @@ class DiscordClient(discord.Client):
 
         logger.info('Logged on as {0}!'.format(self.user))
         self.initialized = True
+
+        with self.meta_database:
+            self.meta_database.execute_query("DELETE FROM commendations")
 
         for guild in self.guilds:
             await guild.chunk()

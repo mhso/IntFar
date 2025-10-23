@@ -343,7 +343,7 @@ def user(disc_id):
 
     with meta_database:
         tokens_data = get_betting_tokens_data(disc_id, meta_database)
-        most_reports_id = meta_database.get_max_reports_details()[1]
+        most_reports_id = meta_database.get_max_commendation_details("report")[1]
 
     context = {
         "disc_id": disc_id,

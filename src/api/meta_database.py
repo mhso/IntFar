@@ -1,5 +1,6 @@
 from datetime import datetime
 import pickle
+from typing import Literal
 
 from dateutil.relativedelta import relativedelta
 from mhooge_flask.database import SQLiteDatabase
@@ -271,49 +272,75 @@ class MetaDatabase(SQLiteDatabase):
         self.update_token_balance(sender, amount, increment=False)
         self.update_token_balance(receiver, amount, increment=True)
 
-    def get_reports(self, disc_id=None):
+    def get_commendations(
+        self,
+        commend_type: Literal["report", "honor"],
+        commended: int | None = None,
+        commender: int | None = None
+    ):
         query_select = """
             SELECT
                 disc_id,
-                reports
-            FROM users
+                COUNT(*) AS c,
+                commender
+            FROM commendations
+            WHERE type = ?
         """
 
         with self:
-            params = []
+            params = [commend_type]
 
-            if disc_id is not None:
-                query_select += "WHERE disc_id = ? "
-                params = [disc_id]
-            else:
-                query_select += "GROUP BY disc_id "
+            if commended is not None:
+                query_select += "AND disc_id = ? "
+                params.append(commended)
 
-            query_select += "ORDER BY reports DESC"
+            if commender is not None:
+                query_select += "AND commender = ? "
+                params.append(commender)
+
+            if commended is None or commender is None:
+                query_select += "GROUP BY"
+                if commended is None:
+                    query_select += " disc_id"
+                if commender is None:
+                    if commended is None:
+                        query_select += ","
+                    query_select += " commender"
+
+            query_select += " ORDER BY c DESC"
 
             return self.execute_query(query_select, *params).fetchall()
 
-    def get_max_reports_details(self):
+    def get_max_commendation_details(self, commend_type: Literal["report", "honor"]):
         query = """
             SELECT
-                MAX(reports),
-                disc_id
-            FROM users
+                MAX(sub.c),
+                sub.disc_id
+            FROM (
+                SELECT
+                    disc_id,
+                    COUNT(*) AS c
+                FROM commendations
+                WHERE type = ?
+                GROUP BY disc_id
+            ) sub
         """
 
         with self:
-            return self.execute_query(query).fetchone()
+            return self.execute_query(query, commend_type).fetchone()
 
-    def report_user(self, disc_id):
+    def commend_user(self, commend_type: Literal["report", "honor"], disc_id: int, commender: int):
         query_update = """
-            UPDATE
-                users
-            SET reports = reports + 1
-            WHERE disc_id = ?
+            INSERT INTO commendations
+            VALUES (?, ?, ?)
         """
 
         with self:
-            self.execute_query(query_update, disc_id)
-            return self.get_reports(disc_id)[0][1]
+            self.execute_query(query_update, disc_id, commend_type, commender)
+            total_reports = sum(x[1] for x in self.get_commendations(commend_type, disc_id))
+            reports_by_commender = self.get_commendations(commend_type, disc_id, commender)[0][1]
+
+            return total_reports, reports_by_commender
 
     def add_items_to_shop(self, item_tuples):
         query = "INSERT INTO shop_items(name, price) VALUES (?, ?)"
