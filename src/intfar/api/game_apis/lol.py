@@ -325,6 +325,7 @@ class RiotAPIClient(GameAPIClient):
     async def get_match_history(
         self,
         puuid: str,
+<<<<<<< HEAD:src/intfar/api/game_apis/lol.py
         date_from: int | None = None,
         date_to: int | None = None
     ):
@@ -333,6 +334,16 @@ class RiotAPIClient(GameAPIClient):
             query_params.append(f"startTime={date_from}")
         if date_to:
             query_params.append(f"endTime={date_to}")
+=======
+        date_from: datetime | None = None,
+        date_to: datetime | None = None
+    ):
+        query_params = []
+        if date_from:
+            query_params.append(f"startTime={date_from.timestamp()}")
+        if date_to:
+            query_params.append(f"endTime={date_to.timestamp()}")
+>>>>>>> fc4a39e8379b928d4349eeaa8c37a03b0d9798e3:src/api/game_apis/lol.py
 
         endpoint = "/lol/match/v5/matches/by-puuid/{0}/ids"
         if query_params:
@@ -340,8 +351,11 @@ class RiotAPIClient(GameAPIClient):
 
         response = await self.make_request(endpoint, API_REGION, puuid)
 
+<<<<<<< HEAD:src/intfar/api/game_apis/lol.py
         return json.loads(response.text)
 
+=======
+>>>>>>> fc4a39e8379b928d4349eeaa8c37a03b0d9798e3:src/api/game_apis/lol.py
     async def get_active_game(self, puuid: str):
         endpoint = "/lol/spectator/v5/active-games/by-summoner/{0}"
         try:
