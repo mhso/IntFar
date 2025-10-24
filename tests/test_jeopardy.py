@@ -12,12 +12,12 @@ from threading import Barrier
 
 import pytest
 
-from src.run_flask import run_app
-from src.app.util import get_hashed_secret
-from src.api.util import MY_GUILD_ID, JEOPARDY_REGULAR_ROUNDS, JEOPADY_EDITION, JEOPARDY_ITERATION
-from src.api.config import Config
-from src.api.meta_database import MetaDatabase
-from src.discbot.commands.util import ADMIN_DISC_ID
+from intfar.run_flask import run_app
+from intfar.app.util import get_hashed_secret
+from intfar.api.util import MY_GUILD_ID, JEOPARDY_REGULAR_ROUNDS, JEOPADY_EDITION, JEOPARDY_ITERATION
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.discbot.commands.util import ADMIN_DISC_ID
 
 BROWSER_OPTIONS = {
     "args": [

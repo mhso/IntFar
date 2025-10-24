@@ -8,15 +8,15 @@ from discord.opus import load_opus
 from mhooge_flask.logging import logger
 from mhooge_flask.restartable import restartable
 
-from api.config import Config
-from api.meta_database import MetaDatabase
-from api.game_databases import get_database_client
-from api.util import SUPPORTED_GAMES
-from api.proxy import ProxyManager
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_databases import get_database_client
+from intfar.api.util import SUPPORTED_GAMES
+from intfar.api.proxy import ProxyManager
 
-from api.game_apis.lol import RiotAPIClient
-from api.game_apis.cs2 import SteamAPIClient
-from api.bets import get_betting_handler
+from intfar.api.game_apis.lol import RiotAPIClient
+from intfar.api.game_apis.cs2 import SteamAPIClient
+from intfar.api.bets import get_betting_handler
 #from ai import model
 
 def start_discord_process(*args):
@@ -102,13 +102,12 @@ def main():
         for game in SUPPORTED_GAMES
     }
 
-    # Start process with machine learning model
-    # that trains in the background after each game.
-
+    # Start flask app hosting Int-Far website
     logger.info("Starting Flask web app...")
     flask_args = [config, meta_database, game_databases, betting_handlers, api_clients]
     flask_process, bot_end_flask = start_flask_process(*flask_args)
 
+    # Start Discord client process
     logger.info("Starting Discord Client...")
     discord_args = [config, meta_database, game_databases, betting_handlers, api_clients, None, bot_end_flask]
     bot_process, _ = start_discord_process(*discord_args)

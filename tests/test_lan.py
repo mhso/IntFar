@@ -2,9 +2,9 @@ import pytest
 from tests.synthetic_data.spec import DataSpec
 from tests.synthetic_data.raw_data import create_synthetic_data
 
-from src.api.util import GUILD_MAP
-from src.api.game_monitor import GameMonitor
-from src.api import lan
+from intfar.api.util import GUILD_MAP
+from intfar.api.game_monitor import GameMonitor
+from intfar.api import lan
 
 TEST_ID = 5452408885
 LAN_DATE = "april_25"

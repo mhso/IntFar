@@ -10,10 +10,10 @@ resources/champions*.json
 resources/items*.json
 resources/maps.json
 resources/databases
-src/app/static/*
-src/app/static/*/bootstrap/
-!src/app/static/js/
-!src/app/static/css/
+src/intfar/app/static/*
+src/intfar/app/static/*/bootstrap/
+!src/intfar/app/static/js/
+!src/intfar/app/static/css/
 resouces/consola.tff
 resources/data
 vendor

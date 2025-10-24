@@ -1,6 +1,6 @@
-from src.api.util import SUPPORTED_GAMES
-from src.api.meta_database import DEFAULT_GAME
-from src.discbot.discord_mocks import MockDiscordClient, MockUser, MockGuild, MockChannel
+from intfar.api.util import SUPPORTED_GAMES
+from intfar.api.meta_database import DEFAULT_GAME
+from intfar.discbot.discord_mocks import MockDiscordClient, MockUser, MockGuild, MockChannel
 
 def get_games():
     games = [game for game in SUPPORTED_GAMES if game != DEFAULT_GAME]

@@ -7,20 +7,21 @@ from datetime import datetime
 import os
 
 from dateutil.relativedelta import relativedelta
-from api.lan import LAN_PARTIES, insert_bingo_challenges
+from intfar.api.lan import LAN_PARTIES, insert_bingo_challenges
 
-from app.routes.soundboard import normalize_sound_volume
-from api import award_qualifiers, config, util
-from api.meta_database import MetaDatabase
-from api.game_database import GameDatabase
-from api.game_databases import get_database_client
-from api.awards import get_awards_handler
-from api.game_data import get_stat_parser, get_stat_quantity_descriptions, stats_from_database
-from api.game_apis.lol import RiotAPIClient
-from api.game_apis.cs2 import SteamAPIClient
-from discbot.commands.util import ADMIN_DISC_ID
-from discbot.discord_bot import DiscordClient
-from api.data_schema import generate_schema
+from intfar.app.routes.soundboard import normalize_sound_volume
+from intfar.app.util import get_relative_static_folder
+from intfar.api import award_qualifiers, config, util
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_database import GameDatabase
+from intfar.api.game_databases import get_database_client
+from intfar.api.awards import get_awards_handler
+from intfar.api.game_data import get_stat_parser, get_stat_quantity_descriptions, stats_from_database
+from intfar.api.game_apis.lol import RiotAPIClient
+from intfar.api.game_apis.cs2 import SteamAPIClient
+from intfar.discbot.commands.util import ADMIN_DISC_ID
+from intfar.discbot.discord_bot import DiscordClient
+from intfar.api.data_schema import generate_schema
 
 class TestFuncs:
     def __init__(self, config, meta_database: MetaDatabase, game_databases: dict[str, GameDatabase], riot_api: RiotAPIClient):
@@ -144,7 +145,7 @@ class TestFuncs:
         print(awards_handler.get_flavor_text("timeline", 4, "random"))
 
     def test_normalize_sound(self):
-        files = glob("app/static/sounds/*.mp3")
+        files = glob("intfar/app/static/sounds/*.mp3")
         for filename in files:
             normalize_sound_volume(filename)
 
@@ -331,7 +332,7 @@ class TestFuncs:
             generate_schema(data, filename, game, self.config)
 
     def test_synthetic_data(self):
-        from api.game_data.lol import LoLGameStats
+        from intfar.api.game_data.lol import LoLGameStats
         argspec = inspect.getfullargspec(LoLGameStats.__init__)
 
         args = argspec[0]
@@ -363,7 +364,7 @@ class TestFuncs:
     def jeopardy_progress(self):
         total = util.JEOPARDY_REGULAR_ROUNDS * 30 + 1
         done = 0
-        with open("app/static/data/jeopardy_questions.json", "r") as fp:
+        with open(f"{self.config.static_folder}/data/jeopardy_questions.json", "r") as fp:
             data = json.load(fp)
             for category in data:
                 for tier in data[category]["tiers"]:
@@ -376,6 +377,15 @@ class TestFuncs:
         data = await self.riot_api.get_game_details(game_id)
         with open("../resources/lol_data.json", "w", encoding="utf-8") as fp:
             json.dump(data, fp)
+
+    def relative_static(self):
+        path = "/mnt/d/mhooge/intfar/src/intfar/app/static/avatars/123.png"
+        print(get_relative_static_folder(path, self.config))
+
+    async def get_lol_matches(self):
+        puuid = "Vg03sswLbwPm1yaJp8ACbObNUCkfJazuq_afJnHrfxZYYy-GvKIipeazQxIjrbqnoNkJFISDuuw9sg"
+        matches = await self.riot_api.get_match_history(puuid, 1760825344)
+        print(matches)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

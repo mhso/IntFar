@@ -3,10 +3,10 @@ import random
 from datetime import datetime
 
 from test.runner import TestRunner, test
-from api.config import Config
-from api.meta_database import Database
-from api import award_qualifiers, game_stats
-from discbot.discord_bot import get_cool_stat_flavor_text, get_doinks_flavor_text, get_intfar_flavor_text, get_reason_flavor_text
+from intfar.api.config import Config
+from intfar.api.meta_database import Database
+from intfar.api import award_qualifiers, game_stats
+from intfar.discbot.discord_bot import get_cool_stat_flavor_text, get_doinks_flavor_text, get_intfar_flavor_text, get_reason_flavor_text
 
 class TestWrapper(TestRunner):
     def __init__(self):

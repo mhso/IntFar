@@ -6,10 +6,10 @@ import traceback
 
 from mhooge_flask.logging import logger
 
-from api.config import Config
-from api.util import GUILD_IDS, MY_GUILD_ID
-from discbot.discord_bot import DiscordClient
-from discbot.commands.base import handle_command, Command
+from intfar.api.config import Config
+from intfar.api.util import GUILD_IDS, MY_GUILD_ID
+from intfar.discbot.discord_bot import DiscordClient
+from intfar.discbot.commands.base import handle_command, Command
 
 def collect_commands(cmd_class: Command):
     """
@@ -36,7 +36,7 @@ def initialize_commands(config: Config):
         if basename.startswith("_") or basename in ("base", "util"):
             continue
 
-        importlib.import_module(f"discbot.commands.{basename}")
+        importlib.import_module(f"intfar.discbot.commands.{basename}")
 
     collect_commands(Command)
 

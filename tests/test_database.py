@@ -1,10 +1,10 @@
 from time import time
 
-from src.api.meta_database import MetaDatabase, DEFAULT_GAME
-from src.api.game_database import GameDatabase
-from src.api.game_data.lol import LoLGameStats, LoLPlayerStats
-from src.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
-from src.api.util import MAIN_GUILD_ID, SUPPORTED_GAMES
+from intfar.api.meta_database import MetaDatabase, DEFAULT_GAME
+from intfar.api.game_database import GameDatabase
+from intfar.api.game_data.lol import LoLGameStats, LoLPlayerStats
+from intfar.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
+from intfar.api.util import MAIN_GUILD_ID, SUPPORTED_GAMES
 
 MY_DISC_ID = 267401734513491969
 GAME = "lol"

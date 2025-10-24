@@ -1,6 +1,6 @@
 import shutil
-from api.config import Config
-from api.meta_database import MetaDatabase
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
 
 conf_1 = Config()
 conf_2 = Config()

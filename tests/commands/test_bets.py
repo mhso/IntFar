@@ -1,9 +1,9 @@
 from time import time
 import pytest
 
-from src.api import betting
-from src.api.util import SUPPORTED_GAMES
-from src.discbot.discord_mocks import *
+from intfar.api import betting
+from intfar.api.util import SUPPORTED_GAMES
+from intfar.discbot.discord_mocks import *
 from tests.commands import get_games, call_command
 
 @pytest.mark.asyncio

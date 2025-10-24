@@ -1,6 +1,6 @@
 import pytest
 
-from src.discbot.discord_mocks import *
+from intfar.discbot.discord_mocks import *
 from tests.commands import get_games
 
 @pytest.mark.asyncio

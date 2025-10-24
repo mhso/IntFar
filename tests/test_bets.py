@@ -1,10 +1,10 @@
 from time import time
-from src.api.betting import BettingHandler, MAX_BETTING_THRESHOLD
-from src.api.meta_database import MetaDatabase
-from src.api.game_database import GameDatabase
-from src.api.game_data.lol import LoLGameStats, LoLPlayerStats
-from src.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
-from src.api.util import SUPPORTED_GAMES
+from intfar.api.betting import BettingHandler, MAX_BETTING_THRESHOLD
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_database import GameDatabase
+from intfar.api.game_data.lol import LoLGameStats, LoLPlayerStats
+from intfar.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
+from intfar.api.util import SUPPORTED_GAMES
 
 def test_game_won_success(
     meta_database: MetaDatabase,

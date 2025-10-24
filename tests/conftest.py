@@ -1,15 +1,15 @@
 import pytest
 
-from src.api.config import Config
-from src.api.meta_database import MetaDatabase
-from src.api.game_databases import get_database_client
-from src.api.game_monitors import get_game_monitor
-from src.api.bets import get_betting_handler
-from src.api.game_apis.mocks.riot_api import MockRiotAPI
-from src.api.game_apis.mocks.steam_api import MockSteamAPI
-from src.api.util import SUPPORTED_GAMES
-from src.discbot.commands.util import ADMIN_DISC_ID
-from src.run_command import create_client
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_databases import get_database_client
+from intfar.api.game_monitors import get_game_monitor
+from intfar.api.bets import get_betting_handler
+from intfar.api.game_apis.mocks.riot_api import MockRiotAPI
+from intfar.api.game_apis.mocks.steam_api import MockSteamAPI
+from intfar.api.util import SUPPORTED_GAMES
+from intfar.discbot.commands.util import ADMIN_DISC_ID
+from intfar.run_command import create_client
 
 _TEST_USERS = [
     ADMIN_DISC_ID, 2, 3, 4, 5, 6

@@ -3,13 +3,13 @@ import argparse
 
 from mhooge_flask.logging import logger
 
-from api.bets import get_betting_handler
-from api.game_apis import get_api_client
-from api.game_databases import get_database_client
-from api.config import Config
-from api.meta_database import MetaDatabase
-from api.util import GUILD_IDS, SUPPORTED_GAMES
-from discbot.discord_bot import DiscordClient
+from intfar.api.bets import get_betting_handler
+from intfar.api.game_apis import get_api_client
+from intfar.api.game_databases import get_database_client
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.util import GUILD_IDS, SUPPORTED_GAMES
+from intfar.discbot.discord_bot import DiscordClient
 
 GUILDS = {
     "nibs": GUILD_IDS[0],

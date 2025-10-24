@@ -1,6 +1,6 @@
-from api.util import SUPPORTED_GAMES
-from api.game_databases import get_database_client
-from api.config import Config
+from intfar.api.util import SUPPORTED_GAMES
+from intfar.api.game_databases import get_database_client
+from intfar.api.config import Config
 
 config = Config()
 

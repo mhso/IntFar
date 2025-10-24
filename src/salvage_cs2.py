@@ -4,14 +4,14 @@ from glob import glob
 import bz2
 import os
 
-from api.config import Config
-from api.game_apis.cs2 import SteamAPIClient
-from api.game_databases import get_database_client
-from api.meta_database import MetaDatabase
-from api.game_monitors.cs2 import CS2GameMonitor
-from api.util import GUILD_MAP
-from api.user import User
-from discbot.commands.util import ADMIN_DISC_ID
+from intfar.api.config import Config
+from intfar.api.game_apis.cs2 import SteamAPIClient
+from intfar.api.game_databases import get_database_client
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_monitors.cs2 import CS2GameMonitor
+from intfar.api.util import GUILD_MAP
+from intfar.api.user import User
+from intfar.discbot.commands.util import ADMIN_DISC_ID
 from awpy import DemoParser
 
 async def download_single_demo(config, steam_api, sharecode):

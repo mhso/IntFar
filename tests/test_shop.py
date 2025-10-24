@@ -1,7 +1,7 @@
 from test.runner import TestRunner, test
-from api.meta_database import Database
-from api.config import Config
-from api.shop import ShopHandler
+from intfar.api.meta_database import Database
+from intfar.api.config import Config
+from intfar.api.shop import ShopHandler
 
 class TestWrapper(TestRunner):
     def __init__(self):

@@ -5,17 +5,17 @@ from mhooge_flask.logging import logger
 from mhooge_flask import init
 from mhooge_flask.init import Route, SocketIOServerWrapper
 
-import app.util
-from app.routes import errors as route_errors
-from api.util import GUILD_IDS, SUPPORTED_GAMES
-from api.game_apis import get_api_client
-from api.game_api_client import GameAPIClient
-from api.game_databases import get_database_client
-from api.meta_database import MetaDatabase
-from api.bets import get_betting_handler
-from api.game_database import GameDatabase
-from api.betting import BettingHandler
-from api.config import Config
+from intfar.app import util
+from intfar.app.routes import errors as route_errors
+from intfar.api.util import GUILD_IDS, SUPPORTED_GAMES
+from intfar.api.game_apis import get_api_client
+from intfar.api.game_api_client import GameAPIClient
+from intfar.api.game_databases import get_database_client
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.bets import get_betting_handler
+from intfar.api.game_database import GameDatabase
+from intfar.api.betting import BettingHandler
+from intfar.api.config import Config
 
 def run_app(
     config: Config,
@@ -60,6 +60,7 @@ def run_app(
         "/intfar/",
         static_routes + game_routes,
         meta_database,
+        root_folder="intfar/app",
         server_cls=SocketIOServerWrapper,
         game_databases=game_databases,
         propagate_exceptions=False,
@@ -87,7 +88,7 @@ def run_app(
     )
 
     # Misc. routing handling.
-    web_app.before_request(app.util.before_request)
+    web_app.before_request(util.before_request)
     web_app.register_error_handler(500, route_errors.handle_internal_error)
     web_app.register_error_handler(404, route_errors.handle_missing_page_error)
 

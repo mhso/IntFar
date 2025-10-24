@@ -3,13 +3,13 @@ from datetime import datetime
 
 import freezegun
 
-from api.game_apis import get_api_client
-from api.game_databases import get_database_client
-from api.config import Config
-from api.meta_database import MetaDatabase
-from discbot.discord_bot import DiscordClient
-from discbot.montly_intfar import MonthlyIntfar
-from api.util import SUPPORTED_GAMES
+from intfar.api.game_apis import get_api_client
+from intfar.api.game_databases import get_database_client
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.discbot.discord_bot import DiscordClient
+from intfar.discbot.montly_intfar import MonthlyIntfar
+from intfar.api.util import SUPPORTED_GAMES
 
 async def announce_ifotm(client, game):
     dt = datetime.now()
