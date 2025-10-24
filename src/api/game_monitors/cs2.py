@@ -6,8 +6,10 @@ from mhooge_flask.logging import logger
 
 from api.user import User
 from api.game_monitor import GameMonitor
+from api.game_apis.cs2 import SteamAPIClient
+from api.game_databases.cs2 import CS2GameDatabase
 
-class CS2GameMonitor(GameMonitor):
+class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient]):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_SURRENDER = 5
     POSTGAME_STATUS_DEMO_MISSING = 6
@@ -54,7 +56,7 @@ class CS2GameMonitor(GameMonitor):
 
         return None
 
-    async def get_active_game_info(self, guild_id):
+    async def get_active_game_info(self, guild_id: int):
         # Create a bunch of maps for different ID representations
         user_dict: Dict[int, User] = (
             self.users_in_voice.get(guild_id, {})

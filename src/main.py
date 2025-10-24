@@ -102,13 +102,12 @@ def main():
         for game in SUPPORTED_GAMES
     }
 
-    # Start process with machine learning model
-    # that trains in the background after each game.
-
+    # Start flask app hosting Int-Far website
     logger.info("Starting Flask web app...")
     flask_args = [config, meta_database, game_databases, betting_handlers, api_clients]
     flask_process, bot_end_flask = start_flask_process(*flask_args)
 
+    # Start Discord client process
     logger.info("Starting Discord Client...")
     discord_args = [config, meta_database, game_databases, betting_handlers, api_clients, None, bot_end_flask]
     bot_process, _ = start_discord_process(*discord_args)

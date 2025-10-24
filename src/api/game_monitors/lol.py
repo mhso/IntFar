@@ -7,8 +7,10 @@ from api import lan
 from api.game_monitor import GameMonitor
 from api.user import User
 from api.game_data.lol import get_player_stats
+from api.game_apis.lol import RiotAPIClient
+from api.game_databases.lol import LoLGameDatabase
 
-class LoLGameMonitor(GameMonitor):
+class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_URF = 5
     POSTGAME_STATUS_INVALID_MAP = 6

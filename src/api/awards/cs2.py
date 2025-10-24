@@ -1,11 +1,13 @@
 from mhooge_flask.logging import logger
 
+from api.game_apis.cs2 import SteamAPIClient
+from api.game_data.cs2 import CS2GameStats
 from api.game_data.cs2 import CS2PlayerStats
 from api.award_qualifiers import AwardQualifiers
 from api.game_stats import get_outlier
 from api.util import round_digits
 
-class CS2AwardQualifiers(AwardQualifiers):
+class CS2AwardQualifiers(AwardQualifiers[SteamAPIClient, CS2GameStats]):
     @classmethod
     def INTFAR_REASONS(cls):
         super().__doc__

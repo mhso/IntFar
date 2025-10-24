@@ -1,12 +1,14 @@
 from mhooge_flask.logging import logger
 
+from api.game_data.lol import LoLGameStats
 from api.game_data.lol import LoLPlayerStats
+from api.game_apis.lol import RiotAPIClient
 from api.award_qualifiers import AwardQualifiers
 from api.util import round_digits
 from api.game_stats import get_outlier
 from api.game_database import GameDatabase
 
-class LoLAwardQualifiers(AwardQualifiers):
+class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats]):
     @classmethod
     def INTFAR_REASONS(cls):
         super().__doc__

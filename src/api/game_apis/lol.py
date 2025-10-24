@@ -1,3 +1,4 @@
+from datetime import datetime
 from time import sleep
 from glob import glob
 from os import remove
@@ -10,6 +11,7 @@ import httpx
 
 from api.game_api_client import GameAPIClient
 from api.user import User
+from src.api.config import Config
 
 API_PLATFORM = "https://euw1.api.riotgames.com"
 API_REGION = "https://europe.api.riotgames.com"
@@ -18,7 +20,7 @@ class RiotAPIClient(GameAPIClient):
     """
     Class for interacting with Riot Games League of Legends game data API.
     """
-    def __init__(self, game, config):
+    def __init__(self, game: str, config: Config):
         super().__init__(game, config)
         self.champ_names = {}
         self.champ_ids = {}
@@ -320,7 +322,25 @@ class RiotAPIClient(GameAPIClient):
 
         return names
 
-    async def get_active_game(self, puuid):
+    async def get_match_history(
+        self,
+        puuid: str,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None
+    ):
+        query_params = []
+        if date_from:
+            query_params.append(f"startTime={date_from.timestamp()}")
+        if date_to:
+            query_params.append(f"endTime={date_to.timestamp()}")
+
+        endpoint = "/lol/match/v5/matches/by-puuid/{0}/ids"
+        if query_params:
+            endpoint += f"?{'&'.join(query_params)}"
+
+        response = await self.make_request(endpoint, API_REGION, puuid)
+
+    async def get_active_game(self, puuid: str):
         endpoint = "/lol/spectator/v5/active-games/by-summoner/{0}"
         try:
             response = await self.make_request(endpoint, API_PLATFORM, puuid, ignore_errors=[404])

@@ -1,9 +1,12 @@
 from datetime import datetime
 from dataclasses import dataclass
 from time import time
+from typing import Any, Dict
 
+from api.game_apis.lol import RiotAPIClient
 from api.game_stats import GameStats, PlayerStats, GameStatsParser
 from api.util import format_duration
+from src.api.user import User
 
 _ROLE_MAP = {
     "MIDDLE": "mid",
@@ -124,7 +127,7 @@ class LoLPlayerStats(PlayerStats):
         return super().get_formatted_stat_value(stat, value)
 
 @dataclass
-class LoLGameStats(GameStats):
+class LoLGameStats(GameStats[LoLPlayerStats]):
     first_blood: int = None
     queue_id: int = None
     team_id: int = None
@@ -385,8 +388,8 @@ class LoLGameStats(GameStats):
             f"{player_stats.deaths}/{player_stats.assists} on {date} in a {fmt_duration} long game"
         )
 
-class LoLGameStatsParser(GameStatsParser):
-    def __init__(self, game, raw_data, api_client, all_users, guild_id):
+class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
+    def __init__(self, game: str, raw_data: Dict[str, Any], api_client: RiotAPIClient, all_users: Dict[int, User], guild_id: int):
         super().__init__(game, raw_data, api_client, all_users, guild_id)
 
     def parse_data(self) -> GameStats:

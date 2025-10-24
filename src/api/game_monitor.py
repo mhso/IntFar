@@ -1,8 +1,8 @@
 import asyncio
 from time import time
 import httpx
-from abc import ABC, abstractmethod
-from typing import Coroutine
+from abc import abstractmethod
+from typing import Coroutine, Generic, TypeVar
 from datetime import datetime
 
 from mhooge_flask.logging import logger
@@ -18,7 +18,10 @@ from api.awards import AwardQualifiers, get_awards_handler
 from api.game_api_client import GameAPIClient
 from api.util import get_website_link
 
-class GameMonitor(ABC):
+GameDatabaseType = TypeVar("GameDatabaseType", bound=GameDatabase)
+GameAPIType = TypeVar("GameAPIType", bound=GameAPIClient)
+
+class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
     GAME_STATUS_NOCHANGE = 0
     GAME_STATUS_ACTIVE = 1
     GAME_STATUS_ENDED = 2
@@ -33,8 +36,8 @@ class GameMonitor(ABC):
         game: str,
         config: Config,
         meta_database: MetaDatabase,
-        game_database: GameDatabase,
-        api_client: GameAPIClient,
+        game_database: GameDatabaseType,
+        api_client: GameAPIType,
         game_over_callback: Coroutine = None
     ):
         """

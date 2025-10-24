@@ -14,7 +14,7 @@ class GameAPIClient(ABC):
 
     @property
     @abstractmethod
-    def playable_count(self):
+    def playable_count(self) -> int:
         ...
 
     @abstractmethod

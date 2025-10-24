@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Dict, Generic, TypeVar
 from dataclasses import dataclass, field
 
 from api.user import User
@@ -16,9 +17,9 @@ class PlayerStats(ABC):
     kills: int
     deaths: int
     assists: int
-    doinks: str = None
-    kda: str = None
-    kp: str = None
+    doinks: str | None = None
+    kda: str | None = None
+    kp: str | None = None
 
     @classmethod
     def stats_to_save(cls) -> list[str]:
@@ -77,8 +78,10 @@ class PlayerStats(ABC):
 
         return fmt_val
 
+PlayerStatsType = TypeVar("PlayerStatsType", bound=PlayerStats)
+
 @dataclass
-class GameStats(ABC):
+class GameStats(Generic[PlayerStatsType]):
     """
     Dataclass representing parsed stats for a finished match.
     The base class contains shared match stats for all games supported by Int-Far.
@@ -94,7 +97,7 @@ class GameStats(ABC):
     map_id: int = None
     intfar_id: int = None
     intfar_reason: str = None
-    filtered_player_stats: list[PlayerStats] = field(default=None, init=False)
+    filtered_player_stats: list[PlayerStatsType] = field(default=None, init=False)
 
     @classmethod
     def stats_to_save(cls) -> list[str]:
@@ -165,8 +168,10 @@ class GameStats(ABC):
     def __post_init__(self):
         self.filtered_player_stats = list(filter(lambda x: x.disc_id is not None, self.all_player_stats))
 
-class GameStatsParser(ABC):
-    def __init__(self, game: str, raw_data: dict, api_client: GameAPIClient, all_users: dict[int, User], guild_id: int):
+GameAPIType = TypeVar("GameAPIType", bound=GameAPIClient)
+
+class GameStatsParser(Generic[GameAPIType]):
+    def __init__(self, game: str, raw_data: Dict, api_client: GameAPIType, all_users: Dict[int, User], guild_id: int):
         self.game = game
         self.raw_data = raw_data
         self.api_client = api_client

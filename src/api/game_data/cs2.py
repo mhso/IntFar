@@ -9,6 +9,7 @@ from awpy.types import GameRound, PlayerStatistics
 
 from mhooge_flask.logging import logger
 
+from api.game_apis.cs2 import SteamAPIClient
 from api.game_stats import GameStats, PlayerStats, GameStatsParser
 from api.util import format_duration
 
@@ -568,7 +569,7 @@ class CS2PlayerStats(PlayerStats):
         return fmt_value
 
 @dataclass
-class CS2GameStats(GameStats):
+class CS2GameStats(GameStats[CS2PlayerStats]):
     map_name: str = None
     started_t: bool = None
     rounds_us: int = None
@@ -604,7 +605,7 @@ class CS2GameStats(GameStats):
             f"{player_stats.deaths}/{player_stats.assists} on {date} in a {fmt_duration} long game"
         )
 
-class CS2GameStatsParser(GameStatsParser):
+class CS2GameStatsParser(GameStatsParser[SteamAPIClient]):
     def parse_data(self) -> GameStats:
         round_stats = self.raw_data["matches"][0]["roundstatsall"]
         demo_parsed = self.raw_data["demo_parse_status"] == "parsed"

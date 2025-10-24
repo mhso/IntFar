@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
 import random
 
 from api.game_stats import GameStats, PlayerStats
@@ -7,8 +8,11 @@ from api.config import Config
 from api.game_database import GameDatabase
 from api.util import load_flavor_texts, SUPPORTED_GAMES
 
-class AwardQualifiers(ABC):
-    def __init__(self, config: Config, api_client: GameAPIClient, parsed_game_stats: GameStats):
+GameAPIType = TypeVar("GameAPIType", bound=GameAPIClient)
+GameStatsType = TypeVar("GameStatsType", bound=GameStats)
+
+class AwardQualifiers(Generic[GameAPIType, GameStatsType]):
+    def __init__(self, config: Config, api_client: GameAPIType, parsed_game_stats: GameStatsType):
         self.game = parsed_game_stats.game
         self.guild_id = parsed_game_stats.guild_id
         self.config = config
