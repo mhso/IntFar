@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/presenter_head.html' %}
+    <body>
+        <div id="bg-image"></div>
+
+        <div id="selection-wrapper">
+            <!-- Logo -->
+            {% include 'jeopardy/logo.html' %}
+            {% set first_round = jeopardy_round == 1 and player_turn == -1 %}
+
+            <!-- Categories -->
+            {% if jeopardy_round < total_rounds %}
+
+            <!-- Jeopardy! and Double Jeopardy! question selection -->
+            <div id="selection-categories-wrapper">
+                {% for category in categories %}
+                <div class="selection-category-entry">
+                    <div class="selection-category-header">
+                        <span>{{ questions[category]["name"] }}</span>
+                    </div>
+                    {% for category_data in questions[category]["tiers"] %}
+                    {% set final_value = category_data["value"] * jeopardy_round %}
+                    <div class="selection-question-box{% if not category_data['active'] %} inactive{% endif %}"
+                    {% if category_data['active'] %}onclick="goToQuestion(event.target, '{{ category }}', {{ loop.index }}, {{ category_data['double'] | tojson }})"{% endif %}>
+                        <span>{{ final_value }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if first_round %}
+            <audio id="selection-start-sound">
+                <source src="{{ url_for('static', _external=True, filename='data/its_happening.mp3') }}" type="audio/mpeg">
+            </audio>
+            {% endif %}
+
+            {% else %}
+
+            <!-- Final Jeopardy! question selection -->
+            <div id="selection-finale-wrapper">
+                <h1>Final Jeopardy!</h1>
+                <h2 id="selection-finale-header1">Kategorien er...</h2>
+                <h2 id="selection-finale-header2">{{ questions[categories[0]]["name"] }}</h2>
+                <h3 id="selection-finale-header3">Tid til at satse hele baduljen!</h3>
+            </div>
+
+            <!-- Jeopardy theme music -->
+            <audio id="selection-jeopardy-theme">
+                <source src="{{ url_for('static', _external=True, filename='img/jeopardy/jeopardy_theme.mp3') }}" type="audio/mpeg">
+            </audio>
+            {% endif %}
+
+            <!-- Contestants -->
+            {% include 'jeopardy/contestants_footer.html' %}
+        </div>
+    </body>
+
+    <script>
+        setVariables(
+            {{ jeopardy_round }},
+            {{ total_rounds }},
+            {{ player_data | tojson }},
+            {{ player_turn }},
+            {{ question_num }}
+        );
+
+        const arrowKeys = ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"];
+
+        socket.on("connect", function() {
+            socket.emit("presenter_joined");
+            window.onkeydown = function(e) {
+                {% if jeopardy_round == 1 and player_turn == -1 %}
+                if (e.code == PRESENTER_ACTION_KEY) {
+                    let startSound = document.getElementById("selection-start-sound");
+                    startSound.volume = 0.3;
+                    startSound.play();
+                    chooseStartingPlayer(function(turn) {
+                        setPlayerTurn(turn, true);
+                        let index = document.getElementsByClassName("active-contestant-entry").item(0).dataset["index"];
+                        socket.emit("first_turn", index);
+                    });
+                }
+                {% endif %}
+                if (arrowKeys.includes(e.code)) {
+                    tabulateCategorySelection(e.code, {{ categories | length - 1 }});
+                }
+                else if (e.code == "Enter") {
+                    goToSelectedCategory();
+                }
+            };
+            {% if jeopardy_round < total_rounds %}
+            setPlayerTurn({{ player_turn }});
+            {% else %}
+            showFinaleCategory({{ total_rounds }}, '{{ categories[0] }}');
+            socket.on("contestant_ready", setPlayerReady);
+            {% endif %}
+        });
+    </script>
+</html>

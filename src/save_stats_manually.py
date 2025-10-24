@@ -3,13 +3,13 @@ import argparse
 
 from mhooge_flask.logging import logger
 
-from api.bets import get_betting_handler
-from api.game_apis import get_api_client
-from api.game_databases import get_database_client
-from api.config import Config
-from api.meta_database import MetaDatabase
-from api.util import GUILD_IDS, SUPPORTED_GAMES
-from discbot.discord_bot import DiscordClient
+from intfar.api.bets import get_betting_handler
+from intfar.api.game_apis import get_api_client
+from intfar.api.game_databases import get_database_client
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.util import GUILD_IDS, SUPPORTED_GAMES
+from intfar.discbot.discord_bot import DiscordClient
 
 GUILDS = {
     "nibs": GUILD_IDS[0],
@@ -104,12 +104,13 @@ class TestMock(DiscordClient):
     async def on_ready(self):
         await super(TestMock, self).on_ready()
 
-        if self.missing:
+        if self.missing and self.game == "lol":
             ids_to_save = self.game_databases[self.game].get_missed_games()
         else:
             ids_to_save = [(self.game_id, self.guild_to_use)]
 
-        for game_id, guild_id in ids_to_save:
+        while ids_to_save:
+            game_id, guild_id = ids_to_save.pop(0)
             game_monitor = self.game_monitors[self.game]
             game_monitor.active_game[guild_id] = {"id": game_id}
 
@@ -147,11 +148,16 @@ class TestMock(DiscordClient):
             if not self.dry_run:
                 self.game_databases[self.game].remove_missed_game(game_id)
 
-        if self.game == "cs2":
-            disc_id = list(game_monitor.users_in_game[guild_id].keys())[0]
-            user = self.game_databases["cs2"].game_users[disc_id]
-            next_code = await self.api_clients["cs2"].get_next_sharecode(user.player_id[0], user.match_auth_code[0], user.latest_match_token[0])
-            print("Next sharecode is:", next_code)
+            if self.game == "cs2":
+                disc_id = list(game_monitor.users_in_game[guild_id].keys())[0]
+                user = self.game_databases["cs2"].game_users[disc_id]
+                next_code = await self.api_clients["cs2"].get_next_sharecode(user.player_id[0], user.match_auth_code[0], user.latest_match_token[0])
+                print("Next sharecode is:", next_code)
+
+                if self.missing and next_code is not None:
+                    ids_to_save.append((next_code, self.guild_to_use))
+
+            print(len(ids_to_save))
 
         await self.close()
         exit(0)

@@ -2,19 +2,19 @@ from argparse import ArgumentParser
 
 import asyncio
 
-from api.config import Config
-from api.meta_database import MetaDatabase
-from api.game_database import GameDatabase
-from api.game_databases import get_database_client
-from api.bets import get_betting_handler
-from api.util import SUPPORTED_GAMES, MY_GUILD_ID, GUILD_MAP, GUILD_IDS
-from discbot.discord_bot import CHANNEL_IDS, TEST_CHANNLEL_ID
-from discbot.commands.base import handle_command
-from discbot.commands.util import COMMANDS, ADMIN_DISC_ID
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_database import GameDatabase
+from intfar.api.game_databases import get_database_client
+from intfar.api.bets import get_betting_handler
+from intfar.api.util import SUPPORTED_GAMES, MY_GUILD_ID, GUILD_MAP, GUILD_IDS
+from intfar.discbot.discord_bot import CHANNEL_IDS, TEST_CHANNLEL_ID
+from intfar.discbot.commands.base import handle_command
+from intfar.discbot.commands.util import COMMANDS, ADMIN_DISC_ID
 from run_discord_bot import initialize_commands
-from discbot.discord_mocks import MockDiscordClient, MockUser, MockGuild, MockChannel
-from api.game_apis.mocks.riot_api import MockRiotAPI
-from api.game_apis.mocks.steam_api import MockSteamAPI
+from intfar.discbot.discord_mocks import MockDiscordClient, MockUser, MockGuild, MockChannel
+from intfar.api.game_apis.mocks.riot_api import MockRiotAPI
+from intfar.api.game_apis.mocks.steam_api import MockSteamAPI
 
 def create_client(config: Config, meta_database: MetaDatabase, game_databases: dict[str, GameDatabase]):
     config.message_timeout = 0

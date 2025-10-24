@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+{% set subtitle = 'Home' %}
+{% include 'head.html' %}
+{% import "intfar_list_entry.html" as list_entry %}
+{% import "navbar.html" as navbar %}
+<body>
+    <div class="wrapper container-flex">
+        {{ navbar.navbar(game, all_games, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
+        <div id="header-wrapper-feed" class="header-wrapper">
+            <h1>Feeding Feed</h1>
+        </div>
+
+        <!-- List of latest events (bets, int-fars, doinks, etc.) across Int-Far -->
+        <div class="row">
+            <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
+            <div id="feed-wrapper" class="col-12 col-md-10 col-lg-8 col-xxl-6">
+                <table class="nice-table">
+                    {% for desc, duration in feed_descs %}
+                    <tr class="feed-entry">
+                        <td>
+                            {% for type, text in desc %}
+                            <span class="{{ type }}">
+                                {{ text }}
+                            </span> 
+                            {% endfor %}
+                        </td>
+                        <td>{{ duration }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <div class="d-none d-md-block col-md-1 col-lg-2 col-xxl-3"></div>
+        </div>
+
+        <div id="header-wrapper-intfars" class="header-wrapper">
+            <h1>Inting Bois</h1>
+        </div>
+
+        <div id="intfar-list-wrapper" class="row">
+            <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 col-xl-2"></div>
+    
+            <!-- List of all-time Int-Far awards -->
+            <div id="intfar-all" class="col-xs-12 col-sm-10 col-md-8 col-lg-6 col-xl-4">
+                <h2>All Time</h2>
+                <table class="nice-table">
+                    <tr class="list-first intfar-list-entry">
+                        <th></th>
+                        <th class="d-none d-sm-table-cell">Intboi</th>
+                        <th>Int</th>
+                        <th>Games</th>
+                        <th>Pct</th>
+                    </tr>
+                    {% for name, disc_id, games, intfars, intfar_pct, avatar in intfar_all %}
+                        {{ list_entry.entry(game, disc_id, name, games, intfars, intfar_pct, avatar) }}
+                    {% endfor %}
+                </table>
+            </div>
+
+            <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 d-xl-none"></div>
+            <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 d-xl-none"></div>
+
+            <!-- List of all-time Int-Far awards -->
+            <div id="intfar-month" class="col-xs-12 col-sm-10 col-md-8 col-lg-6 col-xl-4">
+                <h2>{{ curr_month }}</h2>
+                <table class="nice-table">
+                    <tr class="list-first intfar-list-entry">
+                        <th></th>
+                        <th class="d-none d-sm-table-cell">Intboi</th>
+                        <th>Int</th>
+                        <th>Games</th>
+                        <th>Pct</th>
+                    </tr>
+                    {% for name, disc_id, games, intfars, intfar_pct, avatar in intfar_month %}
+                        {{ list_entry.entry(game, disc_id, name, games, intfars, intfar_pct, avatar) }}
+                    {% endfor %}
+                </table>
+            </div>
+            <div class="d-none d-sm-block col-sm-1 col-md-2 col-lg-3 col-xl-2"></div>
+        </div>
+    </div>
+</body>
+</html>

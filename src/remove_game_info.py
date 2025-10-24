@@ -1,5 +1,5 @@
-from api.config import Config
-from api.game_databases import get_database_client
+from intfar.api.config import Config
+from intfar.api.game_databases import get_database_client
 from argparse import ArgumentParser
 
 parser = ArgumentParser()

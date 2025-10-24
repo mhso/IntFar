@@ -1,11 +1,11 @@
 from argparse import ArgumentParser
-from api.config import Config
-from discbot.discord_bot import DiscordClient
-from api.game_apis import get_api_client
-from api.game_databases import get_database_client
-from api.meta_database import MetaDatabase
-from api.register import register_for_game
-from api.util import SUPPORTED_GAMES, GUILD_MAP
+from intfar.api.config import Config
+from intfar.discbot.discord_bot import DiscordClient
+from intfar.api.game_apis import get_api_client
+from intfar.api.game_databases import get_database_client
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.register import register_for_game
+from intfar.api.util import SUPPORTED_GAMES, GUILD_MAP
 
 parser = ArgumentParser()
 

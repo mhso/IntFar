@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/presenter_head.html' %}
+
+    <body>
+        <div id="bg-image"></div>
+        <div id="endscreen-techno-overlay" class="d-none"></div>
+
+        <div id="endscreen-wrapper">
+            {% include 'jeopardy/logo.html' %}
+
+            <h1>GG WP!</h1>
+
+            <!-- Winner description -->
+            <p id="endscreen-winner-desc">
+                {% autoescape false %}
+                {{ winner_desc }}
+                {% endautoescape %}
+            </p>
+            <div id="endscreen-avatars-wrapper">
+                {% for avatar in winner_avatars %}
+                <div class="endscreen-avatars-entry">
+                    <img src="{{ url_for('static', _external=True, filename='img/jeopardy/crown.png') }}" class="endscreen-crown">
+                    <img src="{{ avatar }}" class="endscreen-avatar">
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Scores table -->
+            <h2>Final Statz</h2>
+            <table id="endscreen-scores-table">
+                <tr>
+                    <th>Navn</th>
+                    <th>Score</th>
+                    <th>Buzzes</th>
+                    <th>Korrekt</th>
+                    <th>Forkert</th>
+                </tr>
+                {% for data in player_data %}
+                <tr>
+                    <td class="endscreen-score-name" style="color: #{{ data['color'] }};">{{ data['name'] }}</td>
+                    <td class="endscreen-score-data">{{ data['score'] }}</td>
+                    <td class="endscreen-score-data">{{ data['buzzes'] }}</td>
+                    <td class="endscreen-score-data">{{ data['hits'] }}</td>
+                    <td class="endscreen-score-data">{{ data['misses'] }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <video id="endscreen-confetti-video" muted loop>
+                <source src="{{ url_for('static', _external=True, filename='img/confetti.webm') }}", type="video/webm">
+            </video>
+        </div>
+
+        <!-- I LOVE LEAGUE OF LEGENDS! -->
+        <audio id="endscreen-sound" class="volume-5">
+            <source src="{{ url_for('static', _external=True, filename='sounds/league.mp3') }}" type="audio/mpeg">
+        </audio>
+
+        <!-- Shooting Star celebratory music -->
+        <audio id="endscreen-music">
+            <source src="{{ url_for('static', _external=True, filename='data/shooting_star.mp3') }}" type="audio/mpeg">
+        </audio>
+    
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                document.getElementById("endscreen-sound").play();
+                startWinnerParty();
+            });
+        </script>
+    </body>
+</html>

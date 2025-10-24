@@ -8,10 +8,10 @@ from jinja2.environment import Environment
 from jinja2.loaders import BaseLoader
 from jinja2.exceptions import TemplateNotFound
 
-from api import util
-from api import lan
-from api.config import Config
-from api.game_databases import get_database_client
+from intfar.api import util
+from intfar.api import lan
+from intfar.api.config import Config
+from intfar.api.game_databases import get_database_client
 
 parser = ArgumentParser()
 PARTICIPANTS_DICT = {

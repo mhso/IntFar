@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+    {% include 'jeopardy/presenter_head.html' %}
+    <body>
+        <div id="bg-image"></div>
+
+        <div id="finale-wrapper">
+            <!-- Logo -->
+            {% include 'jeopardy/logo.html' %}
+
+            <!-- Category and question -->
+            <h2 id="finale-category-header">{{ category_name }}</h2>
+            <h3 id="finale-question-header">{{ question["question"] }}</h3>
+            <h4>Hvad der satses:</h4>
+
+            <div id="finale-wagers-wrapper">
+                {% for data in player_data %}
+                <div class="finale-wager-entry">
+                    <span class="finale-wager-name" style="color: #{{ data['color'] }};">{{ data["name"] }}</span>: <div class="finale-wager-amount">{{ data["wager"] }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <h3 id="finale-answer">Svaret er: <span class="question-emph">{{ question["answer"] }}</span></h3>
+
+            <div id="finale-results-wrapper">
+                <ul>
+                    {% for data in player_data %}
+                    <li class="finale-result-name">
+                        <span>{{ data["name"] }}</span> svarede {{ data["answer"] }} <span class="finale-result-desc"></span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <p id="endscreen-teaser">Hvilket betyder...</p>
+        </div>
+    </body>
+
+    <script>
+        setVariables(
+            {{ total_rounds }},
+            {{ total_rounds }},
+            {{ player_data | tojson }},
+            null,
+            1
+        );
+
+        socket.on("connect", function() {
+            socket.emit("presenter_joined");
+        });
+
+        window.onkeydown = function(e) {
+            if (e.code == PRESENTER_ACTION_KEY) {
+                document.activeElement.blur();
+                showFinaleResult();
+            }
+        }
+    </script>
+</html>

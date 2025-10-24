@@ -1,6 +1,6 @@
 import os
-from api.meta_database import Database
-from api.config import Config
+from intfar.api.meta_database import Database
+from intfar.api.config import Config
 
 BETTING_IDS = {
     "game_win": 0,

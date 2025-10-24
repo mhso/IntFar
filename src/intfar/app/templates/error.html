@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/style.css') }}">
+    </head>
+    <body>
+        <div id="error-page-wrapper">
+            <h1>Big Sad</h1>
+            {% if error_code == 500 %}
+            <p>The website died due to an error made by this fool:</p>
+            <img src="{{ url_for('static', _external=True, filename='img/angry_gual.png') }}">
+            <p>Maybe go harass him or something, idk...</p>
+            {% elif error_code == 404 %}
+            <p>That page does not exist</p>
+            <img src="{{ url_for('static', _external=True, filename='img/mads.png') }}">
+            <br>
+            <a href="{{ url_for('lol.index.index', _external=True) }}">
+                <button class="standard-btn">Go To League of Legends</button>
+            </a>
+            <br>
+            <br>
+            <a href="{{ url_for('cs2.index.index', _external=True) }}">
+                <button class="standard-btn">Go To Counter Strike 2</button>
+            </a>
+            {% elif error_code == 400 %}
+            <p>You provided an invalid game</p>
+            <img src="{{ url_for('static', _external=True, filename='img/david.png') }}">
+            <br>
+            <a href="{{ url_for('lol.index.index', _external=True) }}">
+                <button class="standard-btn">Go To League of Legends</button>
+            </a>
+            <br>
+            <br>
+            <a href="{{ url_for('cs2.index.index', _external=True) }}">
+                <button class="standard-btn">Go To Counter Strike 2</button>
+            </a>
+            {% endif %}
+        </div>
+    </body>
+</html>

@@ -1,0 +1,88 @@
+<html>
+<head>
+    <title>LoL Quiz - Scoreboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-32.png') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-48.png') }}" sizes="48x48">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/bootstrap/bootstrap-grid.min.css') }}"/>
+    <script src="{{ url_for('static', _external=True, filename='js/bootstrap/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', _external=True, filename='js/bootstrap/bootstrap.min.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/style.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/quiz.css') }}">
+</head>
+<body>
+    <div id="bg-image"></div>
+    <div id="scoreboard-wrapper" class="container-flex">
+        <h1 style="margin-bottom: 0;">Den Store</h1>
+        <img id="quiz-lol-logo" src="{{ url_for('static', _external=True, filename='img/lol_logo.webp') }}">
+        <h1 style="margin-top: -15px;">Quiz</h1>
+
+        <div class="quiz-divider"></div>
+
+        <h2 id="score-status-header">{% if round < 3 %}Runde {{ round }}{% else %}Quizzen{% endif %} er slut!</h2>
+        {% if score_blue >= score_red %}
+        {% set winner = team_blue %}
+        {% set team_order = [("blue", team_blue, score_blue), ("red", team_red, score_red)] %}
+        {% else %}
+        {% set winner = team_red %}
+        {% set team_order = [("red", team_red, score_red), ("blue", team_blue, score_blue)] %}
+        {% endif %}
+        <div id="score-points-wrapper">
+            <table>
+            {% for team, team_name, team_score in team_order %}
+            <tr>
+                <td class="score-entry-team">
+                    <h2 id="score-team-{{ team }}">{{ team_name }}:</h2>
+                </td>
+                <td class="score-entry-points">
+                    <h2><span class="quiz-emph">{{ team_score }}</span> point</h2>
+                </td>
+            </tr>
+            {% endfor %}
+            </table>
+        </div>
+
+        {% if round == 3 %}
+        {% if score_blue == score_red %}
+        <h1 id="score-winner">Scoren er uafgjort, ingen vinder!</h1>
+        {% else %}
+        <h1 id="score-winner"><span id="score-team-{% if score_blue > score_red %}blue{% else %}red{% endif %}">{{ winner }}</span> wonnered!</h1>
+        <audio id="score-winner-sound">
+            <source src="{{ url_for('static', _external=True, filename='sounds/kvinder.mp3') }}", type="audio/mpeg">
+        </audio>
+        <video id="score-confetti-video" muted loop>
+            <source src="{{ url_for('static', _external=True, filename='img/confetti.webm') }}", type="video/webm">
+        </video>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', _external=True, filename='js/quiz.js') }}"></script>
+    {% if round == 1 %}
+    <script>
+        window.onkeydown = function(e) {
+            if (e.key == "NumLock") {
+                window.location.href = getBaseURL() + "/intfar/quiz/" + {{ round + 1 }} + "/1"
+            }
+        }
+    </script>
+    {% elif round == 2 %}
+    <script>
+        window.onkeydown = function(e) {
+            if (e.key == "NumLock") {
+                window.location.href = getBaseURL() + "/intfar/quiz/selection/1"
+            }
+        }
+    </script>
+    {% elif round == 3 and score_blue != score_red %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(function() {
+                document.getElementById("score-confetti-video").play();
+            }, 1000);
+            addWinnerSoundEvent();
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

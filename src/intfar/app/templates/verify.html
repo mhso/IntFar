@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+{% include 'head.html' %}
+<body>
+    <div id="verify-wrapper">
+        <h1>You are now verified!</h1>
+        <img src="{{ url_for('static', _external=True, filename='img/peberno.png') }}">
+        <a href="{{ url_for('lol.index.index', _external=True) }}"><button class="standard-btn">Home</button></a><a href="{{ url_for('lol.users.user', _external=True, disc_id=disc_id) }}"><button class="standard-btn">Profile</button></a>
+    </div>
+</body>
+</html>

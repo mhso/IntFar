@@ -4,11 +4,11 @@ from time import sleep
 
 import pytest
 
-from src.api.game_apis.cs2 import SteamAPIClient
-from src.api.config import Config
-from src.api.meta_database import MetaDatabase
-from src.api.game_databases.cs2 import CS2GameDatabase
-from src.api.proxy import ProxyManager
+from intfar.api.game_apis.cs2 import SteamAPIClient
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_databases.cs2 import CS2GameDatabase
+from intfar.api.proxy import ProxyManager
 
 def send_from_proc(proxy, conn):
     tries = 10

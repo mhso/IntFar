@@ -2,8 +2,12 @@ PRAGMA journal_mode = 'wal';
 
 CREATE TABLE [users] (
     [disc_id] INTEGER PRIMARY KEY,
-    [secret] NVARCHAR(64) NOT NULL,
-    [reports] INTEGER DEFAULT(0)
+    [secret] NVARCHAR(64) NOT NULL
+);
+CREATE TABLE [commendations] (
+    [disc_id] INTEGER NOT NULL,
+    [type] NVARCHAR NOT NULL,
+    [commender] INTEGER
 );
 CREATE TABLE [betting_balance] (
     [disc_id] INTEGER PRIMARY KEY,
@@ -36,14 +40,14 @@ CREATE TABLE [owned_items] (
     [name] NVARCHAR(64) NOT NULL,
     [owner_id] INTEGER NOT NULL
 );
+CREATE TABLE [default_game] (
+    [disc_id] INTEGER PRIMARY KEY,
+    [game] NVARCHAR(64) NULL
+);
 CREATE TABLE [command_queue] (
     [id] INTEGER NOT NULL,
     [target] NVARCHAR(64) NOT NULL,
     [command] NVARCHAR(64) NOT NULL,
     [arguments] BLOB NOT NULL,
     [result] BLOB NULL
-);
-CREATE TABLE [default_game] (
-    [disc_id] INTEGER PRIMARY KEY,
-    [game] NVARCHAR(64) NULL
 );

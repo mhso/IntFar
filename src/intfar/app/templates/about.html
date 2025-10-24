@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+{% set subtitle = 'About' %}
+{% include 'head.html' %}
+{% import "navbar.html" as navbar %}
+<body>
+    <div id="about-wrapper" class="container-flex">
+        {{ navbar.navbar(game, all_games, logged_in_user, logged_in_name, logged_in_avatar, active_game_data, admin_id) }}
+        <h1>What the <span class="bold">heck</span> is an <span class="italic">Int-Far</span>?</h1>
+
+        <div class="about-card">
+            <h3 id="about-defintion-header">Int-Far</h3><br>
+            <p>
+                ĭn′t far<br>
+                <span class="italic">a scrub who repeatedly intentional feeds in a game</span>
+            </p>
+    
+            <p>
+                <span class="bold">Derived from</span>:<br>
+                <span class="bold">int</span>: Griefing by intentional feeding
+            </p>
+
+            <p>
+                <span class="bold">In turn derived from:</span><br>
+                <span class="bold">feed</span>: To give kills, and thereby resources, to enemy players
+            </p>
+
+            <p>
+                <span class="bold">And:</span><br>
+                <span class="bold">far</span>: Father, daddy. Dad in danish
+            </p>
+        </div>
+
+        <h1 id="about-scroll-down">Scroll on down to learn more...</h1>
+        <img id="about-arrow-down" src="{{ url_for('static', _external=True, filename='img/arrow_down.png') }}">
+
+        <div class="about-card about-scroll-fade">
+            <p><span class="paragraph-begin">Int-Far</span> is an interactive Discord bot that tracks various games being played in Discord servers.</p>
+
+            <p>
+                Since <span class="bold">2020-07-09</span>
+                Int-Far has tracked <span class="bold">{{ games }}</span> games played by <span class="bold">{{ players }}</span> people in <span class="bold">{{ active_guilds }}</span> Discord servers.
+            </p>
+
+            <p>
+                Int-Far works by first linking a user's Discord ID and in-game ID (summoner ID for LoL, Steam ID for CS2).
+                Then, it tracks the games of people in Discord voice channels.
+            </p>
+
+            <p>
+                When a game is over, a summary is written, stats are saved, and awards for being really bad
+                (somneone is <span class="italic">Int-Far</span>) or really good (someone got <span class="italic">doinks</span>) are handed out.
+            </p>
+        </div>
+
+        <div id="about-card-commands" class="about-card about-scroll-fade">
+            <span class="paragraph-begin">Int-Far</span> supports the following commands through Discord:
+            
+            <table id="about-commands" class="nice-table">
+                {% for command, desc in commands %}
+                <tr class="list-entry commands-list-entry">
+                    <td>{{ command }}</td>
+                    <td>{{ desc }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <span>Parameters: [mandatory] and (optional)</span>
+        </div>
+    </div>
+</body>
+
+<script src="{{ url_for('static', _external=True, filename='js/about.js') }}"></script>
+
+</html>

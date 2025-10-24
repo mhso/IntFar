@@ -5,9 +5,9 @@ monkey.patch_all()
 
 from mhooge_flask.logging import logger
 
-from api.config import Config
-from api.meta_database import MetaDatabase
-from api.game_apis.cs2 import SteamAPIClient
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_apis.cs2 import SteamAPIClient
 from argparse import ArgumentParser
 
 RELOG_INTERVAL = 60 * 60 * 24

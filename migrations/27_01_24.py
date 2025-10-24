@@ -1,10 +1,10 @@
 import os
-from api.meta_database import MetaDatabase
-from api.util import SUPPORTED_GAMES
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.util import SUPPORTED_GAMES
 SUPPORTED_GAMES["csgo"] = "Counter Strike: Global Offensive"
-from api.game_databases import get_database_client
-from api.config import Config
-from api.game_apis.lol import RiotAPIClient
+from intfar.api.game_databases import get_database_client
+from intfar.api.config import Config
+from intfar.api.game_apis.lol import RiotAPIClient
 from time import sleep
 
 conf_1 = Config()

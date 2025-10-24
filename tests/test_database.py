@@ -1,10 +1,10 @@
 from time import time
 
-from src.api.meta_database import MetaDatabase, DEFAULT_GAME
-from src.api.game_database import GameDatabase
-from src.api.game_data.lol import LoLGameStats, LoLPlayerStats
-from src.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
-from src.api.util import MAIN_GUILD_ID, SUPPORTED_GAMES
+from intfar.api.meta_database import MetaDatabase, DEFAULT_GAME
+from intfar.api.game_database import GameDatabase
+from intfar.api.game_data.lol import LoLGameStats, LoLPlayerStats
+from intfar.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
+from intfar.api.util import MAIN_GUILD_ID, SUPPORTED_GAMES
 
 MY_DISC_ID = 267401734513491969
 GAME = "lol"
@@ -71,12 +71,12 @@ def test_add_user(meta_database: MetaDatabase, game_databases: dict[str, GameDat
 def test_user_queries(meta_database: MetaDatabase, game_databases: dict[str, GameDatabase]):
     _add_user(meta_database, game_databases[DEFAULT_GAME], MY_DISC_ID, "my_id", "my_name")
 
-    reports_before = meta_database.get_reports(MY_DISC_ID)[0][1]
+    reports_before = meta_database.get_commendations("report", MY_DISC_ID)[0][1]
     assert reports_before == 0, "Test reports before"
 
     meta_database.report_user(MY_DISC_ID)
 
-    reports_after = meta_database.get_reports(MY_DISC_ID)[0][1]
+    reports_after = meta_database.get_commendations("report", MY_DISC_ID)[0][1]
     assert reports_after == 1, "Test reports after"
 
     # Add another user to test getting user with most reports
@@ -85,7 +85,7 @@ def test_user_queries(meta_database: MetaDatabase, game_databases: dict[str, Gam
     meta_database.report_user(123)
     meta_database.report_user(123)
 
-    max_reports, max_reports_user = meta_database.get_max_reports_details()
+    max_reports, max_reports_user = meta_database.get_max_commendation_details("report")
 
     assert max_reports == 2, "Test max reports"
     assert max_reports_user == 123, "Test max reports user"

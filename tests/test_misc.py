@@ -3,14 +3,14 @@ import json
 import os
 import shutil
 
-from api import game_stats, util
+from intfar.api import game_stats, util
 from test.runner import TestRunner, test
-from api.config import Config
-from api.meta_database import Database
-from discbot.discord_bot import DiscordClient
-from api.meta_database import Database
-from api.game_apis.lol import RiotAPIClient
-from api.betting import BettingHandler
+from intfar.api.config import Config
+from intfar.api.meta_database import Database
+from intfar.discbot.discord_bot import DiscordClient
+from intfar.api.meta_database import Database
+from intfar.api.game_apis.lol import RiotAPIClient
+from intfar.api.betting import BettingHandler
 
 class TestWrapper(TestRunner):
     def __init__(self):

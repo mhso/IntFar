@@ -1,0 +1,31 @@
+<div id="contestants-footer">
+    <div id="footer-contestants">
+        {% for player_dict in player_data %}
+        <div class="footer-contestant-entry" style="background-color: #{{ player_dict['color'] }};" data-index="{{ player_dict['index'] }}">
+            <div class="footer-contestant-buzzes">
+                <div class="footer-contestant-entry-hits">{{ player_dict["hits"] }}</div>
+                <div class="footer-contestant-entry-misses">{{ player_dict["misses"] }}</div>
+            </div>
+            <div class="footer-contestant-header">
+                <div class="footer-contestant-entry-name">{{ player_dict["name"] }}</div>
+                <div class="footer-contestant-entry-score">{{ player_dict["score"] }} GBP</div>
+            </div>
+            <img class="footer-contestant-entry-avatar" src="{{ player_dict['avatar'] }}">
+            <img class="footer-contestant-entry-ready" src="{{ url_for('static', _external=True, filename='img/check.png') }}">
+            <div class="footer-contestant-entry-powers">
+                {% for power in player_dict['power_ups'] %}
+                <div>
+                    {% if power['used'] %}
+                    <img src="{{ url_for('static', _external=True, filename='img/forbidden.png') }}" class="footer-contestant-entry-power-used">
+                    {% endif %}
+                    <img src="{{ url_for('static', _external=True, filename='img/jeopardy/power_' + power['power_id'] + '.png') }}" class="footer-contestant-entry-power-icon">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<script>
+    setContestantTextColors();
+</script>

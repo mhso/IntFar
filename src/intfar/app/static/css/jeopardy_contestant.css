@@ -1,0 +1,297 @@
+@font-face {
+    font-family: league;
+    src: url(../fonts/Friz_Quadrata_Bold.otf);
+}
+
+h1 {
+    font-family: league;
+    font-size: 2.5rem;
+    color: #e6d86b;
+    text-shadow: 1px 3px 2px rgba(0,0,0,0.75);
+}
+
+.d-none {
+    display: none !important;
+}
+
+#bg-image {
+    position: fixed;
+    z-index: -1;
+    background-size: cover;
+    backdrop-filter: blur(5px);
+    background-blend-mode: luminosity;
+    filter: blur(5px) brightness(0.55);
+    height: 101%;
+    width: 101%;
+    top: -0.5%;
+    left: -0.5%;
+}
+
+#contestant-game-wrapper, #contestant-lobby-wrapper {
+    text-align: center;
+}
+
+#contestant-lobby-wrapper > h1 {
+    margin-bottom: 50px;
+}
+
+#contestant-lobby-error {
+    color: red;
+    font-size: 18px;
+    margin-top: 5px;
+}
+
+#contestant-game-wrapper {
+    position: relative;
+    padding: 0 10px;
+}
+
+#contestant-game-header {
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border: 2px solid white;
+    background-color: #323232;
+    width: 210px;
+    margin-top: 20px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+}
+
+#contestant-game-header > div > img {
+    width: 64px;
+    border-radius: 32px;
+}
+
+#contestant-game-info {
+    flex-grow: 1;
+    text-align: right;
+    padding-right: 5px;
+    line-height: 1.6;
+}
+
+#contestant-game-score {
+    font-size: 18px;
+}
+
+#contestant-game-name {
+    text-align: center;
+    font-size: 20px;
+}
+
+#contestant-game-hits {
+    color: rgb(48, 188, 48);
+}
+
+#contestant-game-misses {
+    color: red;
+}
+
+.contestant-low-ping {
+    color: rgb(0, 154, 0);
+}
+
+.contestant-moderate-ping {
+    color: rgb(229, 138, 35);
+}
+
+.contestant-high-ping {
+    color: rgb(247, 10, 10);
+}
+
+#contestant-lobby-wrapper h2 {
+    margin-top: 10px;
+}
+
+#contestant-lobby-avatar {
+    display: block;
+    width: 64px;
+    border-radius: 32px;
+    margin: 0 auto;
+    margin-top: 25px;
+}
+
+#contestant-lobby-name {
+    font-size: 22px;
+    line-height: 1;
+    width: 160px;
+    display: block;
+    margin: 0 auto;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+#contestant-lobby-color {
+    line-height: 1;
+    height: 35px;
+    vertical-align: top;
+}
+
+#contestant-lobby-join {
+    font-size: 20px;
+    background-color: rgb(19, 86, 231);
+    display: block;
+    margin: 0 auto;
+    margin-top: 30px;
+    color: white;
+    border-radius: 5px;
+    border: 2px solid white;
+    cursor: pointer;
+    padding: 5px 10px;
+}
+
+.contestant-round-header {
+    font-weight: 1000;
+    margin-bottom: 0.5rem;
+    font-size: 1.75rem;
+    margin-top: 0;
+}
+
+.player-has-turn {
+    color: #32bc32;
+}
+
+#buzzer-wrapper {
+    touch-action: manipulation;
+}
+
+#buzzer-wrapper > img {
+    width: 200px;
+    margin-bottom: 20px;
+    touch-action: manipulation;
+}
+
+@keyframes showBuzzerStatus {
+    0% {
+        opacity: 0;
+        transform: scale(0.2);
+    }
+    33% {
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+#contestant-buzzer-status {
+    position: fixed;
+    background-color: rgba(0, 0, 0, 0.662);
+    transition: opacity 0.5s;
+    opacity: 0;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 99;
+    text-align: center;
+}
+
+#contestant-buzzer-status > img {
+    width: 90vw;
+    animation-duration: 2s;
+    position: relative;
+    top: calc(50% - 45vw);
+}
+
+#contestant-power-ups {
+    position: absolute;
+    bottom: -75px;
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+
+#contestant-power-ups > button {
+    width: 75px;
+    margin: 0 5px;
+    background-color: transparent;
+    border: none;
+}
+
+.contestant-power-icon, .contestant-power-used {
+    width: 70px;
+    border-radius: 35px;
+    border: 2px solid white;
+}
+
+.contestant-power-used {
+    position: absolute;
+    z-index: 10;
+}
+
+.contestant-power-icon.power-disabled {
+    filter: grayscale(100%);
+}
+
+#question-category-header {
+    color: white;
+    font-family: league;
+    font-size: 2.5rem;
+    margin-top: 20px;
+    margin-bottom: 30px;
+}
+
+#question-category-name {
+    font-weight: 1000;
+    text-decoration: underline;
+    color: rgb(255, 45, 222);
+}
+
+#question-reward-span {
+    color: gold;
+    font-weight: 1000;
+}
+
+#question-choices-indicator {
+    position: relative;
+    height: 32px;
+    vertical-align: top;
+    top: 1.5vw;
+}
+
+#question-wager-input, #finale-wager-input {
+    font-size: 20px;
+    border: 2px solid black;
+    border-radius: 5px;
+    margin-top: 20px;
+    width: 120px;
+    padding: 5px;
+    height: 45px;
+}
+
+#finale-answer {
+    font-size: 20px;
+    border: 2px solid black;
+    border-radius: 5px;
+    margin-top: 20px;
+    padding: 5px;
+    height: 45px;
+}
+
+#contestant-wager-btn {
+    position: relative;
+    background-color: rgb(0, 88, 255);
+    padding: 5px 10px;
+    margin: 0 auto;
+    margin-top: 15px;
+    font-size: 18px;
+    color: white;
+    border-radius: 5px;
+    border: 2px solid white;
+    cursor: pointer;
+    bottom: 1px;
+    margin-left: 5px;
+}
+
+#contestant-wager-btn:disabled {
+    background-color: gray;
+    cursor: auto;
+}
+
+#finale-question-header {
+    font-style: italic;
+}

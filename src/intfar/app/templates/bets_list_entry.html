@@ -1,0 +1,51 @@
+{% macro entry(game, name, better_id, logged_in_user, date, guild, guild_id, events, result, payout, avatar) -%}
+{% for bet_id, event, amount in events %}
+<tr class="bets-list-entry list-entry{% if loop.first and loop.last %} bet-single{% elif loop.first %} bet-main{% else %} bet-follow{% endif %}"
+    data-bet_id="{{ bet_id }}"{% if result and result != -1 and result != 1 %}data-ticket="{{ result }}"{% endif %}>
+    {% if avatar %}
+    <td class="bets-list-avatar">{% if loop.first %}
+        <a href="{{ url_for(game + '.users.user', _external=True, disc_id=better_id) }}">
+            <img class="discord-avatar" src="{{ avatar }}" alt="Discord Avatar">
+        </a>
+        {% endif %}
+    </td>
+    {% endif %}
+    {% if name %}
+    <td class="d-none d-sm-table-cell bets-list-name">{% if loop.first %}<a href="{{ url_for(game + '.users.user', _external=True, disc_id=better_id) }}">{{ name }}</a>{% endif%}</td>
+    {% endif %}
+    {% if date %}
+    <td class="bets-list-date">{% if loop.first %}{{ date }}{% endif %}</td>
+    {% endif %}
+    {% if guild %}
+    <td class="bets-list-guild">{% if loop.first %}{{ guild }}{% endif %}</td>
+    {% endif %}
+    <td class="bets-list-event">{% if not loop.first %}<span class="emph">and</span> {% endif %}{{ event }}</td>
+    <td class="bets-list-amount">{{ amount }}</td>
+    <td class="bets-list-result{% if result == 1 %} bet-won{% elif result == -1 %} bet-lost{% endif %}">
+        {% if result == 1 or result == -1 %}
+            {% if loop.first %}
+                {% if result == 1 %}
+                    {% if payout %}
+                        +{{ payout }}
+                    {% else %}
+                        Won
+                    {% endif %}
+                {% else %}
+                    Lost
+                {% endif %}
+            {% endif %}
+        {% else %}
+            {% if result %}{{ result }}{% endif %}
+            {% if better_id == logged_in_user and loop.first %}
+            <button class="bets-delete-btn"
+                {% if loop.first and loop.last %}onclick="deleteBet('{{ game }}', '{{ bet_id }}', '{{ guild_id }}');"
+                {% else %}onclick="deleteMultiBet('{{ game }}', '{{ result }}', '{{ guild_id }}');"{% endif %}
+            >
+                &times;
+            </button>
+            {% endif %}
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
+{%- endmacro %}

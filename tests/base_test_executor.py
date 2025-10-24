@@ -1,9 +1,9 @@
 import os
-from src.api.util import SUPPORTED_GAMES
-from src.api.config import Config
-from src.api.game_databases import get_database_client
-from src.api.meta_database import MetaDatabase
-from src.api.util import SUPPORTED_GAMES
+from intfar.api.util import SUPPORTED_GAMES
+from intfar.api.config import Config
+from intfar.api.game_databases import get_database_client
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.util import SUPPORTED_GAMES
 
 class BaseTestExecutor:
     def __enter__(self):

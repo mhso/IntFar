@@ -1,7 +1,7 @@
 import inspect
 
-from src.api.game_data.lol import LoLGameStats, LoLPlayerStats
-from src.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
+from intfar.api.game_data.lol import LoLGameStats, LoLPlayerStats
+from intfar.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
 
 GAME_STATS_CLS = {
     "lol": LoLGameStats,

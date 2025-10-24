@@ -1,9 +1,9 @@
 from argparse import ArgumentParser
 
-from api.config import Config
-from api.meta_database import MetaDatabase
-from api.game_databases import get_database_client
-from api.util import SUPPORTED_GAMES
+from intfar.api.config import Config
+from intfar.api.meta_database import MetaDatabase
+from intfar.api.game_databases import get_database_client
+from intfar.api.util import SUPPORTED_GAMES
 
 from mhooge_flask.query_db import query_or_repl
 

@@ -2,12 +2,12 @@ import argparse
 import sys
 import io
 
-from api.betting import BettingHandler
-from api.config import Config
-from api.meta_database import Database
-from api.bets import get_betting_handler
-from discbot.discord_bot import DiscordClient
-from api.util import GUILD_MAP, SUPPORTED_GAMES
+from intfar.api.betting import BettingHandler
+from intfar.api.config import Config
+from intfar.api.meta_database import Database
+from intfar.api.bets import get_betting_handler
+from intfar.discbot.discord_bot import DiscordClient
+from intfar.api.util import GUILD_MAP, SUPPORTED_GAMES
 
 CHANNEL_MAP = {
     "nibs": 730744358751567902,
