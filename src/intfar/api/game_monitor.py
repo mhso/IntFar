@@ -407,11 +407,11 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         return post_game_data
 
-    async def poll_for_game_end(self, guild_id, guild_name):
+    async def poll_for_game_end(self, guild_id: int, guild_name: str):
         """
-        When users are detected in an active game, this method polls the Riot Games
-        League of Legends API to check when the game is over.
-        When this is detected, the 'self.game_over_callback' method is called.
+        When users are detected in an active game, this method polls the relevant API
+        to check when the game has ended. When this is detected,
+        data is saved and the 'self.game_over_callback' method is called.
 
         :param guild_id:    ID of the Discord server where we should poll
                             for the end of the game

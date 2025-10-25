@@ -80,7 +80,7 @@ class GameCommand(Command):
 
 class CommendCommand(Command):
     ACCESS_LEVEL = "all"
-    MANDATORY_PARAMS = [TargetParam("person")]
+    MANDATORY_PARAMS = [TargetParam("person", allow_self=False)]
 
     def __init__(self, client: DiscordClient, message: Message, called_name, commend_type: Literal["report", "honor"]):
         super().__init__(client, message, called_name)
@@ -106,7 +106,7 @@ class CommendCommand(Command):
         if commends_from_user > 1:
             response += "s"
 
-        response += f" by {commender_name})."
+        response += f" by {commender_name})"
 
         await self.message.channel.send(self.client.insert_emotes(response))
 
@@ -127,24 +127,24 @@ class HonorCommand(CommendCommand):
 class CommendsCommand(Command):
     TARGET_ALL = True
     ACCESS_LEVEL = "all"
-    MANDATORY_PARAMS = [TargetParam("person")]
+    OPTIONAL_PARAMS = [TargetParam("person")]
 
     def __init__(self, client: DiscordClient, message: Message, called_name, commend_type: Literal["report", "honor"]):
         super().__init__(client, message, called_name)
         self.commend_type = commend_type
-        self.commend_flavor = f"{self.commend_type}ed"
+        self.commend_name = f"{self.commend_type}ed"
 
     async def handle(self, target_id: int | None):
-        report_data = self.client.meta_database.get_commendations(self.commend_type, target_id)
+        reports_for_user = self.client.meta_database.get_commendations(self.commend_type, commended=target_id)
 
-        response = ""
         grouped_by_user = {}
-        for disc_id, commends, _ in report_data:
+        for disc_id, commends, _ in reports_for_user:
             if disc_id not in grouped_by_user:
                 grouped_by_user[disc_id] = []
 
             grouped_by_user[disc_id].append(commends)
 
+        response = ""
         for disc_id in grouped_by_user:
             data = grouped_by_user[disc_id]
             num_commenders = len(data)
@@ -155,18 +155,40 @@ class CommendsCommand(Command):
             if total_commends > 1:
                 time_desc += "s"
 
-            person_desc = "person" if total_commends == 1 else "people"
+            person_desc = "person" if num_commenders == 1 else "people"
 
-            response += f"{name} has been {self.commend_flavor} {total_commends} {time_desc} by {num_commenders} {person_desc}.\n"
+            response += f"{name} has been {self.commend_name} **{total_commends}** {time_desc} by **{num_commenders}** {person_desc}\n"
 
         if response == "":
             if target_id is None:
-                flavor = "good bois" if self.commend_flavor == "report" else "toxic skanks"
-                response = f"No one has been {self.commend_flavor}, we're all {flavor}!"
+                flavor = "good bois" if self.commend_type == "report" else "toxic skanks"
+                response = f"No one has been {self.commend_name}, we're all {flavor}!\n"
             else:
                 name = self.client.get_discord_nick(target_id, self.message.guild.id)
-                flavor = "a goodie-two-shoes" if self.commend_flavor == "report" else "very dishonorable"
-                response = f"{name} is {flavor} and has never been {self.commend_flavor} by anyone"
+                flavor = "a goodie-two-shoes" if self.commend_type == "report" else "very dishonorable"
+                response = f"{name} is {flavor} and has never been {self.commend_name} by anyone\n"
+
+        # Add info about who this person has reported
+        if target_id is not None:
+            reports_by_user = self.client.meta_database.get_commendations(self.commend_type, commender=target_id)
+            grouped_by_user = {}
+            for _, commends, disc_id in reports_by_user:
+                if disc_id not in grouped_by_user:
+                    grouped_by_user[disc_id] = []
+
+                grouped_by_user[disc_id].append(commends)
+
+            if grouped_by_user != {}:
+                data = grouped_by_user[target_id]
+                num_commended = len(data)
+                total_commends = sum(data)
+        
+                time_desc = "time"
+                if total_commends > 1:
+                    time_desc += "s"
+                person_desc = "person" if num_commended == 1 else "people"
+
+                response += f"They have {self.commend_name} **{num_commended}** other {person_desc} a total of **{total_commends}** {time_desc}"
 
         await self.message.channel.send(response)
 

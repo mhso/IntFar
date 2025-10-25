@@ -1797,9 +1797,6 @@ class DiscordClient(discord.Client):
         logger.info('Logged on as {0}!'.format(self.user))
         self.initialized = True
 
-        with self.meta_database:
-            self.meta_database.execute_query("DELETE FROM commendations")
-
         for guild in self.guilds:
             await guild.chunk()
 

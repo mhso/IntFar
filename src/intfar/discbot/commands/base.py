@@ -30,11 +30,19 @@ class CommandParam:
         return self.name
 
 class TargetParam(CommandParam):
-    def __init__(self, name, default="me", return_val: str = "disc_id", end_index=None):
+    def __init__(
+        self,
+        name: str,
+        default: str | None = "me",
+        return_val: str = "disc_id",
+        end_index: int | None = None,
+        allow_self: bool = True
+    ):
         super().__init__(name, default)
 
         self.return_val = return_val
         self.end_index = end_index
+        self.allow_self = allow_self
 
     def extract_target_name(self, cmd_input, start_index, end_index):
         if len(cmd_input) > start_index:
@@ -132,13 +140,22 @@ class Command:
                     self.TARGET_ALL
                 )
 
-                # If we are targetting ourselves, but are not registered, send an error msg.
-                if user is None and self.ACCESS_LEVEL == "self" and value == author_id:
-                    await self.message.channel.send(
-                        "You must be registered to Int-Far:tm: " +
-                        "to target yourself with this command."
-                    )
-                    return None
+                if value == author_id:
+                    # If we are targetting ourselves, but are not registered, send an error msg
+                    error_msg = None
+                    if user is None and self.ACCESS_LEVEL == "self":
+                        error_msg = (
+                            "You must be registered to Int-Far:tm: "
+                            "to target yourself with this command."
+                        )
+
+                    # If targetting self is not allowed for the command, also send an error msg
+                    if not param.allow_self:
+                        error_msg = "Targetting yourself with that command is not allowed."
+
+                    if error_msg:
+                        await self.message.channel.send(error_msg)
+                        return None
 
                 parsed_args.append(value)
                 index += 1
