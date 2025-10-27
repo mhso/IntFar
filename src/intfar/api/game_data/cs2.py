@@ -666,6 +666,7 @@ class CS2GameStatsParser(GameStatsParser[SteamAPIClient]):
 
             account_id_map = {self.api_client.get_account_id(steam_id): steam_id for steam_id in player_stats}
 
+            game_type = None
             map_id = self.raw_data["mapName"].split("_")[-1]
             if not map_id:
                 game_type = round_stats[-1]["reservation"]["gameType"]

@@ -5,6 +5,7 @@ from os import remove
 from os.path import exists
 import json
 import asyncio
+from typing import Literal
 
 from mhooge_flask.logging import logger
 import httpx
@@ -325,14 +326,17 @@ class RiotAPIClient(GameAPIClient):
     async def get_match_history(
         self,
         puuid: str,
-        date_from: int | None = None,
-        date_to: int | None = None
+        date_from: int | float | None = None,
+        date_to: int | float | None = None,
+        game_type: Literal["ranked", "normal", "tourney", "tutorial"] | None = "ranked",
     ):
         query_params = []
         if date_from:
-            query_params.append(f"startTime={date_from}")
+            query_params.append(f"startTime={int(date_from)}")
         if date_to:
-            query_params.append(f"endTime={date_to}")
+            query_params.append(f"endTime={int(date_to)}")
+        if game_type:
+            query_params.append(f"type={game_type}")
 
         endpoint = "/lol/match/v5/matches/by-puuid/{0}/ids"
         if query_params:

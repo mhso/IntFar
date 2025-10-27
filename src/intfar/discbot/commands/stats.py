@@ -376,7 +376,7 @@ class ChampionCommand(Command):
     ACCESS_LEVEL = "self"
     MANDATORY_PARAMS = [PlayableParam("champion")]
     OPTIONAL_PARAMS = [
-        CommandParam("role", choices=["top", "mid", "support", "bot", "jungle"], consume_if_unmatched=False),
+        CommandParam("role", choices=["top", "mid", "support", "adc", "jungle"], consume_if_unmatched=False),
         TargetParam("person"),
     ]
     ALIASES = ["champ"]

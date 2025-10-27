@@ -1,3 +1,4 @@
+from uuid import uuid4
 from typing import List
 from intfar.api.util import MAIN_GUILD_ID
 from intfar.discbot.discord_bot import DiscordClient, MAIN_CHANNEL_ID
@@ -36,16 +37,22 @@ class MockUser:
     def mention(self):
         return f"@{self.name}"
 
+CLIENT_USER = MockUser(133742, "Int-Far Daddy")
+
 class MockChannel:
     def __init__(self, name: str, members: List[MockUser], channel_id: int = MAIN_CHANNEL_ID):
         self.name = name
         self.members = members
         self.id = channel_id
         self.messages_sent = []
+        self.guild = None
 
     async def send(self, content: str):
         print(content)
-        self.messages_sent.append(content)
+        message = MockMessage(content, CLIENT_USER, self, self.guild)
+        self.messages_sent.append(message)
+
+        return message
 
 class MockRole:
     def __init__(self, role_id: int, name: str, color: tuple):
@@ -84,10 +91,14 @@ class MockGuild:
 
 class MockMessage:
     def __init__(self, content: str, author: MockUser, channel: MockChannel, guild: MockGuild):
+        self.id = uuid4()
         self.content = content
         self.author = author
         self.channel = channel
         self.guild = guild
+
+    async def add_reaction(self, emoji):
+        pass
 
 class MockDiscordClient(DiscordClient):
     def __init__(
@@ -101,10 +112,15 @@ class MockDiscordClient(DiscordClient):
     ):
         super().__init__(config, meta_database, game_databases, betting_handlers, api_clients, **kwargs)
         self._guilds = []
+        self._user = CLIENT_USER
 
     @property
     def guilds(self):
         return self._guilds
+
+    @property
+    def user(self):
+        return self._user
 
     def get_guild(self, guild_id: int) -> MockGuild:
         for guild in self.guilds:

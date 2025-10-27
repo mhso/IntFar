@@ -16,10 +16,6 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
     POSTGAME_STATUS_INVALID_MAP = 6
     POSTGAME_STATUS_REMAKE = 7
 
-    @property
-    def polling_enabled(self):
-        return False
-
     def get_users_in_game(self, user_dict: dict[int, User], game_data: dict):
         users_in_game = {}
         for disc_id in user_dict:
@@ -41,7 +37,7 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
 
         return users_in_game
 
-    async def get_active_game_info(self, guild_id):
+    async def get_active_game_info_old(self, guild_id):
         # First check if users are in the same game (or all are in no games).
         user_dict = (
             self.users_in_voice.get(guild_id, {})
@@ -97,6 +93,43 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
             },
             users_in_current_game,
             None
+        )
+    
+    async def get_active_game_info(self, guild_id: int):
+        # First check if users are in the same game (or all are in no games).
+        user_dict = self.users_in_voice.get(guild_id, {})
+
+        game_ids = set()
+        users_in_current_game = {}
+
+        for disc_id in user_dict:
+            user_data = user_dict[disc_id]
+
+            latest_game = self.game_database.get_latest_game()[0]
+            if latest_game is not None:
+                latest_game, duration = latest_game[0], latest_game[1]
+                latest_game += duration + 30
+
+            matches = await self.api_client.get_match_history(user_data.player_id, latest_game)
+
+            if not matches:
+                continue
+
+            game_id = matches[-1].removeprefix("EUW1_")
+            game_ids.add(game_id)
+
+            users_in_current_game[disc_id] = User(disc_id, user_data.secret)
+
+        if len(game_ids) > 1: # People are in different games.
+            return None, users_in_current_game, self.GAME_STATUS_NOCHANGE
+
+        if len(game_ids) == 0:
+            return None, users_in_current_game, None
+
+        return (
+            {"id": game_ids.pop()},
+            users_in_current_game,
+            GameMonitor.GAME_STATUS_ENDED
         )
 
     def get_finished_game_status(self, game_info: dict, guild_id: int):

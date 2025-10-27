@@ -384,7 +384,12 @@ class TestFuncs:
 
     async def get_lol_matches(self):
         puuid = "Vg03sswLbwPm1yaJp8ACbObNUCkfJazuq_afJnHrfxZYYy-GvKIipeazQxIjrbqnoNkJFISDuuw9sg"
-        matches = await self.riot_api.get_match_history(puuid, 1760825344)
+        latest_game = self.game_databases["lol"].get_latest_game()[0]
+        if latest_game is not None:
+            latest_game, duration = latest_game[0], latest_game[1]
+            latest_game += duration + 30
+
+        matches = await self.riot_api.get_match_history(puuid, latest_game)
         print(matches)
 
 if __name__ == "__main__":

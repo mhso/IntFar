@@ -406,7 +406,7 @@ class WinrateCommand(Command):
     MANDATORY_PARAMS = [CommandParam("champion_or_map")]
     OPTIONAL_PARAMS = [
         GameParam("game"),
-        CommandParam("role", choices=["top", "mid", "support", "bot", "jungle"], consume_if_unmatched=False),
+        CommandParam("role", choices=["top", "mid", "support", "adc", "jungle"], consume_if_unmatched=False),
         TargetParam("person")
     ]
     ALIASES = ["winrate"]

@@ -49,10 +49,18 @@ def create_client(config: Config, meta_database: MetaDatabase, game_databases: d
             MockChannel("Test channel 1", members, CHANNEL_IDS[index-1]),
             MockChannel("Test channel 2", members, 1337),
         ]
-        guilds.append(MockGuild(f"Test guild {index}", members, channels, guild_id))
+        guild = MockGuild(f"Test guild {index}", members, channels, guild_id)
+        for channel in channels:
+            channel.guild = guild
 
-    channels = [MockChannel("Test channel", [members[0]]), 1]
-    guilds.append(MockGuild("Test guild", members, channels, MY_GUILD_ID))
+        guilds.append(guild)
+
+    channels = [MockChannel("Test channel", [members[0]])]
+    guild = MockGuild(f"Test guild", members, channels, MY_GUILD_ID)
+    for channel in channels:
+        channel.guild = guild
+
+    guilds.append(guild)
 
     client._guilds = guilds
 

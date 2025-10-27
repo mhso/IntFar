@@ -96,9 +96,6 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         """
         active_game_info, users_in_current_game, status = await self.get_active_game_info(guild_id)
 
-        if status is not None:
-            return status
-
         if active_game_info is not None and self.active_game.get(guild_id) is None:
             if active_game_info["start"] == 0:
                 active_game_info["start"] = int(time())
@@ -109,6 +106,9 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             self.users_in_game[guild_id] = users_in_current_game
             logger.debug(f"Game start for {self.game}: {datetime.fromtimestamp(self.active_game[guild_id]['start'])}")
 
+            if status is not None:
+                return status
+
             return self.GAME_STATUS_ACTIVE # Game is now active.
 
         if active_game_info is None and self.active_game.get(guild_id) is not None:
@@ -116,7 +116,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         return self.GAME_STATUS_NOCHANGE
 
-    async def poll_for_game_start(self, guild_id: int, guild_name: str, immediately=False):
+    async def poll_for_new_game(self, guild_id: int, guild_name: str, immediately=False):
         """
         Periodically poll the Riot Games League of Legends API to check if any users in
         Discord voice channels have joined a game. Whenever that happens, we instead
@@ -172,8 +172,13 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
             await self.poll_for_game_end(guild_id, guild_name)
 
+        # If we can't track active games for a given game,
+        # the status might go from no game to game ended immediately
+        elif game_status == self.GAME_STATUS_ENDED:
+            await self.on_game_end(guild_id, guild_name)
+
         elif game_status == self.GAME_STATUS_NOCHANGE: # Sleep for a bit and check game status again.
-            await self.poll_for_game_start(guild_id, guild_name)
+            await self.poll_for_new_game(guild_id, guild_name)
 
     def get_finished_game_status(self, game_info: dict, guild_id: int):
         if self.game_database.game_exists(game_info["gameId"]):
@@ -407,6 +412,42 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         return post_game_data
 
+    async def on_game_end(self, guild_id: int, guild_name: str):
+        game_id = None
+        try:
+            game_id = self.active_game.get(guild_id, {}).get("id")
+            logger.bind(event="game_over", game=self.game).info(f"GAME OVER! Active game: {game_id}")
+
+            game_info, status_code = await self.get_finished_game_info(guild_id)
+
+        except Exception:
+            # Something went wrong when doing end-of-game stuff
+            bound_logger = logger.bind(event="game_over_error", game=self.game, guild_id=guild_id, game_id=game_id)
+            bound_logger.exception("Exception after game was over!!!")
+
+            game_info = {"gameId": game_id}
+            status_code = self.POSTGAME_STATUS_ERROR
+
+        finally:
+            # Send update to Int-Far website that the game is over.
+            req_data = {
+                "secret": self.config.discord_token,
+                "guild_id": guild_id,
+                "game_id": game_id
+            }
+            self._send_game_update("game_ended", self.game, req_data)
+
+            logger.info(f"Game status: {status_code}")
+
+            post_game_data = self.handle_game_over(game_info, status_code, guild_id)
+            if self.game_over_callback is not None:
+                await self.game_over_callback(post_game_data)
+
+            del self.active_game[guild_id]
+            del self.users_in_game[guild_id] # Reset the list of users who are in a game.
+
+            asyncio.create_task(self.poll_for_new_game(guild_id, guild_name))
+
     async def poll_for_game_end(self, guild_id: int, guild_name: str):
         """
         When users are detected in an active game, this method polls the relevant API
@@ -431,39 +472,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         game_status = await self.check_game_status(guild_id, guild_name)
         if game_status == self.GAME_STATUS_ENDED: # Game is over.
-            try:
-                game_id = self.active_game.get(guild_id, {}).get("id")
-                logger.bind(event="game_over", game=self.game).info(f"GAME OVER! Active game: {game_id}")
-
-                game_info, status_code = await self.get_finished_game_info(guild_id)
-
-            except Exception:
-                # Something went wrong when doing end-of-game stuff
-                bound_logger = logger.bind(event="game_over_error", game=self.game, guild_id=guild_id, game_id=game_id)
-                bound_logger.exception("Exception after game was over!!!")
-
-                game_info = {"gameId": game_id}
-                status_code = self.POSTGAME_STATUS_ERROR
-
-            finally:
-                # Send update to Int-Far website that the game is over.
-                req_data = {
-                    "secret": self.config.discord_token,
-                    "guild_id": guild_id,
-                    "game_id": game_id
-                }
-                self._send_game_update("game_ended", self.game, req_data)
-
-                logger.info(f"Game status: {status_code}")
-
-                post_game_data = self.handle_game_over(game_info, status_code, guild_id)
-                if self.game_over_callback is not None:
-                    await self.game_over_callback(post_game_data)
-
-                del self.active_game[guild_id]
-                del self.users_in_game[guild_id] # Reset the list of users who are in a game.
-
-                asyncio.create_task(self.poll_for_game_start(guild_id, guild_name))
+            await self.on_game_end(guild_id, guild_name)
 
         elif game_status == self.GAME_STATUS_NOCHANGE:
             await self.poll_for_game_end(guild_id, guild_name)

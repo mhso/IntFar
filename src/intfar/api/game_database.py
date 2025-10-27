@@ -195,7 +195,7 @@ class GameDatabase(SQLiteDatabase):
     def get_latest_game(self, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
 
-        query_games = f"SELECT MAX(timestamp), win, intfar_id, intfar_reason FROM games{delim_str}"
+        query_games = f"SELECT MAX(timestamp), duration, win, intfar_id, intfar_reason FROM games{delim_str}"
         query_doinks = f"""
             SELECT
                 g.timestamp,

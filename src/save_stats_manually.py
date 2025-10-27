@@ -111,6 +111,7 @@ class TestMock(DiscordClient):
 
         while ids_to_save:
             game_id, guild_id = ids_to_save.pop(0)
+            print("Saving data for", game_id)
             game_monitor = self.game_monitors[self.game]
             game_monitor.active_game[guild_id] = {"id": game_id}
 
@@ -121,7 +122,7 @@ class TestMock(DiscordClient):
                 self.game_databases["cs2"].set_new_cs2_sharecode = self.set_sharecode_mock
 
             try:
-                game_info = await self.api_clients[self.game].get_game_details(self.game_id)
+                game_info = await self.api_clients[self.game].get_game_details(game_id)
                 if game_info is None:
                     raise ValueError("Game info is None!")
             except Exception:
@@ -156,8 +157,6 @@ class TestMock(DiscordClient):
 
                 if self.missing and next_code is not None:
                     ids_to_save.append((next_code, self.guild_to_use))
-
-            print(len(ids_to_save))
 
         await self.close()
         exit(0)

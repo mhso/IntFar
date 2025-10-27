@@ -157,7 +157,7 @@ class GiveTokensCommand(Command):
     NAME = "give"
     DESCRIPTION = "Give good-boi points to someone."
     ACCESS_LEVEL = "all"
-    MANDATORY_PARAMS = [CommandParam("amount"), TargetParam("person")]
+    MANDATORY_PARAMS = [CommandParam("amount"), TargetParam("person", allow_self=False)]
 
     async def handle(self, amount: str, target_id: int):
         target_name = self.client.get_discord_nick(target_id, self.message.guild.id)

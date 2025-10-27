@@ -8,6 +8,7 @@ import numpy as np
 from intfar.app import util as app_util
 from intfar.api import util as api_util
 from intfar.api import lan as lan_api
+from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_databases.lol import LoLGameDatabase
 from intfar.api.game_data import get_formatted_stat_names, get_formatted_stat_value
 from intfar.api.awards import get_doinks_reasons, get_intfar_reasons
@@ -36,7 +37,7 @@ def get_champ_faces(users_in_game, face_images, config):
 
         image_data = []
         for disc_id in users_in_game:
-            champ_id = users_in_game[disc_id]["champ_id"]
+            champ_id = users_in_game[disc_id]
 
             face_img = face_images[disc_id]
             coords = coords_map[champ_id]
@@ -62,11 +63,11 @@ def get_test_active_data():
     active_game = "CLASSIC"
     enemy_champs = [15, 421, 45, 10, 432]
     users_in_game = {
-        115142485579137029: User(115142485579137029, None, champ_id=223),
-        172757468814770176: User(172757468814770176, None, champ_id=35),
-        267401734513491969: User(267401734513491969, None, champ_id=517),
-        331082926475182081: User(331082926475182081, None, champ_id=221),
-        347489125877809155: User(347489125877809155, None, champ_id=888),
+        115142485579137029: User(115142485579137029, champ_id=223),
+        172757468814770176: User(172757468814770176, champ_id=35),
+        267401734513491969: User(267401734513491969, champ_id=517),
+        331082926475182081: User(331082926475182081, champ_id=221),
+        347489125877809155: User(347489125877809155, champ_id=888),
     }
     blue_side = True
 
@@ -77,26 +78,28 @@ def get_test_active_data():
         "active_game": active_game
     }
 
-def get_real_active_data(lan_info):
+def get_real_active_data(riot_api: RiotAPIClient, lan_info: lan_api.LANInfo):
     curr_time = time()
-    if not lan_api.is_lan_ongoing(curr_time):
+    if not lan_api.is_lan_ongoing(curr_time, lan_info.guild_id):
         return {"active_game": None}
 
-    game_data = app_util.discord_request(
-        "func",
-        ["get_users_in_game", "get_active_game"],
-        [(_GAME, lan_info.guild_id), (_GAME, lan_info.guild_id)]
-    )
-
-    if game_data[0] is None:
+    live_lol_data = flask.current_app.config["LEAGUE_EVENTS"]
+    if live_lol_data == []:
         return {"active_game": None}
 
-    users_in_game = game_data[0]
-    active_game_data = game_data[1]
-    enemy_champs = active_game_data["enemy_champ_ids"]
+    game_data = live_lol_data[0]
 
-    active_game = active_game_data["game_mode"]
-    blue_side = active_game_data["team_id"] == 100
+    users_in_game = {
+        disc_id: riot_api.try_find_playable_id(champ_name)
+        for disc_id, champ_name in game_data["AllyTeamInfo"].items()
+    }
+    enemy_champs = [
+        riot_api.try_find_playable_id(champ_name)
+        for champ_name in game_data["EnemyTeamInfo"]
+    ]
+
+    active_game = game_data["GameMode"]
+    blue_side = game_data["Team"] == "blue"
 
     return {
         "users_in_game": users_in_game,
@@ -112,7 +115,7 @@ def get_active_game_data(face_images, lan_info):
     if lan_api.TESTING:
         game_data = get_test_active_data()
     else:
-        game_data = get_real_active_data(lan_info)
+        game_data = get_real_active_data(riot_api, lan_info)
 
     if game_data["active_game"] is None:
         return game_data
@@ -120,7 +123,7 @@ def get_active_game_data(face_images, lan_info):
     champ_faces = get_champ_faces(game_data["users_in_game"], face_images, config)
 
     our_champs_imgs = [
-        (flask.url_for("static", _external=True, filename=app_util.get_relative_static_folder(riot_api.get_champ_splash_path(game_data["users_in_game"][disc_id]["champ_id"]), config)),) + face_data
+        (flask.url_for("static", _external=True, filename=app_util.get_relative_static_folder(riot_api.get_champ_splash_path(game_data["users_in_game"][disc_id]), config)),) + face_data
         for disc_id, face_data in zip(game_data["users_in_game"], champ_faces)
     ]
     enemy_champs_imgs = [
@@ -278,7 +281,7 @@ def get_data(lan_info, lan_date):
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
         )
-        latest_timestamp, latest_win, latest_intfar_id, latest_intfar_reason = latest_game_data
+        latest_timestamp, latest_duration, latest_win, latest_intfar_id, latest_intfar_reason = latest_game_data
 
         dt_start = datetime.fromtimestamp(latest_timestamp)
         duration_since_game = api_util.format_duration(dt_start, dt_now)

@@ -9,7 +9,6 @@ from typing import Dict, Type
 
 from mhooge_flask.logging import logger
 
-from intfar.api.config import Config
 from intfar.api.meta_database import MetaDatabase
 
 _DEFAULT_TIMEOUT = 60

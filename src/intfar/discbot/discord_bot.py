@@ -1328,7 +1328,7 @@ class DiscordClient(discord.Client):
                     logger.info(f"Polling is now active for {api_util.SUPPORTED_GAMES[game]}!")
                     game_monitor.polling_active[guild_id] = True
                     asyncio.create_task(
-                        game_monitor.poll_for_game_start(guild_id, guild_name, poll_immediately)
+                        game_monitor.poll_for_new_game(guild_id, guild_name, poll_immediately)
                     )
 
             logger.info(f"Active users in {guild_name} for {game}: {len(users_in_voice[game])}")

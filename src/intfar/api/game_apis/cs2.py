@@ -110,30 +110,34 @@ class SteamAPIClient(GameAPIClient):
     def get_latest_data(self):
         url = "https://developer.valvesoftware.com/wiki/Counter-Strike_2/Maps"
 
-        try:
-            response = httpx.get(url)
-            html = BeautifulSoup(response.text, "html.parser")
+        for attempt in range(3):
+            try:
+                response = httpx.get(url)
+                html = BeautifulSoup(response.text, "html.parser")
 
-            former_header = html.find(id="Current_Maps")
+                former_header = html.find(id="Current_Maps")
 
-            maps_table = former_header.find_next("table")
-            table_rows = maps_table.find_all("tr")
+                maps_table = former_header.find_next("table")
+                table_rows = maps_table.find_all("tr")
 
-            for row in table_rows[3:]:
-                columns = row.find_all("td")
-                full_name = columns[1].string.strip()
-                split = columns[2].string.split("_")
-                if len(split) == 1 or len(columns) < 8 or columns[7].string.strip() == "No":
-                    continue
+                for row in table_rows[3:]:
+                    columns = row.find_all("td")
+                    full_name = columns[1].string.split("(")[0].strip()
+                    split = columns[2].string.split("_")
+                    if len(split) == 1 or len(columns) < 8 or columns[7].string.strip() == "No":
+                        continue
 
-                short_name = split[-1].strip()
-                self.map_names[short_name] = full_name
+                    short_name = split[1].strip()
+                    self.map_names[short_name] = full_name
 
-            if self.map_names == {}:
-                logger.exception(f"Could not get active CS2 maps from {url}")
+                if self.map_names == {}:
+                    logger.exception(f"Could not get active CS2 maps from {url}")
 
-        except httpx.RequestError:
-            logger.exception(f"Exception when downloading CS2 maps from {url}")
+                break
+
+            except httpx.RequestError:
+                logger.exception(f"Exception when downloading CS2 maps from {url}")
+                sleep(2 + attempt)
 
     async def download_demo_file(self, filename: str, url: str):
         try:
