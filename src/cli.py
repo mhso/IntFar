@@ -386,8 +386,7 @@ class TestFuncs:
         puuid = "Vg03sswLbwPm1yaJp8ACbObNUCkfJazuq_afJnHrfxZYYy-GvKIipeazQxIjrbqnoNkJFISDuuw9sg"
         latest_game = self.game_databases["lol"].get_latest_game()[0]
         if latest_game is not None:
-            latest_game, duration = latest_game[0], latest_game[1]
-            latest_game += duration + 30
+            latest_game = latest_game[0] + 3600
 
         matches = await self.riot_api.get_match_history(puuid, latest_game)
         print(matches)

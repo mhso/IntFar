@@ -136,14 +136,10 @@ class TestMock(DiscordClient):
 
             status = game_monitor.get_finished_game_status(game_info, guild_id)
 
-            if status == game_monitor.POSTGAME_STATUS_OK and self.game == "lol":
-                ranks = await self.get_ranks(game_monitor.users_in_game[guild_id])
-                game_info["player_ranks"] = ranks
-
             if self.task not in ("all", "stats") or self.dry_run:
                 game_monitor.save_stats = self.save_stats_mock
 
-            post_game_stats = game_monitor.handle_game_over(game_info, status, guild_id)
+            post_game_stats = await game_monitor.handle_game_over(game_info, status, guild_id)
             await self.on_game_over(post_game_stats)
 
             if not self.dry_run:

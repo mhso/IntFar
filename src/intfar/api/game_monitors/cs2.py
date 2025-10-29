@@ -172,8 +172,8 @@ class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient]):
 
         return game_info, status_code
 
-    def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
-        post_game_data = super().handle_game_over(game_info, status_code, guild_id)
+    async def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
+        post_game_data = await super().handle_game_over(game_info, status_code, guild_id)
 
         if post_game_data.status_code not in (
             self.POSTGAME_STATUS_ERROR,

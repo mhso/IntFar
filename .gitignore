@@ -10,6 +10,7 @@ resources/champions*.json
 resources/items*.json
 resources/maps.json
 resources/databases
+resources/skins.csv
 src/intfar/app/static/*
 src/intfar/app/static/*/bootstrap/
 !src/intfar/app/static/js/

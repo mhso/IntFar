@@ -391,7 +391,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             lifetime_data,
         )
 
-    def handle_game_over(self, game_info: dict, status_code: int, guild_id: int) -> PostGameStats | None:
+    async def handle_game_over(self, game_info: dict, status_code: int, guild_id: int) -> PostGameStats | None:
         """
         Called when a game is over. Combines all the necessary post game data
         into one object that is returned and passed to any listeners via a callback.
@@ -439,7 +439,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
             logger.info(f"Game status: {status_code}")
 
-            post_game_data = self.handle_game_over(game_info, status_code, guild_id)
+            post_game_data = await self.handle_game_over(game_info, status_code, guild_id)
             if self.game_over_callback is not None:
                 await self.game_over_callback(post_game_data)
 
