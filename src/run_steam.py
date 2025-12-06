@@ -88,4 +88,5 @@ if __name__ == "__main__":
         print(exc)
 
     finally:
-        client.close()
+        if client:
+            client.close()

@@ -111,6 +111,7 @@ h1 {
     border-radius: 32px;
     margin: 0 auto;
     margin-top: 25px;
+    border: 2px solid gold;
 }
 
 #contestant-lobby-name {

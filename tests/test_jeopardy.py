@@ -1182,9 +1182,6 @@ async def test_hijack_before_question():
 
         await _wait_for_power_up_video(context)
 
-        
-
-
 @pytest.mark.asyncio
 async def test_discord_message_simple(discord_client):
     player_data = [

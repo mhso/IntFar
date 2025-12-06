@@ -132,28 +132,14 @@ class TestFuncs:
 
         print(response)
 
-    def test_timeline(self):
-        game_id = 6788182214
-        game = "lol"
-        game_data = self.riot_api.get_game_details(game_id)
-        parser = get_stat_parser(game, game_data, self.riot_api, self.game_databases["lol"].game_users, 803987403932172359)
-        parsed_game_stats = parser.parse_data()
-        awards_handler = get_awards_handler(game, self.config, parsed_game_stats)
+    async def get_game_details(self, game_id: str):
+        data = await self.riot_api.get_game_details(game_id)
+        if data is None:
+            print("Downloaded data is None!")
+            return
 
-        timeline_stats = awards_handler.get_cool_timeline_events()
-        print(timeline_stats)
-        print(awards_handler.get_flavor_text("timeline", 4, "random"))
-
-    def test_normalize_sound(self):
-        files = glob("intfar/app/static/sounds/*.mp3")
-        for filename in files:
-            normalize_sound_volume(filename)
-
-    def test_ifotm(self):
-        client = DiscordClient(CONFIG, DATABASE, None, {"lol": RIOT_API, "cs2": None})
-
-        client.add_event_listener("ready", client.assign_monthly_intfar_role, "lol", 1, [267401734513491969])
-        client.run(CONFIG.discord_token)
+        with open("game_data.json", "w", encoding="utf-8") as fp:
+            json.dump(data, fp)
 
     def test_lifetime_stats(self):
         id_dave = 115142485579137029
@@ -198,17 +184,6 @@ class TestFuncs:
         print("Now:", sharecode)
         while (sharecode := await api_client.get_next_sharecode(user.player_id[0], user.match_auth_code[0], sharecode)) is not None:
             print("Next:", sharecode)
-
-    async def test_cs_parse(self):
-        sharecode = "CSGO-7CowZ-OFhzM-6ytLZ-fXJ2J-Kn6nM"
-        api_client = SteamAPIClient("cs2", self.config)
-
-        game_stats = await api_client.get_game_details(sharecode)
-        with open(f"data_{sharecode}.json", "w", encoding="utf-8") as fp:
-            json.dump(game_stats, fp)
-
-        parser = get_stat_parser("cs2", game_stats, api_client, self.game_databases["cs2"].game_users, 619073595561213953)
-        parser.parse_data()
 
     def test_get_stats(self):
         api_client = SteamAPIClient("cs2", self.config)
@@ -341,8 +316,8 @@ class TestFuncs:
         for arg in mandatory_args:
             print(f"{arg}: {annotations[arg].__name__}")
 
-    def insert_bingo_challenges(self):
-        insert_bingo_challenges(self.game_databases["lol"], "august_25")
+    def insert_bingo_challenges(self, lan_date):
+        insert_bingo_challenges(self.game_databases["lol"], lan_date)
 
     async def active_game(self):
         user = self.game_databases["lol"].game_users[219497453374668815]
@@ -382,11 +357,10 @@ class TestFuncs:
         path = "/mnt/d/mhooge/intfar/src/intfar/app/static/avatars/123.png"
         print(get_relative_static_folder(path, self.config))
 
-    async def get_lol_matches(self):
-        puuid = "Vg03sswLbwPm1yaJp8ACbObNUCkfJazuq_afJnHrfxZYYy-GvKIipeazQxIjrbqnoNkJFISDuuw9sg"
+    async def get_lol_matches(self, puuid="Vg03sswLbwPm1yaJp8ACbObNUCkfJazuq_afJnHrfxZYYy-GvKIipeazQxIjrbqnoNkJFISDuuw9sg"):
         latest_game = self.game_databases["lol"].get_latest_game()[0]
         if latest_game is not None:
-            latest_game = latest_game[0] + 3600
+            latest_game = latest_game[0] + 2400
 
         matches = await self.riot_api.get_match_history(puuid, latest_game)
         print(matches)
@@ -407,12 +381,13 @@ if __name__ == "__main__":
     ]
 
     PARSER.add_argument("func", choices=FUNCS)
+    PARSER.add_argument("args", nargs="*")
 
     ARGS = PARSER.parse_args()
 
     func = getattr(TEST_RUNNER, ARGS.func)
 
     if asyncio.iscoroutinefunction(func):
-        asyncio.run(func())
+        asyncio.run(func(*ARGS.args))
     else:
-        func()
+        func(*ARGS.args)

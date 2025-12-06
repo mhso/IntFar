@@ -1,6 +1,6 @@
 from time import time
 import asyncio
-from typing import Coroutine, Dict, List
+from typing import Coroutine, List
 
 from mhooge_flask.logging import logger
 
@@ -19,23 +19,14 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
     POSTGAME_STATUS_INVALID_MAP = 6
     POSTGAME_STATUS_REMAKE = 7
 
-    def __init__(
-        self,
-        game: str,
-        config: Config,
-        meta_database: MetaDatabase,
-        game_database: LoLGameDatabase,
-        api_client: RiotAPIClient,
-        game_over_callback: Coroutine = None
-    ):
-        super().__init__(game, config, meta_database, game_database, api_client, game_over_callback)
+    @property
+    def polling_stop_delay(self):
+        return 300
 
-        self.game_queue: List[str] = []
-
-    def get_users_in_game(self, user_dict: dict[int, User], game_data: dict):
+    def get_users_in_game(self, user_dict: dict[int, User], raw_game_data: dict):
         users_in_game = {}
-        for disc_id in user_dict:
-            player_stats = get_player_stats(game_data, user_dict[disc_id].player_id)
+        for disc_id in user_dict.keys():
+            player_stats = get_player_stats(raw_game_data, user_dict[disc_id].player_id)
             if player_stats is not None:
                 active_summ_name = None
                 for puuid, summ_name in zip(user_dict[disc_id].player_id, user_dict[disc_id].player_name):
@@ -121,7 +112,7 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
 
             latest_game = self.game_database.get_latest_game()[0]
             if latest_game is not None:
-                latest_game = latest_game[0] + 3600
+                latest_game = latest_game[0] + 2400
 
             for puuid, name in zip(user_data.player_id, user_data.player_name):
                 matches = await self.api_client.get_match_history(puuid, latest_game)
@@ -129,12 +120,15 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
                 if not matches:
                     continue
 
-                for match in matches:
-                    game_id = match.removeprefix("EUW1_")
-                    if game_id not in game_ids:
-                        game_ids[game_id] = []
+                logger.bind(event="monitor_match_history", matches=matches).info(f"League match list for {name}: {matches}")
 
-                    game_ids[game_id].append(User(disc_id, user_data.secret, puuid, name))
+                for game_id in matches:
+                    game_id_str = str(game_id)
+
+                    if game_id_str not in game_ids:
+                        game_ids[game_id_str] = []
+
+                    game_ids[game_id_str].append(User(disc_id, user_data.secret, name, puuid))
 
                 await asyncio.sleep(1)
 
@@ -145,19 +139,13 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
         for game_id in game_ids:
             users_in_game = game_ids[game_id]
 
-            print("Game ID:", game_id, "users:")
-            for disc_id in users_in_game:
-                print(disc_id)
-
-            if len(users_in_game) > 1 and game_id not in self.game_queue:
+            if len(users_in_game) > 1 and not self.game_database.game_exists(game_id):
                 elligible_game_id = game_id
                 users_in_current_game = users_in_game
                 break
 
         if elligible_game_id is None:
             return None, users_in_current_game, None
-
-        self.game_queue.append(elligible_game_id)
 
         return (
             {
@@ -213,29 +201,30 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
 
         return game_info, status_code
 
+    async def get_parsed_stats(self, game_info: dict, guild_id: int):
+        logger.debug("Fetching ranks for all players...")
+        player_ranks = {}
+        await asyncio.sleep(2)
+
+        for disc_id in self.users_in_game[guild_id]:
+            puuid = self.users_in_game[guild_id][disc_id].player_id[0]
+            rank_info = await self.api_client.get_player_rank(puuid)
+            if rank_info is not None:
+                player_ranks[disc_id] = rank_info
+
+            await asyncio.sleep(1.5)
+
+        game_info["player_ranks"] = player_ranks
+
+        return await super().get_parsed_stats(game_info, guild_id)
+
     async def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
         if game_info is not None and "queueId" in game_info:
             self.active_game[guild_id]["queue_id"] = game_info["queueId"]
 
         post_game_data = await super().handle_game_over(game_info, status_code, guild_id)
 
-        if status_code == self.POSTGAME_STATUS_OK:
-            player_ranks = {}
-            await asyncio.sleep(2)
-
-            for disc_id in self.users_in_game[guild_id]:
-                puuid = self.users_in_game[guild_id][disc_id].player_id[0]
-                rank_info = await self.api_client.get_player_rank(puuid)
-                if rank_info is not None:
-                    player_ranks[disc_id] = rank_info
-
-                await asyncio.sleep(1.5)
-
-            game_info["player_ranks"] = player_ranks
-
         if post_game_data is not None and lan.is_lan_ongoing(time(), guild_id):
             lan.update_bingo_progress(self.game_database, post_game_data)
-
-        self.game_queue.remove(game_info["id"])
 
         return post_game_data

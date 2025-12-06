@@ -83,23 +83,21 @@ def get_real_active_data(riot_api: RiotAPIClient, lan_info: lan_api.LANInfo):
     if not lan_api.is_lan_ongoing(curr_time, lan_info.guild_id):
         return {"active_game": None}
 
-    live_lol_data = flask.current_app.config["LEAGUE_EVENTS"]
-    if live_lol_data == []:
+    game_start = flask.current_app.config["LEAGUE_GAME_START"]
+    if game_start is None:
         return {"active_game": None}
 
-    game_data = live_lol_data[0]
-
     users_in_game = {
-        disc_id: riot_api.try_find_playable_id(champ_name)
-        for disc_id, champ_name in game_data["AllyTeamInfo"].items()
+        int(disc_id): riot_api.try_find_playable_id(champ_name)
+        for disc_id, champ_name in game_start["AllyTeamInfo"].items()
     }
     enemy_champs = [
         riot_api.try_find_playable_id(champ_name)
-        for champ_name in game_data["EnemyTeamInfo"]
+        for champ_name in game_start["EnemyTeamInfo"]
     ]
 
-    active_game = game_data["GameMode"]
-    blue_side = game_data["Team"] == "blue"
+    active_game = game_start["GameMode"]
+    blue_side = game_start["Team"] == "blue"
 
     return {
         "users_in_game": users_in_game,
@@ -209,9 +207,8 @@ def get_bingo_data(database, lan_date, face_images={}):
 
     return bingo_data
 
-def get_data(lan_info, lan_date):
+def get_data(lan_info, database, lan_date):
     config = flask.current_app.config["APP_CONFIG"]
-    database: LoLGameDatabase = flask.current_app.config["GAME_DATABASES"]["lol"]
     riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
 
     try:
@@ -281,7 +278,7 @@ def get_data(lan_info, lan_date):
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
         )
-        latest_timestamp, latest_duration, latest_win, latest_intfar_id, latest_intfar_reason = latest_game_data
+        latest_timestamp, _, latest_win, latest_intfar_id, latest_intfar_reason = latest_game_data
 
         dt_start = datetime.fromtimestamp(latest_timestamp)
         duration_since_game = api_util.format_duration(dt_start, dt_now)
@@ -419,29 +416,7 @@ def get_data(lan_info, lan_date):
         data["games_played"] = None
         data["lan_over"] = False
 
-    # LAN Bingo!
-    bingo_data = get_bingo_data(database, lan_date, face_images)
-    for bingo_row in bingo_data:
-        for bingo_challenge in bingo_row:
-            if bingo_challenge["new_progress"]:
-                database.reset_bingo_new_progress(bingo_challenge["id"])
-
-    data["bingo_challenges"] = bingo_data
-
-    # Check if bingo is completed
-    bingo_completed = True
-    for bingo_row in bingo_data:
-        all_bingo = True
-        for row_data in bingo_row:
-            if not row_data["bingo"]:
-                all_bingo = False
-                break
-
-        if not all_bingo:
-            bingo_completed = False
-            break
-
-    data["bingo_completed"] = bingo_completed
+    data["bingo_challenges"] = get_bingo_data(database, lan_date, face_images)
 
     return data
 
@@ -463,7 +438,30 @@ def lan_view_for_date(date):
     if not _allowed_access(lan_info, logged_in_user):
         return flask.abort(404) # User not logged in or not a part of the LAN.
 
-    data = get_data(lan_info, date)
+    database: LoLGameDatabase = flask.current_app.config["GAME_DATABASES"]["lol"]
+    with database:
+        data = get_data(lan_info, database, date)
+
+    # LAN Bingo!
+    for bingo_row in data["bingo_challenges"]:
+        for bingo_challenge in bingo_row:
+            if bingo_challenge["new_progress"]:
+                database.reset_bingo_new_progress(bingo_challenge["id"])
+
+    # Check if bingo is completed
+    bingo_completed = True
+    for bingo_row in data["bingo_challenges"]:
+        all_bingo = True
+        for row_data in bingo_row:
+            if not row_data["bingo"]:
+                all_bingo = False
+                break
+
+        if not all_bingo:
+            bingo_completed = False
+            break
+
+    data["bingo_completed"] = bingo_completed
 
     lan_dt = datetime.fromtimestamp(lan_info.start_time)
 
@@ -482,26 +480,27 @@ def live_data(date):
     if not _allowed_access(lan_info, logged_in_user):
         return flask.abort(404) # User not logged in or not a part of the LAN.
 
-    all_data = get_data(lan_info, date)
+    database: LoLGameDatabase = flask.current_app.config["GAME_DATABASES"]["lol"]
+    with database:
+        all_data = get_data(lan_info, database, date)
 
     data_filter = flask.request.args.get("filter")
     if data_filter is not None:
         keys_to_get = data_filter.split(",")
 
     if data_filter is None or ("bingo_challenges" in keys_to_get and "bingo_status" in keys_to_get):
-        database = flask.current_app.config["GAME_DATABASES"]["lol"]
-
         bingo_status = 0
         all_bingo = True
-        for bingo_row in all_data["bingo_challenges"]:
-            for bingo_data in bingo_row:
-                if not bingo_data["bingo"]:
-                    all_bingo = False
-                    continue
+        with database:
+            for bingo_row in all_data["bingo_challenges"]:
+                for bingo_data in bingo_row:
+                    if not bingo_data["bingo"]:
+                        all_bingo = False
+                        continue
 
-                if bingo_data["completed"] and not bingo_data["notification_sent"]:
-                    database.set_bingo_challenge_seen(bingo_data["id"])
-                    bingo_status = 1
+                    if bingo_data["completed"] and not bingo_data["notification_sent"]:
+                        database.set_bingo_challenge_seen(bingo_data["id"])
+                        bingo_status = 1
 
         if all_bingo and bingo_status == 1:
             bingo_status = 2 # Full board cleared!
@@ -516,7 +515,36 @@ def live_data(date):
         200
     )
 
-_EVENTS_KILLED_SYNONYMS = ["whacked", "murdered", "clapped", "killed", "bonked"]
+@lan_page.route("/jeopardy_winner", methods=["POST"])
+def announce_jeopardy_winner():
+    meta_database = flask.current_app.config["DATABASE"]
+    disc_id = flask.request.json.get("disc_id")
+    token = flask.request.json.get("token")
+
+    if disc_id is None or token is None or app_util.get_logged_in_user(meta_database, token) != int(disc_id):
+        return app_util.make_text_response("You are not authorized to access this API.", 403)
+
+    #guild_id = lan_api.get_latest_lan_info().guild_id
+    guild_id = api_util.MY_GUILD_ID
+
+    player_data = flask.request.json["player_data"]
+
+    #if flask.current_app.config["APP_ENV"] == "production" and lan_api.is_lan_ongoing(time(), guild_id):
+    app_util.discord_request("func", "announce_jeopardy_winner", (player_data, guild_id))
+
+    return app_util.make_text_response("Successfully announced jeopardy winner for this LAN!", 200)
+
+_EVENTS_KILLED_SYNONYMS = [
+    "whacked",
+    "murdered",
+    "clapped",
+    "killed",
+    "bonked",
+    "annihilated",
+    "smacked",
+    "blasted",
+    "slaughtered",
+]
 _EVENTS_MULTIKILLS = ["sweet double kill", "spicy triple kill", "nasty quadrakill", "insane pentakill"]
 _EVENTS_STREAKS = ["on a killing spree", "on a rampage", "unstoppable", "dominating", "godlike", "legendary"]
 _EVENTS_DRAGON_NAMES = {
@@ -532,15 +560,16 @@ def _get_lol_event_description(event):
     desc = None
     icon = None
 
-    if "Ally" not in event:
-        category = "neutral"
-    elif event["Ally"]:
-        category = "ally"
+    if event["EventName"] == "GameEnd":
+        category = "win" if event["Result"] == "Win" else "enemy"
+    elif "Ally" in event:
+        category = "ally" if event["Ally"] else "enemy"
     else:
-        category = "enemy"
+        category = "neutral"
 
     if event["EventName"] == "GameStart":
         desc = "Let the games begin!"
+        icon = "game_start.png"
 
     elif event["EventName"] == "GameEnd":
         desc = "Game over! "
@@ -591,7 +620,7 @@ def _get_lol_event_description(event):
         icon = "game_feed_turret.png"
 
     elif event["EventName"] in ("TurretKilled", "InhibKilled"):
-        structure_name = "a turret" if event["EventName"] == "TurretKilled" else "an inhibitor"
+        structure_name = "a turret" if event["EventName"] == "TurretKilled" else "an inhibitor!"
 
         if category == "ally":
             desc = f"We destroyed {structure_name}"
@@ -643,20 +672,17 @@ def _get_lol_event_description(event):
 
 @lan_page.route("/live_league_data", methods=["GET"])
 def live_league_data():
-    lock = flask.current_app.config["LEAGUE_EVENTS_LOCK"]
-    lock.acquire()
+    with flask.current_app.config["LEAGUE_EVENTS_LOCK"]:
+        events = []
+        for event in flask.current_app.config["LEAGUE_EVENTS"]:
+            formatted = _get_lol_event_description(event)
+            if formatted["description"] is None:
+                continue
 
-    events = []
-    for event in flask.current_app.config["LEAGUE_EVENTS"]:
-        formatted = _get_lol_event_description(event)
-        if formatted["description"] is None:
-            continue
+            events.append(formatted)
 
-        events.append(formatted)
-
-    flask.current_app.config["LEAGUE_EVENTS"] = []
-    data = {"events": events}
-    lock.release()
+        flask.current_app.config["LEAGUE_EVENTS"] = []
+        data = {"events": events}
 
     return app_util.make_json_response(data, 200)
 
@@ -687,10 +713,14 @@ def now_playing(date):
 
         # Set live league data
         if data["lol_events"] != []:
-            lock = flask.current_app.config["LEAGUE_EVENTS_LOCK"]
-            lock.acquire()
-            flask.current_app.config["LEAGUE_EVENTS"].extend(data["lol_events"])
-            lock.release()
+            with flask.current_app.config["LEAGUE_EVENTS_LOCK"]:
+                for event in data["lol_events"]:
+                    if event["EventName"] == "GameStart":
+                        flask.current_app.config["LEAGUE_GAME_START"] = event
+                    elif event["EventName"] == "GameEnd":
+                        flask.current_app.config["LEAGUE_GAME_START"] = None
+
+                    flask.current_app.config["LEAGUE_EVENTS"].append(event)
 
         return flask.make_response(("Success! Song playing updated.", 200))
 

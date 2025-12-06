@@ -25,6 +25,7 @@ class GameCommand(Command):
     DESCRIPTION = "See details about the match the given person is in, for the given game, if any."
     MANDATORY_PARAMS = [TargetParam("person")]
     OPTIONAL_PARAMS = [GameParam("game")]
+    DISABLED = True
 
     async def handle(self, target_id: int, game: str):
         database = self.client.game_databases[game]

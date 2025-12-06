@@ -263,7 +263,6 @@ class GameDatabase(SQLiteDatabase):
         delim_str, params = self.get_delimeter(time_after, time_before, prefix="AND")
         aggregator = "MAX" if maximize else "MIN"
 
-        min_condition = f"AND {stat} <> 0" if stat != "deaths" else ""
         player_select = ""
 
         if stat == "first_blood":
@@ -326,20 +325,28 @@ class GameDatabase(SQLiteDatabase):
                         sub.game_id
                     FROM (
                         SELECT
-                            {aggregator}({stat}) AS c,
+                            sub_sub.agg AS c,
                             p.game_id,
-                            u.disc_id
+                            sub_sub.disc_id
                         FROM participants AS p
-                        INNER JOIN games AS g
-                            ON g.game_id = p.game_id
-                        JOIN users AS u
-                            ON u.player_id = p.player_id
-                        WHERE
-                            u.active = 1
-                            AND {stat} IS NOT NULL
-                            {delim_str}
-                            {min_condition}
-                        GROUP BY p.game_id
+                        INNER JOIN (
+                            SELECT
+                                {aggregator}({stat}) AS agg,
+                                p.game_id,
+                                u.disc_id
+                            FROM participants AS p
+                            INNER JOIN games AS g
+                                ON g.game_id = p.game_id
+                            INNER JOIN users AS u
+                                ON u.player_id = p.player_id
+                            WHERE
+                                u.active = 1
+                                AND {stat} IS NOT NULL
+                                {delim_str}
+                            GROUP BY p.game_id
+                        ) sub_sub
+                            ON sub_sub.game_id = p.game_id
+                        WHERE {stat} = sub_sub.agg
                     ) sub
                     GROUP BY sub.disc_id
                 ) best
@@ -1435,60 +1442,94 @@ class GameDatabase(SQLiteDatabase):
 
         return self.query(query, *params, format_func=format_result)
 
-    def get_stat_data(self, parsed_game_stats: GameStats, stat: str, reverse_order=False):
-        (
-            min_stat_id, min_stat,
-            max_stat_id, max_stat
-        ) = get_outlier_stat(
-            parsed_game_stats.filtered_player_stats,
-            stat,
-            reverse_order=reverse_order
-        )
+    def _was_stat_beaten(self, prev_val, curr_val, best, reverse):
+        if None in (prev_val, curr_val):
+            return False
 
-        (
-            best_ever_id,
-            best_ever,
-            _
-        ) = self.get_most_extreme_stat(stat, stat != "deaths")
+        if reverse: # Stat is 'deaths'
+            if best and curr_val < prev_val: # Fewest deaths has been reached
+                return True
+            elif not best and curr_val > prev_val: # Most deaths has been reached
+                return True
+        else: # Stat is any other stat
+            if best and curr_val > prev_val: # A new best has been set for a stat
+                return True
+            elif not best and curr_val < prev_val: # A new worst has been set for a stat
+                return True
 
-        (
-            worst_ever_id,
-            worst_ever,
-            _
-        ) = self.get_most_extreme_stat(stat, stat == "deaths")
+        return False
 
-        return min_stat_id, min_stat, max_stat_id, max_stat, best_ever, best_ever_id, worst_ever, worst_ever_id
+    def get_beaten_stat_records(self, parsed_game_stats: GameStats):
+        global_records_best = []
+        global_records_worst = []
+        player_records_best = []
+        player_records_worst = []
 
-    def save_stats(self, parsed_game_stats: GameStats) -> tuple[list[tuple], list[tuple]]:
+        players_in_game = {stats.disc_id for stats in parsed_game_stats.filtered_player_stats}
+
+        relevant_stats = parsed_game_stats.filtered_player_stats[0].stat_quantity_desc()
+        for stat in relevant_stats:
+            if stat == "first_blood":
+                continue
+
+            reverse_order = stat == "deaths"
+
+            (
+                best_id,
+                best_value,
+                worst_id,
+                worst_value
+            ) = get_outlier_stat(
+                parsed_game_stats.filtered_player_stats,
+                stat,
+                reverse_order=reverse_order
+            )
+
+            # Check whether player has beaten their own record in a stat
+            for disc_id, _, _, players_best, _ in self.get_best_or_worst_stat(stat, maximize=not reverse_order)():
+                if disc_id in players_in_game and self._was_stat_beaten(players_best, best_value, True, reverse_order):
+                    # Player has set a new personal best for a stat
+                    player_records_best.append(
+                        (stat, best_value, best_id, players_best, None)
+                    )
+
+            for disc_id, _, _, players_worst, _ in self.get_best_or_worst_stat(stat, maximize=reverse_order)():
+                if disc_id in players_in_game and self._was_stat_beaten(players_worst, worst_value, False, reverse_order):
+                    # Player has set a new personal worst for a stat
+                    player_records_worst.append(
+                        (stat, worst_value, worst_id, players_worst, None)
+                    )
+
+            # Check once whether anyone has beaten the global record in a stat
+            prev_best_id,  prev_best, _ = self.get_most_extreme_stat(stat, not reverse_order)
+            prev_worst_id, prev_worst, _ = self.get_most_extreme_stat(stat, reverse_order)
+
+            if self._was_stat_beaten(prev_best, best_value, True, reverse_order):
+                # A new best has been set for a stat
+                global_records_best.append(
+                    (stat, best_value, best_id, prev_best, prev_best_id)
+                )
+            elif self._was_stat_beaten(prev_worst, worst_value, False, reverse_order):
+                # A new worst has been set for a stat
+                global_records_worst.append(
+                    (stat, worst_value, worst_id, prev_worst, prev_worst_id)
+                )
+
+        return global_records_best, global_records_worst, player_records_best, player_records_worst
+
+    def save_stats(self, parsed_game_stats: GameStats) -> tuple[list[tuple], list[tuple], list[tuple], list[tuple]]:
         """
         Save all the stats in the given GameStats object to the database.
         Also determines whether any stat "records" have been beaten (i.e. whether
         someone has gotten a new lowest or highest value for a stat) and returns
         those stats along with who beat set the new record.
         """
-        beaten_records_best = []
-        beaten_records_worst = []
-
-        for stat in parsed_game_stats.filtered_player_stats[0].stat_quantity_desc():
-            if stat == "first_blood":
-                continue
-
-            reverse_order = stat == "deaths"
-            (
-                min_id, min_value, max_id, max_value,
-                prev_best, prev_best_id, prev_worst, prev_worst_id
-            ) = self.get_stat_data(parsed_game_stats, stat, reverse_order)
-
-            if reverse_order: # Stat is 'deaths'.
-                if None not in (prev_best, min_value) and min_value < prev_best: # Fewest deaths ever has been reached.
-                    beaten_records_best.append((stat, min_value, min_id, prev_best, prev_best_id))
-                elif None not in(prev_worst, max_value) and max_value > prev_worst: # Most deaths ever has been reached.
-                    beaten_records_worst.append((stat, max_value, max_id, prev_worst, prev_worst_id))
-            else: # Stat is any other stat.
-                if None not in (prev_best, max_value) and max_value > prev_best: # A new best has been set for a stat.
-                    beaten_records_best.append((stat, max_value, max_id, prev_best, prev_best_id))
-                elif None not in (prev_worst, min_value) and min_value < prev_worst: # A new worst has been set for a stat.
-                    beaten_records_worst.append((stat, min_value, min_id, prev_worst, prev_worst_id))
+        (
+            global_records_best, 
+            global_records_worst,
+            player_records_best,
+            player_records_worst,
+        ) = self.get_beaten_stat_records(parsed_game_stats)
 
         game_insert_str = ",\n".join(parsed_game_stats.stats_to_save())
         game_insert_qms = ",".join(["?"] * len(parsed_game_stats.stats_to_save()))
@@ -1523,7 +1564,7 @@ class GameDatabase(SQLiteDatabase):
 
                 self.execute_query(query, *stat_insert_values)
 
-        return beaten_records_best, beaten_records_worst
+        return global_records_best, global_records_worst, player_records_best, player_records_worst
 
     def save_missed_game(self, game_id, guild_id, timestamp):
         query = "INSERT INTO missed_games VALUES (?, ?, ?)"
@@ -1937,6 +1978,86 @@ class GameDatabase(SQLiteDatabase):
 
             data_as_list = sorted(grouped_by_day.items(), key=lambda x: x[1], reverse=True)
             return data_as_list[0:10]
+
+    def get_teamcomp_winrates(self):
+        disc_ids = [
+            "115142485579137029",
+            "172757468814770176",
+            "267401734513491969",
+            "347489125877809155",
+            "331082926475182081",
+        ]
+        disc_ids_str = f"({','.join(disc_ids)})"
+
+        query = f"""
+            SELECT 
+                games.disc_id,
+                games.role,
+                (CAST (wins.c AS REAL) / CAST (games.c AS REAL)) * 100
+            FROM (
+                SELECT
+                    u.disc_id,
+                    role,
+                    COUNT(*) AS c
+                FROM participants AS p
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
+                INNER JOIN games AS g
+                    ON g.game_id = p.game_id
+                WHERE u.disc_id IN {disc_ids_str}
+                GROUP BY
+                    u.disc_id,
+                    role
+            ) games
+            INNER JOIN (
+                SELECT
+                    u.disc_id,
+                    role,
+                    COUNT(*) AS c
+                FROM participants AS p
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
+                INNER JOIN games AS g
+                    ON g.game_id = p.game_id
+                WHERE
+                    u.disc_id IN {disc_ids_str}
+                    AND win = 1
+                GROUP BY
+                    u.disc_id,
+                    role
+            ) wins
+                ON games.disc_id = wins.disc_id
+                    AND games.role = wins.role
+            WHERE games.c > 50
+        """
+
+        combos = []
+        curr_combo = []
+        curr_roles = set()
+        curr_players = set()
+        with self:
+            results = self.execute_query(query).fetchall()
+            for disc_id_1, role_1, winrate_1 in results[:5]:
+                curr_players.add(disc_id_1)
+                curr_roles.add(role_1)
+                curr_combo.append((disc_id_1, role_1, winrate_1))
+
+                for disc_id_2, role_2, winrate_2 in results[5:]:
+                    if disc_id_2 not in curr_players and role_2 not in curr_roles:
+                        curr_players.add(disc_id_2)
+                        curr_roles.add(role_2)
+                        curr_combo.append((disc_id_2, role_2, winrate_2))
+
+                        if len(curr_players) == 5 and len(curr_roles) == 5:
+                            curr_players = set()
+                            curr_roles = set()
+                            combos.append(curr_combo)
+                            break
+
+        for curr_compo in combos:
+            print("=====")
+            for disc_id, role, winrate in curr_compo:
+                print(disc_id, role, winrate)
 
     def clear_tables(self):
         with self:

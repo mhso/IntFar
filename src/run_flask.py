@@ -83,6 +83,7 @@ def run_app(
         jeopardy_power_lock=Lock(),
         bingo_events={},
         league_events=[],
+        league_game_start=None,
         league_events_lock=Lock(),
         exit_code=0
     )

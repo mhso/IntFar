@@ -1,7 +1,27 @@
 const socket = io({"transports": ["websocket", "polling"]});
 var pingActive = true;
 
-function setRandomColor() {
+function getImgURL(url, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function() {
+        callback(xhr.response);
+    };
+    xhr.open("GET", url);
+    xhr.responseType = "blob";
+    xhr.send();
+}
+
+function loadURLToInputFiled(url, filename) {
+    getImgURL(url, (imgBlob) => {
+        // Load img blob to input
+        let file = new File([imgBlob], filename, {type: "image/png", lastModified: new Date().getTime()}, "utf-8");
+        let container = new DataTransfer(); 
+        container.items.add(file);
+        document.getElementById("contestant-lobby-avatar-input").files = container.files;
+    });
+}
+
+function setValues(discId) {
     let colorInput = document.getElementById("contestant-lobby-color");
 
     let randRed = (Math.random() * 255).toString(16).split(".")[0];
@@ -19,6 +39,10 @@ function setRandomColor() {
 
     colorInput.type = "color";
     colorInput.value = `#${randRed}${randGreen}${randBlue}`;
+
+    // Set avatar file
+    let avatarSrc = document.getElementById("contestant-lobby-avatar").src;
+    loadURLToInputFiled(avatarSrc, `${discId}.png`);
 }
 
 function makeDailyDoubleWager(userId) {

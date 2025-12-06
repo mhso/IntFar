@@ -22,6 +22,9 @@ def collect_commands(cmd_class: Command):
         if MY_GUILD_ID not in cmd_class.GUILDS:
            cmd_class.GUILDS.append(MY_GUILD_ID)
 
+        if cmd_class.DISABLED:
+            return
+
         cmd_class.COMMANDS_DICT[cmd_class.NAME] = cmd_class
         return
 

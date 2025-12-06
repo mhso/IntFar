@@ -1,4 +1,3 @@
-from datetime import datetime
 from time import sleep
 from glob import glob
 from os import remove
@@ -346,7 +345,7 @@ class RiotAPIClient(GameAPIClient):
         if response.status_code != 200:
             return []
 
-        return json.loads(response.text)
+        return sorted(map(lambda x: int(x.removeprefix("EUW1_")), json.loads(response.text)))
 
     async def get_active_game(self, puuid: str):
         endpoint = "/lol/spectator/v5/active-games/by-summoner/{0}"

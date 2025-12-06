@@ -52,6 +52,27 @@ class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient]):
 
         return None
 
+    def get_users_in_game(self, user_dict: dict[int, User], raw_game_data: dict):
+        users_in_game = {}
+        round_stats = raw_game_data["matches"][0]["roundstatsall"]
+
+        max_player_round = 0
+        max_players = 0
+        for index, round_data in enumerate(round_stats):
+            players_in_round = len(round_data["reservation"]["accountIds"])
+            if players_in_round > max_players:
+                max_players = players_in_round
+                max_player_round = index
+
+        for disc_id in user_dict.keys():
+            for steam_id in user_dict[disc_id].player_id:
+                account_id = self.api_client.get_account_id(steam_id)
+                if account_id in round_stats[max_player_round]["reservation"]["accountIds"]:
+                    users_in_game[disc_id] = user_dict[disc_id]
+                    break
+
+        return users_in_game
+
     async def get_active_game_info(self, guild_id: int):
         # Create a bunch of maps for different ID representations
         user_dict: Dict[int, User] = (

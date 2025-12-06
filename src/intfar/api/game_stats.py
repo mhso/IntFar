@@ -207,7 +207,7 @@ class PostGameStats:
     winstreak_data: tuple[dict[int, list[int]], dict[int, list[int]]] = None
     timeline_data: list[tuple] = None
     cool_stats_data: dict[int, list[tuple[int, int | str, int]]] = None
-    beaten_records_data: tuple[list[tuple[str, int, int, int, int]], list[tuple[str, int, int, int, int]]] = None
+    beaten_records_data: tuple[list[tuple[str, int, int, int, int]], list[tuple[str, int, int, int, int]], list[tuple[str, int, int, int, None]], list[tuple[str, int, int, int, None]]] = None
     lifetime_data: dict[int, tuple[int, int]] = None
 
 def get_outlier(

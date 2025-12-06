@@ -32,8 +32,9 @@ USED_QUESTIONS_FILE = f"intfar/app/static/data/jeopardy_used_{JEOPARDY_ITERATION
 PLAYER_NAMES = {
     115142485579137029: "Dave",
     172757468814770176: "Murt",
+    219497453374668815: "Tommy",
     331082926475182081: "Muds",
-    219497453374668815: "Tommy"
+    347489125877809155: "Nønø",
 }
 
 PLAYER_INDEXES = list(PLAYER_NAMES.keys())
@@ -42,7 +43,8 @@ PLAYER_BACKGROUNDS = {
     115142485579137029: "coven_nami.png",
     172757468814770176: "pentakill_olaf.png", 
     331082926475182081: "crime_city_tf.png",
-    219497453374668815: "bard_splash.png"
+    219497453374668815: "bard_splash.png",
+    347489125877809155: "gladiator_draven.png",
 }
 
 # Sounds for answering questions correctly/wrong.
@@ -107,10 +109,11 @@ ANSWER_SOUNDS = [
 
 # Sounds played when a specific player buzzes in first
 BUZZ_IN_SOUNDS = {
-    115142485579137029: "buzz_dave",
-    172757468814770176: "buzz_murt",
-    331082926475182081: "buzz_muds",
-    219497453374668815: "buzz_thommy",
+    115142485579137029: "buzz_dave.mp3",
+    172757468814770176: "buzz_murt.mp3",
+    219497453374668815: "buzz_thommy.mp3",
+    331082926475182081: "buzz_muds.mp3",
+    347489125877809155: "buzz_no.mp3",
 }
 
 @dataclass

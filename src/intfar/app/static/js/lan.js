@@ -1,4 +1,4 @@
-var anyGamesPlayed = false;
+var gamesPlayed = 0;
 var isActiveGame = false;
 var isLanActive = false;
 
@@ -18,7 +18,6 @@ function getLiveData(lanDate) {
     }).then((data) => {
         if (data.games_played != null && data.active_game == null && isActiveGame) {
             console.log("Finished game!"); // Game finished. Refresh page.
-            anyGamesPlayed = true;
             isActiveGame = false;
             refreshPage();
         }
@@ -27,8 +26,9 @@ function getLiveData(lanDate) {
             isActiveGame = true; // Active game started. Refresh page.
             refreshPage();
         }
-    }, (error) => {
-        
+        if (data.games_played != null && data.games_played > gamesPlayed) {
+            refreshPage();
+        }
     });
 }
 
@@ -102,7 +102,7 @@ function getLiveLeagueData() {
                 iconElem.src = event["icon"];
             }
             else {
-                iconElem.style.eopacity = 0;
+                iconElem.style.opacity = 0;
             }
             wrapperElem.appendChild(iconElem);
 
@@ -114,8 +114,6 @@ function getLiveLeagueData() {
             feedWrapper.children[0].appendChild(wrapperElem);
             feedWrapper.children[0].scrollTo({left: 0, top: feedWrapper.children[0].scrollHeight, behavior: "smooth"});
         });
-    }, (error) => {
-        
     });
 }
 
@@ -223,15 +221,15 @@ function count() {
     }, 1000);
 }
 
-function monitor(gamesPlayed, activeGame, lanOver, lanDate) {
-    anyGamesPlayed = gamesPlayed != "None";
+function monitor(playedGames, activeGame, lanOver, lanDate) {
+    gamesPlayed = playedGames;
     isActiveGame = activeGame != "None";
-    isLanActive = lanOver == "False";
-    console.log("Games on load: " + anyGamesPlayed)
+    isLanActive = lanOver;
+    console.log("Games on load: " + gamesPlayed)
     console.log("Active games on load: " + isActiveGame)
     console.log("LAN active on load: " + isLanActive)
 
-    let lanDataDelay = 15 * 1000
+    let lanDataDelay = 10 * 1000
     let songDelay = 5 * 1000
     let lolDataDelay = 2 * 1000
 

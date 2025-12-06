@@ -3,8 +3,8 @@
 <head>
     <title>LAN {{ lan_month }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
-    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-32.png') }}" sizes="32x32">
-    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-48.png') }}" sizes="48x48">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-32.ico') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-48.ico') }}" sizes="48x48">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/bootstrap/bootstrap-grid.min.css') }}"/>
     <script src="{{ url_for('static', _external=True, filename='js/bootstrap/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', _external=True, filename='js/bootstrap/bootstrap.min.js') }}"></script>
@@ -197,7 +197,7 @@
     {% endif %}
     <script src="{{ url_for('static', _external=True, filename='js/lan.js') }}"></script>
     <script>
-        monitor("{{ games_played }}", "{{ active_game }}", "{{ lan_over }}", "{{ lan_date }}");
+        monitor({{ games_played | tojson }}, "{{ active_game }}", {{ lan_over | tojson }}, "{{ lan_date }}");
     </script>
 </body>
 </html>

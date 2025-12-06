@@ -124,6 +124,7 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats]):
             "stats_objectives_stolen",
             "stats_turrets_killed",
             "stats_quadrakills",
+            "stats_flawless",
         ]
 
     @classmethod
@@ -347,6 +348,7 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats]):
             - Stealing epic monsters
             - Getting a lot of turret kills
             - Getting one or more quadrakills (but no penta)
+            - Going deathless
         """
         cool_stats = {}
         for stats in self.parsed_game_stats.filtered_player_stats:
@@ -369,6 +371,9 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats]):
 
             if stats.quadrakills - stats.pentakills > 0:
                 cool_stats[stats.disc_id].append((3, stats.quadrakills))
+
+            if stats.deaths == 0:
+                cool_stats[stats.disc_id].append((4, None))
 
         return cool_stats
 

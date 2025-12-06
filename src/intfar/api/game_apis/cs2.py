@@ -135,7 +135,7 @@ class SteamAPIClient(GameAPIClient):
 
                 break
 
-            except httpx.RequestError:
+            except (httpx.RequestError, AttributeError):
                 logger.exception(f"Exception when downloading CS2 maps from {url}")
                 sleep(2 + attempt)
 

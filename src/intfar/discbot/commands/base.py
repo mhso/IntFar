@@ -113,6 +113,7 @@ class Command:
     ALIASES: List[str] = []
     GUILDS: List[str] | None = None
     COMMANDS_DICT: Dict[str, "Command"] = commands_util.COMMANDS
+    DISABLED: bool = False
 
     def __init__(self, client: DiscordClient, message: Message, called_name: str):
         self.client = client

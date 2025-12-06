@@ -294,6 +294,12 @@ class LoLGameStats(GameStats[LoLPlayerStats]):
                         continue
 
                     disc_id = participant_dict.get(int(event["killerId"]))
+                    if disc_id is not None and disc_id in curr_multikill:
+                        # Reset streak on death
+                        curr_multikill[disc_id]["streak"] = 0
+                        continue
+
+                    disc_id = participant_dict.get(int(event["killerId"]))
                     if disc_id is None:
                         continue
 
@@ -657,7 +663,7 @@ class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
                 if player_disc_id is not None:
                     summ_data = {
                         "disc_id": player_disc_id,
-                        "player_name": [participant["summonerName"]],
+                        "player_name": [participant["riotIdGameName"]],
                         "player_id": [participant["puuid"]],
                         "champ_id": participant["championId"]
                     }

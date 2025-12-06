@@ -334,10 +334,24 @@ class MatchHistoryCommand(Command):
                 emote = self.client.insert_emotes("{emote_Doinks}")
                 doinks_description = f"No {emote}"
 
+            # Participants description
+            other_players = []
+            for player_data in game_stats.filtered_player_stats:
+                if player_data.disc_id != target_id:
+                    other_players.append(self.client.get_discord_nick(player_data.disc_id, self.message.guild.id) or "Unknown")
+
+            if len(other_players) == 1:
+                participants = f"*{other_players[0]}*"
+            elif len(other_players) == 2:
+                participants = f"*{other_players[0]}* and *{other_players[1]}*" 
+            else:
+                participants = "*, *".join(other_players[:-1]) + f", and *{other_players[-1]}*"
+
             match_str = (
                 f"- **{win_str}** in **{fmt_duration}** on **{date}** playing **{map_or_champ}**\n"
                 f"- {doinks_description}\n"
                 f"- {intfar_description}\n"
+                f"- With {participants}\n"
                 "```css\n"
             )
 

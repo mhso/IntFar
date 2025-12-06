@@ -242,6 +242,10 @@ h2 {
     color: rgb(195, 20, 20);
 }
 
+.lan-game-feed-entry.win {
+    color: rgb(10, 218, 17);
+}
+
 .lan-game-feed-entry.neutral {
     color: white;
 }

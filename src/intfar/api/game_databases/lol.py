@@ -829,11 +829,11 @@ class LoLGameDatabase(GameDatabase):
         with self:
             self.execute_query(query, *item_ids)
 
-    def insert_bingo_challenge(self, challenge_id, date, challenge_name, total):
+    def insert_bingo_challenge(self, challenge_id, date, challenge_name, total, commit=True):
         query = "INSERT INTO lan_bingo (id, lan_date, name, total) VALUES (?, ?, ?, ?)"
 
         with self:
-            self.execute_query(query, challenge_id, date, challenge_name, total)
+            self.execute_query(query, challenge_id, date, challenge_name, total, commit=commit)
 
     def update_bingo_challenge(self, challenge_id, date, progress=0, new_progress=0, completed=0, completed_by=None):
         query = """

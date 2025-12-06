@@ -46,41 +46,7 @@ class TestMock(DiscordClient):
         pass
 
     def save_stats_mock(self, parsed_game_stats):
-        return [], []
-
-    def get_users_in_cs2_game(self, game_info):
-        users_in_game = {}
-        all_users = self.game_databases["cs2"].game_users
-        round_stats = game_info["matches"][0]["roundstatsall"]
-
-        max_player_round = 0
-        max_players = 0
-        for index, round_data in enumerate(round_stats):
-            players_in_round = len(round_data["reservation"]["accountIds"])
-            if players_in_round > max_players:
-                max_players = players_in_round
-                max_player_round = index
-
-        for disc_id in all_users.keys():
-            for steam_id in all_users[disc_id].player_id:
-                account_id = self.api_clients[self.game].get_account_id(steam_id)
-                if account_id in round_stats[max_player_round]["reservation"]["accountIds"]:
-                    users_in_game[disc_id] = all_users[disc_id]
-                    break
-
-        return users_in_game
-
-    def get_users_in_lol_game(self, game_info):
-        users_in_game = {}
-        all_users = self.game_databases["lol"].game_users
-
-        for participant in game_info["participants"]:
-            for disc_id in all_users.keys():
-                if participant["puuid"] in all_users[disc_id].player_id:
-                    users_in_game[disc_id] = all_users[disc_id]
-                    break
-
-        return users_in_game
+        return [], [], [], []
 
     async def get_ranks(self, users_in_game):
         # Get rank of each player in the game, if status is OK
@@ -118,7 +84,7 @@ class TestMock(DiscordClient):
             if not self.loud or self.dry_run:
                 self.channels_to_write[guild_id] = MockChannel(self.dry_run)
 
-            if self.forget_sharecode or self.dry_run:
+            if self.game == "cs2" and (self.forget_sharecode or self.dry_run):
                 self.game_databases["cs2"].set_new_cs2_sharecode = self.set_sharecode_mock
 
             try:
@@ -129,10 +95,7 @@ class TestMock(DiscordClient):
                 logger.exception("Failed to get game info for some reason!")
                 continue
 
-            if self.game == "cs2":
-                game_monitor.users_in_game[guild_id] = self.get_users_in_cs2_game(game_info)
-            elif self.game == "lol":
-                game_monitor.users_in_game[guild_id] = self.get_users_in_lol_game(game_info)
+            game_monitor.users_in_game[guild_id] = {}
 
             status = game_monitor.get_finished_game_status(game_info, guild_id)
 

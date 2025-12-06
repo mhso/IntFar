@@ -2,7 +2,7 @@ import asyncio
 from time import time
 import httpx
 from abc import abstractmethod
-from typing import Coroutine, Generic, TypeVar
+from typing import Any, Coroutine, Dict, Generic, TypeVar
 from datetime import datetime
 
 from mhooge_flask.logging import logger
@@ -59,14 +59,19 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         self.api_client = api_client
         self.game_over_callback  = game_over_callback
 
-        self.polling_active: dict[int, bool] = {}
-        self.active_game: dict[int, dict] = {}
-        self.users_in_game: dict[int, dict[int, User]] = {}
-        self.users_in_voice: dict[int, dict[int, User]] = {}
+        self.polling_active: Dict[int, bool] = {}
+        self.active_game: Dict[int, dict] = {}
+        self.users_in_game: Dict[int, Dict[int, User]] = {}
+        self.users_in_voice: Dict[int, Dict[int, User]] = {}
+        self.stop_polling_task: Dict[int, asyncio.Task] = {}
 
     @property
     def polling_enabled(self):
         return True
+
+    @property
+    def polling_stop_delay(self) -> int:
+        return 0
 
     @property
     def min_game_minutes(self):
@@ -80,7 +85,11 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         ...
 
     @abstractmethod
-    async def get_finished_game_info(self, guild_id: int) -> tuple[dict, int]:
+    async def get_finished_game_info(self, guild_id: int) -> tuple[Dict, int]:
+        ...
+
+    @abstractmethod
+    def get_users_in_game(self, user_dict: Dict[int, User], raw_game_data: Dict) -> Dict[int, User]:
         ...
 
     async def check_game_status(self, guild_id: int, guild_name: str) -> int:
@@ -116,7 +125,19 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         return self.GAME_STATUS_NOCHANGE
 
-    async def poll_for_new_game(self, guild_id: int, guild_name: str, immediately=False):
+    async def start_polling(self, guild_id: int, guild_name: str, immediately: bool = False):
+        if (polling_task := self.stop_polling_task.get(guild_id)):
+            logger.info("Cancelling stop polling task because of activity!")
+            polling_task.cancel()
+
+        self.polling_active[guild_id] = True
+
+        bound_logger = logger.bind(event="poll_start", game=self.game, guild_id=guild_id)
+        bound_logger.info(f"People are active in {guild_name}! Polling for games for {self.game}...")
+
+        await self.poll_for_new_game(guild_id, guild_name, immediately)
+
+    async def poll_for_new_game(self, guild_id: int, guild_name: str, immediately: bool = False):
         """
         Periodically poll the Riot Games League of Legends API to check if any users in
         Discord voice channels have joined a game. Whenever that happens, we instead
@@ -126,13 +147,10 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         :param guild_name:  Name of the Discord server where we should poll for a game
         :param immediately: Whether to start polling immediately, or sleep for a bit first
         """
-        self.polling_active[guild_id] = True
-        time_slept = 0
-        sleep_per_loop = 0.2
-        bound_logger = logger.bind(event="poll_start", game=self.game, guild_id=guild_id)
-        bound_logger.info(f"People are active in {guild_name}! Polling for games for {self.game}...")
-
         if not immediately:
+            time_slept = 0
+            sleep_per_loop = 0.2
+
             try:
                 while time_slept < self.config.status_interval_dormant:
                     if not self.polling_active.get(guild_id, False): # Stop if people leave voice channels.
@@ -180,7 +198,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         elif game_status == self.GAME_STATUS_NOCHANGE: # Sleep for a bit and check game status again.
             await self.poll_for_new_game(guild_id, guild_name)
 
-    def get_finished_game_status(self, game_info: dict, guild_id: int):
+    def get_finished_game_status(self, game_info: Dict[str, Any], guild_id: int):
         if self.game_database.game_exists(game_info["gameId"]):
             logger.warning(
                 "We triggered end of game stuff again... Strange!"
@@ -298,16 +316,24 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         return awards_handler.get_cool_stats()
 
     def save_stats(self, parsed_game_stats: GameStats):
-        best_records, worst_records = self.game_database.save_stats(parsed_game_stats)
+        (
+            global_best_records,
+            global_worst_records,
+            player_best_records,
+            player_worst_records
+        ) = self.game_database.save_stats(parsed_game_stats)
 
         # Create backup of databases
         self.meta_database.create_backup()
         self.game_database.create_backup()
         logger.info("Game over! Stats were saved succesfully.")
 
-        return best_records, worst_records
+        return global_best_records, global_worst_records, player_best_records, player_worst_records
 
-    def parse_stats(self, game_info: dict, guild_id: int):
+    def get_lifetime_stats_data(self, awards_handler: AwardQualifiers):
+        return awards_handler.get_lifetime_stats(self.game_database)
+
+    async def get_parsed_stats(self, game_info: Dict[str, Any], guild_id: int) -> GameStats | None:
         try: # Get formatted stats that are relevant for the players in the game.
             stat_parser = get_stat_parser(self.game, game_info, self.api_client, self.game_database.game_users, guild_id)
             return stat_parser.parse_data()
@@ -316,20 +342,18 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             logger.bind(event="parse_stats_error", game_id=game_info["gameId"]).exception("Error when parsing game data!")
             return None
 
-    def get_lifetime_stats_data(self, awards_handler: AwardQualifiers):
-        return awards_handler.get_lifetime_stats(self.game_database)
-
-    def get_post_game_data(self, game_info: dict, status_code: int, guild_id: int) -> PostGameStats | None:
+    async def get_post_game_data(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> PostGameStats | None:
+        # Update users in game based on game data
+        logger.bind(event="user_in_game_before", users=self.users_in_game[guild_id]).info(f"Users in game before: {self.users_in_game[guild_id]}")
+        self.users_in_game[guild_id] = self.get_users_in_game(self.game_database.game_users, game_info)
+    
         # Get formatted stats that are relevant for the players in the game.
-        parsed_game_stats = self.parse_stats(game_info, guild_id)
+        parsed_game_stats = await self.get_parsed_stats(game_info, guild_id)
 
-        # Update users in game based on parsed data
-        self.users_in_game[guild_id] = {
-            player_data["disc_id"]: User(**player_data)
-            for player_data in parsed_game_stats.players_in_game
-        }
+        if parsed_game_stats is None:
+            return None
 
-        logger.debug(f"Users in game after: {parsed_game_stats.players_in_game}")
+        logger.bind(event="user_in_game_after", users=self.users_in_game[guild_id]).info(f"Users in game after: {self.users_in_game[guild_id]}")
 
         # Get class for handling award qualifiers for the current game
         awards_handler = get_awards_handler(self.game, self.config, self.api_client, parsed_game_stats)
@@ -391,7 +415,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             lifetime_data,
         )
 
-    async def handle_game_over(self, game_info: dict, status_code: int, guild_id: int) -> PostGameStats | None:
+    async def handle_game_over(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> PostGameStats | None:
         """
         Called when a game is over. Combines all the necessary post game data
         into one object that is returned and passed to any listeners via a callback.
@@ -400,7 +424,9 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             self.game_database.save_missed_game(game_info["gameId"], guild_id, int(time()))
 
         if status_code == self.POSTGAME_STATUS_OK:
-            post_game_data = self.get_post_game_data(game_info, status_code, guild_id)
+            with self.game_database:
+               post_game_data = await self.get_post_game_data(game_info, status_code, guild_id)
+
             if post_game_data is None:
                 status_code = self.POSTGAME_STATUS_ERROR
 
@@ -446,7 +472,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             del self.active_game[guild_id]
             del self.users_in_game[guild_id] # Reset the list of users who are in a game.
 
-            asyncio.create_task(self.poll_for_new_game(guild_id, guild_name))
+            await self.poll_for_new_game(guild_id, guild_name)
 
     async def poll_for_game_end(self, guild_id: int, guild_name: str):
         """
@@ -477,8 +503,20 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         elif game_status == self.GAME_STATUS_NOCHANGE:
             await self.poll_for_game_end(guild_id, guild_name)
 
-    def stop_polling(self, guild_id):
+    async def _stop_polling_after_delay(self, guild_id):
+        await asyncio.sleep(self.polling_stop_delay)
+
+        logger.info(f"Stopping polling of '{self.game}' now!")
         self.polling_active[guild_id] = False
+
+    async def stop_polling(self, guild_id):
+        if self.polling_stop_delay == 0:
+            logger.info(f"Stopping polling of '{self.game}' now.")
+            self.polling_active[guild_id] = False
+
+        elif not self.stop_polling_task.get(guild_id):
+            logger.info(f"Stopping polling of '{self.game}' in {self.polling_stop_delay} seconds...")
+            self.stop_polling_task[guild_id] = asyncio.create_task(self._stop_polling_after_delay(guild_id))
 
     def set_users_in_voice_channels(self, users, guild_id):
         self.users_in_voice[guild_id] = users

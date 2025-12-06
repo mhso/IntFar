@@ -165,6 +165,18 @@ LAN_PARTIES = {
             219497453374668815: "Thommy"
         },
         "nibs"
+    ),
+    "december_25": LANInfo(
+        datetime(2025, 12, 20, 8, 0, 0).timestamp(),
+        datetime(2025, 12, 21, 10, 0, 0).timestamp(),
+        {
+            115142485579137029: "Dave",
+            172757468814770176: "Murt",
+            267401734513491969: "Gual",
+            331082926475182081: "Muds",
+            347489125877809155: "Nønø"
+        },
+        "core"
     )
 }
 LATEST_LAN_PARTY: str = max(LAN_PARTIES.keys(), key=lambda k: LAN_PARTIES[k].start_time)
@@ -484,5 +496,6 @@ def update_bingo_progress(database: LoLGameDatabase, post_game_stats: PostGameSt
             )
 
 def insert_bingo_challenges(database: LoLGameDatabase, date: str):
-    for challenge_id in BINGO_CHALLENGE_NAMES:
-        database.insert_bingo_challenge(challenge_id, date, *BINGO_CHALLENGE_NAMES[challenge_id])
+    for index, challenge_id in enumerate(BINGO_CHALLENGE_NAMES):
+        commit = index == len(BINGO_CHALLENGE_NAMES) - 1
+        database.insert_bingo_challenge(challenge_id, date, *BINGO_CHALLENGE_NAMES[challenge_id], commit=commit)
