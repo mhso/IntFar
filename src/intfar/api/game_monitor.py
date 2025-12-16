@@ -30,6 +30,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
     POSTGAME_STATUS_SOLO = 1
     POSTGAME_STATUS_DUPLICATE = 2
     POSTGAME_STATUS_MISSING = 3
+    POSTGAME_STATUS_REMAKE = 4
 
     def __init__(
         self,
@@ -200,9 +201,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
     def get_finished_game_status(self, game_info: Dict[str, Any], guild_id: int):
         if self.game_database.game_exists(game_info["gameId"]):
-            logger.warning(
-                "We triggered end of game stuff again... Strange!"
-            )
+            logger.warning("We triggered end of game stuff again... Strange!")
             return self.POSTGAME_STATUS_DUPLICATE
 
         if len(self.users_in_game.get(guild_id, [])) == 1:
@@ -226,7 +225,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         amount of times, sleeping inbetween.
         """
         game_info, status = await self._get_finished_game_and_status(game_id, guild_id)
-        if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO):
+        if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_REMAKE):
             return None, status
 
         retry = 0
@@ -241,7 +240,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             time_to_sleep += sleep_delta
 
             game_info, status = await self._get_finished_game_and_status(game_id, guild_id)
-            if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO):
+            if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_REMAKE):
                 return None, status
 
             retry += 1

@@ -1,6 +1,5 @@
 from time import time
 import asyncio
-from typing import Coroutine, List
 
 from mhooge_flask.logging import logger
 
@@ -10,14 +9,11 @@ from intfar.api.user import User
 from intfar.api.game_data.lol import get_player_stats
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_databases.lol import LoLGameDatabase
-from intfar.api.config import Config
-from intfar.api.meta_database import MetaDatabase
 
 class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
-    POSTGAME_STATUS_CUSTOM_GAME = 4
-    POSTGAME_STATUS_URF = 5
-    POSTGAME_STATUS_INVALID_MAP = 6
-    POSTGAME_STATUS_REMAKE = 7
+    POSTGAME_STATUS_CUSTOM_GAME = 5
+    POSTGAME_STATUS_URF = 6
+    POSTGAME_STATUS_INVALID_MAP = 7
 
     @property
     def polling_stop_delay(self):
@@ -116,6 +112,8 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
 
             for puuid, name in zip(user_data.player_id, user_data.player_name):
                 matches = await self.api_client.get_match_history(puuid, latest_game)
+                await asyncio.sleep(0.5)
+                matches += await self.api_client.get_match_history(puuid, latest_game, game_type="normal")
 
                 if not matches:
                     continue
@@ -184,14 +182,14 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
         custom_game = self.active_game[guild_id].get("game_type", "") == "CUSTOM_GAME"
 
         game_info = None
-        if not custom_game:
-            game_info, status_code = await self.try_get_finished_game_info(game_id, guild_id)
 
         if custom_game: # Do nothing.
             logger.info(f"Game was a custom game: {game_id}")
             status_code = self.POSTGAME_STATUS_CUSTOM_GAME
+        else:
+            game_info, status_code = await self.try_get_finished_game_info(game_id, guild_id)
 
-        elif game_info is None and status_code not in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO):
+        if not custom_game and game_info is None and status_code not in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_REMAKE):
              # Game info is still None after 3 retries, log error
             logger.bind(game_id=game_id, guild_id=guild_id).error(
                 "Game info is STILL None after 5 retries! Saving to missing games..."

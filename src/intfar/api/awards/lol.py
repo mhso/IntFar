@@ -80,7 +80,7 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats]):
         return {
             "kda": "KDA larger than or equal to 10",
             "kills": "20 kills or more",
-            "damage": "Half of the teams damage (and more than 10k)",
+            "damage": "Twice anyone else's damage (and more than 10k)",
             "penta": "Getting a pentakill",
             "vision_score": "Vision score larger than 100",
             "kp": "Kill participation over 80%",
@@ -203,7 +203,7 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats]):
         Criteria for getting doinks in LoL:
             - Having a KDA of 10 or more
             - Getting 20 kills or more
-            - Doing more damage than the rest of the team combined
+            - Doing twice the damage of anyone else
             - Getting a penta-kill
             - Having a vision score of 100+
             - Having a kill-participation of 80%+
@@ -222,7 +222,7 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats]):
             if stats.kills >= 20:
                 mention_list.append((1, stats.kills))
 
-            if stats.damage > 10_000 and stats.damage > self.parsed_game_stats.damage_by_our_team - stats.damage:
+            if stats.damage > 10_000 and self.parsed_game_stats.second_highest_dmg is not None and stats.damage >= self.parsed_game_stats.second_highest_dmg * 2:
                 mention_list.append((2, stats.damage))
 
             if stats.pentakills > 0:

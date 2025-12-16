@@ -117,6 +117,7 @@ class DiscordClient(discord.Client):
             for game in api_util.SUPPORTED_GAMES
             if game in self.game_databases
         }
+        self.polling_tasks = {}
 
         self.pagination_data = {}
         self.audio_action_data = {}
@@ -891,7 +892,7 @@ class DiscordClient(discord.Client):
                 stat_fmt = api_util.round_digits(value)
                 stat_name_fmt = stat.replace('_', ' ')
 
-                readable_stat = f"{stat_quantity_desc[stat][int(best)]} {stat_name_fmt}"
+                readable_stat = f"{stat_quantity_desc[stat][int(not best)]} {stat_name_fmt}"
                 name = self.get_mention_str(disc_id, parsed_game_stats.guild_id)
 
                 flavor = (
@@ -1349,22 +1350,30 @@ class DiscordClient(discord.Client):
                 game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
                 logger.debug(f"Game user joined voice: {user_game_info.player_name}")
 
-                def callback(task: asyncio.Task):
-                    try:
-                        task.result()
-                        logger.bind(guild_id=guild_id, game=game).debug("Polling task ended successfully.")
-                    except Exception:
-                        logger.bind(guild_id=guild_id, game=game).exception("Exception in polling task!")
-
                 if game_monitor.should_poll(guild_id):
                     logger.info(f"Polling is now active for {api_util.SUPPORTED_GAMES[game]}!")
                     game_monitor.polling_active[guild_id] = True
-                    task = asyncio.create_task(
+                    if game not in self.polling_tasks:
+                        self.polling_tasks[game] = {}
+
+                    self.polling_tasks[game][guild_id] = asyncio.create_task(
                         game_monitor.start_polling(guild_id, guild_name, poll_immediately)
                     )
-                    task.add_done_callback(callback)
 
             logger.info(f"Active users in {guild_name} for {game}: {len(users_in_voice[game])}")
+
+    def _print_task_result(self, task: asyncio.Task, game: str, guild_id: int):
+        bound_logger = logger.bind(game=game, guild_id=guild_id)
+        try:
+            task.result()
+            bound_logger.info("Polling task ended successfully.")
+        except asyncio.CancelledError:
+            bound_logger.info("Polling task was cancelled.")
+        except asyncio.InvalidStateError:
+            bound_logger.info("Polling task is not yet done.")
+            task.add_done_callback(lambda t: self._print_task_result(t, game, guild_id))
+        except Exception:
+            bound_logger.exception("Exception in polling task!")
 
     async def user_left_voice(self, disc_id: int, guild_id: int):
         """
@@ -1387,7 +1396,9 @@ class DiscordClient(discord.Client):
             game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
 
             if game_monitor.should_stop_polling(guild_id):
+                task = self.polling_tasks[game][guild_id]
                 await game_monitor.stop_polling(guild_id)
+                self._print_task_result(task, game, guild_id)
 
     def get_role(self, role_name, guild):
         """

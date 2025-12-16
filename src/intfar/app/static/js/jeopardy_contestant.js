@@ -45,6 +45,55 @@ function setValues(discId) {
     loadURLToInputFiled(avatarSrc, `${discId}.png`);
 }
 
+function getRenderedColor(color) {
+    const elem = document.createElement("div");
+    elem.style.color = color;
+    return elem.style.color.replace(/\s+/,'').toLowerCase();
+}
+
+function joinGame(event) {
+    event.preventDefault();
+
+    let color = document.getElementById("contestant-lobby-color").value;
+    let errorMsg = document.getElementById("contestant-lobby-error");
+
+    if (!getRenderedColor(color)) {
+        errorMsg.textContent = `Invalid color: '${color}', please provide a valid color.`;
+        errorMsg.classList.remove("d-none");
+        return false;
+    }
+
+    let form = document.getElementById("contestant-join-form");
+    let formData = new FormData(form);
+
+    $.ajax(
+        form.action,
+        {
+            data: formData,
+            method: "POST",
+            crossDomain: true,
+            contentType: false,
+            processData: false,
+            xhrFields: { withCredentials: true },
+        }
+    ).done(function(response) {
+        window.location.href = response["redirect"];
+    }).fail(function(response) {
+        let message;
+        if (Object.hasOwn(response, "responseJSON")) {
+            message = JSON.parse(response["responseText"])["error"];
+        }
+        else {
+            message = "An unknown error occured, try again later."
+        }
+
+        errorMsg.textContent = message;
+        errorMsg.classList.remove("d-none");
+    });
+
+    return false;
+}
+
 function makeDailyDoubleWager(userId) {
     let btn = document.getElementById("contestant-wager-btn");
     if (btn.disabled) {

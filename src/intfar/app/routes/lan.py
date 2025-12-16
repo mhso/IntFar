@@ -524,8 +524,7 @@ def announce_jeopardy_winner():
     if disc_id is None or token is None or app_util.get_logged_in_user(meta_database, token) != int(disc_id):
         return app_util.make_text_response("You are not authorized to access this API.", 403)
 
-    #guild_id = lan_api.get_latest_lan_info().guild_id
-    guild_id = api_util.MY_GUILD_ID
+    guild_id = lan_api.get_latest_lan_info().guild_id
 
     player_data = flask.request.json["player_data"]
 

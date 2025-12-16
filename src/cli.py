@@ -347,8 +347,7 @@ class TestFuncs:
 
         print(f"Done with {done}/{total} ({int((done / total) * 100)}%)")
 
-    async def get_raw_lol_data(self):
-        game_id = "7451201570"
+    async def get_raw_lol_data(self, game_id):
         data = await self.riot_api.get_game_details(game_id)
         with open("../resources/lol_data.json", "w", encoding="utf-8") as fp:
             json.dump(data, fp)
@@ -363,6 +362,8 @@ class TestFuncs:
             latest_game = latest_game[0] + 2400
 
         matches = await self.riot_api.get_match_history(puuid, latest_game)
+        await asyncio.sleep(0.5)
+        matches += await self.riot_api.get_match_history(puuid, latest_game, game_type="normal")
         print(matches)
 
 if __name__ == "__main__":

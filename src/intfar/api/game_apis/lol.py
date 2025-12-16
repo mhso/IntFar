@@ -272,7 +272,14 @@ class RiotAPIClient(GameAPIClient):
         full_url = api_route + req_string
 
         token_header = {"X-Riot-Token": self.config.riot_key}
-        response = await self.httpx_client.get(full_url, headers=token_header)
+        try:
+            response = await self.httpx_client.get(full_url, headers=token_header)
+        except httpx.ConnectTimeout:
+            logger.bind(
+                event="riot_api_error",
+                url=full_url,
+            ).error("Connection timeout during Riot API request")
+            return None
 
         if response.status_code != 200 and response.status_code not in ignore_errors:
             logger.bind(
@@ -287,7 +294,7 @@ class RiotAPIClient(GameAPIClient):
     async def get_puuid(self, game_name, tag):
         endpoint = "/riot/account/v1/accounts/by-riot-id/{0}/{1}"
         response = await self.make_request(endpoint, API_REGION, game_name, tag)
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return None
 
         return response.json()["puuid"]
@@ -298,7 +305,7 @@ class RiotAPIClient(GameAPIClient):
         endpoint = endpoint + "/" + "{0}"
 
         response = await self.make_request(endpoint, route, player_id)
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return None
 
         return response.json()
@@ -306,7 +313,7 @@ class RiotAPIClient(GameAPIClient):
     async def get_player_name(self, puuid: str):
         endpoint = "/riot/account/v1/accounts/by-puuid/{0}"
         response = await self.make_request(endpoint, API_REGION, puuid)
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return None
 
         data = response.json()
@@ -342,7 +349,7 @@ class RiotAPIClient(GameAPIClient):
             endpoint += f"?{'&'.join(query_params)}"
 
         response = await self.make_request(endpoint, API_REGION, puuid)
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return []
 
         return sorted(map(lambda x: int(x.removeprefix("EUW1_")), json.loads(response.text)))
@@ -351,7 +358,7 @@ class RiotAPIClient(GameAPIClient):
         endpoint = "/lol/spectator/v5/active-games/by-summoner/{0}"
         try:
             response = await self.make_request(endpoint, API_PLATFORM, puuid, ignore_errors=[404])
-            if response.status_code != 200:
+            if response is None or response.status_code != 200:
                 return None
 
         except (httpx.ConnectError, httpx.RequestError):
@@ -374,7 +381,7 @@ class RiotAPIClient(GameAPIClient):
         endpoint = "/lol/match/v5/matches/{0}/timeline"
 
         response = await self.make_request(endpoint, API_REGION, f"EUW1_{game_id}")
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             if tries > 0:
                 sleep(30)
                 return await self.get_game_timeline(game_id, tries-1)
@@ -387,7 +394,7 @@ class RiotAPIClient(GameAPIClient):
         endpoint = "/lol/league/v4/entries/by-puuid/{0}"
 
         response = await self.make_request(endpoint, API_PLATFORM, puuid)
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return None
 
         return response.json()
@@ -404,7 +411,7 @@ class RiotAPIClient(GameAPIClient):
 
             return response.json()
 
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return None
 
         data = response.json()["info"]
@@ -423,7 +430,7 @@ class RiotAPIClient(GameAPIClient):
         endpoint = "/lol/champion-mastery/v4/champion-masteries/by-puuid/{0}"
         response = await self.make_request(endpoint, API_PLATFORM, puuid)
 
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return None
 
         return response.json()

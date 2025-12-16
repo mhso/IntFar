@@ -131,7 +131,7 @@ class LoLGameStats(GameStats[LoLPlayerStats]):
     first_blood: int = None
     queue_id: int = None
     team_id: int = None
-    damage_by_our_team: int = None
+    second_highest_dmg: int = None
     our_baron_kills: int = None
     our_dragon_kills: int = None
     our_herald_kills: int = None
@@ -570,7 +570,6 @@ class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
             first_blood=first_blood_id,
             queue_id=self.raw_data["queueId"],
             team_id=team_id,
-            damage_by_our_team=damage_per_team[our_team],
             our_baron_kills=our_baron_kills,
             our_dragon_kills=our_dragon_kills,
             our_herald_kills=our_herald_kills,
@@ -588,7 +587,6 @@ class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
         for all new League of Legends games (until a new one comes along).
         """
         kills_per_team = {100: 0, 200: 0}
-        damage_per_team = {100: 0, 200: 0}
         player_stats = []
         active_users = []
         first_blood_id = None
@@ -602,10 +600,11 @@ class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
                     break
 
         # Collect relevant stats for all players
+        damage_done = []
         for participant in self.raw_data["participants"]:
             if participant["teamId"] == our_team:
                 kills_per_team[participant["teamId"]] += participant["kills"]
-                damage_per_team[participant["teamId"]] += participant["totalDamageDealtToChampions"]
+                damage_done.append(participant["totalDamageDealtToChampions"])
 
                 player_disc_id = None
 
@@ -676,6 +675,8 @@ class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
                 else int((float(stats.kills + stats.assists) / float(kills_per_team[our_team])) * 100.0)
             )
 
+        damage_done.sort(reverse=True)
+
         team_id = None
         game_win = 1
         our_baron_kills = 0
@@ -719,7 +720,7 @@ class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
             first_blood=first_blood_id,
             queue_id=self.raw_data["queueId"],
             team_id=team_id,
-            damage_by_our_team=damage_per_team[our_team],
+            second_highest_dmg=damage_done[1] if len(damage_done) >= 2 else None,
             our_baron_kills=our_baron_kills,
             our_dragon_kills=our_dragon_kills,
             our_herald_kills=our_herald_kills,
