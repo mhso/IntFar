@@ -9,18 +9,18 @@ from intfar.api.game_apis.mocks.riot_api import MockRiotAPI
 from intfar.api.game_apis.mocks.steam_api import MockSteamAPI
 from intfar.api.util import SUPPORTED_GAMES
 from intfar.discbot.commands.util import ADMIN_DISC_ID
-from intfar.run_command import create_client
+from src.run_command import create_client
 
 _TEST_USERS = [
     ADMIN_DISC_ID, 2, 3, 4, 5, 6
 ]
 _GAME_USERS = {
     "lol": [
-        {"player_name": "Senile Felines", "player_id": "10", "puuid": "100"},
-        {"player_name": "Slugger", "player_id": "20", "puuid": "200"},
-        {"player_name": "Murt", "player_id": "30", "puuid": "300"},
-        {"player_name": "Eddie Smurphy", "player_id": "40", "puuid": "400"},
-        {"player_name": "Nønø", "player_id": "50", "puuid": "500"},
+        {"player_name": "Senile Felines", "player_id": "10"},
+        {"player_name": "Slugger", "player_id": "20"},
+        {"player_name": "Murt", "player_id": "30"},
+        {"player_name": "Eddie Smurphy", "player_id": "40"},
+        {"player_name": "Nønø", "player_id": "50"},
     ],
     "cs2": [
         {"player_name": "Say wat", "player_id": "10", "match_auth_code": "100", "latest_match_token": "abc"},

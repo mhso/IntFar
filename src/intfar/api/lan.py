@@ -473,8 +473,8 @@ def get_current_bingo_challenges(database: LoLGameDatabase, lan_date: str):
         in database.get_active_bingo_challenges(lan_date)
     ]
 
-def update_bingo_progress(database: LoLGameDatabase, post_game_stats: PostGameStats):
-    active_challenges = get_current_bingo_challenges(database, LATEST_LAN_PARTY)
+def update_bingo_progress(database: LoLGameDatabase, post_game_stats: PostGameStats, date: str = LATEST_LAN_PARTY):
+    active_challenges = get_current_bingo_challenges(database, date)
 
     with database:
         for challenge_data in active_challenges:
@@ -488,14 +488,15 @@ def update_bingo_progress(database: LoLGameDatabase, post_game_stats: PostGameSt
 
             database.update_bingo_challenge(
                 challenge_data["id"],
-                LATEST_LAN_PARTY,
+                date,
                 min(progress, challenge_data["total"]),
                 progress > challenge_data["progress"],
                 completed,
                 completed_by
             )
 
-def insert_bingo_challenges(database: LoLGameDatabase, date: str):
-    for index, challenge_id in enumerate(BINGO_CHALLENGE_NAMES):
-        commit = index == len(BINGO_CHALLENGE_NAMES) - 1
-        database.insert_bingo_challenge(challenge_id, date, *BINGO_CHALLENGE_NAMES[challenge_id], commit=commit)
+def insert_bingo_challenges(database: LoLGameDatabase, date: str = LATEST_LAN_PARTY):
+    with database:
+        for index, challenge_id in enumerate(BINGO_CHALLENGE_NAMES):
+            commit = index == len(BINGO_CHALLENGE_NAMES) - 1
+            database.insert_bingo_challenge(challenge_id, date, *BINGO_CHALLENGE_NAMES[challenge_id], commit=commit)

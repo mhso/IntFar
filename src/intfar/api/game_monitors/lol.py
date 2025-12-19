@@ -15,6 +15,10 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
     POSTGAME_STATUS_URF = 6
     POSTGAME_STATUS_INVALID_MAP = 7
 
+    def __init__(self, game, config, meta_database, game_database, api_client, game_over_callback = None):
+        super().__init__(game, config, meta_database, game_database, api_client, game_over_callback)
+        self.fetch_ranks = True
+
     @property
     def polling_stop_delay(self):
         return 300
@@ -200,19 +204,20 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
         return game_info, status_code
 
     async def get_parsed_stats(self, game_info: dict, guild_id: int):
-        logger.debug("Fetching ranks for all players...")
-        player_ranks = {}
-        await asyncio.sleep(2)
+        if self.fetch_ranks:
+            logger.debug("Fetching ranks for all players...")
+            player_ranks = {}
+            await asyncio.sleep(2)
 
-        for disc_id in self.users_in_game[guild_id]:
-            puuid = self.users_in_game[guild_id][disc_id].player_id[0]
-            rank_info = await self.api_client.get_player_rank(puuid)
-            if rank_info is not None:
-                player_ranks[disc_id] = rank_info
+            for disc_id in self.users_in_game[guild_id]:
+                puuid = self.users_in_game[guild_id][disc_id].player_id[0]
+                rank_info = await self.api_client.get_player_rank(puuid)
+                if rank_info is not None:
+                    player_ranks[disc_id] = rank_info
 
-            await asyncio.sleep(1.5)
+                await asyncio.sleep(1.5)
 
-        game_info["player_ranks"] = player_ranks
+            game_info["player_ranks"] = player_ranks
 
         return await super().get_parsed_stats(game_info, guild_id)
 

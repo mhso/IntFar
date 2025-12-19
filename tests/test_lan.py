@@ -18,7 +18,8 @@ def test_tilt_value():
     tilt_value = lan.get_tilt_value(recent_games)[0]
     print(tilt_value)
 
-def _update_and_validate_bingo(
+@pytest.mark.asyncio
+async def _update_and_validate_bingo(
     game_monitor,
     game_database,
     raw_game_data,
@@ -28,12 +29,14 @@ def _update_and_validate_bingo(
     expected_completed_by=None,
     tabula_rasa=True
 ):
+    game_monitor.fetch_ranks = False
     guild_id = GUILD_MAP["core"]
     game_monitor.active_game[guild_id] = {"id": raw_game_data["gameId"]}
-    post_game_data = game_monitor.handle_game_over(
+    game_monitor.users_in_game[guild_id] = {}
+    post_game_data = await game_monitor.get_post_game_data(
         raw_game_data,
         GameMonitor.POSTGAME_STATUS_OK,
-        guild_id
+        guild_id,
     )
 
     if tabula_rasa:
@@ -44,7 +47,7 @@ def _update_and_validate_bingo(
             assert challenge["completed_by"] is None
             assert not challenge["notification_sent"]
 
-    lan.update_bingo_progress(game_database, post_game_data)
+    lan.update_bingo_progress(game_database, post_game_data, LAN_DATE)
 
     bingo_challenges = {
         challenge["id"]: challenge
@@ -58,7 +61,8 @@ def _update_and_validate_bingo(
     assert bingo_challenges[challenge_id]["completed"] == expected_completed
     assert bingo_challenges[challenge_id]["completed_by"] == expected_completed_by
 
-def test_bingo_big_lead(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_big_lead(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -71,7 +75,7 @@ def test_bingo_big_lead(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -81,7 +85,8 @@ def test_bingo_big_lead(game_monitors, game_databases):
         None
     )
 
-def test_bingo_bounty_gold(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_bounty_gold(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -91,7 +96,7 @@ def test_bingo_bounty_gold(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -101,7 +106,8 @@ def test_bingo_bounty_gold(game_monitors, game_databases):
         None
     )
 
-def test_bingo_buff_steals(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_buff_steals(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -112,7 +118,7 @@ def test_bingo_buff_steals(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -122,7 +128,8 @@ def test_bingo_buff_steals(game_monitors, game_databases):
         None
     )
 
-def test_bingo_damage_dealt(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_damage_dealt(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -132,7 +139,7 @@ def test_bingo_damage_dealt(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -142,7 +149,8 @@ def test_bingo_damage_dealt(game_monitors, game_databases):
         None
     )
 
-def test_bingo_dives(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_dives(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -153,7 +161,7 @@ def test_bingo_dives(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -163,7 +171,8 @@ def test_bingo_dives(game_monitors, game_databases):
         None
     )
 
-def test_bingo_doinks(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_doinks(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -177,7 +186,7 @@ def test_bingo_doinks(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -187,7 +196,8 @@ def test_bingo_doinks(game_monitors, game_databases):
         None
     )
 
-def test_bingo_dragon_souls(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_dragon_souls(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -195,7 +205,7 @@ def test_bingo_dragon_souls(game_monitors, game_databases):
         {"timeline.frames.15.events.0": DataSpec({"type": "DRAGON_SOUL_GIVEN", "teamId": 100})}
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -205,7 +215,8 @@ def test_bingo_dragon_souls(game_monitors, game_databases):
         None
     )
 
-def test_bingo_early_baron(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_early_baron(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -222,7 +233,7 @@ def test_bingo_early_baron(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -232,7 +243,8 @@ def test_bingo_early_baron(game_monitors, game_databases):
         None
     )
 
-def test_bingo_elder_dragon(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_elder_dragon(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -249,7 +261,7 @@ def test_bingo_elder_dragon(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -259,7 +271,8 @@ def test_bingo_elder_dragon(game_monitors, game_databases):
         None
     )
 
-def test_bingo_fast_win(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_fast_win(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -271,7 +284,7 @@ def test_bingo_fast_win(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -281,7 +294,8 @@ def test_bingo_fast_win(game_monitors, game_databases):
         None
     )
 
-def test_bingo_flawless_ace(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_flawless_ace(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -289,7 +303,7 @@ def test_bingo_flawless_ace(game_monitors, game_databases):
         {"participants.0-5.challenges.flawlessAces": DataSpec(1)}
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -299,7 +313,8 @@ def test_bingo_flawless_ace(game_monitors, game_databases):
         None
     )
 
-def test_bingo_fountain_kill(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_fountain_kill(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -313,7 +328,7 @@ def test_bingo_fountain_kill(game_monitors, game_databases):
             second_player = disc_id
             break
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -323,7 +338,8 @@ def test_bingo_fountain_kill(game_monitors, game_databases):
         second_player
     )
 
-def test_bingo_jungle_doinks(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_jungle_doinks(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -342,7 +358,7 @@ def test_bingo_jungle_doinks(game_monitors, game_databases):
                     jungle_player = disc_id
                     break
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -352,7 +368,8 @@ def test_bingo_jungle_doinks(game_monitors, game_databases):
         jungle_player
     )
 
-def test_bingo_killing_sprees(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_killing_sprees(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -360,7 +377,7 @@ def test_bingo_killing_sprees(game_monitors, game_databases):
         {"participants.0-5.challenges.killingSprees": DataSpec(32)}
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -370,7 +387,8 @@ def test_bingo_killing_sprees(game_monitors, game_databases):
         None
     )
 
-def test_bingo_kills(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_kills(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -382,7 +400,7 @@ def test_bingo_kills(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -392,7 +410,8 @@ def test_bingo_kills(game_monitors, game_databases):
         None
     )
 
-def test_bingo_outnumbered_kills(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_outnumbered_kills(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -400,7 +419,7 @@ def test_bingo_outnumbered_kills(game_monitors, game_databases):
         {"participants.0-5.challenges.outnumberedKills": DataSpec(1)}
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -410,7 +429,8 @@ def test_bingo_outnumbered_kills(game_monitors, game_databases):
         None
     )
 
-def test_bingo_atakhan_kills(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_atakhan_kills(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -420,7 +440,7 @@ def test_bingo_atakhan_kills(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -430,7 +450,8 @@ def test_bingo_atakhan_kills(game_monitors, game_databases):
         None
     )
 
-def test_bingo_solo_kills(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_solo_kills(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -438,7 +459,7 @@ def test_bingo_solo_kills(game_monitors, game_databases):
         {"participants.0-5.challenges.soloKills": DataSpec(2)}
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -448,7 +469,8 @@ def test_bingo_solo_kills(game_monitors, game_databases):
         None
     )
 
-def test_bingo_spells_casted(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_spells_casted(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -456,7 +478,7 @@ def test_bingo_spells_casted(game_monitors, game_databases):
         {"participants.0-5.challenges.abilityUses": DataSpec(1000)}
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -466,7 +488,8 @@ def test_bingo_spells_casted(game_monitors, game_databases):
         None
     )
 
-def test_bingo_spells_dodged(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_spells_dodged(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -474,7 +497,7 @@ def test_bingo_spells_dodged(game_monitors, game_databases):
         {"participants.0-5.challenges.skillshotsDodged": DataSpec(50)}
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -484,7 +507,8 @@ def test_bingo_spells_dodged(game_monitors, game_databases):
         None
     )
 
-def test_bingo_spells_hit(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_spells_hit(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -492,7 +516,7 @@ def test_bingo_spells_hit(game_monitors, game_databases):
         {"participants.0-5.challenges.skillshotsHit": DataSpec(100)}
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -502,7 +526,8 @@ def test_bingo_spells_hit(game_monitors, game_databases):
         None
     )
 
-def test_bingo_steals(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_steals(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -516,7 +541,7 @@ def test_bingo_steals(game_monitors, game_databases):
             second_player = disc_id
             break
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -526,7 +551,8 @@ def test_bingo_steals(game_monitors, game_databases):
         second_player
     )
 
-def test_bingo_two_barons(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_two_barons(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
@@ -536,7 +562,7 @@ def test_bingo_two_barons(game_monitors, game_databases):
         }
     )
 
-    _update_and_validate_bingo(
+    await _update_and_validate_bingo(
         game_monitor,
         game_databases["lol"],
         raw_game_data,
@@ -546,7 +572,8 @@ def test_bingo_two_barons(game_monitors, game_databases):
         None
     )
 
-def test_bingo_wins(game_monitors, game_databases):
+@pytest.mark.asyncio
+async def test_bingo_wins(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     for i in range(5):
         raw_game_data = create_synthetic_data(
@@ -558,7 +585,7 @@ def test_bingo_wins(game_monitors, game_databases):
             }
         )
 
-        _update_and_validate_bingo(
+        await _update_and_validate_bingo(
             game_monitor,
             game_databases["lol"],
             raw_game_data,

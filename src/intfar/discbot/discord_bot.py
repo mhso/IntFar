@@ -1682,7 +1682,14 @@ class DiscordClient(discord.Client):
         role = self.get_role(role_name, guild)
 
         if role is None:
-            colors = [(0, 128, 255), (250, 50, 0), (255, 51, 255), (0, 204, 0), (210, 210, 0)]
+            colors = [
+                (0, 128, 255),
+                (250, 50, 0),
+                (255, 51, 255),
+                (0, 204, 0),
+                (210, 210, 0),
+                (76, 0, 153),
+            ]
             color = discord.Color.from_rgb(*colors[iteration-1])
             role = await guild.create_role(name=role_name, color=color)
 

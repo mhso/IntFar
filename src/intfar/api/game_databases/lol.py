@@ -1,3 +1,4 @@
+from itertools import permutations
 from datetime import datetime
 from intfar.api.game_database import GameDatabase
 from intfar.api.config import Config
@@ -931,3 +932,117 @@ class LoLGameDatabase(GameDatabase):
 
         with self:
             return self.execute_query(query_select, lan_date).fetchall()
+
+    def get_teamcomp_winrates(self):
+        disc_ids = [
+            "115142485579137029",
+            "172757468814770176",
+            "267401734513491969",
+            "347489125877809155",
+            "331082926475182081",
+        ]
+        disc_ids_str = f"({','.join(disc_ids)})"
+
+        query = f"""
+            SELECT 
+                games.disc_id,
+                games.role,
+                games.c,
+                (CAST (wins.c AS REAL) / CAST (games.c AS REAL)) * 100
+            FROM (
+                SELECT
+                    u.disc_id,
+                    role,
+                    COUNT(*) AS c
+                FROM participants AS p
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
+                INNER JOIN games AS g
+                    ON g.game_id = p.game_id
+                WHERE u.disc_id IN {disc_ids_str}
+                GROUP BY
+                    u.disc_id,
+                    role
+            ) games
+            INNER JOIN (
+                SELECT
+                    u.disc_id,
+                    role,
+                    COUNT(*) AS c
+                FROM participants AS p
+                INNER JOIN users AS u
+                    ON u.player_id = p.player_id
+                INNER JOIN games AS g
+                    ON g.game_id = p.game_id
+                WHERE
+                    u.disc_id IN {disc_ids_str}
+                    AND win = 1
+                GROUP BY
+                    u.disc_id,
+                    role
+            ) wins
+                ON games.disc_id = wins.disc_id
+                AND games.role = wins.role
+            WHERE games.c > 200
+        """
+
+        results = self.execute_query(query)
+        grouped_by_roles = {}
+        for disc_id, role, games, winrate in results:
+            if role not in grouped_by_roles:
+                grouped_by_roles[role] = []
+
+            grouped_by_roles[role].append((self.game_users[disc_id].player_name[0], games, winrate))
+
+        # for role in grouped_by_roles:
+        #     print("=" * 5, role, "=" * 5)
+        #     print(grouped_by_roles[role])
+
+        compositions = []
+        for index_list in permutations(range(5), 5):
+            data = []
+            for role, index in zip(grouped_by_roles, index_list):
+                role_list = grouped_by_roles[role]
+                if index < len(role_list):
+                    data.append((role, role_list[index]))
+            
+            if len(data) == 5:
+                compositions.append(data)
+
+        compositions.sort(key=lambda l: sum(r[1][2] for r in l) / len(l))
+
+        worst = compositions[0]
+        best = compositions[-1]
+
+        print(worst, sum(r[1][2] for r in worst) / len(worst))
+        print(best, sum(r[1][2] for r in best) / len(best))
+
+        return []
+
+        combos = []
+        curr_combo = []
+        curr_roles = set()
+        curr_players = set()
+        with self:
+            results = self.execute_query(query).fetchall()
+            for disc_id_1, role_1, winrate_1 in results[:5]:
+                curr_players.add(disc_id_1)
+                curr_roles.add(role_1)
+                curr_combo.append((disc_id_1, role_1, winrate_1))
+
+                for disc_id_2, role_2, winrate_2 in results[5:]:
+                    if disc_id_2 not in curr_players and role_2 not in curr_roles:
+                        curr_players.add(disc_id_2)
+                        curr_roles.add(role_2)
+                        curr_combo.append((disc_id_2, role_2, winrate_2))
+
+                        if len(curr_players) == 5 and len(curr_roles) == 5:
+                            curr_players = set()
+                            curr_roles = set()
+                            combos.append(curr_combo)
+                            break
+
+        for curr_compo in combos:
+            print("=====")
+            for disc_id, role, winrate in curr_compo:
+                print(disc_id, role, winrate)
