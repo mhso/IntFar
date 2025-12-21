@@ -64,7 +64,7 @@ class SteamAPIClient(GameAPIClient):
         }
         self.cs2_app_id = 730
 
-        self.get_latest_data()
+        #self.get_latest_data()
 
         self._init_clients()
         self.login()

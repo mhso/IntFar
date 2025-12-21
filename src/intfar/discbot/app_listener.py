@@ -37,24 +37,33 @@ def listen_for_request(disc_client, event_loop):
                         result = new_conn
 
                     elif command_type == "func": # Return data from Discord client to a user.
-                        if params[0] is None and len(params) == 1:
-                            result = disc_client.__getattribute__(command)()
-                        else:
-                            result = disc_client.__getattribute__(command)(*params)
+                        try:
+                            if params[0] is None and len(params) == 1:
+                                result = disc_client.__getattribute__(command)()
+                            else:
+                                result = disc_client.__getattribute__(command)(*params)
 
-                        if asyncio.iscoroutine(result):
-                            try:
-                                future = asyncio.run_coroutine_threadsafe(result, event_loop)
-                                result = future.result(3)
-                            except (FutureTimeout, CancelledError):
-                                # Log error
-                                logger.bind(
-                                    command_type=command_type,
-                                    command=command,
-                                    params=params
-                                ).exception(f"Exception during Discord request")
+                            if asyncio.iscoroutine(result):
+                                try:
+                                    future = asyncio.run_coroutine_threadsafe(result, event_loop)
+                                    result = future.result(5)
+                                except (FutureTimeout, CancelledError):
+                                    # Log error
+                                    logger.bind(
+                                        command_type=command_type,
+                                        command=command,
+                                        params=params
+                                    ).exception(f"Timeout error during Discord async request")
 
-                                result = None
+                                    result = None
+                        except Exception:
+                            # Log error
+                            logger.bind(
+                                command_type=command_type,
+                                command=command,
+                                params=params
+                            ).exception(f"Exception during Discord request")
+                            result = None
 
                     elif command_type == "bot_command":
                         pass # Do bot command.

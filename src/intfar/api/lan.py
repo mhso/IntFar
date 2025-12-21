@@ -342,7 +342,7 @@ class BingoSolver:
                 if (
                     event["type"] == "ELITE_MONSTER_KILL"
                     and event["monsterType"] == "BARON_NASHOR"
-                    and event.get("teamId", None) == self.parsed_data.team_id
+                    and event.get("killerTeamId", None) == self.parsed_data.team_id
                     and event["timestamp"] / 1000 / 60 < 28
                 ):
                     self.progress = 1
@@ -353,7 +353,7 @@ class BingoSolver:
             for event in frame_data.get("events", []):
                 if (
                     event["type"] == "ELITE_MONSTER_KILL"
-                    and event.get("teamId") == self.parsed_data.team_id
+                    and event.get("killerTeamId") == self.parsed_data.team_id
                     and event["monsterType"] == "DRAGON"
                     and event["monsterSubType"] == "ELDER_DRAGON"
                 ):

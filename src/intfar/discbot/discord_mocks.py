@@ -151,6 +151,6 @@ class MockDiscordClient(DiscordClient):
         guild: MockGuild,
     ):
         message = MockMessage(command, author, channel, guild)
-        await self.on_message(message)
+        await self.on_message(message, True)
 
         return message

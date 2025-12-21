@@ -105,6 +105,10 @@ if __name__ == "__main__":
     member = guild.get_member(args.author)
     channel = guild.get_channel(args.channel)
 
+    if channel is None:
+        print("Error: The given channel is not part of the given guild.")
+        exit(0)
+
     message = asyncio.run(call_command(args.command, client, member, channel, guild))
 
     if not message.channel.messages_sent:

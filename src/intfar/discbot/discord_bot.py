@@ -2013,7 +2013,7 @@ class DiscordClient(discord.Client):
         msg = self.insert_emotes("This command is not implemented yet {emote_peberno}")
         await message.channel.send(msg)
 
-    async def on_message(self, message):
+    async def on_message(self, message, mock: bool = False):
         """
         Method that is called when a message is sent on Discord
         in any of the channels that Int-Far is active in. 
@@ -2021,7 +2021,7 @@ class DiscordClient(discord.Client):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
 
-        if ((self.config.env == "dev" and message.guild.id != api_util.MY_GUILD_ID)
+        if not mock and ((self.config.env == "dev" and message.guild.id != api_util.MY_GUILD_ID)
                 or (self.config.env == "production" and message.guild.id not in api_util.GUILD_IDS)):
             # If Int-Far is running in dev mode, only handle messages that are sent from
             # my personal sandbox Discord server.

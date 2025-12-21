@@ -224,10 +224,10 @@ function count() {
 function monitor(playedGames, activeGame, lanOver, lanDate) {
     gamesPlayed = playedGames;
     isActiveGame = activeGame != "None";
-    isLanActive = lanOver;
-    console.log("Games on load: " + gamesPlayed)
-    console.log("Active games on load: " + isActiveGame)
-    console.log("LAN active on load: " + isLanActive)
+    isLanActive = !lanOver;
+    console.log("Games on load: " + gamesPlayed);
+    console.log("Active games on load: " + isActiveGame);
+    console.log("LAN active on load: " + !isLanActive);
 
     let lanDataDelay = 10 * 1000
     let songDelay = 5 * 1000

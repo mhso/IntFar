@@ -198,6 +198,9 @@ def get_game_info(game):
 
             flask.current_app.config["ACTIVE_GAME"][guild_id][game] = active_game
 
+        if "game_mode" not in active_game:
+            continue
+
         active_game["game_duration"] = time() - active_game["start"]
         active_games.append(
             [
