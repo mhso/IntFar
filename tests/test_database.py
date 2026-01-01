@@ -140,7 +140,7 @@ def test_game_queries(meta_database: MetaDatabase, game_databases: dict[str, Gam
 
         _save_mock_game(game, database, game_id, guild_id, disc_id, player_id, timestamp, duration, win, intfar_id, intfar_reason)
 
-        latest_timestamp, latest_duration, latest_win, latest_intfar_id, latest_intfar_reason = database.get_latest_game()[0]
+        _, latest_timestamp, latest_duration, latest_win, latest_intfar_id, latest_intfar_reason = database.get_latest_game()[0]
         assert latest_timestamp == timestamp, "Correct latest game timestamp"
         assert latest_duration == duration, "Correct latest game duration"
         assert latest_win == win, "Correct latest game win"

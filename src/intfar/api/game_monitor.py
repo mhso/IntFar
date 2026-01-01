@@ -30,7 +30,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
     POSTGAME_STATUS_SOLO = 1
     POSTGAME_STATUS_DUPLICATE = 2
     POSTGAME_STATUS_MISSING = 3
-    POSTGAME_STATUS_REMAKE = 4
+    POSTGAME_STATUS_TOO_SHORT = 4
 
     def __init__(
         self,
@@ -225,13 +225,13 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         amount of times, sleeping inbetween.
         """
         game_info, status = await self._get_finished_game_and_status(game_id, guild_id)
-        if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_REMAKE):
+        if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_TOO_SHORT):
             return None, status
 
         retry = 0
         retries = 5
         time_to_sleep = start_sleep
-        while (game_info is None or status != self.POSTGAME_STATUS_OK) and retry < retries:
+        while (game_info is None or status == self.POSTGAME_STATUS_ERROR) and retry < retries:
             logger.warning(
                 f"Game info is None! Retrying in {time_to_sleep} secs..."
             )
@@ -240,7 +240,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             time_to_sleep += sleep_delta
 
             game_info, status = await self._get_finished_game_and_status(game_id, guild_id)
-            if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_REMAKE):
+            if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_TOO_SHORT):
                 return None, status
 
             retry += 1

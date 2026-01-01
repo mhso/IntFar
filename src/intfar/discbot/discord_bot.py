@@ -198,7 +198,7 @@ class DiscordClient(discord.Client):
             response += "and no stats will be saved."
             await self.channels_to_write[post_game_stats.guild_id].send(self.insert_emotes(response))
 
-        elif post_game_stats.status_code == game_monitor.POSTGAME_STATUS_REMAKE:
+        elif post_game_stats.status_code == game_monitor.POSTGAME_STATUS_TOO_SHORT:
             # Game was too short, most likely a remake.
             response = (
                 f"That game lasted less than {game_monitor.min_game_minutes} minutes "
@@ -259,16 +259,16 @@ class DiscordClient(discord.Client):
 
             await self.handle_game_over(post_game_stats)
 
-    async def send_message_in_chunks(self, channel: discord.channel.TextChannel, text: str):
+    async def send_message_in_chunks(self, recipient: discord.channel.TextChannel |discord.user.User, text: str):
         if len(text) < 2000:
-            await channel.send(text)
+            await recipient.send(text)
             return
 
         split = text.split("\n")
         text_chunk = ""
         for chunk in split:
             if len(text_chunk) + len(chunk) + 2 >= 2000:
-                await channel.send(text_chunk)
+                await recipient.send(text_chunk)
                 text_chunk = ""
             else:
                 text_chunk += "\n"
@@ -276,7 +276,7 @@ class DiscordClient(discord.Client):
             text_chunk += chunk
 
         if len(text_chunk) < 2000:
-            await channel.send(text_chunk)
+            await recipient.send(content=text_chunk)
 
     async def handle_game_over(self, post_game_stats: PostGameStats):
         """
@@ -1620,9 +1620,9 @@ class DiscordClient(discord.Client):
                 await self.set_newest_usernames()
 
                 # Check if a ranked split in League have ended, by seeing
-                # if people's ranks are reset and send a end-of-split
+                # if people's ranks are reset and send an end-of-split
                 # summary message, if so
-                #await self.send_end_of_split_message()
+                # await self.send_end_of_split_message()
 
                 curr_day = new_day
 
@@ -2004,7 +2004,7 @@ class DiscordClient(discord.Client):
         """
         user = self.get_user(disc_id)
         try:
-            await user.send(content=text)
+            await self.send_message_in_chunks(user, text)
             return True
         except (HTTPException, Forbidden):
             return False

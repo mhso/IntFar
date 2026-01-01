@@ -20,6 +20,8 @@ class MockUser:
         self.messages_sent = []
 
     async def send(self, content: str):
+        print("User DM:")
+        print(content)
         self.messages_sent.append(content)
 
     async def add_roles(self, *roles):
@@ -48,6 +50,7 @@ class MockChannel:
         self.guild = None
 
     async def send(self, content: str):
+        print("Channel message:")
         print(content)
         message = MockMessage(content, CLIENT_USER, self, self.guild)
         self.messages_sent.append(message)

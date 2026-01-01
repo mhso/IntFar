@@ -11,6 +11,7 @@ resources/items*.json
 resources/maps.json
 resources/databases
 resources/skins.csv
+resources/lol_data.json
 src/intfar/app/static/*
 src/intfar/app/static/*/bootstrap/
 !src/intfar/app/static/js/

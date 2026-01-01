@@ -111,6 +111,6 @@ if __name__ == "__main__":
 
     message = asyncio.run(call_command(args.command, client, member, channel, guild))
 
-    if not message.channel.messages_sent:
+    if not message.channel.messages_sent and not member.messages_sent:
         print("No response.")
         exit(0)

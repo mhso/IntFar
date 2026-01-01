@@ -34,9 +34,7 @@ def run_app(
         Route("lan", "lan_page", "lan"),
         Route("lists", "lists_page", "lol/lists"),
         Route("register_cs2", "register_cs2_page", "cs2/register"),
-        Route("quiz", "quiz_page", "quiz"),
-        Route("jeopardy_contestant", "jeopardy_contestant_page", "jeopardy"),
-        Route("jeopardy_presenter", "jeopardy_presenter_page", "jeopardy/presenter"),
+        Route("jeoparty", "jeopardy_contestant_page", "jeopardy"),
     ]
 
     # Dynamic routes that depend on which game is chosen

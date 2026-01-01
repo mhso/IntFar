@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from datetime import datetime
 from sqlite3 import Cursor
+from typing import Any, Dict
 
 from mhooge_flask.database import SQLiteDatabase, DBException, Query
 from mhooge_flask.logging import logger
@@ -164,6 +165,24 @@ class GameDatabase(SQLiteDatabase):
             self.execute_query(query_1, game_id, commit=False)
             self.execute_query(query_2, game_id)
 
+    def get_delim_clause(self, params: Dict[str, Any]):
+        clauses = ""
+        param_values = []
+        for param_name in params:
+            param_val = params[param_name]
+            if param_val is None:
+                continue
+
+            if param_values == []:
+                clauses += "WHERE "
+            else:
+                clauses += " AND "
+
+            clauses += f"{param_name} ?"
+            param_values.append(param_val)
+
+        return clauses, param_values
+
     def get_delimeter(self, time_after, time_before=None, guild_id=None, other_key=None, other_param=None, prefix=None):
         prefix = prefix if prefix is not None else "WHERE"
         delimiter = "" if other_param is None else f" {prefix} {other_key} = ?"
@@ -195,7 +214,18 @@ class GameDatabase(SQLiteDatabase):
     def get_latest_game(self, time_after=None, time_before=None, guild_id=None):
         delim_str, params = self.get_delimeter(time_after, time_before, guild_id)
 
-        query_games = f"SELECT MAX(timestamp), duration, win, intfar_id, intfar_reason FROM games{delim_str}"
+        query_games = f"""
+            SELECT
+                game_id,
+                MAX(timestamp),
+                guild_id,
+                duration,
+                win,
+                intfar_id,
+                intfar_reason
+            FROM games{delim_str}
+            GROUP BY guild_id
+        """
         query_doinks = f"""
             SELECT
                 g.timestamp,
@@ -216,9 +246,9 @@ class GameDatabase(SQLiteDatabase):
             WHERE p.doinks IS NOT NULL
         """
         with self:
-            game_data = self.execute_query(query_games, *params).fetchone()
+            game_data = self.execute_query(query_games, *params).fetchall()
             doinks_data = self.execute_query(query_doinks, *params).fetchall()
-            return game_data, doinks_data
+            return game_data[0] if guild_id is not None else game_data, doinks_data
 
     def get_most_extreme_stat(self, stat, maximize=True):
         with self:

@@ -144,20 +144,17 @@ class LoLGameDatabase(GameDatabase):
         return self.query(query, *parameters, format_func="one")
 
     def get_average_stat(self, stat, disc_id=None, played_id=None, role=None, min_games=10, time_after=None, time_before=None):
-        champ_condition = ""
-        role_condition = ""
-        player_condition, params = self.get_delimeter(time_after, time_before, None, "played.disc_id", disc_id, "AND")
+        clauses, params = self.get_delim_clause(
+            {
+                "u.disc_id =": disc_id,
+                "p.champ_id =": played_id,
+                "p.role =": role,
+                "g.timestamp >": time_after,
+                "g.timestamp <": time_before
+            }
+        )
 
-        extra_params = []
-        if played_id is not None:
-            extra_params.append(played_id)
-            champ_condition = "WHERE p.champ_id = ?"
-
-        if role is not None:
-            extra_params.append(role)
-            role_condition = f"{'AND' if played_id else 'WHERE'} p.role = ?"
-
-        params = (extra_params * 2) + params
+        params = params * 2
 
         if stat == "first_blood":
             query = f"""
@@ -175,8 +172,7 @@ class LoLGameDatabase(GameDatabase):
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
                         AND u.disc_id = g.first_blood
-                    {champ_condition}
-                    {role_condition}
+                    {clauses}
                     GROUP BY g.first_blood
                 ) first_bloods
                 INNER JOIN
@@ -190,8 +186,7 @@ class LoLGameDatabase(GameDatabase):
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
-                    {champ_condition}
-                    {role_condition}
+                    {clauses}
                     GROUP BY u.disc_id
                 ) played
                     ON played.disc_id = first_bloods.first_blood
@@ -199,7 +194,6 @@ class LoLGameDatabase(GameDatabase):
                     ON u.disc_id = played.disc_id
                 WHERE u.active = 1
                     AND played.c >= {min_games}
-                    {player_condition}
                 GROUP BY played.disc_id
                 ORDER BY avg_val DESC
             """
@@ -213,12 +207,13 @@ class LoLGameDatabase(GameDatabase):
                 FROM (
                     SELECT
                         u.disc_id,
-                        SUM({stat}) AS s
-                    FROM participants AS p
+                        SUM(p.{stat}) AS s
+                    FROM games AS g
+                    INNER JOIN participants AS p
+                        ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
-                    {champ_condition}
-                    {role_condition}
+                    {clauses}
                     GROUP BY u.disc_id
                 ) stat_values
                 INNER JOIN (
@@ -231,8 +226,7 @@ class LoLGameDatabase(GameDatabase):
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
-                    {champ_condition}
-                    {role_condition}
+                    {clauses}
                     GROUP BY u.disc_id
                 ) played
                 ON played.disc_id = stat_values.disc_id
@@ -240,7 +234,6 @@ class LoLGameDatabase(GameDatabase):
                 ON u.disc_id = played.disc_id
                 WHERE u.active = 1
                     AND played.c >= {min_games}
-                    {player_condition}
                 GROUP BY played.disc_id
                 ORDER BY avg_val DESC
             """
@@ -502,7 +495,7 @@ class LoLGameDatabase(GameDatabase):
             return result if result[0] is not None else (None, None, None)
 
     def get_role_winrate(self, disc_id, time_after=None, time_before=None):
-        delim_str, params = self.get_delimeter(time_after, time_before, prefix="AND")
+        delim_str, params = self.get_delimeter(time_after, time_before, None, "u.disc_id", disc_id)
         query = f"""
             SELECT
                 sub.wr,
@@ -522,8 +515,7 @@ class LoLGameDatabase(GameDatabase):
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
-                    WHERE
-                        u.disc_id = ?
+                    {delim_str}
                         AND g.win = 1
                     GROUP BY p.role
                     ORDER BY p.role
@@ -538,20 +530,18 @@ class LoLGameDatabase(GameDatabase):
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
-                    WHERE u.disc_id = ?
+                    {delim_str}
                     GROUP BY p.role
                     ORDER BY p.role
                 ) played
                 ON wins.role = played.role
-                {delim_str}
             ) sub
             ORDER BY sub.wr DESC
         """
 
         with self:
-            params.extend([disc_id] * 2)
-            result = self.execute_query(query, *params).fetchall()
-            return result or (None, None, None)
+            result = self.execute_query(query, *params * 2).fetchall()
+            return result or [(None, None, None)]
 
     def get_player_ranks(self, disc_id, time_after=None, time_before=None, order="ASC"):
         main_player_id = self.game_users[disc_id].player_id[0]
@@ -642,7 +632,7 @@ class LoLGameDatabase(GameDatabase):
         with self:
             self.execute_query(query, main_player_id, timestamp)
 
-    def get_split_summary_data(self, disc_id, stats):
+    def get_split_summary_data(self, disc_id, stats, prev_split_start, curr_split_start):
         """
         Summarizes the following stats:
         - Avg stats, compare each to prev split
@@ -653,22 +643,17 @@ class LoLGameDatabase(GameDatabase):
         - Highest rank
         - New champs played
         """
-        offset_1 = 30 * 24 * 60 * 60
-        offset_2 = 190 * 24 * 60 * 60
-
-        curr_split_start = self.get_split_start(offset_1)
-        prev_split_start = self.get_split_start(offset_2)
         no_previous = curr_split_start == prev_split_start
 
         # Get average stats for prev split and this split
-        avg_stats_before = []
-        avg_stats_now = []
+        avg_stats_before = {}
+        avg_stats_now = {}
         for stat in stats:
             avg_prev_split = None if no_previous else self.get_average_stat(stat, disc_id, time_after=prev_split_start, time_before=curr_split_start)()
             avg_curr_split = self.get_average_stat(stat, disc_id, time_after=curr_split_start)()
 
-            avg_stats_before.append((stat, avg_prev_split))
-            avg_stats_now.append((stat, avg_curr_split))
+            avg_stats_before[stat] = avg_prev_split[0] if avg_prev_split else (None, None, None)
+            avg_stats_now[stat] = avg_curr_split[0]
 
         # Get Int-Fars & doinks for prev split and this split
         intfars_before = None if no_previous else self.get_intfar_count(disc_id, prev_split_start, curr_split_start)

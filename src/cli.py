@@ -2,14 +2,12 @@ import asyncio
 import inspect
 import json
 import argparse
-from glob import glob
 from datetime import datetime
 import os
 
 from dateutil.relativedelta import relativedelta
 from intfar.api.lan import LAN_PARTIES, insert_bingo_challenges
 
-from intfar.app.routes.soundboard import normalize_sound_volume
 from intfar.app.util import get_relative_static_folder
 from intfar.api import award_qualifiers, config, util
 from intfar.api.meta_database import MetaDatabase
@@ -20,8 +18,9 @@ from intfar.api.game_data import get_stat_parser, get_stat_quantity_descriptions
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_apis.cs2 import SteamAPIClient
 from intfar.discbot.commands.util import ADMIN_DISC_ID
-from intfar.discbot.discord_bot import DiscordClient
 from intfar.api.data_schema import generate_schema
+from intfar.discbot.commands.split import handle_end_of_split_msg
+from run_command import create_client
 
 class TestFuncs:
     def __init__(self, config, meta_database: MetaDatabase, game_databases: dict[str, GameDatabase], riot_api: RiotAPIClient):
@@ -358,13 +357,21 @@ class TestFuncs:
 
     async def get_lol_matches(self, puuid="Vg03sswLbwPm1yaJp8ACbObNUCkfJazuq_afJnHrfxZYYy-GvKIipeazQxIjrbqnoNkJFISDuuw9sg"):
         latest_game = self.game_databases["lol"].get_latest_game()[0]
+        latest_id = None
         if latest_game is not None:
-            latest_game = latest_game[0] + 2400
+            latest_id = latest_game[0]
+            latest_game = latest_game[1]
 
         matches = await self.riot_api.get_match_history(puuid, latest_game)
         await asyncio.sleep(0.5)
         matches += await self.riot_api.get_match_history(puuid, latest_game, game_type="normal")
+
+        matches = list(filter(lambda game_id: str(game_id) != latest_id, matches))
         print(matches)
+
+    async def split_message(self, disc_id=ADMIN_DISC_ID):
+        client = create_client(self.config, self.meta_database, self.game_databases)
+        await handle_end_of_split_msg(client, disc_id)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

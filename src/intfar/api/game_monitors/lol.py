@@ -18,10 +18,23 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
     def __init__(self, game, config, meta_database, game_database, api_client, game_over_callback = None):
         super().__init__(game, config, meta_database, game_database, api_client, game_over_callback)
         self.fetch_ranks = True
+        self.latest_game_timestamp = {}
+        self.latest_game_id = {}
+        self._get_latest_game()
 
     @property
     def polling_stop_delay(self):
         return 300
+
+    def _get_latest_game(self):
+        latest_game_data = self.game_database.get_latest_game()[0]
+        for row in latest_game_data:
+            latest_id = int(row[0])
+            latest_game = row[1]
+            guild_id = row[2]
+
+            self.latest_game_id[guild_id] = latest_id
+            self.latest_game_timestamp[guild_id] = latest_game
 
     def get_users_in_game(self, user_dict: dict[int, User], raw_game_data: dict):
         users_in_game = {}
@@ -44,64 +57,6 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
 
         return users_in_game
 
-    async def get_active_game_info_old(self, guild_id):
-        # First check if users are in the same game (or all are in no games).
-        user_dict = (
-            self.users_in_voice.get(guild_id, {})
-            if self.users_in_game.get(guild_id) is None
-            else self.users_in_game[guild_id]
-        )
-
-        active_game = None
-        active_game_start = None
-        active_game_team = None
-        game_ids = set()
-        users_in_current_game = {}
-
-        for disc_id in user_dict:
-            game_data, active_id = await self.api_client.get_active_game_for_user(user_dict[disc_id])
-            if game_data is None:
-                continue
-
-            game_start = int(game_data["gameStartTime"]) / 1000
-            active_game_start = game_start
-
-            player_stats = get_player_stats(game_data, [active_id])
-            if player_stats is None:
-                logger.bind(game_data=game_data).warning(f"Could not find player stats for {active_id}!")
-
-            game_ids.add(game_data["gameId"])
-            active_game_team = player_stats["teamId"]
-            active_game = game_data
-
-            users_in_current_game.update(self.get_users_in_game(user_dict, game_data))
-
-        if len(game_ids) > 1: # People are in different games.
-            return None, users_in_current_game, self.GAME_STATUS_NOCHANGE
-
-        if active_game is None:
-            return None, users_in_current_game, None
-
-        enemy_champ_ids = []
-        for participant in active_game["participants"]:
-            if participant["teamId"] != active_game_team:
-                enemy_champ_ids.append(participant["championId"])
-
-        return (
-            {
-                "id": active_game["gameId"],
-                "start": active_game_start,
-                "team_id": active_game_team,
-                "enemy_champ_ids": enemy_champ_ids,
-                "map_id": active_game["mapId"],
-                "map_name": self.api_client.get_map_name(active_game["mapId"]),
-                "game_type": active_game["gameType"],
-                "game_mode": active_game["gameMode"],
-            },
-            users_in_current_game,
-            None
-        )
-
     async def get_active_game_info(self, guild_id: int):
         # First check if users are in the same game (or all are in no games).
         user_dict = self.users_in_voice.get(guild_id, {})
@@ -110,27 +65,26 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
         for disc_id in user_dict:
             user_data = user_dict[disc_id]
 
-            latest_game = self.game_database.get_latest_game()[0]
-            if latest_game is not None:
-                latest_game = latest_game[0] + 2400
-
             for puuid, name in zip(user_data.player_id, user_data.player_name):
-                matches = await self.api_client.get_match_history(puuid, latest_game)
+                matches = await self.api_client.get_match_history(puuid, self.latest_game_timestamp[guild_id])
                 await asyncio.sleep(0.5)
-                matches += await self.api_client.get_match_history(puuid, latest_game, game_type="normal")
+                matches += await self.api_client.get_match_history(puuid, self.latest_game_timestamp[guild_id], game_type="normal")
 
                 if not matches:
                     continue
 
-                logger.bind(event="monitor_match_history", matches=matches).info(f"League match list for {name}: {matches}")
-
                 for game_id in matches:
-                    game_id_str = str(game_id)
+                    if self.latest_game_id[guild_id] == game_id:
+                        continue
 
+                    game_id_str = str(game_id)
                     if game_id_str not in game_ids:
                         game_ids[game_id_str] = []
 
                     game_ids[game_id_str].append(User(disc_id, user_data.secret, name, puuid))
+
+                if game_ids != {}:
+                    logger.bind(event="monitor_match_history", matches=matches).info(f"League match list for {name}: {matches}")
 
                 await asyncio.sleep(1)
 
@@ -175,7 +129,7 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
 
         if game_info["gameDuration"] < self.min_game_minutes * 60:
             # Game was too short to count. Probably a remake.
-            return self.POSTGAME_STATUS_REMAKE
+            return self.POSTGAME_STATUS_TOO_SHORT
 
         return self.POSTGAME_STATUS_OK
 
@@ -193,13 +147,17 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
         else:
             game_info, status_code = await self.try_get_finished_game_info(game_id, guild_id)
 
-        if not custom_game and game_info is None and status_code not in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_REMAKE):
-             # Game info is still None after 3 retries, log error
+        if not custom_game and game_info is None and status_code == self.POSTGAME_STATUS_ERROR:
+            # Game info is still None after 3 retries, log error
             logger.bind(game_id=game_id, guild_id=guild_id).error(
                 "Game info is STILL None after 5 retries! Saving to missing games..."
             )
             game_info = {"gameId": game_id}
             status_code = self.POSTGAME_STATUS_MISSING
+
+        if game_info is not None and "gameCreation" in game_info:
+            self.latest_game_timestamp[guild_id] = int(game_info["gameCreation"] / 1000)
+            self.latest_game_id[guild_id] = game_info.get("gameId")
 
         return game_info, status_code
 

@@ -11,9 +11,8 @@ from intfar.api.game_databases.cs2 import CS2GameDatabase
 
 class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient]):
     POSTGAME_STATUS_CUSTOM_GAME = 4
-    POSTGAME_STATUS_SURRENDER = 5
-    POSTGAME_STATUS_DEMO_MISSING = 6
-    POSTGAME_STATUS_DEMO_MALFORMED = 7
+    POSTGAME_STATUS_DEMO_MISSING = 5
+    POSTGAME_STATUS_DEMO_MALFORMED = 6
 
     @property
     def min_game_minutes(self):
@@ -146,7 +145,7 @@ class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient]):
 
         if last_round["matchDuration"] < self.min_game_minutes * 60:
             # Game was too short to count. Probably an early surrender.
-            return self.POSTGAME_STATUS_SURRENDER
+            return self.POSTGAME_STATUS_TOO_SHORT
 
         if game_info["demo_parse_status"] == "missing":
             # Demo was not found on Valve's servers
