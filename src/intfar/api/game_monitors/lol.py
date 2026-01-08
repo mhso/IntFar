@@ -1,5 +1,6 @@
 from time import time
 import asyncio
+from typing import Dict, List
 
 from mhooge_flask.logging import logger
 
@@ -9,6 +10,7 @@ from intfar.api.user import User
 from intfar.api.game_data.lol import get_player_stats
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_databases.lol import LoLGameDatabase
+from intfar.api.util import GUILD_IDS
 
 class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
     POSTGAME_STATUS_CUSTOM_GAME = 5
@@ -18,8 +20,8 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
     def __init__(self, game, config, meta_database, game_database, api_client, game_over_callback = None):
         super().__init__(game, config, meta_database, game_database, api_client, game_over_callback)
         self.fetch_ranks = True
-        self.latest_game_timestamp = {}
-        self.latest_game_id = {}
+        self.latest_game_timestamp: Dict[int, int] = {}
+        self.latest_game_id: Dict[int, List[int]] = {}
         self._get_latest_game()
 
     @property
@@ -28,13 +30,13 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
 
     def _get_latest_game(self):
         latest_game_data = self.game_database.get_latest_game()[0]
-        for row in latest_game_data:
-            latest_id = int(row[0])
-            latest_game = row[1]
-            guild_id = row[2]
+        if latest_game_data is not None:
+            latest_id = int(latest_game_data[0])
+            latest_game = latest_game_data[1]
 
-            self.latest_game_id[guild_id] = latest_id
-            self.latest_game_timestamp[guild_id] = latest_game
+            for guild_id in GUILD_IDS:
+                self.latest_game_id[guild_id] = [latest_id]
+                self.latest_game_timestamp[guild_id] = latest_game
 
     def get_users_in_game(self, user_dict: dict[int, User], raw_game_data: dict):
         users_in_game = {}
@@ -74,7 +76,7 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
                     continue
 
                 for game_id in matches:
-                    if self.latest_game_id[guild_id] == game_id:
+                    if game_id in self.latest_game_id[guild_id]:
                         continue
 
                     game_id_str = str(game_id)
@@ -155,9 +157,19 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
             game_info = {"gameId": game_id}
             status_code = self.POSTGAME_STATUS_MISSING
 
-        if game_info is not None and "gameCreation" in game_info:
-            self.latest_game_timestamp[guild_id] = int(game_info["gameCreation"] / 1000)
-            self.latest_game_id[guild_id] = game_info.get("gameId")
+        if game_info is not None:
+            timestamp = game_info.get("gameCreation")
+
+            logger.info(f"Saving game ID and timestamp to cache: {timestamp}, {game_info.get('gameId')}")
+
+            if timestamp is not None:
+                self.latest_game_timestamp[guild_id] = int(timestamp / 1000)
+
+            if status_code == self.POSTGAME_STATUS_OK:
+                # If status is OK, we save the game to DB and don't need to cache game IDs
+                self.latest_game_id[guild_id] = []
+
+            self.latest_game_id[guild_id].append(game_info.get("gameId"))
 
         return game_info, status_code
 

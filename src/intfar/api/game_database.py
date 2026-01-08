@@ -218,13 +218,11 @@ class GameDatabase(SQLiteDatabase):
             SELECT
                 game_id,
                 MAX(timestamp),
-                guild_id,
                 duration,
                 win,
                 intfar_id,
                 intfar_reason
             FROM games{delim_str}
-            GROUP BY guild_id
         """
         query_doinks = f"""
             SELECT
@@ -246,9 +244,9 @@ class GameDatabase(SQLiteDatabase):
             WHERE p.doinks IS NOT NULL
         """
         with self:
-            game_data = self.execute_query(query_games, *params).fetchall()
+            game_data = self.execute_query(query_games, *params).fetchone()
             doinks_data = self.execute_query(query_doinks, *params).fetchall()
-            return game_data[0] if guild_id is not None else game_data, doinks_data
+            return game_data, doinks_data
 
     def get_most_extreme_stat(self, stat, maximize=True):
         with self:

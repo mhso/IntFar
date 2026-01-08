@@ -167,7 +167,7 @@ class RandomSoundCommand(Command):
         voice_state = self.message.author.voice
 
         sounds_list = self.client.audio_handler.get_sounds()
-        sound = sounds_list[random.randint(0, len(sounds_list)-1)][0]
+        sound = random.choice(sounds_list)
 
         await self.message.channel.send(f"Playing random sound: `{sound}`")
 

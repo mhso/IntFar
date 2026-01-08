@@ -278,7 +278,7 @@ def get_data(lan_info, database, lan_date):
             time_before=lan_info.end_time,
             guild_id=lan_info.guild_id
         )
-        _, latest_timestamp, _, _, latest_win, latest_intfar_id, latest_intfar_reason = latest_game_data
+        _, latest_timestamp, _, latest_win, latest_intfar_id, latest_intfar_reason = latest_game_data
 
         dt_start = datetime.fromtimestamp(latest_timestamp)
         duration_since_game = api_util.format_duration(dt_start, dt_now)

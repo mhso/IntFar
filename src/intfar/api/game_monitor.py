@@ -226,7 +226,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
         """
         game_info, status = await self._get_finished_game_and_status(game_id, guild_id)
         if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_TOO_SHORT):
-            return None, status
+            return game_info, status
 
         retry = 0
         retries = 5
@@ -241,7 +241,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
             game_info, status = await self._get_finished_game_and_status(game_id, guild_id)
             if status in (self.POSTGAME_STATUS_DUPLICATE, self.POSTGAME_STATUS_SOLO, self.POSTGAME_STATUS_TOO_SHORT):
-                return None, status
+                return game_info, status
 
             retry += 1
 

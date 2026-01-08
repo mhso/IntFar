@@ -276,7 +276,7 @@ class DiscordClient(discord.Client):
             text_chunk += chunk
 
         if len(text_chunk) < 2000:
-            await recipient.send(content=text_chunk)
+            await recipient.send(text_chunk)
 
     async def handle_game_over(self, post_game_stats: PostGameStats):
         """

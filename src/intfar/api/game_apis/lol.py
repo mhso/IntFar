@@ -466,7 +466,10 @@ class RiotAPIClient(GameAPIClient):
         . or ' (fx. Kai'sa should be Kaisa, Dr. Mundo should be Dr_Mundo)
         """
         search_name = search_term.strip().lower().replace("_", " ").replace("'", "")
-        candidates = []
+        candidates = {
+            0: [],
+            1: []
+        }
 
         # Try to find candidates that have the search_term in ther name.
         for champ_id in self.champ_names:
@@ -474,15 +477,23 @@ class RiotAPIClient(GameAPIClient):
             if search_name == lowered:
                 return champ_id
 
+            if lowered.startswith(search_name):
+                candidates[0].append(champ_id)
+                continue
+
             if search_name in lowered:
-                candidates.append(champ_id)
+                candidates[1].append(champ_id)
                 continue
 
             # Remove apostrophe and period from name.
             if search_name in lowered.replace("'", "").replace(".", ""):
-                candidates.append(champ_id)
+                candidates[1].append(champ_id)
 
-        return candidates[0] if len(candidates) == 1 else None
+        for priority in candidates:
+            if len(candidates[priority]) == 1:
+                return candidates[priority][0]
+
+        return None
 
     def get_map_name(self, map_id):
         """

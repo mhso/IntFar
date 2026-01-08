@@ -8,14 +8,8 @@ from intfar.api.game_apis import get_api_client
 from intfar.api.game_databases import get_database_client
 from intfar.api.config import Config
 from intfar.api.meta_database import MetaDatabase
-from intfar.api.util import GUILD_IDS, SUPPORTED_GAMES
+from intfar.api.util import GUILD_MAP, SUPPORTED_GAMES
 from intfar.discbot.discord_bot import DiscordClient
-
-GUILDS = {
-    "nibs": GUILD_IDS[0],
-    "circus": GUILD_IDS[1],
-    "core": GUILD_IDS[2]
-}
 
 class MockChannel:
     def __init__(self, dry_run=False):
@@ -33,7 +27,7 @@ class TestMock(DiscordClient):
         self.missing = args.missing
         self.game = args.game
         self.game_id = args.id
-        self.guild_to_use = GUILDS.get(args.guild)
+        self.guild_to_use = GUILD_MAP.get(args.guild)
         self.task = args.task if not self.missing else "all"
         self.loud = not args.silent if not self.missing else False
         self.dry_run = args.dry_run
@@ -128,7 +122,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--missing", action="store_true")
 parser.add_argument("--game", type=str)
 parser.add_argument("--id", type=str)
-parser.add_argument("--guild", type=str, choices=GUILDS)
+parser.add_argument("--guild", type=str, choices=GUILD_MAP)
 parser.add_argument("--task", type=str, choices=("all", "bets", "stats", "train", "announce"))
 parser.add_argument("--sound", type=str, choices=("True", "1", "False", "0", "Yes", "yes", "No", "no"))
 parser.add_argument("--forget_sharecode", "-fs", action="store_true")
