@@ -23,9 +23,8 @@ meta_database = MetaDatabase(config)
 game_databases = {game: get_database_client(game, config) for game in SUPPORTED_GAMES}
 api_clients = {game: get_api_client(game, config) for game in SUPPORTED_GAMES}
 
-client = DiscordClient(config, meta_database, game_databases, None, api_clients)
 
-async def add_user(disc_id):
+async def add_user(client, disc_id):
     game_args = [arg for arg in (args.player_name, args.extra_1, args.extra_2) if arg]
     status, msg = register_for_game(meta_database, game_databases[args.game], api_clients[args.game], disc_id, *game_args)
 
@@ -34,7 +33,7 @@ async def add_user(disc_id):
 
     await client.close()
 
-async def find_discord_id():
+async def find_discord_id(client):
     name_or_id = args.discord_name_or_id
     try:
         if not client.meta_database.user_exists(int(name_or_id)):
@@ -49,7 +48,8 @@ async def find_discord_id():
             await client.close()
             return
 
-    await add_user(disc_id)
+    await add_user(client, disc_id)
 
-client.add_event_listener("ready", find_discord_id)
-client.run(config.discord_token)
+discord_client = DiscordClient(config, meta_database, game_databases, None, api_clients)
+discord_client.add_event_listener("ready", find_discord_id)
+discord_client.run(config.discord_token)

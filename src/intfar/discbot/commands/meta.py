@@ -191,14 +191,15 @@ class StatusCommand(Command):
         response = f"**Uptime:** {get_uptime(self.client.time_initialized)}\n"
 
         (
-            games, earliest_game, latest_game, games_won,
-            unique_game_guilds, longest_game_duration,
+            games, earliest_game, latest_game, playtime,
+            games_won, unique_game_guilds, longest_game_duration,
             longest_game_time, users, doinks_games,
             total_doinks, intfars, games_ratios,
             intfar_ratios, intfar_multi_ratios
         ) = self.client.game_databases[game].get_meta_stats()
 
         pct_games_won = (games_won / games) * 100
+        playtime_hours = playtime / 60 / 60
 
         longest_game_start = datetime.fromtimestamp(longest_game_time)
         longest_game_end = datetime.fromtimestamp(longest_game_time + longest_game_duration)
@@ -270,6 +271,7 @@ class StatusCommand(Command):
         response += (
             f"--- From **{earliest_time}** to **{latest_time}** ---\n"
             f"- **{games}** games of **{api_util.SUPPORTED_GAMES[game]}** have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
+            f"- That amounts to a total of **{playtime_hours:.1f}** hours of game time!\n"
             f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
             f"- **{users}** users have signed up for this game\n"
             f"- **{intfars}** Int-Far awards have been given\n"
@@ -301,7 +303,7 @@ class WebsiteCommand(Command):
     async def handle(self):
         response = (
             "Check out the amazing Int-Far website {emote_smol_gual}\n" +
-            f"{api_util.get_website_link()}\n" +
+            f"{api_util.get_website_link()}\n\n" +
             "Write `!website_verify` to sign in to the website, " +
             "allowing you to create bets, see stats, upload sounds, and more! "
             "You can also more easily sign up for CS2 here!"
@@ -343,7 +345,7 @@ class VerifyCommand(Command):
         client_secret = self.client.meta_database.get_client_secret(self.message.author.id)
         url = f"{api_util.get_website_link()}/verify/{client_secret}"
         response_dm = "Go to this link to verify yourself (totally not a virus):\n"
-        response_dm += url + "\n"
+        response_dm += url + "\n\n"
         response_dm += "This will enable you to interact with the Int-Far bot from "
         response_dm += "the website, fx. to see stats or place bets.\n"
         response_dm += "To log in to a new device (phone fx.), simply use the above link again.\n"

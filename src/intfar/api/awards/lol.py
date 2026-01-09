@@ -8,7 +8,7 @@ from intfar.api.util import round_digits
 from intfar.api.game_stats import get_outlier
 from intfar.api.game_database import GameDatabase
 
-class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats]):
+class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats, LoLPlayerStats]):
     @classmethod
     def INTFAR_REASONS(cls):
         super().__doc__

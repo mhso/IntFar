@@ -533,7 +533,9 @@ class RankCommand(Command):
 
     async def handle(self, queue: str, game: str, target_id: int):
         nickname = self.client.get_discord_nick(target_id, self.message.guild.id)
-        rank_info = self.client.game_databases[game].get_current_rank(target_id)
+        database = self.client.game_databases[game]
+        main_player_id = database.game_users[target_id].player_id[0]
+        rank_info = database.get_current_rank(main_player_id)
         fmt_stat_names = get_formatted_stat_names(game)
 
         if game == "lol":

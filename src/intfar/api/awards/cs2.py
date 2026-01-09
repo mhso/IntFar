@@ -7,7 +7,7 @@ from intfar.api.award_qualifiers import AwardQualifiers
 from intfar.api.game_stats import get_outlier
 from intfar.api.util import round_digits
 
-class CS2AwardQualifiers(AwardQualifiers[SteamAPIClient, CS2GameStats]):
+class CS2AwardQualifiers(AwardQualifiers[SteamAPIClient, CS2GameStats, CS2PlayerStats]):
     @classmethod
     def INTFAR_REASONS(cls):
         super().__doc__

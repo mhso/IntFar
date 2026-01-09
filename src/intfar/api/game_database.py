@@ -602,7 +602,8 @@ class GameDatabase(SQLiteDatabase):
                     u.disc_id,
                     g.guild_id,
                     g.win,
-                    g.timestamp
+                    g.timestamp,
+                    g.duration
                 FROM games AS g
                 INNER JOIN participants AS p
                 ON p.game_id = g.game_id
@@ -617,11 +618,13 @@ class GameDatabase(SQLiteDatabase):
                 games.c,
                 games.t_min,
                 games.t_max,
+                games.d,
                 wins.c,
                 guilds.c
             FROM (
                 SELECT
                     COUNT(DISTINCT game_id) AS c,
+                    SUM(duration) AS d,
                     MIN(timestamp) AS t_min,
                     MAX(timestamp) AS t_max
                 FROM game_cte

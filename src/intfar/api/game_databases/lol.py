@@ -428,7 +428,7 @@ class LoLGameDatabase(GameDatabase):
         else:
             champs_condition = ""
 
-        delim_str, params = self.get_delimeter(time_after, time_before, prefix="AND")
+        delim_str, params = self.get_delimeter(time_after, time_before, other_key="u.disc_id", other_param=disc_id)
 
         query = f"""
             SELECT
@@ -449,8 +449,7 @@ class LoLGameDatabase(GameDatabase):
                         ON g.game_id = p.game_id
                     INNER JOIN users AS u
                         ON u.player_id = p.player_id
-                    WHERE
-                        u.disc_id = ?
+                    {delim_str}
                         AND g.win = 1
                     GROUP BY p.champ_id
                     ORDER BY p.champ_id
@@ -465,7 +464,7 @@ class LoLGameDatabase(GameDatabase):
                     ON g.game_id = p.game_id
                 INNER JOIN users AS u
                     ON u.player_id = p.player_id
-                WHERE u.disc_id = ?
+                {delim_str}
                 GROUP BY p.champ_id
                 ORDER BY p.champ_id
                ) played
@@ -473,7 +472,6 @@ class LoLGameDatabase(GameDatabase):
                     wins.champ_id = played.champ_id
                     AND played.c > {min_games}
                     {champs_condition}
-                    {delim_str}
             ) sub
             ORDER BY
                 sub.wr {sort_order},
@@ -482,7 +480,7 @@ class LoLGameDatabase(GameDatabase):
         """
 
         with self:
-            params.extend([disc_id] * 2)
+            params = params * 2
             result = self.execute_query(query, *params).fetchall()
 
             if return_top_n == 1:
@@ -543,9 +541,8 @@ class LoLGameDatabase(GameDatabase):
             result = self.execute_query(query, *params * 2).fetchall()
             return result or [(None, None, None)]
 
-    def get_player_ranks(self, disc_id, time_after=None, time_before=None, order="ASC"):
-        main_player_id = self.game_users[disc_id].player_id[0]
-        delim_str, params = self.get_delimeter(time_after, time_before, None, "p.player_id", main_player_id)
+    def get_player_ranks(self, player_id, time_after=None, time_before=None, order="ASC"):
+        delim_str, params = self.get_delimeter(time_after, time_before, None, "p.player_id", player_id)
 
         query = f"""
             SELECT
@@ -560,20 +557,28 @@ class LoLGameDatabase(GameDatabase):
 
         return self.query(query, *params, format_func="all")
 
-    def get_current_rank(self, disc_id, time_after=None, time_before=None) -> tuple[str, str]:
-        main_player_id = self.game_users[disc_id].player_id[0]
+    def get_current_rank(self, player_id: str) -> tuple[str, str]:
         query = f"""
-            {self.get_player_ranks(disc_id, time_after, time_before, "DESC").query}
-            LIMIT 1
+            SELECT
+                rank_solo,
+                rank_flex
+            FROM users
+            WHERE player_id = ?
         """
 
         with self:
-            return self.execute_query(query, main_player_id).fetchone() or (None, None)
+            return self.execute_query(query, player_id).fetchone() or (None, None)
 
-    def get_highest_rank(self, disc_id, time_after=None, time_before=None) -> tuple[str, str]:
+    def set_current_rank(self, player_id: str, rank_solo: str, rank_flex: str):
+        query = "UPDATE users SET rank_solo = ?, rank_flex = ? WHERE player_id = ?"
+
         with self:
-            ranks = self.get_player_ranks(disc_id, time_after, time_before)()
-        
+            self.execute_query(query, rank_solo, rank_flex, player_id)
+
+    def get_highest_rank(self, player_id, time_after=None, time_before=None) -> tuple[str, str]:
+        with self:
+            ranks = self.get_player_ranks(player_id, time_after, time_before)()
+
             solo_highest_val = 0
             solo_highest = "Unranked"
             flex_highest_val = 0
@@ -590,7 +595,6 @@ class LoLGameDatabase(GameDatabase):
                     flex_highest = rank_flex
 
             return solo_highest, flex_highest
-
 
     def get_split_start(self, offset=0):
         timestamp_before = datetime.now().timestamp() - offset
@@ -618,19 +622,17 @@ class LoLGameDatabase(GameDatabase):
             return self.execute_query(query, timestamp_before).fetchone()[0]
 
     def get_split_message_status(self, disc_id):
-        main_player_id = self.game_users[disc_id].player_id[0]
-        query = "SELECT timestamp FROM split_messages WHERE player_id = ?"
+        query = "SELECT timestamp FROM split_messages WHERE disc_id = ?"
 
         with self:
-            result = self.execute_query(query, main_player_id).fetchone()
+            result = self.execute_query(query, disc_id).fetchone()
             return result[0] if result is not None else None
 
     def set_split_message_sent(self, disc_id, timestamp):
-        main_player_id = self.game_users[disc_id].player_id[0]
         query = "INSERT INTO split_messages VALUES (?, ?)"
     
         with self:
-            self.execute_query(query, main_player_id, timestamp)
+            self.execute_query(query, disc_id, timestamp)
 
     def get_split_summary_data(self, disc_id, stats, prev_split_start, curr_split_start):
         """
@@ -667,14 +669,16 @@ class LoLGameDatabase(GameDatabase):
         games_played_after = self.get_games_count(disc_id, curr_split_start)
 
         # Get best and worst performing champ this split
-        best_wr_info = self.get_min_or_max_winrate_played(disc_id, True, min_games=5)
-        worst_wr_info = self.get_min_or_max_winrate_played(disc_id, False, min_games=5)
+        best_wr_info = self.get_min_or_max_winrate_played(disc_id, True, min_games=5, time_after=prev_split_start)
+        worst_wr_info = self.get_min_or_max_winrate_played(disc_id, False, min_games=5, time_after=prev_split_start)
 
         # Get role performance
         role_winrates = self.get_role_winrate(disc_id, curr_split_start)
 
         # Get highest rank
-        solo_highest, flex_highest = self.get_highest_rank(disc_id, curr_split_start)
+        main_player_id = self.game_users[disc_id].player_id[0]
+        solo_current, flex_current = self.get_current_rank(main_player_id)
+        solo_highest, flex_highest = self.get_highest_rank(main_player_id, curr_split_start)
 
         # Get new champs played prev split and this split
         played_before = None if no_previous else len(self.get_played_ids(disc_id, prev_split_start, curr_split_start))
@@ -692,7 +696,9 @@ class LoLGameDatabase(GameDatabase):
             "best_wr_champ": best_wr_info,
             "worst_wr_champ": worst_wr_info,
             "role_winrates": role_winrates,
+            "solo_current": solo_current,
             "solo_highest": solo_highest,
+            "flex_current": flex_current,
             "flex_highest": flex_highest,
             "played_before": played_before,
             "played_after": played_after

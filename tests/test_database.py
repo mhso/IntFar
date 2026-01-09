@@ -150,7 +150,7 @@ def test_game_queries(meta_database: MetaDatabase, game_databases: dict[str, Gam
         ids = database.get_game_ids()
         assert ids == [(game_id, guild_id)], "Correct game and guild IDs"
 
-        games, first_timestamp, last_timestamp, wins, guilds = database.get_games_count()
+        games, first_timestamp, last_timestamp, playtime, wins, guilds = database.get_games_count()
         assert games == 1, "Correct games count"
         assert first_timestamp == timestamp, "Correct first timestamp"
         assert last_timestamp == timestamp, "Correct last timestamp"

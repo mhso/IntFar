@@ -1,17 +1,16 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Generic, TypeVar
 import random
 
-from intfar.api.game_stats import GameStats, PlayerStats
+from intfar.api.game_stats import GameStatsType, PlayerStatsType
 from intfar.api.game_api_client import GameAPIClient
 from intfar.api.config import Config
 from intfar.api.game_database import GameDatabase
 from intfar.api.util import load_flavor_texts, SUPPORTED_GAMES
 
 GameAPIType = TypeVar("GameAPIType", bound=GameAPIClient)
-GameStatsType = TypeVar("GameStatsType", bound=GameStats)
 
-class AwardQualifiers(Generic[GameAPIType, GameStatsType]):
+class AwardQualifiers(Generic[GameAPIType, GameStatsType, PlayerStatsType]):
     def __init__(self, config: Config, api_client: GameAPIType, parsed_game_stats: GameStatsType):
         self.game = parsed_game_stats.game
         self.guild_id = parsed_game_stats.guild_id
@@ -189,7 +188,7 @@ class AwardQualifiers(Generic[GameAPIType, GameStatsType]):
 
             game_data = database.get_games_count(stats.disc_id)
             total_games = game_data[0]
-            total_wins = game_data[3]
+            total_wins = game_data[4]
             total_intfars = database.get_intfar_count(stats.disc_id)
             total_doinks = database.get_doinks_count(stats.disc_id)[1]
 
@@ -242,7 +241,7 @@ class AwardQualifiers(Generic[GameAPIType, GameStatsType]):
     def get_intfar(self) -> tuple[int, list[tuple], bool, str]:
         ... 
 
-    def get_intfar_candidates(self, intfar_details: list[tuple[str, list[PlayerStats]]]) -> tuple[dict[int, list[tuple[str, PlayerStats]]], int, int]:
+    def get_intfar_candidates(self, intfar_details: list[tuple[str, list[PlayerStatsType]]]) -> tuple[dict[int, list[tuple[str, PlayerStatsType]]], int, int]:
         max_intfar_count = 1
         max_count_intfar = None
         intfar_counts = {}

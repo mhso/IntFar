@@ -15,12 +15,14 @@ from intfar.api.game_database import GameDatabase
 from intfar.api.game_databases import get_database_client
 from intfar.api.awards import get_awards_handler
 from intfar.api.game_data import get_stat_parser, get_stat_quantity_descriptions, stats_from_database
+from intfar.api.game_data.lol import parse_player_rank
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_apis.cs2 import SteamAPIClient
 from intfar.discbot.commands.util import ADMIN_DISC_ID
 from intfar.api.data_schema import generate_schema
-from intfar.discbot.commands.split import handle_end_of_split_msg
+from intfar.discbot.commands.split import get_end_of_split_msg, has_ranks_reset, should_send_split_message
 from run_command import create_client
+from run_discord_bot import run_client
 
 class TestFuncs:
     def __init__(self, config, meta_database: MetaDatabase, game_databases: dict[str, GameDatabase], riot_api: RiotAPIClient):
@@ -369,9 +371,53 @@ class TestFuncs:
         matches = list(filter(lambda game_id: str(game_id) != latest_id, matches))
         print(matches)
 
-    async def split_message(self, disc_id=ADMIN_DISC_ID):
+    async def split_has_ranks_reset(self, disc_id=ADMIN_DISC_ID):
+        disc_id = int(disc_id)
+        database = self.game_databases["lol"]
+        offset_1 = 30 * 24 * 60 * 60
+        offset_2 = 190 * 24 * 60 * 60
+        curr_split_start = database.get_split_start(offset_1)
+        prev_split_start = database.get_split_start(offset_2)
+
+        main_player_id = database.game_users[disc_id].player_id[0]
+        rank_data = await self.riot_api.get_player_rank(main_player_id)
+        rank_data = {disc_id: parse_player_rank(rank_data)}
+
+        should_send = should_send_split_message(database, disc_id, prev_split_start, curr_split_start)
+        ranks_reset = has_ranks_reset(database, rank_data)
+
+        print("Should send:", should_send)
+        print("Ranks reset:", ranks_reset)
+
+    async def test_split_message(self, disc_id=ADMIN_DISC_ID):
+        disc_id = int(disc_id)
         client = create_client(self.config, self.meta_database, self.game_databases)
-        await handle_end_of_split_msg(client, disc_id)
+
+        database = self.game_databases["lol"]
+        offset_1 = 30 * 24 * 60 * 60
+        offset_2 = 190 * 24 * 60 * 60
+        curr_split_start = database.get_split_start(offset_1)
+        prev_split_start = database.get_split_start(offset_2)
+
+        message = get_end_of_split_msg(database, self.riot_api, disc_id, prev_split_start, curr_split_start)
+
+        await client.send_dm(message, disc_id)
+
+    def send_split_summary(self, disc_id=ADMIN_DISC_ID):
+        disc_id = int(disc_id)
+
+        database = self.game_databases["lol"]
+        offset_1 = 30 * 24 * 60 * 60
+        offset_2 = 190 * 24 * 60 * 60
+        curr_split_start = database.get_split_start(offset_1)
+        prev_split_start = database.get_split_start(offset_2)
+
+        message = get_end_of_split_msg(database, self.riot_api, disc_id, prev_split_start, curr_split_start)
+
+        async def on_ready(client):
+            await client.send_dm(client.insert_emotes(message), disc_id)
+
+        run_client(self.config, self.meta_database, self.game_databases, {}, {"lol": self.riot_api}, on_ready=on_ready)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

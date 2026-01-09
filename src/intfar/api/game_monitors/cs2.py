@@ -7,9 +7,10 @@ from mhooge_flask.logging import logger
 from intfar.api.user import User
 from intfar.api.game_monitor import GameMonitor
 from intfar.api.game_apis.cs2 import SteamAPIClient
+from intfar.api.game_data.cs2 import CS2GameStats, CS2PlayerStats
 from intfar.api.game_databases.cs2 import CS2GameDatabase
 
-class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient]):
+class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient, CS2GameStats, CS2PlayerStats]):
     POSTGAME_STATUS_CUSTOM_GAME = 4
     POSTGAME_STATUS_DEMO_MISSING = 5
     POSTGAME_STATUS_DEMO_MALFORMED = 6

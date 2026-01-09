@@ -15,7 +15,7 @@ from streamscape import Streamscape
 
 from intfar.discbot.montly_intfar import MonthlyIntfar
 from intfar.discbot.app_listener import listen_for_request
-from intfar.discbot.commands.split import handle_end_of_split_msg
+from intfar.discbot.commands.split import should_send_split_message, get_end_of_split_msg, has_ranks_reset
 from intfar.api.award_qualifiers import AwardQualifiers
 from intfar.api.awards import get_awards_handler
 from intfar.api.game_api_client import GameAPIClient
@@ -26,6 +26,7 @@ from intfar.api.game_monitor import GameMonitor
 from intfar.api.game_monitors import get_game_monitor
 from intfar.api.game_monitors.lol import LoLGameMonitor
 from intfar.api.game_monitors.cs2 import CS2GameMonitor
+from intfar.api.game_databases.lol import LoLGameDatabase
 from intfar.api.meta_database import MetaDatabase
 from intfar.api.game_database import GameDatabase
 from intfar.api.betting import BettingHandler
@@ -114,8 +115,8 @@ class DiscordClient(discord.Client):
                 self.api_clients[game],
                 self.on_game_over
             )
-            for game in api_util.SUPPORTED_GAMES
-            if game in self.game_databases
+            for game in self.game_databases
+            if game in self.api_clients
         }
         self.polling_tasks = {}
 
@@ -602,7 +603,7 @@ class DiscordClient(discord.Client):
     async def emit_event(self, event, *extra_args):
         results = []
         for (callback, args) in self.event_listeners.get(event, []):
-            evaluated = callback(*args, *extra_args)
+            evaluated = callback(self, *args, *extra_args)
             if asyncio.iscoroutine(evaluated):
                 results.append(await evaluated)
 
@@ -1542,46 +1543,57 @@ class DiscordClient(discord.Client):
 
                     await asyncio.sleep(2)
 
-    async def send_end_of_split_message(self):
-        min_games = 10
-        offset_secs = 30 * 24 * 60 * 60
-        now = datetime.now().timestamp()
+    async def get_latest_ranks(self):
         database = self.game_databases["lol"]
-
-        # Check if all player ranks have been reset
-        all_reset = True
+        ranks = {}
         for disc_id in database.game_users.keys():
-            curr_rank_solo, curr_rank_flex = database.get_current_rank(disc_id)
-            puuid = database.game_users[disc_id].player_id[0]
-            rank_data = await self.api_clients["lol"].get_player_rank(puuid, now - offset_secs)
-            new_rank_solo, new_rank_flex = parse_player_rank(rank_data)
+            user = database.game_users[disc_id]
 
-            if all(rank is None for rank in (curr_rank_solo, curr_rank_flex, new_rank_solo, new_rank_flex)):
-                continue
+            try:
+                for player_id in user.player_id:
+                    rank_data = await self.api_clients["lol"].get_player_rank(player_id)
+                    rank_solo, rank_flex = parse_player_rank(rank_data)
 
-            if (
-                (curr_rank_solo is not None and new_rank_solo is not None)
-                or (curr_rank_flex is not None and new_rank_flex is not None)
-            ):
-                all_reset = False
-                break
+                    logger.info(f"Got ranks for user with player ID {player_id}: solo: {rank_solo}, flex: {rank_flex}", flush=True)
+                    ranks[player_id] = (rank_solo, rank_flex)
+            except Exception:
+                logger.bind(event="get_latest_ranks", disc_id=disc_id, player_id=player_id).exception(
+                    "Failed to get latest ranks"
+                )
+
+                await asyncio.sleep(2)
+
+        return ranks
+
+    async def set_latest_ranks(self, player_ranks):
+        database: LoLGameDatabase = self.game_databases["lol"]
+        with database:
+            for player_id in player_ranks:
+                rank_solo, rank_flex = player_ranks[player_id]
+                database.set_current_rank(player_id, rank_solo, rank_flex)
+
+    async def send_end_of_split_message(self, player_ranks):
+        now = datetime.now().timestamp()
+        database: LoLGameDatabase = self.game_databases["lol"]
+
+        offset_1 = 30 * 24 * 60 * 60
+        offset_2 = 190 * 24 * 60 * 60
+
+        curr_split_start = database.get_split_start(offset_1)
+        prev_split_start = database.get_split_start(offset_2)
 
         # If ranks are reset, get the start of the previous split and send
         # end of split summary to players with more than 10 games that split
-        if all_reset:
-            prev_split_start = database.get_split_start(offset=offset_secs)
+        if has_ranks_reset(database, player_ranks):
             for disc_id in database.game_users.keys():
-                latest_timestamp = database.get_split_message_status(disc_id)
-                if (
-                    latest_timestamp is not None
-                    and database.get_games_count(disc_id, prev_split_start)[0] >= min_games
-                ):
+                if should_send_split_message(database, disc_id, prev_split_start, curr_split_start):
                     try:
-                        await handle_end_of_split_msg(self, disc_id)
+                        message = get_end_of_split_msg(database, self.api_clients["lol"], disc_id, prev_split_start, curr_split_start)
+                        await self.send_dm(self.insert_emotes(message), disc_id)
                         database.set_split_message_sent(disc_id, now)
                         logger.bind(event="end_split_message_success").info(f"Sent end-of-split message to {disc_id}")
                     except Exception:
-                        logger.exception(event="end_split_message_error").info(f"Error when sending end-of-split message to {disc_id}")
+                        logger.bind(event="end_split_message_error").exception(f"Error when sending end-of-split message to {disc_id}")
 
     async def polling_loop(self):
         """
@@ -1618,11 +1630,13 @@ class DiscordClient(discord.Client):
 
                 # Get latest usernames for all players in all games, if they've changed
                 await self.set_newest_usernames()
+                player_ranks = await self.get_latest_ranks()
 
                 # Check if a ranked split in League have ended, by seeing
                 # if people's ranks are reset and send an end-of-split
                 # summary message, if so
-                # await self.send_end_of_split_message()
+                await self.send_end_of_split_message(player_ranks)
+                await self.set_latest_ranks(player_ranks)
 
                 curr_day = new_day
 
@@ -2035,7 +2049,7 @@ class DiscordClient(discord.Client):
         command = split[0][1:].lower()
         args = split[1:]
 
-        handler = (await self.emit_event("command", self, message, command, args))[0]
+        handler = (await self.emit_event("command", message, command, args))[0]
         if handler is None:
             if command == "usage":
                 await message.channel.send(

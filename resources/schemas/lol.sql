@@ -6,6 +6,8 @@ CREATE TABLE [users] (
     [player_id] NVARCHAR(78) NOT NULL,
     [main] INTEGER(1),
     [active] INTEGER DEFAULT(1),
+    [rank_solo] NVARCHAR(32),
+    [rank_flex] NVARCHAR(32),
     PRIMARY KEY (disc_id, player_id)
 );
 CREATE TABLE [games] (
@@ -90,6 +92,6 @@ CREATE TABLE [lan_bingo] (
     PRIMARY KEY (id, lan_date)
 );
 CREATE TABLE [split_messages] (
-    [player_id] NVARCHAR(64) NOT NULL,
+    [disc_id] INTEGER NOT NULL,
     [timestamp] INTEGER
 );

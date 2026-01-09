@@ -34,6 +34,6 @@ if __name__ == "__main__":
     api_clients = {game: get_api_client(game, config) for game in SUPPORTED_GAMES}
 
     client = DiscordClient(config, meta_database, game_databases, betting_handlers, api_clients)
-    client.add_event_listener("ready", announce_ifotm, client, args.game)
+    client.add_event_listener("ready", announce_ifotm, args.game)
 
     client.run(config.discord_token)

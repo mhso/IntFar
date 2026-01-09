@@ -13,7 +13,7 @@ from intfar.api.game_database import GameDatabase
 from mhooge_flask.database import DBException
 from intfar.api.config import Config
 from intfar.api.game_data import get_stat_parser
-from intfar.api.game_stats import PostGameStats, GameStats
+from intfar.api.game_stats import PostGameStats, GameStatsType, PlayerStatsType
 from intfar.api.awards import AwardQualifiers, get_awards_handler
 from intfar.api.game_api_client import GameAPIClient
 from intfar.api.util import get_website_link
@@ -21,7 +21,7 @@ from intfar.api.util import get_website_link
 GameDatabaseType = TypeVar("GameDatabaseType", bound=GameDatabase)
 GameAPIType = TypeVar("GameAPIType", bound=GameAPIClient)
 
-class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
+class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerStatsType]):
     GAME_STATUS_NOCHANGE = 0
     GAME_STATUS_ACTIVE = 1
     GAME_STATUS_ENDED = 2
@@ -247,7 +247,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         return game_info, status
 
-    def get_intfar_data(self, awards_handler: AwardQualifiers):
+    def get_intfar_data(self, awards_handler: AwardQualifiers[GameAPIType, GameStatsType, PlayerStatsType]):
         intfar_data = awards_handler.get_intfar()
         intfar_id = intfar_data[0]
         intfar_reasons = intfar_data[1]
@@ -268,21 +268,21 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         return intfar_data, self.game_database.get_current_intfar_streak()
 
-    def get_doinks_data(self, awards_handler: AwardQualifiers):
+    def get_doinks_data(self, awards_handler: AwardQualifiers[GameAPIType, GameStatsType, PlayerStatsType]):
         doinks_mentions, doinks = awards_handler.get_big_doinks()
         for stats in awards_handler.parsed_game_stats.filtered_player_stats:
             stats.doinks = doinks.get(stats.disc_id)
 
         return doinks_mentions, doinks
 
-    def get_ranks_data(self, awards_handler: AwardQualifiers):
+    def get_ranks_data(self, awards_handler: AwardQualifiers[GameAPIType, GameStatsType, PlayerStatsType]):
         prev_ranks = {
-            stats.disc_id: self.game_database.get_current_rank(stats.disc_id)
+            stats.disc_id: self.game_database.get_current_rank(stats.player_id)
             for stats in awards_handler.parsed_game_stats.filtered_player_stats
         }
         return awards_handler.get_rank_mentions(prev_ranks)
 
-    def get_winstreak_data(self, parsed_game_stats: GameStats):
+    def get_winstreak_data(self, parsed_game_stats: GameStatsType):
         active_streaks = {}
         broken_streaks = {}
         game_result = parsed_game_stats.win
@@ -308,13 +308,13 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         return active_streaks, broken_streaks
 
-    def get_cool_timeline_data(self, awards_handler: AwardQualifiers):
+    def get_cool_timeline_data(self, awards_handler: AwardQualifiers[GameAPIType, GameStatsType, PlayerStatsType]):
         return awards_handler.get_cool_timeline_events()
 
-    def get_cool_stats_data(self, awards_handler: AwardQualifiers):
+    def get_cool_stats_data(self, awards_handler: AwardQualifiers[GameAPIType, GameStatsType, PlayerStatsType]):
         return awards_handler.get_cool_stats()
 
-    def save_stats(self, parsed_game_stats: GameStats):
+    def save_stats(self, parsed_game_stats: GameStatsType):
         (
             global_best_records,
             global_worst_records,
@@ -329,10 +329,10 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
 
         return global_best_records, global_worst_records, player_best_records, player_worst_records
 
-    def get_lifetime_stats_data(self, awards_handler: AwardQualifiers):
+    def get_lifetime_stats_data(self, awards_handler: AwardQualifiers[GameAPIType, GameStatsType, PlayerStatsType]):
         return awards_handler.get_lifetime_stats(self.game_database)
 
-    async def get_parsed_stats(self, game_info: Dict[str, Any], guild_id: int) -> GameStats | None:
+    async def get_parsed_stats(self, game_info: Dict[str, Any], guild_id: int) -> GameStatsType | None:
         try: # Get formatted stats that are relevant for the players in the game.
             stat_parser = get_stat_parser(self.game, game_info, self.api_client, self.game_database.game_users, guild_id)
             return stat_parser.parse_data()
@@ -341,7 +341,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             logger.bind(event="parse_stats_error", game_id=game_info["gameId"]).exception("Error when parsing game data!")
             return None
 
-    async def get_post_game_data(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> PostGameStats | None:
+    async def get_post_game_data(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> PostGameStats[GameStatsType, PlayerStatsType] | None:
         # Update users in game based on game data
         logger.bind(event="user_in_game_before", users=self.users_in_game[guild_id]).info(f"Users in game before: {self.users_in_game[guild_id]}")
         self.users_in_game[guild_id] = self.get_users_in_game(self.game_database.game_users, game_info)
@@ -414,7 +414,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType]):
             lifetime_data,
         )
 
-    async def handle_game_over(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> PostGameStats | None:
+    async def handle_game_over(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> PostGameStats[GameStatsType, PlayerStatsType] | None:
         """
         Called when a game is over. Combines all the necessary post game data
         into one object that is returned and passed to any listeners via a callback.

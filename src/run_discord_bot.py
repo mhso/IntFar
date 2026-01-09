@@ -43,7 +43,17 @@ def initialize_commands(config: Config):
 
     collect_commands(Command)
 
-def run_client(config, meta_database, game_databases, betting_handlers, api_clients, ai_pipe, flask_pipe, main_pipe):
+def run_client(
+    config,
+    meta_database,
+    game_databases,
+    betting_handlers,
+    api_clients,
+    ai_pipe=None,
+    flask_pipe=None,
+    main_pipe=None,
+    on_ready=None
+):
     client = DiscordClient(
         config,
         meta_database,
@@ -56,6 +66,8 @@ def run_client(config, meta_database, game_databases, betting_handlers, api_clie
     )
     initialize_commands(client.config)
     client.add_event_listener("command", handle_command)
+    if on_ready:
+        client.add_event_listener("ready", on_ready)
 
     async def runner():
         async with client:

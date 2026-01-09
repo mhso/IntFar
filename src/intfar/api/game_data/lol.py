@@ -382,7 +382,7 @@ class LoLGameStats(GameStats[LoLPlayerStats]):
 
         :param disc_id: Discord ID of the player for whom to get the summary for
         """
-        player_stats: LoLPlayerStats = GameStats.find_player_stats(disc_id, self.filtered_player_stats)
+        player_stats = GameStats[LoLPlayerStats].find_player_stats(disc_id, self.filtered_player_stats)
 
         date = datetime.fromtimestamp(self.timestamp).strftime("%Y/%m/%d")
         dt_1 = datetime.fromtimestamp(time())
@@ -394,17 +394,17 @@ class LoLGameStats(GameStats[LoLPlayerStats]):
             f"{player_stats.deaths}/{player_stats.assists} on {date} in a {fmt_duration} long game"
         )
 
-class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
+class LoLGameStatsParser(GameStatsParser[LoLGameStats, RiotAPIClient]):
     def __init__(self, game: str, raw_data: Dict[str, Any], api_client: RiotAPIClient, all_users: Dict[int, User], guild_id: int):
         super().__init__(game, raw_data, api_client, all_users, guild_id)
 
-    def parse_data(self) -> GameStats:
+    def parse_data(self) -> LoLGameStats:
         if "participantIdentities" in self.raw_data: # Old match v4 data.
             return self.get_relevant_stats_v4()
 
         return self.get_relevant_stats()
 
-    def parse_from_database(self, database, game_id: int = None) -> list[GameStats]:
+    def parse_from_database(self, database, game_id: int | None = None) -> list[LoLGameStats]:
         """
         Get data for a given game, or all games if `game_id` is None, from the database
         and return a list of GameStats objects with the game data.
@@ -432,7 +432,7 @@ class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
 
         return all_stats
 
-    def get_relevant_stats_v4(self) -> GameStats:
+    def get_relevant_stats_v4(self) -> LoLGameStats:
         """
         Get relevant stats from the given game data and filter the data
         that is relevant for the Discord users that participated in the game.
@@ -578,7 +578,7 @@ class LoLGameStatsParser(GameStatsParser[RiotAPIClient]):
             enemy_herald_kills=enemy_herald_kills,
         )
 
-    def get_relevant_stats(self) -> GameStats:
+    def get_relevant_stats(self) -> LoLGameStats:
         """
         Get relevant stats from the given game data and filter the data
         that is relevant for the Discord users that participated in the game.
@@ -829,5 +829,5 @@ def get_rank_value(rank: str):
         return 0
 
     division, tier, points = rank.split("_")
-    numerals = ["I", "II", "III", "IV", "V"]
-    return (_RANKS.index(division) * 100) + (numerals.index(tier.upper()) * 10) + int(points)
+    numerals = ["V", "IV", "III", "II", "I"]
+    return (_RANKS.index(division) * 1000) + (numerals.index(tier.upper()) * 100) + int(points)

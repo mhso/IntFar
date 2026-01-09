@@ -115,7 +115,7 @@ class GameStats(Generic[PlayerStatsType]):
         ]
 
     @classmethod
-    def get_stats_from_db(cls, database, player_stats_cls: PlayerStats, game_id: int = None) -> tuple[list[dict], list[dict]]:
+    def get_stats_from_db(cls, database, player_stats_cls: type[PlayerStatsType], game_id: int | None = None) -> tuple[list[dict], list[dict]]:
         """
         Load stats from the database for all games or a single game
         as well as stats for players in the game(s).
@@ -142,7 +142,7 @@ class GameStats(Generic[PlayerStatsType]):
         return game_stats_dicts, player_stats_dicts
 
     @classmethod
-    def find_player_stats(cls, disc_id: int, player_list: list[PlayerStats]) -> PlayerStats:
+    def find_player_stats(cls, disc_id: int, player_list: list[PlayerStatsType]) -> PlayerStatsType | None:
         """
         Find the stats for a player given their disc_id and a list of player_stats.
         """
@@ -169,8 +169,9 @@ class GameStats(Generic[PlayerStatsType]):
         self.filtered_player_stats = list(filter(lambda x: x.disc_id is not None, self.all_player_stats))
 
 GameAPIType = TypeVar("GameAPIType", bound=GameAPIClient)
+GameStatsType = TypeVar("GameStatsType", bound=GameStats)
 
-class GameStatsParser(Generic[GameAPIType]):
+class GameStatsParser(Generic[GameStatsType, GameAPIType]):
     def __init__(self, game: str, raw_data: Dict, api_client: GameAPIType, all_users: Dict[int, User], guild_id: int):
         self.game = game
         self.raw_data = raw_data
@@ -179,7 +180,7 @@ class GameStatsParser(Generic[GameAPIType]):
         self.guild_id = guild_id
 
     @abstractmethod
-    def parse_data(self) -> GameStats:
+    def parse_data(self) -> GameStatsType:
         ...
 
     @abstractmethod
@@ -187,7 +188,7 @@ class GameStatsParser(Generic[GameAPIType]):
         ...
 
     @abstractmethod
-    def parse_from_database(self, database, game_id: int = None) -> list[GameStats]:
+    def parse_from_database(self, database, game_id: int = None) -> list[GameStatsType]:
         """
         Get data for a given game, or all games if `game_id` is None, from the database
         and return a list of GameStats objects with the game data.
@@ -195,11 +196,11 @@ class GameStatsParser(Generic[GameAPIType]):
         ...
 
 @dataclass
-class PostGameStats:
+class PostGameStats(Generic[GameStatsType, PlayerStatsType]):
     game: str
     status_code: int
     guild_id: int
-    parsed_game_stats: GameStats = None
+    parsed_game_stats: GameStatsType = None
     intfar_data: tuple[int, list[tuple], bool, str] = None
     intfar_streak_data: tuple[int, int] = None
     doinks_data: tuple[dict[int, list[tuple]], dict[int, str]] = None
@@ -211,11 +212,11 @@ class PostGameStats:
     lifetime_data: dict[int, tuple[int, int]] = None
 
 def get_outlier(
-    player_stats_list: list[PlayerStats],
+    player_stats_list: list[PlayerStatsType],
     stat: str,
     asc=True,
     include_ties=False
-) -> list[PlayerStats] | PlayerStats | None:
+) -> list[PlayerStatsType] | PlayerStatsType | None:
     """
     Get the best or worse stat for a player in a finished game, fx.
     the player with most kills, and how many kills that was.
@@ -227,7 +228,7 @@ def get_outlier(
                             or just return one person as an outlier, ignoring ties
     """
 
-    def outlier_func_short(x: PlayerStats):
+    def outlier_func_short(x: PlayerStatsType):
         return getattr(x, stat)
 
     filtered_data = list(filter(lambda p: outlier_func_short(p) is not None, player_stats_list))

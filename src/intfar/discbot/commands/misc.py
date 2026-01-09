@@ -276,7 +276,8 @@ class SummaryCommand(Command):
         fmt_stat_names = get_formatted_stat_names(game)
 
         if game == "lol":
-            rank_solo, rank_flex = database.get_current_rank(target_id)
+            main_player_id = database.game_users[target_id].player_id[0]
+            rank_solo, rank_flex = database.get_current_rank(main_player_id)
             fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_solo)
             response_1 += f"Their current rank in {fmt_stat_names['rank_solo']} is **{fmt_rank}**.\n"
 

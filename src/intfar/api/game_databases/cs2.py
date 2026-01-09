@@ -334,19 +334,17 @@ class CS2GameDatabase(GameDatabase):
 
             return result
 
-    def get_current_rank(self, disc_id) -> str:
+    def get_current_rank(self, player_id: str) -> str:
         query = """
             SELECT p.rank
             FROM participants AS p
-            INNER JOIN users AS u
-                ON u.player_id = p.player_id
-            WHERE u.disc_id = ?
+            WHERE o.player_id = ?
             ORDER BY p.game_id DESC
             LIMIT 1
         """
 
         with self:
-            return self.execute_query(query, disc_id).fetchone()
+            return self.execute_query(query, player_id).fetchone()
 
     def get_overtime_winrate(self, disc_id):
         query = """

@@ -7,12 +7,12 @@ from mhooge_flask.logging import logger
 from intfar.api import lan
 from intfar.api.game_monitor import GameMonitor
 from intfar.api.user import User
-from intfar.api.game_data.lol import get_player_stats
+from intfar.api.game_data.lol import LoLGameStats, LoLPlayerStats, get_player_stats
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_databases.lol import LoLGameDatabase
 from intfar.api.util import GUILD_IDS
 
-class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
+class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient, LoLGameStats, LoLPlayerStats]):
     POSTGAME_STATUS_CUSTOM_GAME = 5
     POSTGAME_STATUS_URF = 6
     POSTGAME_STATUS_INVALID_MAP = 7
@@ -197,7 +197,12 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient]):
 
         post_game_data = await super().handle_game_over(game_info, status_code, guild_id)
 
-        if post_game_data is not None and lan.is_lan_ongoing(time(), guild_id):
-            lan.update_bingo_progress(self.game_database, post_game_data)
+        if post_game_data is not None:
+            with self.game_database:
+                for player_data in post_game_data.parsed_game_stats.filtered_player_stats:
+                    self.game_database.set_current_rank(player_data.player_id, player_data.rank_solo, player_data.rank_flex)
+
+                if lan.is_lan_ongoing(time(), guild_id):
+                    lan.update_bingo_progress(self.game_database, post_game_data)
 
         return post_game_data

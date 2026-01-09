@@ -593,7 +593,7 @@ class CS2GameStats(GameStats[CS2PlayerStats]):
 
         :param disc_id: Discord ID of the player for whom to get the summary for
         """
-        player_stats: CS2PlayerStats = GameStats.find_player_stats(disc_id, self.filtered_player_stats)
+        player_stats = GameStats[CS2PlayerStats].find_player_stats(disc_id, self.filtered_player_stats)
 
         date = datetime.fromtimestamp(self.timestamp).strftime("%Y/%m/%d")
         dt_1 = datetime.fromtimestamp(time())
@@ -605,8 +605,8 @@ class CS2GameStats(GameStats[CS2PlayerStats]):
             f"{player_stats.deaths}/{player_stats.assists} on {date} in a {fmt_duration} long game"
         )
 
-class CS2GameStatsParser(GameStatsParser[SteamAPIClient]):
-    def parse_data(self) -> GameStats:
+class CS2GameStatsParser(GameStatsParser[CS2GameStats, SteamAPIClient]):
+    def parse_data(self) -> CS2GameStats:
         round_stats = self.raw_data["matches"][0]["roundstatsall"]
         demo_parsed = self.raw_data["demo_parse_status"] == "parsed"
 
@@ -868,7 +868,7 @@ class CS2GameStatsParser(GameStatsParser[SteamAPIClient]):
             biggest_deficit=biggest_deficit
         )
 
-    def parse_from_database(self, database, game_id: int = None) -> list[GameStats]:
+    def parse_from_database(self, database, game_id: int = None) -> list[CS2GameStats]:
         """
         Get data for a given game, or all games if `game_id` is None, from the database
         and return a list of GameStats objects with the game data.
