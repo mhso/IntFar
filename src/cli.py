@@ -187,8 +187,7 @@ class TestFuncs:
             print("Next:", sharecode)
 
     def test_get_stats(self):
-        api_client = SteamAPIClient("cs2", self.config)
-        print(stats_from_database("cs2", self.game_databases["cs2"], api_client, 619073595561213953, "CSGO-JPzyG-faFGY-jHDaM-5YQjz-2B3xK"))
+        print(stats_from_database("lol", self.game_databases["lol"], self.riot_api, 619073595561213953, "7673863643"))
 
     def test_quadra_steal(self):
         game_id = "6700149519"

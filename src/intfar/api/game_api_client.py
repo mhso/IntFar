@@ -10,7 +10,10 @@ class GameAPIClient(ABC):
         self.game = game
         self.config = config
 
-        self.httpx_client = AsyncClient()
+        self.httpx_client = self._create_http_client()
+
+    def _create_http_client(self):
+        return AsyncClient()
 
     @property
     @abstractmethod

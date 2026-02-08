@@ -229,7 +229,7 @@ class DiscordClient(discord.Client):
         :param guild_id:    ID of the Discord server where the game took place
         :param status_code: Integer that describes the status of the finished game
         """        
-        if post_game_stats.status_code == game_monitor.POSTGAME_STATUS_SURRENDER:
+        if post_game_stats.status_code == game_monitor.POSTGAME_STATUS_TOO_SHORT:
             # Game was too short, most likely an early surrender
             response = (
                 f"That game lasted less than {game_monitor.min_game_minutes} minutes "
@@ -1341,40 +1341,18 @@ class DiscordClient(discord.Client):
             await self.audio_handler.play_sound(join_sound, member.voice)
 
         users_in_voice = self.get_users_in_voice()[guild_id]
-        for game in users_in_voice:
+        for game in api_util.SUPPORTED_GAMES:
             user_game_info = self.game_databases[game].game_user_data_from_discord_id(disc_id)
             if user_game_info is not None:
                 game_monitor = self.game_monitors.get(game)
                 if game_monitor is None:
                     continue
 
-                game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
-                logger.debug(f"Game user joined voice: {user_game_info.player_name}")
+                logger.debug(f"Game user joined voice for {api_util.SUPPORTED_GAMES[game]}: {user_game_info.player_name}")
 
-                if game_monitor.should_poll(guild_id):
-                    logger.info(f"Polling is now active for {api_util.SUPPORTED_GAMES[game]}!")
-                    game_monitor.polling_active[guild_id] = True
-                    if game not in self.polling_tasks:
-                        self.polling_tasks[game] = {}
-
-                    self.polling_tasks[game][guild_id] = asyncio.create_task(
-                        game_monitor.start_polling(guild_id, guild_name, poll_immediately)
-                    )
+                game_monitor.add_user_in_voice_channel(user_game_info, guild_id, poll_immediately)
 
             logger.info(f"Active users in {guild_name} for {game}: {len(users_in_voice[game])}")
-
-    def _print_task_result(self, task: asyncio.Task, game: str, guild_id: int):
-        bound_logger = logger.bind(game=game, guild_id=guild_id)
-        try:
-            task.result()
-            bound_logger.info("Polling task ended successfully.")
-        except asyncio.CancelledError:
-            bound_logger.info("Polling task was cancelled.")
-        except asyncio.InvalidStateError:
-            bound_logger.info("Polling task is not yet done.")
-            task.add_done_callback(lambda t: self._print_task_result(t, game, guild_id))
-        except Exception:
-            bound_logger.exception("Exception in polling task!")
 
     async def user_left_voice(self, disc_id: int, guild_id: int):
         """
@@ -1388,18 +1366,14 @@ class DiscordClient(discord.Client):
         guild_name = self.get_guild_name(guild_id)
         logger.debug(f"User left voice in {guild_name}: {disc_id}")
 
-        users_in_voice = self.get_users_in_voice()[guild_id]
-        for game in users_in_voice:
-            game_monitor = self.game_monitors.get(game)
-            if game_monitor is None:
-                continue
+        for game in api_util.SUPPORTED_GAMES:
+            user_game_info = self.game_databases[game].game_user_data_from_discord_id(disc_id)
+            if user_game_info is not None:
+                game_monitor = self.game_monitors.get(game)
+                if game_monitor is None:
+                    continue
 
-            game_monitor.set_users_in_voice_channels(users_in_voice[game], guild_id)
-
-            if game_monitor.should_stop_polling(guild_id):
-                task = self.polling_tasks[game][guild_id]
-                await game_monitor.stop_polling(guild_id)
-                self._print_task_result(task, game, guild_id)
+                await game_monitor.remove_user_from_voice_channel(user_game_info, guild_id)
 
     def get_role(self, role_name, guild):
         """

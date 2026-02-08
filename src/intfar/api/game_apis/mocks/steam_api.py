@@ -4,8 +4,13 @@ from intfar.api.game_apis.mocks.httpx_client import MockAsyncClient
 
 class MockSteamAPI(SteamAPIClient):
     def __init__(self, game: str, config: Config):
-        self.httpx_client = MockAsyncClient()
         super().__init__(game, config)
+
+    def _create_http_client(self):
+        return MockAsyncClient()
+
+    def _init_clients(self):
+        pass
 
     def get_latest_data(self):
         self.map_names = {

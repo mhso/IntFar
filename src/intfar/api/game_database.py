@@ -1682,12 +1682,19 @@ class GameDatabase(SQLiteDatabase):
         elif stats_copy[2] == "player_id":
             stats_copy[2] = "p.player_id"
 
-        try:
-            # game_id will be ambigious, so we need to specify table alias
-            index = stats_copy.index("game_id")
-            stats_copy[index] = "g.game_id"
-        except ValueError:
-            pass
+        ambigious_columns = {
+            "game_id": "g.game_id",
+            "rank_solo": "p.rank_solo",
+            "rank_flex": "p.rank_flex",
+        }
+
+        # Some columns will be ambigious, so we need to specify table alias
+        for col in ambigious_columns:
+            try:
+                index = stats_copy.index(col)
+                stats_copy[index] = ambigious_columns[col]
+            except ValueError:
+                pass
 
         stats_to_select = ", ".join(stats_copy)
 

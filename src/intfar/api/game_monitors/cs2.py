@@ -76,7 +76,7 @@ class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient, CS2GameStats, 
     async def get_active_game_info(self, guild_id: int):
         # Create a bunch of maps for different ID representations
         user_dict: Dict[int, User] = (
-            self.users_in_voice.get(guild_id, {})
+            dict(self.users_in_voice.get(guild_id, {}))
             if self.users_in_game.get(guild_id) is None
             else self.users_in_game[guild_id]
         )
@@ -193,6 +193,9 @@ class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient, CS2GameStats, 
 
         return game_info, status_code
 
+    def is_status_error(self, status_code: int):
+        return super().is_status_error(status_code) or status_code == self.POSTGAME_STATUS_DEMO_MALFORMED
+
     async def handle_game_over(self, game_info: dict, status_code: int, guild_id: int):
         post_game_data = await super().handle_game_over(game_info, status_code, guild_id)
 
@@ -206,7 +209,7 @@ class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient, CS2GameStats, 
                 and post_game_data.status_code != self.POSTGAME_STATUS_SOLO
             ):
                 # Parse only basic stats if CS2 demo is missing or malformed
-                post_game_data.parsed_game_stats = self.parse_stats(game_info, guild_id)
+                post_game_data.parsed_game_stats = self.get_parsed_stats(game_info, guild_id)
                 self.save_stats(post_game_data.parsed_game_stats)
 
                 post_game_data.winstreak_data = self.get_winstreak_data(post_game_data.parsed_game_stats)

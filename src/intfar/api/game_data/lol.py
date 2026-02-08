@@ -321,7 +321,7 @@ class LoLGameStats(GameStats[LoLPlayerStats]):
                             victim_list.append(person_with_quadra)
                             stolen_penta_victims[disc_id] = victim_list
 
-            if 10_000 < frame_data["timestamp"] < 70_000:
+            if 10_000 < frame_data["timestamp"] < 50_000:
                 # Check whether someone left the fountain without buying items
                 people_buying_items = set()
                 for event in frame_data.get("events", []):
@@ -337,7 +337,7 @@ class LoLGameStats(GameStats[LoLPlayerStats]):
                     if not self._is_event_in_fountain(x, y) and (disc_id := participant_dict.get(participant_id)) is not None:
                         people_forgetting_items.append(disc_id)
 
-            if frame_data["timestamp"] < 130_000:
+            if frame_data["timestamp"] < 60_000:
                 # Check whether we invaded at the start of the game
                 # and either got kills or got killed
                 for event in frame_data.get("events", []):

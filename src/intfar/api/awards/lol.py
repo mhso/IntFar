@@ -82,10 +82,10 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats, LoLPlayerS
             "kills": "20 kills or more",
             "damage": "Twice anyone else's damage (and more than 10k)",
             "penta": "Getting a pentakill",
-            "vision_score": "Vision score larger than 100",
+            "vision_score": "Vision score larger than 125",
             "kp": "Kill participation over 80%",
             "monsters": "Securing all epic monsters (and more than 3)",
-            "cs": "More than 8 cs/min"
+            "cs": "More than 9 cs/min"
         }
 
     @classmethod
@@ -228,7 +228,7 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats, LoLPlayerS
             if stats.pentakills > 0:
                 mention_list.append((3, stats.pentakills))
 
-            if stats.vision_score > 100:
+            if stats.vision_score > 125:
                 mention_list.append((4, stats.vision_score))
 
             if stats.kp > 80:
@@ -252,7 +252,7 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats, LoLPlayerS
             if stats.lane == "JUNGLE" and stats.position == "NONE" and own_epics > 3 and enemy_epics == 0:
                 mention_list.append((6, own_epics))
 
-            if stats.cs_per_min >= 8:
+            if stats.cs_per_min >= 8.5:
                 mention_list.append((7, round_digits(stats.cs_per_min)))
 
             if mention_list != []:

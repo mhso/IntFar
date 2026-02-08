@@ -13,7 +13,7 @@ from intfar.api.util import SUPPORTED_GAMES
 
 async def announce_ifotm(client, game):
     dt = datetime.now()
-    dt = dt.replace(hour=client.config.hour_of_ifotm_announce, minute=0, second=0, microsecond=0)
+    dt = dt.replace(day=1, hour=client.config.hour_of_ifotm_announce, minute=0, second=0, microsecond=0)
     ifotm_monitor = MonthlyIntfar(client.config.hour_of_ifotm_announce)
     ifotm_monitor.time_at_announcement = ifotm_monitor.time_at_announcement.replace(year=dt.year, month=dt.month)
 

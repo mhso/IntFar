@@ -338,7 +338,7 @@ class CS2GameDatabase(GameDatabase):
         query = """
             SELECT p.rank
             FROM participants AS p
-            WHERE o.player_id = ?
+            WHERE p.player_id = ?
             ORDER BY p.game_id DESC
             LIMIT 1
         """

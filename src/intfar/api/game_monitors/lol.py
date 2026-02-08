@@ -20,17 +20,14 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient, LoLGameStats, L
     def __init__(self, game, config, meta_database, game_database, api_client, game_over_callback = None):
         super().__init__(game, config, meta_database, game_database, api_client, game_over_callback)
         self.fetch_ranks = True
+        self.polling_stop_delay = 300
         self.latest_game_timestamp: Dict[int, int] = {}
         self.latest_game_id: Dict[int, List[int]] = {}
         self._get_latest_game()
 
-    @property
-    def polling_stop_delay(self):
-        return 300
-
     def _get_latest_game(self):
         latest_game_data = self.game_database.get_latest_game()[0]
-        if latest_game_data is not None:
+        if latest_game_data is not None and latest_game_data[0] is not None:
             latest_id = int(latest_game_data[0])
             latest_game = latest_game_data[1]
 
@@ -61,16 +58,16 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient, LoLGameStats, L
 
     async def get_active_game_info(self, guild_id: int):
         # First check if users are in the same game (or all are in no games).
-        user_dict = self.users_in_voice.get(guild_id, {})
+        user_dict = dict(self.users_in_voice.get(guild_id, {}))
 
         game_ids = {}
         for disc_id in user_dict:
             user_data = user_dict[disc_id]
 
             for puuid, name in zip(user_data.player_id, user_data.player_name):
-                matches = await self.api_client.get_match_history(puuid, self.latest_game_timestamp[guild_id])
+                matches = await self.api_client.get_match_history(puuid, self.latest_game_timestamp.get(guild_id))
                 await asyncio.sleep(0.5)
-                matches += await self.api_client.get_match_history(puuid, self.latest_game_timestamp[guild_id], game_type="normal")
+                matches += await self.api_client.get_match_history(puuid, self.latest_game_timestamp.get(guild_id), game_type="normal")
 
                 if not matches:
                     continue
@@ -197,7 +194,7 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient, LoLGameStats, L
 
         post_game_data = await super().handle_game_over(game_info, status_code, guild_id)
 
-        if post_game_data is not None:
+        if post_game_data is not None and post_game_data.parsed_game_stats is not None:
             with self.game_database:
                 for player_data in post_game_data.parsed_game_stats.filtered_player_stats:
                     self.game_database.set_current_rank(player_data.player_id, player_data.rank_solo, player_data.rank_flex)

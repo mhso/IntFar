@@ -16,7 +16,7 @@ from intfar.api.game_data import get_stat_parser
 from intfar.api.game_stats import PostGameStats, GameStatsType, PlayerStatsType
 from intfar.api.awards import AwardQualifiers, get_awards_handler
 from intfar.api.game_api_client import GameAPIClient
-from intfar.api.util import get_website_link
+from intfar.api.util import get_website_link, GUILD_ABBREVIATIONS, SUPPORTED_GAMES
 
 GameDatabaseType = TypeVar("GameDatabaseType", bound=GameDatabase)
 GameAPIType = TypeVar("GameAPIType", bound=GameAPIClient)
@@ -60,19 +60,17 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
         self.api_client = api_client
         self.game_over_callback  = game_over_callback
 
+        self.polling_stop_delay: int = 0
         self.polling_active: Dict[int, bool] = {}
         self.active_game: Dict[int, dict] = {}
         self.users_in_game: Dict[int, Dict[int, User]] = {}
         self.users_in_voice: Dict[int, Dict[int, User]] = {}
-        self.stop_polling_task: Dict[int, asyncio.Task] = {}
+        self.polling_tasks: Dict[int, asyncio.Task] = {}
+        self.remove_user_task: Dict[int, Dict[int, asyncio.Task]] = {}
 
     @property
     def polling_enabled(self):
         return True
-
-    @property
-    def polling_stop_delay(self) -> int:
-        return 0
 
     @property
     def min_game_minutes(self):
@@ -93,7 +91,10 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
     def get_users_in_game(self, user_dict: Dict[int, User], raw_game_data: Dict) -> Dict[int, User]:
         ...
 
-    async def check_game_status(self, guild_id: int, guild_name: str) -> int:
+    def is_status_error(self, status_code: int):
+        return status_code == self.POSTGAME_STATUS_ERROR
+
+    async def check_game_status(self, guild_id: int) -> int:
         """
         Check whether people that are active in voice channels are currently in a game.
         Returns a status code that can be one of:
@@ -102,7 +103,6 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
          - GameMonitor.GAME_STATUS_ENDED    (2):    Game is now over
 
         :param guild_id:    ID of the Discord server where the game took place
-        :param guild_name:  Name of the Discord server where the game took place
         """
         active_game_info, users_in_current_game, status = await self.get_active_game_info(guild_id)
 
@@ -110,7 +110,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
             if active_game_info["start"] == 0:
                 active_game_info["start"] = int(time())
 
-            active_game_info["game_guild_name"] = guild_name
+            active_game_info["game_guild_name"] = GUILD_ABBREVIATIONS.get(guild_id, "Unknown Server")
 
             self.active_game[guild_id] = active_game_info
             self.users_in_game[guild_id] = users_in_current_game
@@ -126,78 +126,62 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
 
         return self.GAME_STATUS_NOCHANGE
 
-    async def start_polling(self, guild_id: int, guild_name: str, immediately: bool = False):
-        if (polling_task := self.stop_polling_task.get(guild_id)):
-            logger.info("Cancelling stop polling task because of activity!")
-            polling_task.cancel()
-
-        self.polling_active[guild_id] = True
-
-        bound_logger = logger.bind(event="poll_start", game=self.game, guild_id=guild_id)
-        bound_logger.info(f"People are active in {guild_name}! Polling for games for {self.game}...")
-
-        await self.poll_for_new_game(guild_id, guild_name, immediately)
-
-    async def poll_for_new_game(self, guild_id: int, guild_name: str, immediately: bool = False):
+    async def poll_for_new_game(self, guild_id: int, immediately: bool = False):
         """
-        Periodically poll the Riot Games League of Legends API to check if any users in
+        Periodically poll the API for the relevant game to check if any users in
         Discord voice channels have joined a game. Whenever that happens, we instead
         switch to periodically polling for the game to end.
 
         :param guild_id:    ID of the Discord server where we should poll for a game
-        :param guild_name:  Name of the Discord server where we should poll for a game
         :param immediately: Whether to start polling immediately, or sleep for a bit first
         """
-        if not immediately:
-            time_slept = 0
-            sleep_per_loop = 0.2
+        while True:
+            if not immediately:
+                try:
+                    await asyncio.sleep(self.config.status_interval_dormant)
+                except KeyboardInterrupt:
+                    self.polling_active[guild_id] = False
+                    return
+                
+            immediately = False
 
-            try:
-                while time_slept < self.config.status_interval_dormant:
-                    if not self.polling_active.get(guild_id, False): # Stop if people leave voice channels.
-                        return
-
-                    await asyncio.sleep(sleep_per_loop)
-                    time_slept += sleep_per_loop
-
-            except KeyboardInterrupt:
-                self.polling_active[guild_id] = False
+            if not self.polling_active.get(guild_id, False): # Stop if people leave voice channels.
                 return
 
-        try:
-            game_status = await self.check_game_status(guild_id, guild_name)
-        except Exception:
-            bound_logger = logger.bind(event="game_status_error", game=self.game, guild_id=guild_id)
-            bound_logger.exception(f"Error when getting status for {self.game}")
-            game_status = self.GAME_STATUS_NOCHANGE
+            try:
+                game_status = await self.check_game_status(guild_id)
+            except Exception:
+                bound_logger = logger.bind(event="game_status_error", game=self.game, guild_id=guild_id)
+                bound_logger.exception(f"Error when getting status for {self.game}")
+                game_status = self.GAME_STATUS_NOCHANGE
 
-        if game_status == self.GAME_STATUS_ACTIVE: # Game has started.
-            # Send update to Int-Far website that a game has started.
-            req_data = {
-                "secret": self.config.discord_token,
-                "guild_id": guild_id
-            }
-            req_data.update(self.active_game[guild_id])
-            self._send_game_update("game_started", self.game, req_data)
+            # If we can't track active games for a given game,
+            # the status might go from no game to game ended immediately
+            if game_status == self.GAME_STATUS_NOCHANGE: # Sleep for a bit and check game status again.
+                continue
 
-            bound_logger = logger.bind(
-                event="game_start",
-                game=self.game,
-                guild_id=guild_id,
-                users_in_game=self.users_in_game,
-                users_in_voice=self.users_in_voice
-            )
-            bound_logger.info(f"Game of {self.game} is now active in {guild_name}, polling for game end...")
+            if game_status == self.GAME_STATUS_ACTIVE: # Game has started.
+                # Send update to Int-Far website that a game has started.
+                req_data = {
+                    "secret": self.config.discord_token,
+                    "guild_id": guild_id
+                }
+                req_data.update(self.active_game[guild_id])
+                self._send_game_update("game_started", self.game, req_data)
 
-            await self.poll_for_game_end(guild_id, guild_name)
+                bound_logger = logger.bind(
+                    event="game_start",
+                    game=self.game,
+                    guild_id=guild_id,
+                    users_in_game=self.users_in_game,
+                    users_in_voice=self.users_in_voice
+                )
+                bound_logger.info(f"Game of {self.game} is now active in guild with ID {guild_id}, polling for game end...")
 
-        # If we can't track active games for a given game,
-        # the status might go from no game to game ended immediately
-        elif game_status == self.GAME_STATUS_ENDED:
-            await self.on_game_end(guild_id, guild_name)
+                await self.poll_for_game_end(guild_id)
 
-        elif game_status == self.GAME_STATUS_NOCHANGE: # Sleep for a bit and check game status again.
-            await self.poll_for_new_game(guild_id, guild_name)
+            elif game_status == self.GAME_STATUS_ENDED:
+                await self.on_game_end(guild_id)
 
     def get_finished_game_status(self, game_info: Dict[str, Any], guild_id: int):
         if self.game_database.game_exists(game_info["gameId"]):
@@ -231,7 +215,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
         retry = 0
         retries = 5
         time_to_sleep = start_sleep
-        while (game_info is None or status == self.POSTGAME_STATUS_ERROR) and retry < retries:
+        while (game_info is None or self.is_status_error(status)) and retry < retries:
             logger.warning(
                 f"Game info is None! Retrying in {time_to_sleep} secs..."
             )
@@ -437,7 +421,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
 
         return post_game_data
 
-    async def on_game_end(self, guild_id: int, guild_name: str):
+    async def on_game_end(self, guild_id: int):
         game_id = None
         try:
             game_id = self.active_game.get(guild_id, {}).get("id")
@@ -471,9 +455,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
             del self.active_game[guild_id]
             del self.users_in_game[guild_id] # Reset the list of users who are in a game.
 
-            await self.poll_for_new_game(guild_id, guild_name)
-
-    async def poll_for_game_end(self, guild_id: int, guild_name: str):
+    async def poll_for_game_end(self, guild_id: int):
         """
         When users are detected in an active game, this method polls the relevant API
         to check when the game has ended. When this is detected,
@@ -481,50 +463,89 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
 
         :param guild_id:    ID of the Discord server where we should poll
                             for the end of the game
-        :param guild_name:  Name of the Discord server where we should poll
-                            for the end of the game
         """
-        logger.info(f"Polling for {self.game} game end...")
-        time_slept = 0
-        sleep_per_loop = 0.2
-        try:
-            while time_slept < self.config.status_interval_ingame:
-                await asyncio.sleep(sleep_per_loop)
-                time_slept += sleep_per_loop
+        while True:
+            try:
+                logger.info(f"Polling for {self.game} game end...")
+                await asyncio.sleep(self.config.status_interval_ingame)
 
-        except KeyboardInterrupt:
-            return
+            except KeyboardInterrupt:
+                return
 
-        game_status = await self.check_game_status(guild_id, guild_name)
-        if game_status == self.GAME_STATUS_ENDED: # Game is over.
-            await self.on_game_end(guild_id, guild_name)
+            game_status = await self.check_game_status(guild_id)
+            if game_status == self.GAME_STATUS_NOCHANGE:
+                continue
 
-        elif game_status == self.GAME_STATUS_NOCHANGE:
-            await self.poll_for_game_end(guild_id, guild_name)
+            if game_status == self.GAME_STATUS_ENDED: # Game is over.
+                await self.on_game_end(guild_id)
 
-    async def _stop_polling_after_delay(self, guild_id):
-        await asyncio.sleep(self.polling_stop_delay)
-
-        logger.info(f"Stopping polling of '{self.game}' now!")
-        self.polling_active[guild_id] = False
+            break
 
     async def stop_polling(self, guild_id):
-        if self.polling_stop_delay == 0:
-            logger.info(f"Stopping polling of '{self.game}' now.")
-            self.polling_active[guild_id] = False
-
-        elif not self.stop_polling_task.get(guild_id):
-            logger.info(f"Stopping polling of '{self.game}' in {self.polling_stop_delay} seconds...")
-            self.stop_polling_task[guild_id] = asyncio.create_task(self._stop_polling_after_delay(guild_id))
-
-    def set_users_in_voice_channels(self, users, guild_id):
-        self.users_in_voice[guild_id] = users
+        self.polling_active[guild_id] = False
+        logger.info(f"Stopping polling of '{self.game}'.")
 
     def should_stop_polling(self, guild_id):
         return len(self.users_in_voice.get(guild_id, [])) < 2 and self.polling_active.get(guild_id, False)
 
     def should_poll(self, guild_id):
         return self.polling_enabled and len(self.users_in_voice.get(guild_id, [])) > 1 and not self.polling_active.get(guild_id, False)
+
+    def _print_task_result(self, task: asyncio.Task,  guild_id: int):
+        bound_logger = logger.bind(game=self.game, guild_id=guild_id)
+        try:
+            task.result()
+            bound_logger.info("Polling task ended successfully.")
+        except asyncio.CancelledError:
+            bound_logger.info("Polling task was cancelled.")
+        except asyncio.InvalidStateError:
+            bound_logger.info("Polling task is not yet done.")
+        except Exception:
+            bound_logger.exception("Exception in polling task!")
+
+    def add_user_in_voice_channel(self, user: User, guild_id: int, poll_immediately: bool = False):
+        if guild_id not in self.users_in_voice:
+            self.users_in_voice[guild_id] = {}
+
+        self.users_in_voice[guild_id][user.disc_id] = user
+
+        if self.remove_user_task.get(guild_id, {}).get(user.disc_id):
+            self.remove_user_task[guild_id][user.disc_id].cancel()
+
+        if self.should_poll(guild_id):
+            bound_logger = logger.bind(event="poll_start", game=self.game, guild_id=guild_id)
+            bound_logger.info(f"People are active in guild with ID {guild_id}! Polling for games for {SUPPORTED_GAMES[self.game]}...")
+
+            self.polling_active[guild_id] = True
+            polling_task = asyncio.create_task(self.poll_for_new_game(guild_id, poll_immediately))
+            polling_task.add_done_callback(lambda t: self._print_task_result(t, guild_id))
+            self.polling_tasks[guild_id] = polling_task
+
+    async def _remove_user(self, user: User, guild_id: int):
+        logger.info(f"Removing user '{user.player_name[0]}' in '{self.game}' now")
+        del self.users_in_voice[guild_id][user.disc_id]
+
+        if guild_id in self.remove_user_task and user.disc_id in self.remove_user_task[guild_id]:
+           del self.remove_user_task[guild_id][user.disc_id]
+
+        if self.should_stop_polling(guild_id):
+            task = self.polling_tasks[guild_id]
+            await self.stop_polling(guild_id)
+            self._print_task_result(task, guild_id)
+
+    async def _remove_user_after_delay(self, user: User, guild_id: int):
+        await asyncio.sleep(self.polling_stop_delay)
+        await self._remove_user(user, guild_id)
+
+    async def remove_user_from_voice_channel(self, user: User, guild_id: int):
+        if self.polling_stop_delay == 0:
+            await self._remove_user(user, guild_id)
+        elif not self.remove_user_task.get(guild_id, {}).get(user.disc_id):
+            if guild_id not in self.remove_user_task:
+                self.remove_user_task[guild_id] = {}
+
+            logger.info(f"Removing user '{user.player_name[0]}' in '{self.game}' after {self.polling_stop_delay} seconds...")
+            self.remove_user_task[guild_id][user.disc_id] = asyncio.create_task(self._remove_user_after_delay(user, guild_id))    
 
     def _send_game_update(self, endpoint, game, data):
         try:
