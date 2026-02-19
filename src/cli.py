@@ -18,6 +18,7 @@ from intfar.api.game_data import get_stat_parser, get_stat_quantity_descriptions
 from intfar.api.game_data.lol import parse_player_rank
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_apis.cs2 import SteamAPIClient
+from intfar.api.game_monitors import get_game_monitor
 from intfar.discbot.commands.util import ADMIN_DISC_ID
 from intfar.api.data_schema import generate_schema
 from intfar.discbot.commands.split import get_end_of_split_msg, has_ranks_reset, should_send_split_message
@@ -291,7 +292,7 @@ class TestFuncs:
 
     def awpy(self):
         from awpy import DemoParser
-        match_id = "CSGO-syuCM-w45kr-Hce9x-JM7TZ-FFzQN"
+        match_id = "CSGO-9s2bt-xjT3L-u967i-eByxH-O9tvE"
         demo_dem_file = f"{self.config.resources_folder}/data/cs2/{match_id}.dem"
         parser = DemoParser(demofile=demo_dem_file, debug=True)
         demo_game_data = parser.parse()
@@ -361,13 +362,17 @@ class TestFuncs:
         latest_id = None
         if latest_game is not None:
             latest_id = latest_game[0]
-            latest_game = latest_game[1]
+            latest_game = latest_game[1] * 1000
+
+        print(latest_id)
+        print(latest_game)
 
         matches = await self.riot_api.get_match_history(puuid, latest_game)
         await asyncio.sleep(0.5)
         matches += await self.riot_api.get_match_history(puuid, latest_game, game_type="normal")
-
+        matches = sorted(set(matches))
         matches = list(filter(lambda game_id: str(game_id) != latest_id, matches))
+
         print(matches)
 
     async def split_has_ranks_reset(self, disc_id=ADMIN_DISC_ID):
@@ -417,6 +422,18 @@ class TestFuncs:
             await client.send_dm(client.insert_emotes(message), disc_id)
 
         run_client(self.config, self.meta_database, self.game_databases, {}, {"lol": self.riot_api}, on_ready=on_ready)
+
+    async def test_game_monitor(self):
+        guild_id = util.GUILD_MAP["core"]
+        game_monitor = get_game_monitor("lol", self.config, self.meta_database, self.game_databases["lol"], self.riot_api)
+        game_monitor.polling_active[guild_id] = True
+        game_monitor.users_in_voice[guild_id] = {
+            115142485579137029: self.game_databases["lol"].game_user_data_from_discord_id(115142485579137029),
+            267401734513491969: self.game_databases["lol"].game_user_data_from_discord_id(267401734513491969),
+        }
+        print(game_monitor.latest_game_timestamp)
+        print(game_monitor.latest_game_id)
+        await game_monitor.poll_for_new_game(guild_id, True)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

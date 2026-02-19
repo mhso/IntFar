@@ -1,0 +1,12 @@
+resources/data
+resources/databases/test
+resources/databases/*_backup.db
+resources/game_data_schemas
+resources/lol_data.json
+resources/message.txt
+resources/skins.csv
+resources/team_comps.txt
+
+src/cli.py
+src/dummy.txt
+src/query_db.py

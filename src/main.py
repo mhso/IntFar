@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from run_flask import run_app as run_flask_app
 from run_discord_bot import run_client as run_discord_client
 
@@ -6,7 +7,6 @@ from multiprocessing import Process, Pipe, Manager
 
 from discord.opus import load_opus
 from mhooge_flask.logging import logger
-from mhooge_flask.restartable import restartable
 
 from intfar.api.config import Config
 from intfar.api.meta_database import MetaDatabase
@@ -17,7 +17,6 @@ from intfar.api.proxy import ProxyManager
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_apis.cs2 import SteamAPIClient
 from intfar.api.bets import get_betting_handler
-#from ai import model
 
 def start_discord_process(*args):
     """
@@ -65,16 +64,12 @@ def kill_all_processes(processes):
         sleep(0.25)
         exit(1)
 
-@restartable
-def main():
+def main(flask_port: int):
     config = Config()
 
     env_desc = "DEVELOPMENT" if config.env == "dev" else "PRODUCTION"
 
     logger.info(f"+++++ Running in {env_desc} mode +++++")
-
-    if config.env == "production":
-        load_opus("/usr/local/lib/libopus.so")
 
     logger.info("Initializing databases...")
     sync_manager = Manager()
@@ -104,7 +99,7 @@ def main():
 
     # Start flask app hosting Int-Far website
     logger.info("Starting Flask web app...")
-    flask_args = [config, meta_database, game_databases, betting_handlers, api_clients]
+    flask_args = [flask_port, config, meta_database, game_databases, betting_handlers, api_clients]
     flask_process, bot_end_flask = start_flask_process(*flask_args)
 
     # Start Discord client process
@@ -150,4 +145,8 @@ def main():
             break
 
 if __name__ == "__main__":
-    main()
+    parser = ArgumentParser()
+    parser.add_argument("-p", "--port", default=5000, type=int)
+    args = parser.parse_args()
+
+    main(args.port)

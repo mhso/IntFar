@@ -1,7 +1,7 @@
 from glob import glob
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_apis.mocks.httpx_client import MockAsyncClient
-from src.intfar.api.config import Config
+from intfar.api.config import Config
 
 class MockRiotAPI(RiotAPIClient):
     def __init__(self, game: str, config: Config):

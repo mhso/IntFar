@@ -76,13 +76,7 @@ if __name__ == "__main__":
 
     try:
         client = SteamAPIClient(args.game, config)
-
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-
-        loop.run_until_complete(listen(database, client))
+        asyncio.run(listen(database, client))
 
     except Exception as exc:
         print(exc)

@@ -1,14 +1,12 @@
 import asyncio
 import math
 from datetime import datetime
+import os
+from subprocess import Popen, PIPE
 
-from discord import PCMVolumeTransformer
+from discord import Message, PCMVolumeTransformer
 from discord.player import FFmpegPCMAudio
 
-from streamscape import Streamscape
-from streamscape.sites import SITES
-from streamscape.errors import StreamCreationError, InvalidSiteError, InvalidURLError
-from streamscape.stream import AudioStream
 from mhooge_flask.logging import logger
 
 from intfar.api.config import Config
@@ -101,19 +99,47 @@ class AudioHandler:
         EMOJI_PREV, EMOJI_PLAY, EMOJI_STOP, EMOJI_NEXT
     ]
 
-    def __init__(self, config: Config, meta_database: MetaDatabase, stream_handler: Streamscape):
+    def __init__(self, config: Config, meta_database: MetaDatabase):
         self.meta_database = meta_database
         self.config = config
         self.sounds_path = f"{config.static_folder}/sounds"
-        self.stream_handler = stream_handler
         self.youtube_api = YouTubeAPIClient(config)
         self.voice_streams = {} # Keep track of connections to voice channels.
-        self.web_streams: dict[int, AudioStream] = {}
+        self.web_streams = {}
         self.web_stream_status = {}
         self.playback_msg = {}
         self.sound_queue = {}
         self.active_youtube_suggestions = {}
         self.youtube_suggestions_msg = {}
+
+    async def _download_from_url(self, message: Message, url: str):
+        filename = "output.mp3"
+        args = ["yt-dlp", "-x", "--audio-format", "mp3", "-o", filename, url]
+        process = Popen(args, stdout=PIPE, stderr=PIPE, text=True)
+
+        stdout, stderr = process.communicate()
+
+        if not stdout or process.returncode != 0:
+            # Error when downloading video with yt-dlp
+            logger.bind(
+                event="yt_dlp_error", stdout=stdout, stderr=stderr
+            ).error(f"Error when downloading file with yt-dlp: {stderr}")
+
+            admin_mention = None
+            for member in message.guild.members:
+                if member.id == ADMIN_DISC_ID:
+                    admin_mention = member.mention
+                    break
+
+            response = "Weird error happened while playing sound... "
+            if admin_mention is not None:
+                response += f"This sounds like a job for {admin_mention}!"
+
+            await message.channel.send(response)
+
+            return None
+
+        return filename
 
     async def _play_loop(self, guild_id):
         while (sound_queue := self.sound_queue.get(guild_id, [])) != []:
@@ -126,93 +152,33 @@ class AudioHandler:
 
             if sound_type == "file":
                 # Stream audio from a file
-                audio_source = FFmpegPCMAudio(f"{self.sounds_path}/{sound_name}.mp3", executable="ffmpeg")
+                sound_path = f"{self.sounds_path}/{sound_name}.mp3"
                 volume = 1
             else:
-                # Stream audio from a URL using Streamscape
-                sample_rate = 48000
-                try:
-                    self.web_streams[guild_id] = self.stream_handler.get_stream(
-                        sound_name,
-                        sample_rate=sample_rate,
-                        buffer_size=1024,
-                        raw_format="s16le"
-                    )
-                    self.web_stream_status[guild_id] = "Starting..."
-                except ValueError:
-                    # URL was invalid in some way
-                    await message.channel.send(
-                        f"Could not get audio from '{sound_name}'. "
-                        "Either the link is invalid or the site could not be reached."
-                    )
-                    continue
-                except Exception:
-                    logger.exception("Error during Streamscape 'get_stream'")
-
-                    # Uncaught exception when creating stream.
-                    admin_mention = None
-                    for member in message.guild.members:
-                        if member.id == ADMIN_DISC_ID:
-                            admin_mention = member.mention
-                            break
-
-                    response = "Weird error happened while playing sound... "
-                    if admin_mention is not None:
-                        response += f"This sounds like a job for {admin_mention}!"
-
-                    await message.channel.send(response)
-                    continue
-
-                try:
-                    self.web_streams[guild_id].open()
-                except StreamCreationError:
-                    response = (
-                        "Failed to start this video/song for some reason :( "
-                        "maybe it is age-restricted or maybe Int-Far just sucks."
-                    )
-                    await message.channel.send(response)
-                    continue
-
-                audio_source = ClosableFFmpegPCMAudio(
-                    self.web_streams[guild_id],
-                    executable="ffmpeg",
-                    pipe=True,
-                    before_options=f"-f s16le -ar {sample_rate} -ac 2"
-                )
+                sound_path = await self._download_from_url(message, sound_name)
                 volume = 0.2
-                self.playback_msg[guild_id] = await message.channel.send(self._get_playback_str(guild_id))
-                for control_button in self.AUDIO_CONTROL_EMOJIS:
-                    await self.playback_msg[guild_id].add_reaction(control_button)
 
-            # Create volume controlled FFMPEG player from sound file.
-            player = PCMVolumeTransformer(audio_source, volume=volume)
+            if sound_path is None:
+                continue
 
-            # Start the player and wait until it is done.
-            self.voice_streams[guild_id].play(player)
+            try:
+                audio_source = FFmpegPCMAudio(sound_path, executable="ffmpeg")
 
-            if sound_type == "url":
-                self.web_stream_status[guild_id] = "Now Playing"
+                # Create volume controlled FFMPEG player from sound file.
+                player = PCMVolumeTransformer(audio_source, volume=volume)
 
-            while self.voice_streams[guild_id].is_playing():
-                await asyncio.sleep(1)
-                if self.playback_msg.get(guild_id) is not None:
-                    await self.playback_msg[guild_id].edit(content=self._get_playback_str(guild_id))
+                # Start the player and wait until it is done.
+                self.voice_streams[guild_id].play(player)
 
-            await asyncio.sleep(0.5)
+                while self.voice_streams[guild_id].is_playing():
+                    await asyncio.sleep(1)
 
-            if guild_id in self.playback_msg:
-                # Delete playback progress message
-                await self.playback_msg[guild_id].delete()
-                del self.playback_msg[guild_id]
+                await asyncio.sleep(0.5)
+            finally:
+                if sound_type == "url" and os.path.exists(sound_path):
+                    os.remove(sound_path)
 
-            self.voice_streams[guild_id].stop()
-
-            if guild_id in self.web_streams:
-                del self.web_streams[guild_id]
-                del self.web_stream_status[guild_id]
-
-            if sound_type == "url" and audio_source.error:
-                return False, audio_source.error
+                self.voice_streams[guild_id].stop()
 
         # Disconnect from voice channel.
         await self.voice_streams[guild_id].disconnect()
@@ -221,8 +187,15 @@ class AudioHandler:
         if guild_id in self.sound_queue:
             del self.sound_queue[guild_id]
         del self.voice_streams[guild_id]
-    
+
         return True, None
+
+    async def _is_youtube_url(self, url: str):
+        return (
+            url.startswith("https://youtube.com")
+            or url.startswith("www.youtube.com")
+            or url.startswith("https://www.youtube.com")
+        )
 
     async def play_sound(self, sounds, voice_state, message=None):
         """
@@ -255,33 +228,25 @@ class AudioHandler:
                 except ValueError:
                     pass
 
-            # Check if 'sound' is a URL to a valid website
-            try:
-                url = self.stream_handler.validate_url(sound)
-
-            except InvalidSiteError:
-                err_msg = f"Connection timed out when trying to connect to `{sound}`, try again later."
-                if len(sounds) == 1:
+            # Check if 'sound' is a sound file or a URL to a valid website
+            if len(sounds) == 1:
+                # Check if given sound closely matches an actual sound
+                sound_match = get_closest_match(sound, [t[0] for t in self.get_sounds()])
+                if sound_match is not None:
+                    err_msg = f"Can't play sound `{sound}`, did you mean `{sound_match}`?"
                     return False, err_msg
 
-            except InvalidURLError:
-                if len(sounds) == 1:
-                    # Check if given sound closely matches an actual sound
-                    sound_match = get_closest_match(sound, [t[0] for t in self.get_sounds()])
-                    if sound_match is not None:
-                        err_msg = f"Can't play sound `{sound}`, did you mean `{sound_match}`?"
-                    else:
-                        valid_sites = ", ".join(f"{site}.com" for site in SITES)
-                        err_msg = (
-                            f"Can't play sound `{sound}`. " +
-                            f"Either provide a link to one of `{valid_sites}` or the name of a sound.\n"
-                            "Use `!sounds` for a list of available sounds.\n"
-                            "Use `!search` to search for a video on YouTube."
-                        )
+                if not await self._is_youtube_url(sound):
+                    err_msg = (
+                        f"Can't play sound `{sound}`. " +
+                        f"Either provide an unshortened link to YouTube or the name of a sound.\n"
+                        "Use `!sounds` for a list of available sounds.\n"
+                        "Use `!search` to search for a video on YouTube."
+                    )
 
                     return False, err_msg
 
-            validated_sounds.append((url, message, "url"))
+            validated_sounds.append((sound, message, "url"))
 
         if voice_state is None: # Check if user is in a voice channel.
             err_msg = (

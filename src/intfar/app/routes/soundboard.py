@@ -48,7 +48,7 @@ def normalize_sound_volume(filename):
 def home():
     config = flask.current_app.config["APP_CONFIG"]
     database = flask.current_app.config["DATABASE"]
-    audio_handler = AudioHandler(config, database, None)
+    audio_handler = AudioHandler(config, database)
     sounds = audio_handler.get_sounds()
 
     if flask.request.method == "POST":
@@ -110,7 +110,7 @@ def delete():
 
     config = flask.current_app.config["APP_CONFIG"]
     database = flask.current_app.config["DATABASE"]
-    audio_handler = AudioHandler(config, database, None)
+    audio_handler = AudioHandler(config, database)
     sounds = audio_handler.get_sounds()
 
     data = flask.request.form

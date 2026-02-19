@@ -2,7 +2,7 @@ import asyncio
 from time import time
 import httpx
 from abc import abstractmethod
-from typing import Any, Coroutine, Dict, Generic, TypeVar
+from typing import Any, Coroutine, Dict, Generic, Tuple, TypeVar
 from datetime import datetime
 
 from mhooge_flask.logging import logger
@@ -142,7 +142,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
                 except KeyboardInterrupt:
                     self.polling_active[guild_id] = False
                     return
-                
+
             immediately = False
 
             if not self.polling_active.get(guild_id, False): # Stop if people leave voice channels.
@@ -325,16 +325,18 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
             logger.bind(event="parse_stats_error", game_id=game_info["gameId"]).exception("Error when parsing game data!")
             return None
 
-    async def get_post_game_data(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> PostGameStats[GameStatsType, PlayerStatsType] | None:
+    async def get_post_game_data(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> Tuple[PostGameStats[GameStatsType, PlayerStatsType] | None, int]:
         # Update users in game based on game data
         logger.bind(event="user_in_game_before", users=self.users_in_game[guild_id]).info(f"Users in game before: {self.users_in_game[guild_id]}")
         self.users_in_game[guild_id] = self.get_users_in_game(self.game_database.game_users, game_info)
+        if len(self.users_in_game[guild_id]) <= 1:
+            return None, self.POSTGAME_STATUS_SOLO
     
         # Get formatted stats that are relevant for the players in the game.
         parsed_game_stats = await self.get_parsed_stats(game_info, guild_id)
 
         if parsed_game_stats is None:
-            return None
+            return None, self.POSTGAME_STATUS_ERROR
 
         logger.bind(event="user_in_game_after", users=self.users_in_game[guild_id]).info(f"Users in game after: {self.users_in_game[guild_id]}")
 
@@ -382,20 +384,23 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
             beaten_records_data = None
             lifetime_data = None
 
-        return PostGameStats(
-            self.game,
-            status_code,
-            guild_id,
-            parsed_game_stats,
-            intfar_data,
-            intfar_streak_data,
-            doinks_data,
-            ranks_mentions,
-            winstreak_data,
-            timeline_mentions,
-            cool_stats_data,
-            beaten_records_data,
-            lifetime_data,
+        return (
+            PostGameStats(
+                self.game,
+                status_code,
+                guild_id,
+                parsed_game_stats,
+                intfar_data,
+                intfar_streak_data,
+                doinks_data,
+                ranks_mentions,
+                winstreak_data,
+                timeline_mentions,
+                cool_stats_data,
+                beaten_records_data,
+                lifetime_data,
+            ),
+            self.POSTGAME_STATUS_OK
         )
 
     async def handle_game_over(self, game_info: Dict[str, Any], status_code: int, guild_id: int) -> PostGameStats[GameStatsType, PlayerStatsType] | None:
@@ -406,15 +411,10 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
         if status_code in (self.POSTGAME_STATUS_ERROR, self.POSTGAME_STATUS_MISSING) and game_info["gameId"] is not None:
             self.game_database.save_missed_game(game_info["gameId"], guild_id, int(time()))
 
+        post_game_data = None
         if status_code == self.POSTGAME_STATUS_OK:
             with self.game_database:
-               post_game_data = await self.get_post_game_data(game_info, status_code, guild_id)
-
-            if post_game_data is None:
-                status_code = self.POSTGAME_STATUS_ERROR
-
-        else:
-            post_game_data = None
+               post_game_data, status_code = await self.get_post_game_data(game_info, status_code, guild_id)
 
         if post_game_data is None:
             post_game_data = PostGameStats(self.game, status_code, guild_id)

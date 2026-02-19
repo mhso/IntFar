@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from multiprocessing.connection import Connection
 from multiprocessing import Lock
 
@@ -18,6 +19,7 @@ from intfar.api.betting import BettingHandler
 from intfar.api.config import Config
 
 def run_app(
+    port: int,
     config: Config,
     meta_database: MetaDatabase,
     game_databases: dict[str, GameDatabase],
@@ -25,7 +27,6 @@ def run_app(
     api_clients: dict[str, GameAPIClient],
     bot_pipe: Connection
 ):
-
     # Define URL routes
     static_routes = [
         Route("about", "about_page", "about"),
@@ -91,18 +92,20 @@ def run_app(
     web_app.register_error_handler(500, route_errors.handle_internal_error)
     web_app.register_error_handler(404, route_errors.handle_missing_page_error)
 
-    ports_file = "../../flask_ports.json"
-
     try:
-        init.run_app(web_app, app_name, ports_file)
+        init.run_app(web_app, app_name, port)
     except KeyboardInterrupt:
         logger.info("Stopping Flask web app...")
 
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("-p", "--port", default=5000, type=int)
+    args = parser.parse_args()
+
     config = Config()
     meta_database = MetaDatabase(config)
     game_databases = {game: get_database_client(game, config) for game in SUPPORTED_GAMES}
     bet_handlers = {game: get_betting_handler(game, config, meta_database, game_databases[game]) for game in SUPPORTED_GAMES}
     api_clients = {"lol": get_api_client("lol", config), "cs2": None}
 
-    run_app(config, meta_database, game_databases, bet_handlers, api_clients, None)
+    run_app(args.port, config, meta_database, game_databases, bet_handlers, api_clients, None)

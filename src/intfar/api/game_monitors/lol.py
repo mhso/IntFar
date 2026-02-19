@@ -25,6 +25,10 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient, LoLGameStats, L
         self.latest_game_id: Dict[int, List[int]] = {}
         self._get_latest_game()
 
+    @property
+    def polling_enabled(self):
+        return False
+
     def _get_latest_game(self):
         latest_game_data = self.game_database.get_latest_game()[0]
         if latest_game_data is not None and latest_game_data[0] is not None:
@@ -68,6 +72,7 @@ class LoLGameMonitor(GameMonitor[LoLGameDatabase, RiotAPIClient, LoLGameStats, L
                 matches = await self.api_client.get_match_history(puuid, self.latest_game_timestamp.get(guild_id))
                 await asyncio.sleep(0.5)
                 matches += await self.api_client.get_match_history(puuid, self.latest_game_timestamp.get(guild_id), game_type="normal")
+                matches = sorted(set(matches))
 
                 if not matches:
                     continue

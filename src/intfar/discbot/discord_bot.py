@@ -11,7 +11,6 @@ import discord
 from discord.errors import NotFound, DiscordException, HTTPException, Forbidden
 
 from mhooge_flask.logging import logger
-from streamscape import Streamscape
 
 from intfar.discbot.montly_intfar import MonthlyIntfar
 from intfar.discbot.app_listener import listen_for_request
@@ -94,12 +93,7 @@ class DiscordClient(discord.Client):
         self.betting_handlers = betting_handlers
         self.api_clients = api_clients
 
-        if self.config.env == "production":
-           streamscape = Streamscape(browser_executable="/usr/bin/google-chrome")
-        else:
-           streamscape = None
-
-        self.audio_handler = AudioHandler(self.config, self.meta_database, streamscape)
+        self.audio_handler = AudioHandler(self.config, self.meta_database)
         self.shop_handler = ShopHandler(self.config, self.meta_database)
 
         self.ai_conn = kwargs.get("ai_pipe")
