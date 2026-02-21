@@ -1,6 +1,5 @@
 resources/data
-resources/databases/test
-resources/databases/*_backup.db
+resources/databases
 resources/game_data_schemas
 resources/lol_data.json
 resources/message.txt

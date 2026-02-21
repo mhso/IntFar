@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 import random
 from typing import List
@@ -122,20 +123,20 @@ class PlaySoundCommand(Command):
         elif status is not None:
             await self.message.channel.send(self.client.insert_emotes(status))
 
-class SeekSoundCommand(Command):
-    NAME = "jump"
-    DESCRIPTION = (
-        "Jump to a specific point in an active YouTube/Soundcloud sound. "
-        "Fx. '!jump 01:45', '!jump 1:5:34', or '!jump 30'"
-    )
-    MANDATORY_PARAMS = [CommandParam("time")]
+# class SeekSoundCommand(Command):
+#     NAME = "jump"
+#     DESCRIPTION = (
+#         "Jump to a specific point in an active YouTube/Soundcloud sound. "
+#         "Fx. '!jump 01:45', '!jump 1:5:34', or '!jump 30'"
+#     )
+#     MANDATORY_PARAMS = [CommandParam("time")]
 
-    async def handle(self, time_str: str):
-        voice_state = self.message.author.voice
-        status = await self.client.audio_handler.seek_sound(voice_state, time_str)
+#     async def handle(self, time_str: str):
+#         voice_state = self.message.author.voice
+#         status = await self.client.audio_handler.seek_sound(voice_state, time_str)
 
-        if status is not None:
-            await self.message.channel.send(self.client.insert_emotes(status))
+#         if status is not None:
+#             await self.message.channel.send(self.client.insert_emotes(status))
 
 class SkipSoundCommand(Command):
     NAME = "skip"
@@ -163,15 +164,16 @@ class RandomSoundCommand(Command):
     NAME = "play_random"
     DESCRIPTION = "Play a random sound. (See `!sounds` for a list of them)."
 
-    async def handle_random_sound_msg(self):
+    async def handle(self):
         voice_state = self.message.author.voice
 
         sounds_list = self.client.audio_handler.get_sounds()
-        sound = random.choice(sounds_list)
+        sound = random.choice(sounds_list)[0]
 
         await self.message.channel.send(f"Playing random sound: `{sound}`")
+        await asyncio.sleep(0.5)
 
-        success, status = await self.client.audio_handler.play_sound(sound, voice_state)
+        success, status = await self.client.audio_handler.play_sound(sound, voice_state, self.message)
 
         if not success:
             await self.message.channel.send(self.client.insert_emotes(status))
@@ -180,7 +182,7 @@ class SearchCommand(Command):
     NAME = "search"
     DESCRIPTION = "Search for a YouTube video to play as a sound."
 
-    async def handle_search_msg(self, search_args):
+    async def handle(self, *search_args):
         if not search_args:
             return
 

@@ -182,6 +182,8 @@ class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient, CS2GameStats, 
             status_code = self.POSTGAME_STATUS_MISSING
 
         else:
+            await asyncio.sleep(30)
+
             game_info, status_code = await self.try_get_finished_game_info(next_code, guild_id)
             if game_info is None and status_code != self.POSTGAME_STATUS_DUPLICATE:
                 game_info = {"gameId": next_code}
@@ -209,7 +211,7 @@ class CS2GameMonitor(GameMonitor[CS2GameDatabase, SteamAPIClient, CS2GameStats, 
                 and post_game_data.status_code != self.POSTGAME_STATUS_SOLO
             ):
                 # Parse only basic stats if CS2 demo is missing or malformed
-                post_game_data.parsed_game_stats = self.get_parsed_stats(game_info, guild_id)
+                post_game_data.parsed_game_stats = await self.get_parsed_stats(game_info, guild_id)
                 self.save_stats(post_game_data.parsed_game_stats)
 
                 post_game_data.winstreak_data = self.get_winstreak_data(post_game_data.parsed_game_stats)

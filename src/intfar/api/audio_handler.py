@@ -3,9 +3,11 @@ import math
 from datetime import datetime
 import os
 from subprocess import Popen, PIPE
+from time import time
+from typing import Dict
 
-from discord import Message, PCMVolumeTransformer
-from discord.player import FFmpegPCMAudio
+from discord import Message, PCMVolumeTransformer, TextChannel, VoiceClient
+from discord.player import FFmpegPCMAudio, AudioSource
 
 from mhooge_flask.logging import logger
 
@@ -39,50 +41,19 @@ def _get_padded_str(string, total_chars):
     pad_right = math.ceil(total_padding / 2)
     return f"{' ' * pad_left}{string}{' ' * pad_right}"
 
-class ClosableFFmpegPCMAudio(FFmpegPCMAudio):
-    """
-    Subclass of discord.py FFmpegPCMAudio class that overrides the `pipe_writer`
-    class, to allow the audio stream to close properly when it is exhausted.
-    """
-    def __init__(self, source, *, executable = 'ffmpeg', pipe = False, stderr = None, before_options = None, options = None):
-        self.error = None
-        super().__init__(
-            source,
-            executable=executable,
-            pipe=pipe,
-            stderr=stderr,
-            before_options=before_options,
-            options=options
-        )
+class AudioStream:
+    def __init__(self, client: VoiceClient, title: str | None, duration: float | None = None):
+        self.client = client
+        self.title = title
+        self.duration = duration
+        self.status = "Starting..."
+        self.message: Message | None = None
+        self.progress: float = 0.0
 
-    def _pipe_writer(self, source):
-        def close_callback(err_msg=None):
-            self.error = err_msg
-            self._kill_process()
-
-        source.on("stop", close_callback)
-
-        while self._process:
-            # arbitrarily large read size
-            data = source.read(-1)
-            if not data and self._process.returncode is not None:
-                return
-            try:
-                if self._stdin is not None:
-                    try:
-                        self._stdin.write(data)
-                    except AttributeError:
-                        return
-            except Exception:
-                # at this point the source data is either exhausted or the process is fubar
-                self._kill_process()
-                return
-
-    def read(self) -> bytes:
-        try:
-            return super().read()
-        except ValueError:
-            return b''
+    def start(self, source: AudioSource):
+        self.client.play(source)
+        self.last_resume = time()
+        self.status = "Now Playing"
 
 class AudioHandler:
     """
@@ -104,17 +75,15 @@ class AudioHandler:
         self.config = config
         self.sounds_path = f"{config.static_folder}/sounds"
         self.youtube_api = YouTubeAPIClient(config)
-        self.voice_streams = {} # Keep track of connections to voice channels.
-        self.web_streams = {}
-        self.web_stream_status = {}
-        self.playback_msg = {}
+        self.voice_streams: Dict[int, VoiceClient] = {} # Keep track of connections to voice channels
+        self.audio_streams: Dict[int, AudioStream] = {} # Keep track of playing audio
         self.sound_queue = {}
         self.active_youtube_suggestions = {}
         self.youtube_suggestions_msg = {}
 
     async def _download_from_url(self, message: Message, url: str):
-        filename = "output.mp3"
-        args = ["yt-dlp", "-x", "--audio-format", "mp3", "-o", filename, url]
+        filename = '%(title)s.mp3'
+        args = ["yt-dlp", "-x", "--audio-format", "mp3", "-o", filename, "--restrict-filenames", "--print", "after_move:filepath", url]
         process = Popen(args, stdout=PIPE, stderr=PIPE, text=True)
 
         stdout, stderr = process.communicate()
@@ -125,23 +94,44 @@ class AudioHandler:
                 event="yt_dlp_error", stdout=stdout, stderr=stderr
             ).error(f"Error when downloading file with yt-dlp: {stderr}")
 
-            admin_mention = None
-            for member in message.guild.members:
-                if member.id == ADMIN_DISC_ID:
-                    admin_mention = member.mention
-                    break
-
-            response = "Weird error happened while playing sound... "
-            if admin_mention is not None:
-                response += f"This sounds like a job for {admin_mention}!"
-
+            response = (
+                f"Could not play sound from the given URL. "
+                "Either it's not a valid YouTube link "
+                "or some network fuckery is going on"
+            )
             await message.channel.send(response)
+
+            return None, None
+
+        filename = stdout.strip()
+        title = os.path.basename(filename).split(".")[0].replace("_", " ")
+
+        return filename, title
+
+    def _get_sound_duration(self, sound_path: str) -> float | None:
+        args = ["ffprobe", "-show_entries", "format=duration", "-v", "quiet", "-print_format", "compact=print_section=0:nokey=1:escape=csv", sound_path]
+        process = Popen(args, stdout=PIPE, stderr=PIPE, text=True)
+
+        stdout, stderr = process.communicate()
+        if stdout == "" or process.returncode != 0:
+            # Error when getting duration of sound with ffbrope
+            logger.bind(
+                event="ffprobe_error", stdout=stdout, stderr=stderr
+            ).error(f"Error when getting duration of sound with ffbrope: {stderr}")
 
             return None
 
-        return filename
+        return float(stdout.strip())
 
-    async def _play_loop(self, guild_id):
+    async def _send_audio_progress_message(self, audio_stream: AudioStream, channel: TextChannel, guild_id: int):
+        audio_stream.message = await channel.send(self._get_playback_str(guild_id))
+        for control_button in self.AUDIO_CONTROL_EMOJIS:
+            try:
+                await audio_stream.message.add_reaction(control_button)
+            except Exception:
+                return
+
+    async def _play_loop(self, guild_id: int, user_triggered: bool = False):
         while (sound_queue := self.sound_queue.get(guild_id, [])) != []:
             sound_name, message, sound_type = sound_queue.pop(0)
             if sound_type == "search":
@@ -153,51 +143,84 @@ class AudioHandler:
             if sound_type == "file":
                 # Stream audio from a file
                 sound_path = f"{self.sounds_path}/{sound_name}.mp3"
+                title = f'"{sound_name}"'
+                owner_id = self.meta_database.get_sound_owner(sound_name)
+                if owner_id is not None and (member := message.guild.get_member(owner_id)):
+                    title += f" by {member.nick}"
+
                 volume = 1
             else:
-                sound_path = await self._download_from_url(message, sound_name)
+                sound_path, title = await self._download_from_url(message, sound_name)
+                title = f'"{title}"'
                 volume = 0.2
 
             if sound_path is None:
                 continue
 
             try:
-                audio_source = FFmpegPCMAudio(sound_path, executable="ffmpeg")
+                # Get duration of sound
+                duration = self._get_sound_duration(sound_path) if user_triggered else None
+                show_status = user_triggered and (duration is None or duration > 5)
 
                 # Create volume controlled FFMPEG player from sound file.
-                player = PCMVolumeTransformer(audio_source, volume=volume)
+                audio_source = PCMVolumeTransformer(FFmpegPCMAudio(sound_path, executable="ffmpeg"), volume=volume)
 
                 # Start the player and wait until it is done.
-                self.voice_streams[guild_id].play(player)
+                voice_stream = self.voice_streams[guild_id]
+                audio_stream = AudioStream(voice_stream, title, duration)
+                self.audio_streams[guild_id] = audio_stream
 
-                while self.voice_streams[guild_id].is_playing():
+                # Write sound status message in text channel and add sound control emojis
+                if show_status:
+                    asyncio.create_task(self._send_audio_progress_message(audio_stream, message.channel, guild_id))
+
+                audio_stream.start(audio_source)
+
+                # Play loop. Wait for sound to finish and update progress and status, if relevant
+                while voice_stream.is_playing() or voice_stream.is_paused():
                     await asyncio.sleep(1)
 
+                    if show_status and audio_stream.message is not None:
+                        new_content = self._get_playback_str(guild_id)
+                        if new_content != audio_stream.message.content:
+                            await audio_stream.message.edit(content=new_content)
+
                 await asyncio.sleep(0.5)
+
             finally:
                 if sound_type == "url" and os.path.exists(sound_path):
                     os.remove(sound_path)
+
+                if (
+                    user_triggered
+                    and guild_id in self.audio_streams
+                    and self.audio_streams[guild_id].message is not None
+                ):
+                    await self.audio_streams[guild_id].message.delete()
 
                 self.voice_streams[guild_id].stop()
 
         # Disconnect from voice channel.
         await self.voice_streams[guild_id].disconnect()
 
-        # Reset the sound queue and voice stream for the current guild
+        # Reset the sound queue, audio stream, and voice stream for the current guild
         if guild_id in self.sound_queue:
             del self.sound_queue[guild_id]
+
+        if guild_id in self.audio_streams:
+            del self.audio_streams[guild_id]
+
         del self.voice_streams[guild_id]
 
         return True, None
 
-    async def _is_youtube_url(self, url: str):
+    def _is_url(self, sound_name: str):
         return (
-            url.startswith("https://youtube.com")
-            or url.startswith("www.youtube.com")
-            or url.startswith("https://www.youtube.com")
+            (sound_name.startswith("http://") or sound_name.startswith("https://"))
+            and "." in sound_name
         )
 
-    async def play_sound(self, sounds, voice_state, message=None):
+    async def play_sound(self, sounds, voice_state, message: Message | None = None):
         """
         Add one or more sounds to the sound queue for the given server.
         The sounds will be played as soon as their spot in the queue is reached
@@ -236,10 +259,10 @@ class AudioHandler:
                     err_msg = f"Can't play sound `{sound}`, did you mean `{sound_match}`?"
                     return False, err_msg
 
-                if not await self._is_youtube_url(sound):
+                if not self._is_url(sound):
                     err_msg = (
                         f"Can't play sound `{sound}`. " +
-                        f"Either provide an unshortened link to YouTube or the name of a sound.\n"
+                        f"Either provide a link to YouTube or the name of a sound.\n"
                         "Use `!sounds` for a list of available sounds.\n"
                         "Use `!search` to search for a video on YouTube."
                     )
@@ -262,17 +285,8 @@ class AudioHandler:
                     if self.voice_streams.get(guild_id) is not None:
                         response = f"Adding sound to the queue..."
                     else:
-                        hosts = ["YouTube", "Soundcloud", "Suno"]
-                        hostname = None
-                        for host in hosts:
-                            if host.lower() in sound:
-                                hostname = host
-                                break
+                        response = f"Playing sound from the interwebz..."
 
-                        if hostname is None:
-                            hostname = "link"
-
-                        response = f"Playing sound from `{hostname}`..."
                     await msg.channel.send(response)
                     if len(validated_sounds) > 1:
                         await asyncio.sleep(0.5)
@@ -284,10 +298,9 @@ class AudioHandler:
             self.sound_queue[guild_id].extend(validated_sounds)
 
             if guild_id not in self.voice_streams:
-                # If no voice connection exists, make a new one.
                 self.voice_streams[guild_id] = await voice_channel.connect(timeout=5)
 
-                success, status = await self._play_loop(guild_id) # Play sounds in the queue.
+                success, status = await self._play_loop(guild_id, message is not None) # Play sounds in the queue.
                 return success, status
 
             return True, None
@@ -346,15 +359,15 @@ class AudioHandler:
                 "You must be in a voice channel to skip sounds {emote_simp_but_closeup}"
             )
             return err_msg
-        
+
         guild_id = voice_state.channel.guild.id
 
         # Check if a stream is active
-        if (web_stream := self.web_streams.get(guild_id)) is not None:
-            self.web_stream_status[guild_id] = "Skipping..."
-            sound_title = "sound" if web_stream.title is None else f"`{web_stream.title}`"
+        if (audio_stream := self.audio_streams.get(guild_id)) is not None:
+            audio_stream.status = "Skipping..."
+            sound_title = "sound" if audio_stream.title is None else f"`{audio_stream.title}`"
             msg = f"Skipped {sound_title}."
-            web_stream.stop()
+            audio_stream.client.stop()
             return msg
 
         # No active stream, do nothing
@@ -370,13 +383,19 @@ class AudioHandler:
 
         guild_id = voice_state.channel.guild.id
 
-        if (web_stream := self.web_streams.get(guild_id)) is not None:
-            pausing = self.web_stream_status[guild_id] in ("Now Playing", "Resuming...")
-            self.web_stream_status[guild_id] = "Pausing..." if pausing else "Resuming..."
-            web_stream.pause_or_play()
+        if (audio_stream := self.audio_streams.get(guild_id)) is not None:
+            pausing = audio_stream.client.is_playing()
+            if pausing:
+                audio_stream.status = "Pausing..."
+                audio_stream.client.pause()
+                audio_stream.progress += time() - audio_stream.last_resume
+            else:
+                audio_stream.status = "Resuming..."
+                audio_stream.client.resume()
+                audio_stream.last_resume = time()
 
-            await asyncio.sleep(2)
-            self.web_stream_status[guild_id] = "Paused" if pausing else "Now Playing"
+            await asyncio.sleep(1)
+            audio_stream.status = "Paused" if pausing else "Now Playing"
 
         # No active stream, do nothing
         return None
@@ -392,8 +411,8 @@ class AudioHandler:
         guild_id = voice_state.channel.guild.id
 
         # Check if a stream is active
-        if (web_stream := self.web_streams.get(guild_id)) is not None:
-            self.web_stream_status[guild_id] = "Stopping..."
+        if (audio_stream := self.audio_streams.get(guild_id)) is not None:
+            audio_stream.status = "Stopping..."
             sound_quantifier = "sound" if len(self.sound_queue) == 1 else "sounds"
             sound_queue = self.sound_queue.get(guild_id, [])
             queue_len_str = (
@@ -402,7 +421,7 @@ class AudioHandler:
             )
             msg = f"Stopping sound{queue_len_str}"
             del self.sound_queue[guild_id]
-            web_stream.stop()
+            audio_stream.client.stop()
             return msg
 
         # No active stream, do nothing
@@ -413,7 +432,7 @@ class AudioHandler:
         Called when a user reacts to the currently active playback status message
         with a valid audio control emoji such as play, pause, stop, or skip.
         """
-        if channel.guild.id in self.web_streams and member.voice is not None:
+        if channel.guild.id in self.audio_streams and member.voice is not None:
             if emoji.name == self.EMOJI_NEXT:
                 # Stop the active stream and skip to the next sound in the queue
                 if (msg := await self.skip_sound(member.voice)) is not None:
@@ -444,27 +463,39 @@ class AudioHandler:
 
         return success, suggestions
 
-    def _get_playback_str(self, guild_id):
+    def _get_playback_str(self, guild_id: int):
         """
         Get a string describing the status and progress of the audio stream currently
         being played. This string is posted and periodically updated by the bot in
         the text channel where the sound was started from. The status includes the
         title of the audio/video being played as well as progress and duration.
         """
+        stream = self.audio_streams.get(guild_id)
+        if not stream:
+            return ""
+
         duration = None
-        if self.web_streams.get(guild_id) is not None and self.web_streams[guild_id].duration is not None:
-            duration = self.web_streams[guild_id].duration
+        if stream.duration is not None:
+            duration = stream.duration
 
         chars_per_line = 68
 
         # Status of playback
-        now_playing = _get_padded_str(self.web_stream_status[guild_id], chars_per_line)
+        now_playing = _get_padded_str(stream.status, chars_per_line)
 
-        title = self.web_streams[guild_id].title if self.web_streams[guild_id].title is not None else self.web_streams[guild_id].url
-        title = _get_padded_str(f'"{title}"', chars_per_line)
+        title = stream.title if stream.title is not None else "Unknown Sound"
+        title = _get_padded_str(title, chars_per_line)
+
+        # Get the progress in seconds of the current sound
+        if stream.client.is_paused():
+            progress = stream.progress
+        else:
+            progress = time() - stream.last_resume + stream.progress if stream.last_resume else 0
+
+        if duration is not None and progress > duration:
+            progress = duration
 
         # Create string describing time played vs. total duration
-        progress = self.web_streams[guild_id].progress
         progress_str = _get_time_str(progress)
         if duration is not None:
             duration_str = _get_time_str(duration)

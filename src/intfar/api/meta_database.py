@@ -149,7 +149,12 @@ class MetaDatabase(SQLiteDatabase):
         with self:
             return self.execute_query(query).fetchall()
 
-    def is_valid_sound(self, sound):
+    def get_sound_owner(self, sound: str):
+        query = "SELECT owner_id FROM sounds WHERE sound = ?"
+        with self:
+            return self.execute_query(query, sound).fetchone() is not None
+
+    def is_valid_sound(self, sound: str):
         query = "SELECT sound FROM sounds WHERE sound = ?"
         with self:
             return self.execute_query(query, sound).fetchone() is not None

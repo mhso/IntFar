@@ -7,7 +7,7 @@ import os
 
 from dateutil.relativedelta import relativedelta
 from intfar.api.lan import LAN_PARTIES, insert_bingo_challenges
-
+from intfar.api.youtube_api import YouTubeAPIClient
 from intfar.app.util import get_relative_static_folder
 from intfar.api import award_qualifiers, config, util
 from intfar.api.meta_database import MetaDatabase
@@ -292,7 +292,7 @@ class TestFuncs:
 
     def awpy(self):
         from awpy import DemoParser
-        match_id = "CSGO-9s2bt-xjT3L-u967i-eByxH-O9tvE"
+        match_id = "CSGO-Y9Y49-oAtxK-Y5zxd-PK5DP-XwJ5O"
         demo_dem_file = f"{self.config.resources_folder}/data/cs2/{match_id}.dem"
         parser = DemoParser(demofile=demo_dem_file, debug=True)
         demo_game_data = parser.parse()
@@ -434,6 +434,12 @@ class TestFuncs:
         print(game_monitor.latest_game_timestamp)
         print(game_monitor.latest_game_id)
         await game_monitor.poll_for_new_game(guild_id, True)
+
+    def get_youtube_suggestions(self, search_term: str):
+        client = YouTubeAPIClient(self.config)
+        success, result = client.query(search_term)
+        print("Success:", success)
+        print(result)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

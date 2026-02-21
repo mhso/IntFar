@@ -61,9 +61,7 @@ async def listen(database: MetaDatabase, client: SteamAPIClient):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-
     parser.add_argument("game")
-
     args = parser.parse_args()
 
     logger.info("Starting Steam command handler process")

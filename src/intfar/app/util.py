@@ -14,9 +14,6 @@ from intfar.discbot.commands.util import ADMIN_DISC_ID
 
 _GAME_SPECIFIC_ROUTES = ["index", "users", "betting", "doinks", "stats", "api", "register"]
 
-# Initialized in run_flask
-socket_io = None
-
 def register_discord_connection():
     bot_conn = flask.current_app.config["BOT_CONN"]
     conn_map = flask.current_app.config["CONN_MAP"]

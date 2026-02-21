@@ -3,7 +3,6 @@ import json
 import bz2
 import os
 from uuid import uuid4
-from os import environ
 import subprocess
 
 from mhooge_flask.logging import logger

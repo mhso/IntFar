@@ -1942,8 +1942,9 @@ class DiscordClient(discord.Client):
                     message_data["message"]
                 )
             elif (
-                self.audio_handler.playback_msg.get(guild_id) is not None
-                and message_id == self.audio_handler.playback_msg[guild_id].id
+                self.audio_handler.audio_streams.get(guild_id) is not None
+                and self.audio_handler.audio_streams[guild_id].message is not None
+                and message_id == self.audio_handler.audio_streams[guild_id].message.id
                 and react_event.emoji.name in self.audio_handler.AUDIO_CONTROL_EMOJIS
             ):
                 channel = self.get_channel(react_event.channel_id)
@@ -1964,10 +1965,12 @@ class DiscordClient(discord.Client):
         message_id = react_event.message_id
         user_id = react_event.user_id
         guild_id = react_event.guild_id
+
         if (
             user_id != self.user.id
-            and self.audio_handler.playback_msg.get(guild_id) is not None
-            and message_id == self.audio_handler.playback_msg[guild_id].id
+            and self.audio_handler.audio_streams.get(guild_id) is not None
+            and self.audio_handler.audio_streams[guild_id].message is not None
+            and message_id == self.audio_handler.audio_streams[guild_id].message.id
             and message_id in self.audio_action_data
             and react_event.emoji.name in self.audio_handler.AUDIO_CONTROL_EMOJIS
         ):
