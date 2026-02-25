@@ -1,7 +1,7 @@
 from intfar.api.util import find_subclasses_in_dir
 from intfar.api.award_qualifiers import AwardQualifiers
 
-_GAME_AWARD_HANDLERS: dict[str, AwardQualifiers] = find_subclasses_in_dir("intfar/api/awards", AwardQualifiers)
+_GAME_AWARD_HANDLERS: dict[str, type[AwardQualifiers]] = find_subclasses_in_dir("intfar/api/awards", AwardQualifiers)
 
 def get_awards_handler(game, config, api_client, parsed_game_stats) -> AwardQualifiers:
     return _GAME_AWARD_HANDLERS[game](config, api_client, parsed_game_stats)

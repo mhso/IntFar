@@ -369,25 +369,6 @@ def get_data(lan_info, database, lan_date):
         )
         tilt_value, tilt_color = lan_api.get_tilt_value([x[0] for x in recent_games])
 
-        # Team Comp ideas
-        with open(f"{config.resources_folder}/team_comps.txt") as fp:
-            team_comps = []
-            for line in fp.readlines():
-                split_1 = line.strip().split(":")
-                name = split_1[0].strip()
-                portraits = []
-                for champ_name in split_1[1].split(","):
-                    stripped = champ_name.strip()
-                    if stripped == "_":
-                        img_name = "img/any_champ.png"
-                    else:
-                        champ_id = riot_api.try_find_playable_id(stripped)
-                        img_name = app_util.get_relative_static_folder(riot_api.get_champ_portrait_path(champ_id), config)
-
-                    portraits.append(flask.url_for("static", _external=True, filename=img_name))
-
-                team_comps.append((name, portraits))
-
         game_data = {
             "games_played": games_played,
             "games_won": games_won,
@@ -409,7 +390,6 @@ def get_data(lan_info, database, lan_date):
             "latest_doinks": latest_doinks,
             "tilt_value": tilt_value,
             "tilt_color": tilt_color,
-            "team_comps": team_comps,
         }
         data.update(game_data)
     else:
@@ -429,6 +409,54 @@ def lan_view():
     return flask.redirect(
         flask.url_for("lan.lan_view_for_date", _external=True, date=lan_api.LATEST_LAN_PARTY)
     )
+
+@lan_page.route("/jeopardy_winner", methods=["POST"])
+def announce_jeopardy_winner():
+    meta_database = flask.current_app.config["DATABASE"]
+    disc_id = flask.request.json.get("disc_id")
+    token = flask.request.json.get("token")
+
+    if disc_id is None or token is None or app_util.get_logged_in_user(meta_database, token) != int(disc_id):
+        return app_util.make_text_response("You are not authorized to access this API.", 403)
+
+    guild_id = lan_api.get_latest_lan_info().guild_id
+
+    player_data = flask.request.json["player_data"]
+
+    if flask.current_app.config["APP_ENV"] == "production" and lan_api.is_lan_ongoing(time(), guild_id):
+        app_util.discord_request("func", "announce_jeopardy_winner", (player_data, guild_id))
+
+    return app_util.make_text_response("Successfully announced jeopardy winner for this LAN!", 200)
+
+@lan_page.route("/set_jeoparty_info", methods=["POST"])
+def set_jeoparty_info():
+    meta_database = flask.current_app.config["DATABASE"]
+    disc_id = flask.request.json.get("disc_id")
+    token = flask.request.json.get("token")
+
+    if disc_id is None or token is None or app_util.get_logged_in_user(meta_database, token) != int(disc_id):
+        return app_util.make_text_response("You are not authorized to access this API.", 403)
+
+    flask.current_app.config["JEOPARTY_INFO"] = {
+        "join_url": flask.request.json["join_url"],
+        "password": flask.request.json.get("password")
+    }
+
+    return app_util.make_text_response("Successfully set Jeoparty info", 200)
+
+@lan_page.route("/get_jeoparty_info/<client_secret>", methods=["GET"])
+def get_jeoparty_info(client_secret):
+    if client_secret is None or client_secret == "None":
+        return flask.abort(404)
+
+    database = flask.current_app.config["DATABASE"]
+    lan_info = lan_api.get_latest_lan_info()
+
+    disc_id = database.get_user_from_secret(client_secret)
+    if disc_id is None or int(disc_id) not in lan_info.participants:
+        return flask.abort(404)
+
+    return app_util.make_json_response(flask.current_app.config["JEOPARTY_INFO"])
 
 @lan_page.route('/<date>')
 def lan_view_for_date(date):
@@ -469,6 +497,7 @@ def lan_view_for_date(date):
     month = api_util.MONTH_NAMES[lan_dt.month-1]
     data["lan_month"] = month
     data["lan_date"] = f"{month.lower()}_{str(lan_dt.year)[-2:]}"
+    data["lan_location"] = lan_info.location
 
     return app_util.make_template_context("lan.html", 200, **data)
 
@@ -514,24 +543,6 @@ def live_data(date):
         {k: all_data[k] for k in keys_to_get} if data_filter is not None else data,
         200
     )
-
-@lan_page.route("/jeopardy_winner", methods=["POST"])
-def announce_jeopardy_winner():
-    meta_database = flask.current_app.config["DATABASE"]
-    disc_id = flask.request.json.get("disc_id")
-    token = flask.request.json.get("token")
-
-    if disc_id is None or token is None or app_util.get_logged_in_user(meta_database, token) != int(disc_id):
-        return app_util.make_text_response("You are not authorized to access this API.", 403)
-
-    guild_id = lan_api.get_latest_lan_info().guild_id
-
-    player_data = flask.request.json["player_data"]
-
-    if flask.current_app.config["APP_ENV"] == "production" and lan_api.is_lan_ongoing(time(), guild_id):
-        app_util.discord_request("func", "announce_jeopardy_winner", (player_data, guild_id))
-
-    return app_util.make_text_response("Successfully announced jeopardy winner for this LAN!", 200)
 
 _EVENTS_KILLED_SYNONYMS = [
     "whacked",

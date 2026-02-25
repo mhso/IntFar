@@ -10,9 +10,10 @@ from intfar.api.util import GUILD_MAP
 TESTING = False
 
 class LANInfo:
-    def __init__(self, start_time: float, end_time: float, participants: Dict[int, str], guild_name: str):
+    def __init__(self, start_time: float, end_time: float, location: str, participants: Dict[int, str], guild_name: str):
         self.start_time = start_time
         self.end_time = end_time
+        self.location = location
         self.participants = participants
         match guild_name:
             case "core": self.guild_name = "CoreNibbas"
@@ -25,6 +26,7 @@ LAN_PARTIES = {
     # "october_19": LANInfo(
     #     datetime(2019, 4, 12, 12, 0, 0).timestamp(),
     #     datetime(2019, 4, 13, 12, 0, 0).timestamp(),
+    #     "Nønø",
     #     {
     #         115142485579137029: "Dave",
     #         274654800182902785: "Mogens",
@@ -37,6 +39,7 @@ LAN_PARTIES = {
     "august_20": LANInfo(
         datetime(2020, 8, 3, 14, 0, 0).timestamp(),
         datetime(2020, 8, 4, 12, 0, 0).timestamp(),
+        "Gual",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -49,6 +52,7 @@ LAN_PARTIES = {
     "march_21": LANInfo(
         datetime(2021, 3, 31, 12, 0, 0).timestamp(),
         datetime(2021, 4, 1, 12, 0, 0).timestamp(),
+        "Gual",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -61,6 +65,7 @@ LAN_PARTIES = {
     "october_21": LANInfo(
         datetime(2021, 10, 30, 14, 0, 0).timestamp(),
         datetime(2021, 10, 31, 12, 0, 0).timestamp(),
+        "Gual",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -73,6 +78,7 @@ LAN_PARTIES = {
     "april_22": LANInfo(
         datetime(2022, 4, 15, 14, 0, 0).timestamp(),
         datetime(2022, 4, 16, 12, 0, 0).timestamp(),
+        "Nønø",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -85,6 +91,7 @@ LAN_PARTIES = {
     "september_23": LANInfo(
         datetime(2023, 9, 9, 14, 0, 0).timestamp(),
         datetime(2023, 9, 10, 18, 0, 0).timestamp(),
+        "Gual",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -97,6 +104,7 @@ LAN_PARTIES = {
     "december_23": LANInfo(
         datetime(2023, 12, 30, 13, 0, 0).timestamp(),
         datetime(2023, 12, 31, 3, 0, 0).timestamp(),
+        "Muds",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -109,6 +117,7 @@ LAN_PARTIES = {
     "april_24": LANInfo(
         datetime(2024, 4, 27, 10, 0, 0).timestamp(),
         datetime(2024, 4, 28, 10, 0, 0).timestamp(),
+        "Muds",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -121,6 +130,7 @@ LAN_PARTIES = {
     "august_24": LANInfo(
         datetime(2024, 8, 17, 10, 0, 0).timestamp(),
         datetime(2024, 8, 18, 10, 0, 0).timestamp(),
+        "Gual",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -133,6 +143,7 @@ LAN_PARTIES = {
     "february_25": LANInfo(
         datetime(2025, 2, 8, 11, 0, 0).timestamp(),
         datetime(2025, 2, 9, 12, 0, 0).timestamp(),
+        "Gual",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -145,6 +156,7 @@ LAN_PARTIES = {
     "april_25": LANInfo(
         datetime(2025, 4, 26, 9, 0, 0).timestamp(),
         datetime(2025, 4, 27, 12, 0, 0).timestamp(),
+        "Muds",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -157,6 +169,7 @@ LAN_PARTIES = {
     "august_25": LANInfo(
         datetime(2025, 8, 23, 8, 0, 0).timestamp(),
         datetime(2025, 8, 24, 14, 0, 0).timestamp(),
+        "Gual",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -169,6 +182,7 @@ LAN_PARTIES = {
     "december_25": LANInfo(
         datetime(2025, 12, 20, 8, 0, 0).timestamp(),
         datetime(2025, 12, 21, 10, 0, 0).timestamp(),
+        "Nønø",
         {
             115142485579137029: "Dave",
             172757468814770176: "Murt",
@@ -343,7 +357,7 @@ class BingoSolver:
                     event["type"] == "ELITE_MONSTER_KILL"
                     and event["monsterType"] == "BARON_NASHOR"
                     and event.get("killerTeamId", None) == self.parsed_data.team_id
-                    and event["timestamp"] / 1000 / 60 < 28
+                    and event["timestamp"] / 1000 / 60 < 24
                 ):
                     self.progress = 1
                     return
@@ -378,6 +392,9 @@ class BingoSolver:
     def invade_kills(self):
         self.progress += self.parsed_data.timeline_data["invade_kills"] + self.parsed_data.timeline_data["anti_invade_kills"]
 
+    def cheese_kills(self):
+        self.progress += sum(player.challenges["killAfterHiddenWithAlly"] for player in self.parsed_data.filtered_player_stats)
+
     def jungle_doinks(self):
         for player in self.parsed_data.filtered_player_stats:
             if player.doinks and player.doinks[6] == "1":
@@ -394,8 +411,8 @@ class BingoSolver:
     def outnumbered_kills(self):
         self.progress += sum(player.challenges["outnumberedKills"] for player in self.parsed_data.filtered_player_stats)
 
-    def atakhan_kills(self):
-        self.progress += self.parsed_data.our_atakhan_kills
+    def minion_kills(self):
+        self.progress += sum(player.cs for player in self.parsed_data.filtered_player_stats)
 
     def solo_kills(self):
         self.progress += sum(player.challenges["soloKills"] for player in self.parsed_data.filtered_player_stats)
@@ -433,17 +450,17 @@ BINGO_CHALLENGE_NAMES = {
     "dives": ("Dive Kills", 5),
     "doinks": ("Doinks", 10),
     "dragon_souls": ("Dragon Souls", 3),
-    "early_baron": ("Baron Before 28 Mins", 1),
+    "early_baron": ("Baron Before 24 Mins", 1),
     "elder_dragon": ("Elder Dragon", 1),
     "fast_win": ("Win before 22 Mins", 1),
     "flawless_ace": ("Flawless Ace", 1),
     "fountain_kill": ("Fountain Kill", 1),
-    "invade_kills": ("Invade Kills", 5),
+    "cheese_kills": ("Cheese Kills", 5),
     "jungle_doinks": ("Jungle Doinks", 1),
-    "killing_sprees": ("Killing Sprees", 10),
+    "killing_sprees": ("Killing Sprees", 15),
     "kills": ("Kills", 100),
     "outnumbered_kills": ("Outnumbered Kills", 5),
-    "atakhan_kills": ("Atakhan Kills", 4),
+    "minion_kills": ("CS", 9000),
     "solo_kills": ("Solo Kills", 10),
     "spells_casted": ("Spell Casts", 5000),
     "spells_dodged": ("Skillshots Dodged", 200),

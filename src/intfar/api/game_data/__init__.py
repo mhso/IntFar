@@ -2,9 +2,9 @@ from intfar.api.util import find_subclasses_in_dir
 from intfar.api.game_stats import GameStatsParser, GameStats, PlayerStats
 
 _PATH = "intfar/api/game_data"
-_GAME_STAT_PARSERS: dict[str, GameStatsParser] = find_subclasses_in_dir(_PATH, GameStatsParser)
-_GAME_STATS_HOLDERS: dict[str, GameStats] = find_subclasses_in_dir(_PATH, GameStats)
-_PLAYER_STATS_HOLDERS: dict[str, PlayerStats] = find_subclasses_in_dir(_PATH, PlayerStats)
+_GAME_STAT_PARSERS: dict[str, type[GameStatsParser]] = find_subclasses_in_dir(_PATH, GameStatsParser)
+_GAME_STATS_HOLDERS: dict[str, type[GameStats]] = find_subclasses_in_dir(_PATH, GameStats)
+_PLAYER_STATS_HOLDERS: dict[str, type[PlayerStats]] = find_subclasses_in_dir(_PATH, PlayerStats)
 
 def get_stat_parser(game, raw_data, api_client, all_users, guild_id) -> GameStatsParser:
     return _GAME_STAT_PARSERS[game](game, raw_data, api_client, all_users, guild_id)

@@ -39,7 +39,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
         meta_database: MetaDatabase,
         game_database: GameDatabaseType,
         api_client: GameAPIType,
-        game_over_callback: Coroutine = None
+        game_over_callback: Coroutine | None = None
     ):
         """
         Initialize the game monitor. This class handles the logic of polling for

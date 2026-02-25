@@ -18,6 +18,7 @@
     <div id="lan-wrapper" class="container-flex">
         {% if games_played or active_game %}
         <h1>LAN {{ lan_month }} {{ lan_year }}</h1>
+        <h2>@ Casa del {{ lan_location }}</h2>
         {% endif %}
 
         <div class="row">
@@ -76,10 +77,14 @@
 
                         <!-- Bingo plate is all filled out -->
                         {% if bingo_completed %}
-                        <h3>
-                            BINGO BANGO BONGO<br>
-                            GG WP!
-                        </h3>
+                        <div id="lan-bingo-bango-wrapper">
+                            <div>
+                                BINGO<br>
+                                BANGO<br>
+                                BONGO<br>
+                                GG WP!
+                            </div>
+                        </div>
                         {% endif %}
                     {% else %}
                     No Bingo this LAN :)

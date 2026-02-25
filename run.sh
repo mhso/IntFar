@@ -2,8 +2,9 @@ pushd $(dirname $0)
 
 port=5000
 
-# Clean up old images
-podman image prune -f > /dev/null
+# Clean up old image
+podman -i stop intfar
+podman -i rm intfar
 
 # Build latest image and run container
 podman build . -t intfar:latest --env PORT=$port
@@ -22,6 +23,6 @@ podman run \
     -v ./src/intfar/app/static/img/items:/intfar/src/intfar/app/static/img/items \
     -v ./src/intfar/app/static/sounds:/intfar/src/intfar/app/static/sounds \
     -v $HOME/.config/steamguard-cli/maFiles:/root/.config/steamguard-cli/maFiles \
-    --replace intfar:latest
+    intfar:latest
 
 popd

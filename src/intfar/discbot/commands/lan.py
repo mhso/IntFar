@@ -2,6 +2,7 @@ from datetime import datetime
 from time import time
 
 from discord import Message
+import httpx
 
 from intfar.api import lan as lan_api
 from intfar.api import util as api_util
@@ -273,10 +274,23 @@ class JeopardyJoinCommand(BaseLANCommand):
         if not lan_api.is_lan_ongoing(datetime.now().timestamp(), self.message.guild.id) or author_id not in self.lan_party.participants:
             return
 
+        if author_id not in self.lan_party.participants:
+            return
+
         client_secret = self.client.meta_database.get_client_secret(author_id)
-        url = f"{api_util.get_website_link()}/jeopardy/{client_secret}"
-        response_dm = "Go to this link to join Jeopardy!\n"
-        response_dm += url
+
+        hostname_url = f"{api_util.get_website_link()}/lan/{client_secret}"
+        response = httpx.get(hostname_url)
+        if response.status_code != 200:
+            response = "Something went wrong :( you don't seem to be a part of this LAN :O"
+            await self.message.channel.send(response)
+            return
+
+        data = response.json()
+        join_url = data["join_url"]
+
+        response_dm = "Go to this link to join the Jeoparty!\n"
+        response_dm += f"{join_url}/lan?user_id={author_id}"
 
         mention = self.client.get_mention_str(author_id, self.message.guild.id)
         response_server = (

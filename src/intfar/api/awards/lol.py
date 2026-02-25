@@ -85,7 +85,7 @@ class LoLAwardQualifiers(AwardQualifiers[RiotAPIClient, LoLGameStats, LoLPlayerS
             "vision_score": "Vision score larger than 125",
             "kp": "Kill participation over 80%",
             "monsters": "Securing all epic monsters (and more than 3)",
-            "cs": "More than 9 cs/min"
+            "cs": "More than 8.5 cs/min"
         }
 
     @classmethod

@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from multiprocessing.connection import Connection
 from multiprocessing import Lock
 
+import gevent
 from mhooge_flask.logging import logger
 from mhooge_flask import init
 from mhooge_flask.init import Route, SocketIOServerWrapper
@@ -35,7 +36,6 @@ def run_app(
         Route("lan", "lan_page", "lan"),
         Route("lists", "lists_page", "lol/lists"),
         Route("register_cs2", "register_cs2_page", "cs2/register"),
-        Route("jeoparty", "jeopardy_contestant_page", "jeopardy"),
     ]
 
     # Dynamic routes that depend on which game is chosen
@@ -52,6 +52,7 @@ def run_app(
         ]
 
     app_name = "intfar"
+    gevent.get_hub().NOT_ERROR += (KeyboardInterrupt,)
 
     # Create Flask app.
     web_app = init.create_app(
@@ -76,10 +77,7 @@ def run_app(
         conn_lock=Lock(),
         max_content_length=1024 * 512, # 500 KB limit for uploaded sounds
         now_playing=None,
-        jeopardy_data={"contestants": {}, "state": None},
-        jeopardy_buzz_lock=Lock(),
-        jeopardy_join_lock=Lock(),
-        jeopardy_power_lock=Lock(),
+        jeoparty_info={},
         bingo_events={},
         league_events=[],
         league_game_start=None,

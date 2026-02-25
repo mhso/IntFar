@@ -140,8 +140,15 @@ def get_payout():
 
 @betting_page.route("/create", methods=["POST"])
 def create_bet():
-    game = flask.current_app.config["CURRENT_GAME"]
+    logged_in_user, logged_in_name, logged_in_avatar = app_util.get_user_details()
     data = flask.request.get_json()
+    disc_id = data["disc_id"]
+
+    if disc_id is None or logged_in_user is None:
+        return app_util.make_json_response("Error: You need to be logged in to place a bet.", 403)
+
+    game = flask.current_app.config["CURRENT_GAME"]
+
     database = flask.current_app.config["DATABASE"]
     betting_handler = flask.current_app.config["BET_HANDLERS"][game]
     events = [int(x) for x in data["events"]]
@@ -156,13 +163,7 @@ def create_bet():
     amounts = data["amounts"]
     targets = [None if t in ("invalid", "any") else int(t) for t in data["targets"]]
     target_names = data["targetNames"]
-    disc_id = data["disc_id"]
     guild_id = data["guildId"]
-
-    logged_in_user, logged_in_name, logged_in_avatar = app_util.get_user_details()
-
-    if disc_id is None or logged_in_user is None:
-        return app_util.make_json_response("Error: You need to be logged in to place a bet.", 403)
 
     game_start = app_util.discord_request("func", "get_game_start", [game, guild_id])
 

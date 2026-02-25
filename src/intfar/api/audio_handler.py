@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 from subprocess import Popen, PIPE
 from time import time
+import traceback
 from typing import Dict
 
 from discord import Message, PCMVolumeTransformer, TextChannel, VoiceClient
@@ -15,7 +16,6 @@ from intfar.api.config import Config
 from intfar.api.meta_database import MetaDatabase
 from intfar.api.youtube_api import YouTubeAPIClient, NUM_SEARCH_RESULTS
 from intfar.api.util import get_closest_match
-from intfar.discbot.commands.util import ADMIN_DISC_ID
 
 def _get_time_str(seconds):
     secs = int(seconds)
@@ -140,16 +140,20 @@ class AudioHandler:
                 del self.youtube_suggestions_msg[guild_id]
                 sound_type = "url"
 
+            title = None
             if sound_type == "file":
                 # Stream audio from a file
                 sound_path = f"{self.sounds_path}/{sound_name}.mp3"
-                title = f'"{sound_name}"'
-                owner_id = self.meta_database.get_sound_owner(sound_name)
-                if owner_id is not None and (member := message.guild.get_member(owner_id)):
-                    title += f" by {member.nick}"
+
+                if user_triggered:
+                    title = f'"{sound_name}"'
+                    owner_id = self.meta_database.get_sound_owner(sound_name)
+                    if owner_id is not None and (member := message.guild.get_member(owner_id)):
+                        title += f" by {member.nick}"
 
                 volume = 1
             else:
+                # Stream audio from a URL
                 sound_path, title = await self._download_from_url(message, sound_name)
                 title = f'"{title}"'
                 volume = 0.2

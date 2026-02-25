@@ -12,6 +12,7 @@ from intfar.api import util
 from intfar.api import lan
 from intfar.api.config import Config
 from intfar.api.game_databases import get_database_client
+from intfar.api.game_databases.lol import LoLGameDatabase
 
 parser = ArgumentParser()
 PARTICIPANTS_DICT = {
@@ -78,53 +79,8 @@ def insert_in_lan_entries(args, date_key, config: Config):
         for line in all_lines:
             fp.write(line)
 
-def bump_jeopardy_version():
-    new_version = util.JEOPARDY_ITERATION + 1
-    all_lines = inspect.getsourcelines(util)[0]
-    for line_no, line in enumerate(all_lines):
-        if line.strip().startswith("JEOPARDY_ITERATION = "):
-            all_lines[line_no] = f"JEOPARDY_ITERATION = {new_version}\n"
-            break
-
-    with open("api/lan.py", "w", encoding="utf-8") as fp:
-        for line in all_lines:
-            fp.write(line)
-
-    return new_version
-
-def set_jeopardy_player_names():
-    pass
-
-def create_jeopardy_folder(version: int, config: Config):
-    os.mkdir(os.path.join(config.static_folder, f"img/jeopardy/{version}"))
-
-def create_jeopardy_question_files(version: int, config: Config):
-    # Create empty 'jeopardy_questions' file
-    file_old = f"{config.static_folder}/data/jeopardy_questions_{version - 1}.json"
-    with open(file_old, "r") as fp:
-        data = json.load(fp)
-        for category in data:
-            for index in range(len(data[category]["tiers"])):
-                data[category]["tiers"][index]["questions"] = []
-
-    file_new = f"{config.static_folder}/data/jeopardy_questions_{version}.json"
-    with open(file_new, "w", encoding="utf-8") as fp:
-        json.dump(data, fp, indent=4)
-
-    # Create empty 'jeopardy_used' file
-    used_file = f"{config.static_folder}/data/jeopardy_used_{version}.json"
-    used_questions = {}
-    for category in data:
-        used_questions[category] = [
-            {"active": True, "used": [], "double": False}
-            for _ in range(5)
-        ]
-
-    with open(used_file, "w", encoding="utf-8") as fp:
-        json.dump(used_questions, fp, indent=4)
-
 def set_now_playing_date(date_key):
-    file_path = "D:/Misc_Scripts/now_playing/live_lol.py"
+    file_path = "/mnt/d/Misc_Scripts/now_playing/live_lol.py"
     lines = []
     with open(file_path, "r", encoding="utf-8") as fp:
         for line in fp:
@@ -132,7 +88,7 @@ def set_now_playing_date(date_key):
                 lines.append(f'LAN_DATE = "{date_key}"\n')
             else:
                 lines.append(line)
-    
+
     with open(file_path, "w", encoding="utf-8") as fp:
         for line in lines:
             fp.write(line)
@@ -145,13 +101,10 @@ parser.add_argument("-g", "--guild", choices=list(util.GUILD_MAP.keys()), defaul
 args = parser.parse_args()
 
 config = Config()
-database = get_database_client("lol", config)
+database: LoLGameDatabase = get_database_client("lol", config)
 date_key = f"{util.MONTH_NAMES[args.start.month - 1].lower()}_{str(args.start.year)[-2:]}"
 
 insert_in_lan_entries(args, date_key, config)
-jeopardy_version = bump_jeopardy_version()
-create_jeopardy_folder(jeopardy_version, config)
-create_jeopardy_question_files(jeopardy_version, config)
 lan.insert_bingo_challenges(database, date_key)
 
 if config.env == "dev":
