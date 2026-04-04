@@ -279,7 +279,7 @@ class JeopardyJoinCommand(BaseLANCommand):
 
         client_secret = self.client.meta_database.get_client_secret(author_id)
 
-        hostname_url = f"{api_util.get_website_link()}/lan/{client_secret}"
+        hostname_url = f"{api_util.get_website_link(self.client.config)}/lan/get_jeoparty_info/{client_secret}"
         response = httpx.get(hostname_url)
         if response.status_code != 200:
             response = "Something went wrong :( you don't seem to be a part of this LAN :O"
@@ -287,6 +287,9 @@ class JeopardyJoinCommand(BaseLANCommand):
             return
 
         data = response.json()
+        if data == {}:
+            return
+
         join_url = data["join_url"]
 
         response_dm = "Go to this link to join the Jeoparty!\n"

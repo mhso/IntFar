@@ -10,7 +10,7 @@ class RandomChampCommand(Command):
     NAME = "random_champ"
     DESCRIPTION = (
         "Pick a random champion. If a list is given, only champs from this list is used. " +
-        f"Champion lists can be created at {get_website_link('lol')}/lists/"
+        f"Champion lists can be created at {get_website_link(game='lol')}/lists/"
     )
     OPTIONAL_PARAMS = [CommandParam("list")]
 
@@ -37,7 +37,7 @@ class RandomUnplayedCommand(Command):
     NAME = "random_unplayed"
     DESCRIPTION = (
         "Pick a random champion. If a list is given, only champs from this list is used. " +
-        f"Champion lists can be created at {get_website_link('lol')}/lists/"
+        f"Champion lists can be created at {get_website_link(game='lol')}/lists/"
     )
     OPTIONAL_PARAMS = [CommandParam("list")]
 
@@ -65,11 +65,12 @@ class ChampListsCommand(Command):
 
     async def handle(self, target_id: int = None): 
         lists = self.client.game_databases[_GAME].get_lists(target_id)
+        website_url = get_website_link(self.client.config, 'lol')
 
         if lists == []:
             response = (
                 "There are currently no champion lists. " +
-                f"Create one at {get_website_link('lol')}/lists/"
+                f"Create one at {website_url}/lists/"
             )
         else:
             if target_id is None:
@@ -86,7 +87,8 @@ class ChampListsCommand(Command):
                     response += f" (by {owner_name})"
                 response += "\n"
 
-            response += f"\nSee which champs are in each list at {get_website_link('lol')}/lists/ "
+    
+            response += f"\nSee which champs are in each list at {website_url}/lists/ "
             response += "\nor with `!champs [list]`"
             response += "\nSelect a random champ from a list with `!random_champ [list]`"
 

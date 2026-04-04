@@ -5,14 +5,12 @@ from threading import Thread
 from dateutil.relativedelta import relativedelta
 import importlib
 import os
-import json
 import secrets
 import math
 
 from intfar.api.config import Config
 
 import Levenshtein
-import numpy as np
 
 MAIN_GUILD_ID = 619073595561213953
 MY_GUILD_ID  = 512363920044982272
@@ -161,8 +159,9 @@ def format_timestamp(timestamp):
 
     return f"{zero_pad(minutes)}:{zero_pad(seconds)}"
 
-def get_website_link(game=None):
-    base_url = "https://mhooge.com/intfar"
+def get_website_link(config: Config | None = None, game: str | None = None):
+    host = "http://localhost:5000" if config and config.env == "dev" else "https://mhooge.com"
+    base_url = f"{host}/intfar"
     if game is None:
         return base_url
 

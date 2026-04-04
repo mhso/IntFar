@@ -22,6 +22,7 @@ from intfar.api.game_monitors import get_game_monitor
 from intfar.discbot.commands.util import ADMIN_DISC_ID
 from intfar.api.data_schema import generate_schema
 from intfar.discbot.commands.split import get_end_of_split_msg, has_ranks_reset, should_send_split_message
+from intfar.api.audio_handler import AudioHandler
 from run_command import create_client
 from run_discord_bot import run_client
 
@@ -337,17 +338,6 @@ class TestFuncs:
                     database.execute_query(query, summ_data["puuid"], summ_id)
                     await asyncio.sleep(2)
 
-    def jeopardy_progress(self):
-        total = util.JEOPARDY_REGULAR_ROUNDS * 30 + 1
-        done = 0
-        with open(f"{self.config.static_folder}/data/jeopardy_questions.json", "r") as fp:
-            data = json.load(fp)
-            for category in data:
-                for tier in data[category]["tiers"]:
-                    done += len(tier["questions"])
-
-        print(f"Done with {done}/{total} ({int((done / total) * 100)}%)")
-
     async def get_raw_lol_data(self, game_id):
         data = await self.riot_api.get_game_details(game_id)
         with open("../resources/lol_data.json", "w", encoding="utf-8") as fp:
@@ -441,6 +431,15 @@ class TestFuncs:
         print("Success:", success)
         print(result)
 
+    async def test_yt_dlp(self):
+        audio_handler = AudioHandler(self.config, self.meta_database)
+        await audio_handler.refresh_youtube_cookies()
+        await audio_handler._download_from_url("https://www.youtube.com/watch?v=SL2WmM9tbzM")
+
+    async def announce_jeoparty_winner(self, player_data):
+        client = create_client(self.config, self.meta_database, self.game_databases)
+        await client.announce_jeopardy_winner(json.loads(player_data), str(util.MY_GUILD_ID))
+
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
 
@@ -463,7 +462,7 @@ if __name__ == "__main__":
 
     func = getattr(TEST_RUNNER, ARGS.func)
 
-    if asyncio.iscoroutinefunction(func):
+    if inspect.iscoroutinefunction(func):
         asyncio.run(func(*ARGS.args))
     else:
         func(*ARGS.args)

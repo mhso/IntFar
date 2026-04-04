@@ -24,7 +24,7 @@ RUN curl -sSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -
 COPY pyproject.toml pdm.lock ./
 
 # Download PDM and install requirements
-RUN curl -sSL https://pdm-project.org/install.sh | bash && pdm install
+RUN curl -sSL https://pdm-project.org/install.sh | bash && pdm install --prod && pdm run playwright install firefox
 
 # Copy code and resources
 COPY src ./src

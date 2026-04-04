@@ -74,8 +74,9 @@ def insert_in_lan_entries(args, date_key, config: Config):
             new_text = [f"{l}\n" for l in render_lan_entry(args, date_key, config).split("\n")]
             all_lines[line_no - 1] = all_lines[line_no - 1].removesuffix("\n") + ",\n"
             all_lines = all_lines[:line_no] + new_text + all_lines[line_no:]
+            break
 
-    with open("api/lan.py", "w", encoding="utf-8") as fp:
+    with open("intfar/api/lan.py", "w", encoding="utf-8") as fp:
         for line in all_lines:
             fp.write(line)
 

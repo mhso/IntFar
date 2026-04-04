@@ -225,7 +225,7 @@ class SoundsCommand(Command):
             for sound, owner_id, plays, timestamp in self.client.audio_handler.get_sounds(ordering)
         ]
         header = "Available sounds:"
-        footer = f"Upload your own at `{get_website_link()}/soundboard`!"
+        footer = f"Upload your own at `{get_website_link(self.client.config)}/soundboard`!"
 
         await self.client.paginate(self.message.channel, sounds_list, 0, 10, header, footer)
 

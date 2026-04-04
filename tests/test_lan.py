@@ -33,7 +33,7 @@ async def _update_and_validate_bingo(
     guild_id = GUILD_MAP["core"]
     game_monitor.active_game[guild_id] = {"id": raw_game_data["gameId"]}
     game_monitor.users_in_game[guild_id] = {}
-    post_game_data = await game_monitor.get_post_game_data(
+    post_game_data, _ = await game_monitor.get_post_game_data(
         raw_game_data,
         GameMonitor.POSTGAME_STATUS_OK,
         guild_id,
@@ -226,8 +226,8 @@ async def test_bingo_early_baron(game_monitors, game_databases):
                 {
                     "type": "ELITE_MONSTER_KILL",
                     "monsterType": "BARON_NASHOR",
-                    "teamId": 100,
-                    "timestamp": 1560
+                    "killerTeamId": 100,
+                    "timestamp": 1260
                 }
             )
         }
@@ -255,7 +255,7 @@ async def test_bingo_elder_dragon(game_monitors, game_databases):
                     "type": "ELITE_MONSTER_KILL",
                     "monsterType": "DRAGON",
                     "monsterSubType": "ELDER_DRAGON",
-                    "teamId": 100
+                    "killerTeamId": 100
                 }
             )
         }
@@ -339,6 +339,24 @@ async def test_bingo_fountain_kill(game_monitors, game_databases):
     )
 
 @pytest.mark.asyncio
+async def test_bingo_cheese_kills(game_monitors, game_databases):
+    game_monitor = game_monitors["lol"]
+    raw_game_data = create_synthetic_data(
+        "lol",
+        game_databases,
+        {"participants.1.challenges.killAfterHiddenWithAlly": DataSpec(5)}
+    )
+
+    await _update_and_validate_bingo(
+        game_monitor,
+        game_databases["lol"],
+        raw_game_data,
+        "cheese_kills",
+        5,
+        True,
+    )
+
+@pytest.mark.asyncio
 async def test_bingo_jungle_doinks(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
@@ -382,7 +400,7 @@ async def test_bingo_killing_sprees(game_monitors, game_databases):
         game_databases["lol"],
         raw_game_data,
         "killing_sprees",
-        10,
+        15,
         True,
         None
     )
@@ -430,13 +448,16 @@ async def test_bingo_outnumbered_kills(game_monitors, game_databases):
     )
 
 @pytest.mark.asyncio
-async def test_bingo_atakhan_kills(game_monitors, game_databases):
+async def test_bingo_minion_kills(game_monitors, game_databases):
     game_monitor = game_monitors["lol"]
     raw_game_data = create_synthetic_data(
         "lol",
         game_databases,
         {
-            "teams.0.objectives.atakhan.kills": DataSpec(1)
+            "participants.0.neutralMinionsKilled": DataSpec(3000),
+            "participants.0.totalMinionsKilled": DataSpec(3000),
+            "participants.1.neutralMinionsKilled": DataSpec(2000),
+            "participants.1.totalMinionsKilled": DataSpec(1200),
         }
     )
 
@@ -444,10 +465,9 @@ async def test_bingo_atakhan_kills(game_monitors, game_databases):
         game_monitor,
         game_databases["lol"],
         raw_game_data,
-        "atakhan_kills",
-        1,
-        False,
-        None
+        "minion_kills",
+        9000,
+        True,
     )
 
 @pytest.mark.asyncio

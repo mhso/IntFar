@@ -3,18 +3,20 @@ pushd $(dirname $0)
 port=5000
 
 # Clean up old image
-podman -i stop intfar
-podman -i rm intfar
+podman stop -i intfar
+podman rm -i intfar
 
 # Build latest image and run container
 podman build . -t intfar:latest --env PORT=$port
+podman image prune -f
 
 podman run \
     --name intfar \
     -i \
     -t \
-    -p \
-    $port:$port \
+    -p $port:$port \
+    -m 6500m \
+    --memory-reservation 4g \
     -v ./log:/intfar/log \
     -v ./resources/databases:/intfar/resources/databases \
     -v ./src/intfar/app/static/champ_data:/intfar/src/intfar/app/static/champ_data \

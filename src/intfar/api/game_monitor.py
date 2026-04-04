@@ -167,7 +167,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
                     "guild_id": guild_id
                 }
                 req_data.update(self.active_game[guild_id])
-                self._send_game_update("game_started", self.game, req_data)
+                self._send_game_update("game_started", self.game, req_data, self.config)
 
                 bound_logger = logger.bind(
                     event="game_start",
@@ -444,7 +444,7 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
                 "guild_id": guild_id,
                 "game_id": game_id
             }
-            self._send_game_update("game_ended", self.game, req_data)
+            self._send_game_update("game_ended", self.game, req_data, self.config)
 
             logger.info(f"Game status: {status_code}")
 
@@ -547,9 +547,9 @@ class GameMonitor(Generic[GameDatabaseType, GameAPIType, GameStatsType, PlayerSt
             logger.info(f"Removing user '{user.player_name[0]}' in '{self.game}' after {self.polling_stop_delay} seconds...")
             self.remove_user_task[guild_id][user.disc_id] = asyncio.create_task(self._remove_user_after_delay(user, guild_id))    
 
-    def _send_game_update(self, endpoint, game, data):
+    def _send_game_update(self, endpoint, game, data, config):
         try:
-            base_url = get_website_link(game)
+            base_url = get_website_link(config, game)
             return httpx.post(f"{base_url}/{endpoint}", data=data)
         except httpx.RequestError:
             logger.bind(endpoint=endpoint, data=data).exception(f"Error ignored in send_game_update for {self.game}")

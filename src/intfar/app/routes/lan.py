@@ -422,6 +422,7 @@ def announce_jeopardy_winner():
     guild_id = lan_api.get_latest_lan_info().guild_id
 
     player_data = flask.request.json["player_data"]
+    print("Player data:", player_data)
 
     if flask.current_app.config["APP_ENV"] == "production" and lan_api.is_lan_ongoing(time(), guild_id):
         app_util.discord_request("func", "announce_jeopardy_winner", (player_data, guild_id))

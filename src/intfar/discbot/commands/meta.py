@@ -303,7 +303,7 @@ class WebsiteCommand(Command):
     async def handle(self):
         response = (
             "Check out the amazing Int-Far website {emote_smol_gual}\n" +
-            f"{api_util.get_website_link()}\n\n" +
+            f"{api_util.get_website_link(self.client.config)}\n\n" +
             "Write `!website_verify` to sign in to the website, " +
             "allowing you to create bets, see stats, upload sounds, and more! "
             "You can also more easily sign up for CS2 here!"
@@ -324,7 +324,7 @@ class ProfileCommand(Command):
         target_name = self.client.get_discord_nick(target_id, self.message.guild.id)
 
         response = f"URL to {target_name}'s personal Int-Far profile for {api_util.SUPPORTED_GAMES[game]}:\n"
-        response += f"{api_util.get_website_link(game)}/user/{target_id}"
+        response += f"{api_util.get_website_link(self.client.config, game)}/user/{target_id}"
 
         await self.message.channel.send(response)
 
@@ -343,7 +343,7 @@ class VerifyCommand(Command):
         then sent via. a Discord DM to the invoker of the command.
         """
         client_secret = self.client.meta_database.get_client_secret(self.message.author.id)
-        url = f"{api_util.get_website_link()}/verify/{client_secret}"
+        url = f"{api_util.get_website_link(self.client.config)}/verify/{client_secret}"
         response_dm = "Go to this link to verify yourself (totally not a virus):\n"
         response_dm += url + "\n\n"
         response_dm += "This will enable you to interact with the Int-Far bot from "

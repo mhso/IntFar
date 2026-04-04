@@ -191,7 +191,20 @@ LAN_PARTIES = {
             347489125877809155: "Nønø"
         },
         "core"
-    )
+    ),
+    "april_26": LANInfo(
+        datetime(2026, 4, 11, 10, 0).timestamp(),
+        datetime(2026, 4, 12, 12, 0).timestamp(),
+        "Gual",
+        {
+                115142485579137029: "Dave",
+                172757468814770176: "Murt",
+                267401734513491969: "Gual",
+                331082926475182081: "Muds",
+                347489125877809155: "Nønø",
+        },
+        "core"
+    ),
 }
 LATEST_LAN_PARTY: str = max(LAN_PARTIES.keys(), key=lambda k: LAN_PARTIES[k].start_time)
 
@@ -388,9 +401,6 @@ class BingoSolver:
                 self.progress = 1
                 self.completed_by = player.disc_id
                 return
-
-    def invade_kills(self):
-        self.progress += self.parsed_data.timeline_data["invade_kills"] + self.parsed_data.timeline_data["anti_invade_kills"]
 
     def cheese_kills(self):
         self.progress += sum(player.challenges["killAfterHiddenWithAlly"] for player in self.parsed_data.filtered_player_stats)

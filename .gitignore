@@ -18,6 +18,7 @@ src/intfar/app/static/*/bootstrap/
 !src/intfar/app/static/css/
 resouces/consola.tff
 resources/data
+resources/cookies.txt
 vendor
 composer.lock
 all_messages.txt
