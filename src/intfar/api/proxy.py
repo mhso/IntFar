@@ -69,7 +69,7 @@ class ProxyManager(object):
         self.target_name = self.target_cls.__name__
 
         self.steam_process = subprocess.Popen(
-            f"pdm run run_steam.py {game}",
+            f"uv run run_steam.py {game}",
             executable="/bin/bash",
             shell=True,
             text=True

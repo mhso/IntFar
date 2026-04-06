@@ -31,7 +31,7 @@ from intfar.api.game_database import GameDatabase
 from intfar.api.betting import BettingHandler
 from intfar.api.audio_handler import AudioHandler
 from intfar.api.shop import ShopHandler
-from intfar.api.config import Config
+from intfar.api.config import Config, Environment
 from intfar.discbot.commands import util as commands_util
 from intfar.api import util as api_util
 #from ai.data import shape_predict_data
@@ -1619,7 +1619,7 @@ class DiscordClient(discord.Client):
     async def announce_jeopardy_winner(self, player_data: List[Dict[str, Any]], guild_id: str):
         iteration = api_util.JEOPARDY_ITERATION
         edition = api_util.JEOPADY_EDITION
-        guild_id = int(guild_id) if self.config.env == "production" else api_util.MY_GUILD_ID
+        guild_id = int(guild_id) if self.config.env is Environment.PRODUCTION else api_util.MY_GUILD_ID
 
         for player_dict in player_data:
             player_dict["disc_id"] = int(player_dict["contestant_id"])
@@ -1808,7 +1808,7 @@ class DiscordClient(discord.Client):
     def get_main_channel(self):
         return (
             self.channels_to_write[api_util.MAIN_GUILD_ID]
-            if self.config.env == "production"
+            if self.config.env is Environment.PRODUCTION
             else self.channels_to_write[api_util.MY_GUILD_ID]
         )
 
@@ -1846,11 +1846,11 @@ class DiscordClient(discord.Client):
 
                 for text_channel in guild.text_channels:
                     # Find the channel to write in for each guild.
-                    if text_channel.id in CHANNEL_IDS and self.config.env == "production":
+                    if text_channel.id in CHANNEL_IDS and self.config.env is Environment.PRODUCTION:
                         self.channels_to_write[guild.id] = text_channel
                         break
 
-            if guild.id == api_util.MY_GUILD_ID and self.config.env == "dev":
+            if guild.id == api_util.MY_GUILD_ID and self.config.env is Environment.DEVELOPMENT:
                 CHANNEL_IDS.append(guild.text_channels[0].id)
                 self.channels_to_write[guild.id] = guild.text_channels[0]
 
@@ -2006,8 +2006,8 @@ class DiscordClient(discord.Client):
         if message.author == self.user: # Ignore message since it was sent by us (the bot).
             return
 
-        if not mock and ((self.config.env == "dev" and message.guild.id != api_util.MY_GUILD_ID)
-                or (self.config.env == "production" and message.guild.id not in api_util.GUILD_IDS)):
+        if not mock and ((self.config.env is Environment.DEVELOPMENT and message.guild.id != api_util.MY_GUILD_ID)
+                or (self.config.env is Environment.PRODUCTION and message.guild.id not in api_util.GUILD_IDS)):
             # If Int-Far is running in dev mode, only handle messages that are sent from
             # my personal sandbox Discord server.
             return

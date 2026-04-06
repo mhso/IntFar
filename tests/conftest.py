@@ -1,6 +1,6 @@
 import pytest
 
-from intfar.api.config import Config
+from intfar.api.config import Config, Environment
 from intfar.api.meta_database import MetaDatabase
 from intfar.api.game_databases import get_database_client
 from intfar.api.game_monitors import get_game_monitor
@@ -35,7 +35,7 @@ def config():
     config = Config()
     config.static_folder = f"{config.src_folder}/app/static"
     config.database_folder += "/test"
-    config.env = "test"
+    config.env = Environment.TESTING
 
     yield config
 

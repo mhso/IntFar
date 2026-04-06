@@ -12,7 +12,7 @@ RUN curl -sSL https://github.com/dyc3/steamguard-cli/releases/download/v0.17.1/s
     && apt install -y golang
 
 # Set environment variables
-ENV PDM_HOME=/bin
+ENV UV_INSTALL_DIR=/bin
 ENV DENO_INSTALL=/usr
 
 # Install user dependencies
@@ -21,10 +21,10 @@ RUN curl -sSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -
     && curl -fsSL https://deno.land/install.sh | bash
 
 # Copy pyproject.toml
-COPY pyproject.toml pdm.lock ./
+COPY pyproject.toml uv.lock ./
 
-# Download PDM and install requirements
-RUN curl -sSL https://pdm-project.org/install.sh | bash && pdm install --prod && pdm run playwright install firefox
+# Download UV and install requirements
+RUN curl -LsSf https://astral.sh/uv/install.sh | bash && uv sync --no-dev && uv run playwright install firefox
 
 # Copy code and resources
 COPY src ./src
@@ -32,4 +32,4 @@ COPY resources ./resources
 
 # Run the server
 WORKDIR /intfar/src
-CMD ["pdm", "run", "main.py", "-p", "${PORT}"]
+CMD uv run main.py -p ${PORT}

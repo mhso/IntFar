@@ -1,7 +1,6 @@
 from argparse import ArgumentParser, ArgumentTypeError
 from datetime import datetime
 import inspect
-import json
 import os
 
 from jinja2.environment import Environment
@@ -10,7 +9,7 @@ from jinja2.exceptions import TemplateNotFound
 
 from intfar.api import util
 from intfar.api import lan
-from intfar.api.config import Config
+from intfar.api.config import Config, Environment
 from intfar.api.game_databases import get_database_client
 from intfar.api.game_databases.lol import LoLGameDatabase
 
@@ -108,5 +107,5 @@ date_key = f"{util.MONTH_NAMES[args.start.month - 1].lower()}_{str(args.start.ye
 insert_in_lan_entries(args, date_key, config)
 lan.insert_bingo_challenges(database, date_key)
 
-if config.env == "dev":
+if config.env is Environment.DEVELOPMENT:
     set_now_playing_date(date_key)

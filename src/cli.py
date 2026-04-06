@@ -222,7 +222,7 @@ class TestFuncs:
         print(x, y)
 
     def test_items(self):
-        with open(f"{self.config.resources_folder}/items-14.3.1.json", encoding="utf-8") as fp:
+        with open(f"{self.config.resources_folder}/game_data/lol//items-14.3.1.json", encoding="utf-8") as fp:
             items = json.load(fp)
 
         with open("items.txt", "w", encoding="utf-8") as fp:

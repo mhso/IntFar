@@ -6,9 +6,6 @@ queries.sql
 __pycache__
 __pypackages__
 *.pt
-resources/champions*.json
-resources/items*.json
-resources/maps.json
 resources/databases
 resources/skins.csv
 resources/lol_data.json
@@ -17,7 +14,8 @@ src/intfar/app/static/*/bootstrap/
 !src/intfar/app/static/js/
 !src/intfar/app/static/css/
 resouces/consola.tff
-resources/data
+resources/game_data
+resources/match_data
 resources/cookies.txt
 vendor
 composer.lock
@@ -28,5 +26,4 @@ log
 todo.txt
 dummy.txt
 resources/message.txt
-.pdm-python
-.pdm-config
+.python-version

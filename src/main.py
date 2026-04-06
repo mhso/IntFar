@@ -8,7 +8,7 @@ from multiprocessing import Process, Pipe, Manager
 from discord.opus import load_opus
 from mhooge_flask.logging import logger
 
-from intfar.api.config import Config
+from intfar.api.config import Config, Environment
 from intfar.api.meta_database import MetaDatabase
 from intfar.api.game_databases import get_database_client
 from intfar.api.util import SUPPORTED_GAMES
@@ -67,7 +67,7 @@ def kill_all_processes(processes):
 def main(flask_port: int):
     config = Config()
 
-    env_desc = "DEVELOPMENT" if config.env == "dev" else "PRODUCTION"
+    env_desc = "DEVELOPMENT" if config.env is Environment.DEVELOPMENT else "PRODUCTION"
 
     logger.info(f"+++++ Running in {env_desc} mode +++++")
 

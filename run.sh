@@ -19,6 +19,7 @@ podman run \
     --memory-reservation 4g \
     -v ./log:/intfar/log \
     -v ./resources/databases:/intfar/resources/databases \
+    -v ./resources/game_data:/intfar/resources/game_data \
     -v ./src/intfar/app/static/champ_data:/intfar/src/intfar/app/static/champ_data \
     -v ./src/intfar/app/static/img/avatars:/intfar/src/intfar/app/static/img/avatars \
     -v ./src/intfar/app/static/img/champions:/intfar/src/intfar/app/static/img/champions \

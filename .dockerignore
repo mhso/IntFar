@@ -1,4 +1,5 @@
-resources/data
+resources/match_data
+resources/game_data
 resources/databases
 resources/game_data_schemas
 resources/lol_data.json

@@ -12,7 +12,7 @@ class MockRiotAPI(RiotAPIClient):
         return MockAsyncClient()
 
     def get_latest_patch(self):
-        champ_file = glob(f"{self.config.resources_folder}/champions-*.json")[-1]
+        champ_file = glob(f"{self.config.resources_folder}/game_data/lol/champions-*.json")[-1]
         return champ_file.split("-")[1].replace(".json", "")
 
     def get_latest_data(self):

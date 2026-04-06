@@ -8,6 +8,7 @@ import numpy as np
 from intfar.app import util as app_util
 from intfar.api import util as api_util
 from intfar.api import lan as lan_api
+from intfar.api.config import Environment
 from intfar.api.game_apis.lol import RiotAPIClient
 from intfar.api.game_databases.lol import LoLGameDatabase
 from intfar.api.game_data import get_formatted_stat_names, get_formatted_stat_value
@@ -412,6 +413,7 @@ def lan_view():
 
 @lan_page.route("/jeopardy_winner", methods=["POST"])
 def announce_jeopardy_winner():
+    config = flask.current_app.config["APP_CONFIG"]
     meta_database = flask.current_app.config["DATABASE"]
     disc_id = flask.request.json.get("disc_id")
     token = flask.request.json.get("token")
@@ -424,7 +426,7 @@ def announce_jeopardy_winner():
     player_data = flask.request.json["player_data"]
     print("Player data:", player_data)
 
-    if flask.current_app.config["APP_ENV"] == "production" and lan_api.is_lan_ongoing(time(), guild_id):
+    if config.env is Environment.PRODUCTION and lan_api.is_lan_ongoing(time(), guild_id):
         app_util.discord_request("func", "announce_jeopardy_winner", (player_data, guild_id))
 
     return app_util.make_text_response("Successfully announced jeopardy winner for this LAN!", 200)

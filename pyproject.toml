@@ -1,7 +1,7 @@
 [project]
 name = "intfar"
-version = "1.1.0"
-description = "Int-Far - Now with PDM"
+version = "1.2.0"
+description = "Int-Far - Now with UV"
 authors = [
     {name = "Mikkel Sørensen", email = "m_hooge@hotmail.com"},
 ]
@@ -24,19 +24,21 @@ dependencies = [
     "steam @ git+https://github.com/mhso/steam.git",
     "awpy @ git+https://github.com/mhso/awpy.git",
     "opencv-python==4.12.0.88",
+    "davey>=0.1.5",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
 license = {text = "MIT"}
 
-[tool.pdm]
-distribution = false
+[tool.uv]
+package = false
 
-[tool.pdm.dev-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=0.24.0",
 ]
+
 [tool.pytest.ini_options]
 pythonpath = [
     "src"

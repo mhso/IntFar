@@ -7,8 +7,8 @@ from typing import Any, List, Literal, Tuple
 from mhooge_flask.logging import logger
 import flask
 
+from intfar.api.config import Config, Environment
 from intfar.api.util import GUILD_IDS, SUPPORTED_GAMES
-from intfar.api.config import Config
 from intfar.api.meta_database import DEFAULT_GAME
 from intfar.discbot.commands.util import ADMIN_DISC_ID
 
@@ -86,7 +86,7 @@ def create_session_id():
 def ensure_https():
     config = flask.current_app.config["APP_CONFIG"]
 
-    if config.env == "production" and not flask.request.is_secure:
+    if config.env is Environment.PRODUCTION and not flask.request.is_secure:
         url = flask.request.url.replace('http://', 'https://', 1)
         code = 301
         return flask.redirect(url, code=code)

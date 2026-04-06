@@ -8,7 +8,7 @@ import os
 import secrets
 import math
 
-from intfar.api.config import Config
+from intfar.api.config import Config, Environment
 
 import Levenshtein
 
@@ -160,7 +160,7 @@ def format_timestamp(timestamp):
     return f"{zero_pad(minutes)}:{zero_pad(seconds)}"
 
 def get_website_link(config: Config | None = None, game: str | None = None):
-    host = "http://localhost:5000" if config and config.env == "dev" else "https://mhooge.com"
+    host = "http://localhost:5000" if config and config.env is Environment.DEVELOPMENT else "https://mhooge.com"
     base_url = f"{host}/intfar"
     if game is None:
         return base_url

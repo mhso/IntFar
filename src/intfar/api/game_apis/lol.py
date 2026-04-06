@@ -1,6 +1,6 @@
 from time import sleep
 from glob import glob
-from os import remove
+from os import remove, mkdir
 from os.path import exists
 import json
 import asyncio
@@ -38,16 +38,20 @@ class RiotAPIClient(GameAPIClient):
         return len(self.champ_ids)
 
     @property
+    def data_path(self):
+        return f"{self.config.resources_folder}/game_data/lol"
+
+    @property
     def champions_file(self):
-        return f"{self.config.resources_folder}/champions-{self.latest_patch}.json"
+        return f"{self.data_path}/champions-{self.latest_patch}.json"
 
     @property
     def items_file(self):
-        return f"{self.config.resources_folder}/items-{self.latest_patch}.json"
+        return f"{self.data_path}/items-{self.latest_patch}.json"
 
     @property
     def maps_file(self):
-        return f"{self.config.resources_folder}/maps.json"
+        return f"{self.data_path}/maps.json"
 
     def get_latest_data(self):
         """
@@ -55,6 +59,9 @@ class RiotAPIClient(GameAPIClient):
         First, fetches what the latest patch is,
         then downloads champion metadata, splashes, and portraits.
         """
+        if not exists(self.data_path):
+            mkdir(self.data_path)
+
         self.latest_patch = self.get_latest_patch()
         if not exists(self.champions_file):
             self.get_latest_champions_file()
@@ -94,7 +101,7 @@ class RiotAPIClient(GameAPIClient):
         url = f"http://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/champion.json"
         logger.info(f"Downloading latest champions file: '{self.champions_file}'")
 
-        old_files = glob(f"{self.config.resources_folder}/champions-*.json")
+        old_files = glob(f"{self.data_path}/champions-*.json")
 
         try:
             response_json = httpx.get(url).json()
@@ -109,7 +116,7 @@ class RiotAPIClient(GameAPIClient):
         url = f"https://ddragon.leagueoflegends.com/cdn/{self.latest_patch}/data/en_US/item.json"
         logger.info(f"Downloading latest item file: '{self.items_file}'")
 
-        old_files = glob(f"{self.config.resources_folder}/items-*.json")
+        old_files = glob(f"{self.data_path}/items-*.json")
 
         try:
             response_json = httpx.get(url).json()

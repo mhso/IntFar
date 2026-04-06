@@ -1,4 +1,10 @@
 import json
+from enum import Enum
+
+class Environment(Enum):
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
+    TESTING = "testing"
 
 class Config:
     def __init__(self):
@@ -25,7 +31,7 @@ class Config:
         self.steam_secrets = auth["steamSecrets"]
         self.steam_username = auth["steamUsername"]
         self.steam_password = auth["steamPassword"]
-        self.env = auth["env"]
+        self.env = Environment(auth["env"])
         self.database_folder = f"{self.resources_folder}/databases"
         self.schema_folder = f"{self.resources_folder}/schemas"
         self.generate_predictions_img = False

@@ -1,11 +1,12 @@
 import asyncio
+from inspect import iscoroutinefunction
 from time import time
 from gevent import monkey, sleep
 monkey.patch_all()
 
 from mhooge_flask.logging import logger
 
-from intfar.api.config import Config
+from intfar.api.config import Config, Environment
 from intfar.api.meta_database import MetaDatabase
 from intfar.api.game_apis.cs2 import SteamAPIClient
 from argparse import ArgumentParser
@@ -28,7 +29,7 @@ async def listen(database: MetaDatabase, client: SteamAPIClient):
                 result = getattr(client, command)
 
                 if (
-                    (asyncio.iscoroutinefunction(result) or callable(result))
+                    (iscoroutinefunction(result) or callable(result))
                     and time() - time_since_relog > RELOG_INTERVAL
                     and (not client.is_logged_in() or not client.cs_client.ready)
                 ):
@@ -38,7 +39,7 @@ async def listen(database: MetaDatabase, client: SteamAPIClient):
                     client.cs_client.launch()
                     time_since_relog = time()
 
-                if asyncio.iscoroutinefunction(result):
+                if iscoroutinefunction(result):
                     result = await result(*args)
                 elif callable(result):
                     result = result(*args)
@@ -69,7 +70,7 @@ if __name__ == "__main__":
     config = Config()
     database = MetaDatabase(config)
 
-    if config.env == "dev":
+    if config.env is Environment.DEVELOPMENT:
         exit(0)
 
     try:
