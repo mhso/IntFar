@@ -10,6 +10,7 @@ from mhooge_flask.logging import logger
 import httpx
 from bs4 import BeautifulSoup
 from steam.client import SteamClient
+from steam.webauth import WebAuth
 from csgo.client import CSGOClient
 from steam.steamid import SteamID
 from steam.core.msg import MsgProto
@@ -63,6 +64,11 @@ class SteamAPIClient(GameAPIClient):
             268435464: "overpass"
         }
         self.cs2_app_id = 730
+
+        self.web_auth = WebAuth(
+            self.config.steam_username,
+            self.config.steam_password
+        )
 
         #self.get_latest_data()
 
@@ -434,8 +440,8 @@ class SteamAPIClient(GameAPIClient):
         )
 
     def _handle_channel_secured(self):
-        if self.logged_on_once and self.steam_client.relogin_available:
-            self.steam_client.relogin()
+        if self.logged_on_once and not self.steam_client.logged_on:
+            self._retry_login()
 
     def _handle_steam_disconnect(self):
         logger.warning("Steam disconnected!")
@@ -463,7 +469,7 @@ class SteamAPIClient(GameAPIClient):
         Generate Steam two-factor authentication code with `steamguard-cli`.
         """
         p = subprocess.Popen(["steamguard"], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return p.communicate()[0]
+        return p.communicate()[0].strip()
 
     def _retry_login(self, attempts=3):
         success = False
@@ -476,9 +482,10 @@ class SteamAPIClient(GameAPIClient):
                     self.config.steam_password,
                     two_factor_code=self.get_2fa_codes()
                 )
+
             except RuntimeError:
                 logger.warning("Already logged in to Steam!")
-                return
+                return None, None
 
             if status_code == EResult.OK:
                 success = True
@@ -508,7 +515,7 @@ class SteamAPIClient(GameAPIClient):
         if not success:
             # Try to re-initialize Steam and CS clients
             self._init_clients()
-            success = self._retry_login(attempts)
+            success, status_code = self._retry_login(attempts)
 
         if not success:
             extra_info = ""

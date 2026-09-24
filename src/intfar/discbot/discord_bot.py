@@ -188,10 +188,11 @@ class DiscordClient(discord.Client):
 
         elif post_game_stats.status_code == game_monitor.POSTGAME_STATUS_INVALID_MAP:
             # Game is not on summoners rift. Same deal.
-            response = "That game was not on SR, Nexus Blitz, or Arena "
-            response += "{emote_woahpikachu} no Int-Far will be crowned "
-            response += "and no stats will be saved."
-            await self.channels_to_write[post_game_stats.guild_id].send(self.insert_emotes(response))
+            pass
+            # response = "That game was not on SR, Nexus Blitz, or Arena "
+            # response += "{emote_woahpikachu} no Int-Far will be crowned "
+            # response += "and no stats will be saved."
+            # await self.channels_to_write[post_game_stats.guild_id].send(self.insert_emotes(response))
 
         elif post_game_stats.status_code == game_monitor.POSTGAME_STATUS_TOO_SHORT:
             # Game was too short, most likely a remake.
@@ -254,7 +255,7 @@ class DiscordClient(discord.Client):
 
             await self.handle_game_over(post_game_stats)
 
-    async def send_message_in_chunks(self, recipient: discord.channel.TextChannel |discord.user.User, text: str):
+    async def send_message_in_chunks(self, recipient: discord.abc.Messageable, text: str):
         if len(text) < 2000:
             await recipient.send(text)
             return
@@ -1834,8 +1835,6 @@ class DiscordClient(discord.Client):
         self.initialized = True
 
         for guild in self.guilds:
-            #await guild.chunk()
-
             if guild.id in api_util.GUILD_IDS:
                 for voice_channel in guild.voice_channels:
                     members_in_voice = voice_channel.members

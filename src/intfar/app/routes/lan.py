@@ -209,9 +209,6 @@ def get_bingo_data(database, lan_date, face_images={}):
     return bingo_data
 
 def get_data(lan_info, database, lan_date):
-    config = flask.current_app.config["APP_CONFIG"]
-    riot_api = flask.current_app.config["GAME_API_CLIENTS"]["lol"]
-
     try:
         games_stats = database.get_games_results(
             time_after=lan_info.start_time,

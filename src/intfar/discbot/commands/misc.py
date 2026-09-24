@@ -248,6 +248,10 @@ class SummaryCommand(Command):
         # Shows information about various stats a person has accrued.
         nickname = self.client.get_discord_nick(target_id, self.message.guild.id)
         games_played = database.get_intfar_stats(target_id)[0]
+        games_data = database.get_games_count(target_id)
+        games_played = games_data[0]
+        playtime = games_data[3]
+        playtime_hours = playtime / 60 / 60
         num_played_ids = len(database.get_played_ids(target_id))
 
         total_winrate = database.get_total_winrate(target_id)
@@ -268,8 +272,9 @@ class SummaryCommand(Command):
         playable_name = "champions" if game == "lol" else "maps"
 
         response_1 = (
-            f"{nickname} has played a total of **{games_played}** games " +
-            f"(**{total_winrate:.1f}%** was won).\n" +
+            f"{nickname} has played a total of **{games_played}** games "
+            f"(**{total_winrate:.1f}%** was won).\n"
+            f"This is equal to an in-game playtime of **{playtime_hours:.2f} hours**.\n"
             f"They have played **{num_played_ids}**/**{total_ids}** different {playable_name}.\n\n"
         )
 
@@ -342,12 +347,7 @@ class SummaryCommand(Command):
             f"**{score:.2f}**/**10**\nThis ranks them at **{rank}**/**{num_scores}**."
         )
 
-        if len(response_1) + len(response_2) < 4000:
-            await self.message.channel.send(response_1 + response_2)
-        else:
-            await self.message.channel.send(response_1)
-            await asyncio.sleep(1)
-            await self.message.channel.send(response_2)
+        await self.client.send_message_in_chunks(self.message.channel, response_1 + response_2)
 
 class PerformanceCommand(Command):
     NAME = "performance"

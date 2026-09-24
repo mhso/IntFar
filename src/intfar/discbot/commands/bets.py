@@ -102,26 +102,29 @@ class MakeBetCommand(Command):
         else:
             index = 1
 
-        while index < len(args):
-            event = args[index+1]
-            amount = args[index]
-            if "&" in (event, amount):
-                raise ValueError("Multi-bet input is formatted incorrectly!")
+        try:
+            while index < len(args):
+                event = args[index+1]
+                amount = args[index]
+                if "&" in (event, amount):
+                    raise ValueError("Multi-bet input is formatted incorrectly!")
 
-            target = None
-            if index + 2 < len(args) and args[index+2] != "&":
-                try:
-                    end_index = args.index("&", index)
-                except ValueError:
-                    end_index = len(args)
-                target = extract_target_name(args, index+2, end_index)
-                index = end_index + 1
-            else:
-                index += 3
+                target = None
+                if index + 2 < len(args) and args[index+2] != "&":
+                    try:
+                        end_index = args.index("&", index)
+                    except ValueError:
+                        end_index = len(args)
+                    target = extract_target_name(args, index+2, end_index)
+                    index = end_index + 1
+                else:
+                    index += 3
 
-            amounts.append(amount)
-            events.append(event)
-            targets.append(target)
+                amounts.append(amount)
+                events.append(event)
+                targets.append(target)
+        except IndexError:
+            raise CommandParsingError("Bet is formatted incorrectly.")
 
         return [game, amounts, events, targets]
 

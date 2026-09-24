@@ -7,6 +7,5 @@ resources/message.txt
 resources/skins.csv
 resources/team_comps.txt
 
-src/cli.py
 src/dummy.txt
 src/query_db.py

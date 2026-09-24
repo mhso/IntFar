@@ -133,7 +133,7 @@ class CommandsCommand(Command):
         header = "**--- Valid commands, and their usages: ---**"
         lines = []
         for cmd in commands_util.COMMANDS:
-            cmd_obj = commands_util.COMMANDS[cmd](self.client, self.message)
+            cmd_obj = commands_util.COMMANDS[cmd](self.client, self.message, cmd)
             if self.message.guild.id in cmd_obj.GUILDS:
                 cmd_str = f"`{cmd_obj}` - {cmd_obj.DESCRIPTION}"
                 lines.append(cmd_str)
@@ -191,11 +191,21 @@ class StatusCommand(Command):
         response = f"**Uptime:** {get_uptime(self.client.time_initialized)}\n"
 
         (
-            games, earliest_game, latest_game, playtime,
-            games_won, unique_game_guilds, longest_game_duration,
-            longest_game_time, users, doinks_games,
-            total_doinks, intfars, games_ratios,
-            intfar_ratios, intfar_multi_ratios
+            games,
+            earliest_game,
+            latest_game,
+            playtime,
+            games_won,
+            unique_game_guilds,
+            longest_game_duration,
+            longest_game_time,
+            users,
+            doinks_games,
+            total_doinks,
+            intfars,
+            games_ratios,
+            intfar_ratios,
+            intfar_multi_ratios,
         ) = self.client.game_databases[game].get_meta_stats()
 
         pct_games_won = (games_won / games) * 100

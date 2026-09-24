@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from datetime import datetime
 from sqlite3 import Cursor
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from mhooge_flask.database import SQLiteDatabase, DBException, Query
 from mhooge_flask.logging import logger
@@ -440,7 +440,7 @@ class GameDatabase(SQLiteDatabase):
         ...
 
     @abstractmethod
-    def get_min_or_max_winrate_played(self, disc_id, best, included_ids=None, return_top_n=1, min_games=10):
+    def get_min_or_max_winrate_played(self, disc_id, best, included_ids=None, return_top_n=1, min_games=10) -> Tuple[float, int, str]:
         ...
 
     @abstractmethod

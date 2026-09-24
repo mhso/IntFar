@@ -274,9 +274,6 @@ class JeopardyJoinCommand(BaseLANCommand):
         if not lan_api.is_lan_ongoing(datetime.now().timestamp(), self.message.guild.id) or author_id not in self.lan_party.participants:
             return
 
-        if author_id not in self.lan_party.participants:
-            return
-
         client_secret = self.client.meta_database.get_client_secret(author_id)
 
         hostname_url = f"{api_util.get_website_link(self.client.config)}/lan/get_jeoparty_info/{client_secret}"

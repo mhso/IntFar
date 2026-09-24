@@ -180,10 +180,10 @@ class TestFuncs:
         api_client = SteamAPIClient("csgo", self.config)
         print(api_client.map_names)
 
-    async def cs_sharecode(self):
+    async def cs_sharecode(self, sharecode: str | None = None):
         api_client = SteamAPIClient("cs2", self.config)
         user = self.game_databases["cs2"].game_users[ADMIN_DISC_ID]
-        sharecode = user.latest_match_token[0]
+        sharecode = sharecode or user.latest_match_token[0]
         print("Now:", sharecode)
         while (sharecode := await api_client.get_next_sharecode(user.player_id[0], user.match_auth_code[0], sharecode)) is not None:
             print("Next:", sharecode)

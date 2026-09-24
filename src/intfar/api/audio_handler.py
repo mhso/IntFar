@@ -149,9 +149,11 @@ class AudioHandler:
             except Exception:
                 return
 
-    async def _play_loop(self, guild_id: int, user_triggered: bool = False):
+    async def _play_loop(self, guild_id: int):
         while (sound_queue := self.sound_queue.get(guild_id, [])) != []:
             sound_name, message, sound_type = sound_queue.pop(0)
+            user_triggered = message is not None
+
             if sound_type == "search":
                 del self.active_youtube_suggestions[guild_id]
                 await self.youtube_suggestions_msg[guild_id].delete()
@@ -330,7 +332,7 @@ class AudioHandler:
             if guild_id not in self.voice_streams:
                 self.voice_streams[guild_id] = await voice_channel.connect(timeout=5)
 
-                success, status = await self._play_loop(guild_id, message is not None) # Play sounds in the queue.
+                success, status = await self._play_loop(guild_id) # Play sounds in the queue.
                 return success, status
 
             return True, None

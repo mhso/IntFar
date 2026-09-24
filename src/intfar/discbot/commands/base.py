@@ -177,7 +177,10 @@ class Command:
 
             elif isinstance(param, GameParam):
                 if index >= len(args):
-                    game_value = user.default_game or param.default if param.default else None
+                    if user is None:
+                        game_value = param.default if param.default else None
+                    else:
+                        game_value = user.default_game or param.default if param.default else None
 
                     parsed_args.append(game_value)
                     continue
