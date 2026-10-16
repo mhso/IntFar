@@ -2,7 +2,7 @@ from intfar.api.util import SUPPORTED_GAMES
 from intfar.api.awards import get_doinks_reasons, organize_doinks_stats
 from intfar.discbot.commands.base import *
 
-class DoinksCommand(Command):
+class DoinksCommand(StatCommand):
     NAME = "doinks"
     DESCRIPTION = (
         "Show big doinks plays that you (or someone else) did! " +
@@ -13,7 +13,7 @@ class DoinksCommand(Command):
     OPTIONAL_PARAMS = [GameParam("game"), TargetParam("person")]
 
     async def handle(self, game: str, target_id: int):
-        database = self.client.game_databases[game]
+        database = self.game_databases[game]
         doinks_reasons = get_doinks_reasons(game)
 
         def get_doinks_stats(disc_id, expanded=True):
@@ -52,16 +52,16 @@ class DoinksCommand(Command):
         else: # Check doinks for a specific person.
             response = get_doinks_stats(target_id)[0]
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
 
-class DoinksRelationsCommand(Command):
+class DoinksRelationsCommand(StatCommand):
     NAME = "doinks_relations"
     DESCRIPTION = "Show who you (or someone else) get Big Doinks the most with."
     ACCESS_LEVEL = "self"
     OPTIONAL_PARAMS = [GameParam("game"), TargetParam("person")]
 
     def _get_doinks_relation_stats(self, game: str, target_id: int):
-        database = self.client.game_databases[game]
+        database = self.game_databases[game]
         data = []
         games_relations, doinks_relations = database.get_doinks_relations(target_id)
         doinks_games = database.get_doinks_count(target_id)[0]
@@ -69,7 +69,7 @@ class DoinksRelationsCommand(Command):
             doinks = doinks_relations.get(disc_id, 0)
             data.append(
                 (
-                    disc_id, total_games, doinks, int((doinks / doinks_games) * 100),
+                    disc_id, total_games, doinks, int((doinks / doinks_games) * 100) if doinks_games else 0,
                     int((doinks / total_games) * 100)
                 )
             )
@@ -77,7 +77,7 @@ class DoinksRelationsCommand(Command):
         return sorted(data, key=lambda x: x[2], reverse=True)
 
     async def handle(self, game: str, target_id: int):
-        database = self.client.game_databases[game]
+        database = self.game_databases[game]
 
         data = []
         games_relations, doinks_relations = database.get_doinks_relations(target_id)
@@ -86,7 +86,7 @@ class DoinksRelationsCommand(Command):
             doinks = doinks_relations.get(disc_id, 0)
             data.append(
                 (
-                    disc_id, total_games, doinks, int((doinks / doinks_games) * 100),
+                    disc_id, total_games, doinks, int((doinks / doinks_games) * 100) if doinks_games else 0,
                     int((doinks / total_games) * 100)
                 )
             )
@@ -102,7 +102,7 @@ class DoinksRelationsCommand(Command):
             response += f"- {nick}: **{doinks}** times (**{doinks_ratio}%**) "
             response += f"(**{games_ratio}%** of **{total_games}** games)\n"
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
 
 class DoinksCriteriaCommand(Command):
     NAME = "doinks_criteria"

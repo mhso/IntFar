@@ -558,6 +558,18 @@ class LoLGameDatabase(GameDatabase):
         return self.query(query, *params, format_func="all")
 
     def get_current_rank(self, player_id: str) -> tuple[str, str]:
+        if self.stat_period is not None:
+            query = """
+                SELECT p.rank_solo, p.rank_flex
+                FROM participants AS p
+                INNER JOIN games AS g ON g.game_id = p.game_id
+                WHERE p.player_id = ?
+                ORDER BY g.timestamp DESC, g.game_id DESC
+                LIMIT 1
+            """
+            with self:
+                return self.execute_query(query, player_id).fetchone() or (None, None)
+
         query = f"""
             SELECT
                 rank_solo,

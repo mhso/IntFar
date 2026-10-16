@@ -234,7 +234,7 @@ class FlirtSpanishCommand(BaseFlirtCommand):
     def __init__(self, client: DiscordClient, message: Message):
         super().__init__(client, message, called_name, "spanish")
 
-class SummaryCommand(Command):
+class SummaryCommand(StatCommand):
     NAME = "summary"
     DESCRIPTION = (
         "Show a summary of you or someone else's stats across all recorded games."
@@ -243,13 +243,16 @@ class SummaryCommand(Command):
     OPTIONAL_PARAMS = [GameParam("game"), TargetParam("person")]
 
     async def handle(self, game: str, target_id: int):
-        database = self.client.game_databases[game]
+        database = self.game_databases[game]
 
         # Shows information about various stats a person has accrued.
         nickname = self.client.get_discord_nick(target_id, self.message.guild.id)
         games_played = database.get_intfar_stats(target_id)[0]
         games_data = database.get_games_count(target_id)
         games_played = games_data[0]
+        if not games_played:
+            await self.message.channel.send(self.format_stat_response(f"No games found for {nickname}."))
+            return
         playtime = games_data[3]
         playtime_hours = playtime / 60 / 60
         num_played_ids = len(database.get_played_ids(target_id))
@@ -283,11 +286,12 @@ class SummaryCommand(Command):
         if game == "lol":
             main_player_id = database.game_users[target_id].player_id[0]
             rank_solo, rank_flex = database.get_current_rank(main_player_id)
+            rank_description = "current rank" if self.stat_period is None else "latest recorded rank"
             fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_solo)
-            response_1 += f"Their current rank in {fmt_stat_names['rank_solo']} is **{fmt_rank}**.\n"
+            response_1 += f"Their {rank_description} in {fmt_stat_names['rank_solo']} is **{fmt_rank}**.\n"
 
             fmt_rank = get_formatted_stat_value(game, "rank_solo", rank_flex)
-            response_1 += f"Their current rank in {fmt_stat_names['rank_flex']} is **{fmt_rank}**.\n\n"
+            response_1 += f"Their {rank_description} in {fmt_stat_names['rank_flex']} is **{fmt_rank}**.\n\n"
 
         response_1 += f"Their longest winning streak was **{longest_win_streak}** games.\n"
         response_1 += f"Their longest loss streak was **{longest_loss_streak}** games.\n"
@@ -347,9 +351,9 @@ class SummaryCommand(Command):
             f"**{score:.2f}**/**10**\nThis ranks them at **{rank}**/**{num_scores}**."
         )
 
-        await self.client.send_message_in_chunks(self.message.channel, response_1 + response_2)
+        await self.client.send_message_in_chunks(self.message.channel, self.format_stat_response(response_1 + response_2))
 
-class PerformanceCommand(Command):
+class PerformanceCommand(StatCommand):
     NAME = "performance"
     DESCRIPTION = (
         "Show you or someone else's Personally Evaluated Normalized Int Score."
@@ -360,10 +364,12 @@ class PerformanceCommand(Command):
     ALIASES = ["penis"]
 
     async def handle(self, game: str, target_id: int = None):
-        performance_data = self.client.game_databases[game].get_performance_score(target_id)()
+        performance_data = self.game_databases[game].get_performance_score(target_id)()
         game_name = api_util.SUPPORTED_GAMES[game]
         if target_id is None:
             response = f"*Personally Evaluated Normalized Int-Far Scores* for **{game_name}** for all users:"
+            if not performance_data:
+                response += "\nNo players have enough games for a performance score."
             for score_id, score_value in performance_data:
                 name = self.client.get_discord_nick(score_id, self.message.guild.id)
                 response += f"\n- {name}: **{score_value:.2f}**"
@@ -385,19 +391,20 @@ class PerformanceCommand(Command):
             f"You must have a minimum of {min_games} games to get a score."
         )
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
 
-def get_winrate(client: DiscordClient, champ_or_map: str, game: str, target_id: int, role: str=None):
+def get_winrate(client: DiscordClient, champ_or_map: str, game: str, target_id: int, role: str=None, database=None):
     args = [target_id, champ_or_map]
     if role is not None:
         args.append(role)
 
-    winrate, games = client.game_databases[game].get_played_winrate(*args)
+    database = client.game_databases[game] if database is None else database
+    winrate, games = database.get_played_winrate(*args)
     qualified_name = client.api_clients[game].get_playable_name(champ_or_map)
 
     return qualified_name, winrate, games
 
-class WinrateCommand(Command):
+class WinrateCommand(StatCommand):
     NAME = "wr"
     DESCRIPTION = (
         "Show you or someone else's winrate. This command accepts different parameters "
@@ -426,7 +433,9 @@ class WinrateCommand(Command):
             target_id = role
             role = None
 
-        qualified_name, winrate, games = get_winrate(self.client, playable_id, game, target_id, role)
+        qualified_name, winrate, games = get_winrate(
+            self.client, playable_id, game, target_id, role, self.game_databases[game]
+        )
 
         user_name = self.client.get_discord_nick(target_id, self.message.guild.id)
         if winrate is not None:
@@ -437,4 +446,4 @@ class WinrateCommand(Command):
         else:
             response = f"{user_name} has not played any games on {qualified_name}."
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
