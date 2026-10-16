@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from copy import copy
 from datetime import datetime
 from sqlite3 import Cursor
 from typing import Any, Dict, Tuple
@@ -11,8 +12,11 @@ from intfar.api.game_data import get_stat_quantity_descriptions
 from intfar.api.game_stats import GameStats, get_outlier_stat
 from intfar.api.config import Config
 from intfar.api.user import User
+from intfar.api.stat_period import StatPeriod
 
 class GameDatabase(SQLiteDatabase):
+    stat_period: StatPeriod | None = None
+
     def __init__(self, game: str, config: Config):
         database = f"{config.database_folder}/{game}.db"
         schema = f"{config.schema_folder}/{game}.sql"
@@ -21,6 +25,39 @@ class GameDatabase(SQLiteDatabase):
         self.game = game
         self.config = config
         self.game_users = self.get_all_registered_users()
+
+    def for_period(self, period: StatPeriod):
+        """Return an isolated, read-only view of this database for stat lookups.
+
+        Filtering both tables also covers queries which only read participants,
+        such as champion rankings and teammate comparisons. Connections belong
+        to the returned object so concurrent all-time lookups remain unaffected.
+        """
+        database = copy(self)
+        database.stat_period = period
+        database._connections = {}
+        database._nested_contexts = {}
+        return database
+
+    def get_connection(self):
+        connection = super().get_connection()
+        if self.stat_period is not None:
+            start, end = self.stat_period.timestamps
+            # SQLite view definitions cannot bind parameters. These values are
+            # integer timestamps derived from a validated calendar year.
+            connection.executescript(f"""
+                CREATE TEMP VIEW games AS
+                    SELECT * FROM main.games
+                    WHERE timestamp >= {start} AND timestamp < {end};
+                CREATE TEMP VIEW participants AS
+                    SELECT p.* FROM main.participants AS p
+                    INNER JOIN temp.games AS g ON g.game_id = p.game_id;
+                CREATE TEMP VIEW bets AS
+                    SELECT * FROM main.bets
+                    WHERE timestamp >= {start} AND timestamp < {end};
+                PRAGMA query_only = ON;
+            """)
+        return connection
 
     @property
     def game_user_params(self):
@@ -804,7 +841,7 @@ class GameDatabase(SQLiteDatabase):
                     games_with_person[part_id] = games
 
             winrate_with_person = [
-                (x, games_with_person[x], (wins_with_person[x] / games_with_person[x]) * 100)
+                (x, games_with_person[x], (wins_with_person.get(x, 0) / games_with_person[x]) * 100)
                 for x in games_with_person if games_with_person[x] > min_games
             ]
 

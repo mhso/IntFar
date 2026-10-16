@@ -5,6 +5,7 @@ from discord import Message
 from intfar.discbot.commands import util as commands_util
 from intfar.discbot.discord_bot import DiscordClient
 from intfar.api.meta_database import DEFAULT_GAME
+from intfar.api.stat_period import StatPeriod
 from intfar.api.util import SUPPORTED_GAMES
 
 from mhooge_flask.logging import logger
@@ -298,6 +299,56 @@ class Command:
         params_str = f"{params_str_1}{params_str_2}"
 
         return f"!{cmd_str}{params_str}"
+
+class StatCommand(Command):
+    """Historical stat commands share an optional trailing calendar year."""
+
+    stat_period: StatPeriod | None = None
+
+    def __init__(self, client: DiscordClient, message: Message, called_name: str):
+        super().__init__(client, message, called_name)
+        self.game_databases = client.game_databases
+
+    async def parse_args(self, args):
+        parsed_args = await super().parse_args(args)
+        if parsed_args is not None and self.stat_period is not None:
+            game = next((arg for arg in parsed_args if arg in SUPPORTED_GAMES), "lol")
+            if self.game_databases[game].get_games_count()[0] == 0:
+                response = f"No games recorded for {SUPPORTED_GAMES[game]} in {self.stat_period.year}."
+                await self.message.channel.send(response)
+                return None
+        return parsed_args
+
+    async def __call__(self, args):
+        self.stat_period = None
+        self.game_databases = self.client.game_databases
+        try:
+            period = StatPeriod.from_token(args[-1]) if args else None
+        except ValueError as error:
+            await self.message.channel.send(str(error))
+            return
+
+        if period is not None:
+            args = args[:-1]
+            if len(args) < len(self.MANDATORY_PARAMS):
+                await self.message.channel.send(f"Usage: `{self}`")
+                return
+            self.stat_period = period
+            self.game_databases = {
+                game: database.for_period(period)
+                for game, database in self.client.game_databases.items()
+            }
+
+        await super().__call__(args)
+
+    def format_stat_response(self, response: str):
+        if self.stat_period is None:
+            return response
+        return f"**Stats for {self.stat_period.year}**\n{response}"
+
+    def __str__(self):
+        return super().__str__() + " (year/YYYY)"
+
 
 def get_handler(cmd: str, client: DiscordClient, message: Message) -> Command:
     cmd_name = cmd

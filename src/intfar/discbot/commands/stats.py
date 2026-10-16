@@ -29,14 +29,19 @@ class StatsCommand(Command):
         response += "\n```"
         response += "You can use these stats with the following commands: "
         response += "`!average [stat]`, `!best [stat]`, or `!worst [stat]`"
+        response += (
+            "\nStats cover all time by default. Add `year` at the end for this "
+            "calendar year, or a year such as `2025` for that year. "
+            "For example: `!average kda year` or `!best kills all 2025`."
+        )
 
         await self.message.channel.send(response)
 
-class AverageCommand(Command):
+class AverageCommand(StatCommand):
     NAME = "average"
     DESCRIPTION = (
         "Show the average value for a stat for you (or someone else). "
-        "Fx. `!average lol kda` to see your average KDA over all games. "
+        "Fx. `!average kda lol` to see your average KDA over all games. "
         "This command accepts different parameters for different games. "
         "For LoL, you can see KDA on champs (fx. `!average kda jhin`), "
         "for CS2, you can see KDA on maps (fx. `!average kda inferno`). "
@@ -55,7 +60,7 @@ class AverageCommand(Command):
         if stat not in stat_quantity_descs: # Check if the requested stat is a valid stat.
             emote = "{emote_carole_fucking_baskin}"
             response = f"Not a valid stat: '{stat}' {emote}. See `!stats` for a list of valid stats."
-            await self.message.channel.send(self.client.insert_emotes(response))
+            await self.message.channel.send(self.format_stat_response(self.client.insert_emotes(response)))
             return
 
         playable_name = None
@@ -63,9 +68,12 @@ class AverageCommand(Command):
             playable_name = self.client.api_clients[game].get_playable_name(playable_id)
 
         minimum_games = 10 if playable_id is None else 5
-        values = self.client.game_databases[game].get_average_stat(stat, disc_id, playable_id, min_games=minimum_games)()
+        values = self.game_databases[game].get_average_stat(stat, disc_id, playable_id, min_games=minimum_games)()
 
         for_all = disc_id is None
+        if for_all and values == [(None, None, None)]:
+            await self.message.channel.send(self.format_stat_response("No players have enough games for this average."))
+            return
         readable_stat = stat_name_descs[stat]        
 
         response = ""
@@ -118,9 +126,9 @@ class AverageCommand(Command):
             if index < len(values) - 1:
                 response += "\n"
 
-        await self.message.channel.send(self.client.insert_emotes(response))
+        await self.message.channel.send(self.format_stat_response(self.client.insert_emotes(response)))
 
-class BestOrWorstStatCommand(Command):
+class BestOrWorstStatCommand(StatCommand):
     TARGET_ALL = True
     ACCESS_LEVEL = "self"
     MANDATORY_PARAMS = [CommandParam("stat")]
@@ -142,7 +150,7 @@ class BestOrWorstStatCommand(Command):
         if stat not in stat_quant_descs: # Check if the requested stat is a valid stat.
             emote = "{emote_carole_fucking_baskin}"
             response = f"Not a valid stat: '{stat}' {emote}. See `!stats` for a list of valid stats."
-            await self.message.channel.send(self.client.insert_emotes(response))
+            await self.message.channel.send(self.format_stat_response(self.client.insert_emotes(response)))
             return
 
         # Check whether to find the max or min of some value, when returning
@@ -175,14 +183,18 @@ class BestOrWorstStatCommand(Command):
                 target_id, # <- Who got the highest/lowest stat ever
                 min_or_max_value, # <- The highest/lowest value of the stat
                 game_id # <- The game where it happened
-            ) = self.client.game_databases[game].get_most_extreme_stat(stat, maximize)
+            ) = self.game_databases[game].get_most_extreme_stat(stat, maximize)
         else:
             (
                 stat_count, # <- How many times the stat has occured
                 game_count, # <- How many games were the stat was relevant
                 min_or_max_value, # <- Highest/lowest occurance of the stat value
                 game_id
-            ) = self.client.game_databases[game].get_best_or_worst_stat(stat, target_id, maximize)()
+            ) = self.game_databases[game].get_best_or_worst_stat(stat, target_id, maximize)() or (0, 0, None, None)
+
+        if min_or_max_value is None and (check_all or game_count == 0):
+            await self.message.channel.send(self.format_stat_response("No qualifying results found for this stat."))
+            return
 
         recepient = self.client.get_discord_nick(target_id, self.message.guild.id)
 
@@ -200,12 +212,13 @@ class BestOrWorstStatCommand(Command):
                 response += f"is {recepient} with **{min_or_max_value}** games"
                 response += self.client.insert_emotes(emote_to_use)
             else:
-                response = f"The {readable_stat} ever in a game was **{min_or_max_value}** "
+                period = "ever" if self.stat_period is None else f"in {self.stat_period.year}"
+                response = f"The {readable_stat} {period} in a game was **{min_or_max_value}** "
                 response += f"by {recepient} " + self.client.insert_emotes(emote_to_use)
                 if game_summary is not None:
                     response += f"\nHe got this when playing {game_summary}"
         else:
-            played_id, played_count = self.client.game_databases[game].get_played_count_for_stat(
+            played_id, played_count = self.game_databases[game].get_played_count_for_stat(
                 stat, maximize, target_id
             )
 
@@ -224,10 +237,11 @@ class BestOrWorstStatCommand(Command):
             )
             if min_or_max_value is not None:
                 # The target user has gotten most/fewest of 'stat' in at least one game.
-                response += f"Their {readable_stat} ever was "
+                period = "ever" if self.stat_period is None else f"in {self.stat_period.year}"
+                response += f"Their {readable_stat} {period} was "
                 response += f"**{min_or_max_value}** when playing {game_summary}"
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
 
     def get_game_summary(self, game: str, game_id: int, target_id: int, guild_id: int) -> str:
         """
@@ -236,7 +250,7 @@ class BestOrWorstStatCommand(Command):
         """
         game_stats = stats_from_database(
             game,
-            self.client.game_databases[game],
+            self.game_databases[game],
             self.client.api_clients[game],
             guild_id,
             game_id,
@@ -248,8 +262,8 @@ class BestStatCommand(BestOrWorstStatCommand):
     DESCRIPTION = (
         "Show how many times you (or someone else) "
         "were the best in the specific stat. "
-        "Fx. `!best lol kda` shows how many times you had the best KDA in a LoL game. "
-        "`!best [game] [stat] all` shows what the best ever was for that stat, and who got it."
+        "Fx. `!best kda lol` shows how many times you had the best KDA in a LoL game. "
+        "`!best [stat] [game] all` shows what the best ever was for that stat, and who got it."
     )
     ALIASES = ["most", "highest"]
 
@@ -261,15 +275,15 @@ class WorstStatCommand(BestOrWorstStatCommand):
     DESCRIPTION = (
         "Show how many times you (or someone else) "
         "were the worst at the specific stat. "
-        "Fx. `!worst lol kda` shows how many times you had the worst KDA in a LoL game. "
-        "`!worst [game] [stat] all` shows what the worst ever was for that stat, and who got it."
+        "Fx. `!worst kda lol` shows how many times you had the worst KDA in a LoL game. "
+        "`!worst [stat] [game] all` shows what the worst ever was for that stat, and who got it."
     )
     ALIASES = ["least", "lowest", "fewest"]
 
     def __init__(self, client: DiscordClient, message: Message, called_name: str):
         super().__init__(client, message, called_name, False)
 
-class MatchHistoryCommand(Command):
+class MatchHistoryCommand(StatCommand):
     NAME = "match_history"
     DESCRIPTION = (
         "See the match history of you (or someone else) for the given game."
@@ -282,7 +296,7 @@ class MatchHistoryCommand(Command):
 
         all_game_stats = stats_from_database(
             game,
-            self.client.game_databases[game],
+            self.game_databases[game],
             self.client.api_clients[game],
             self.message.guild.id,
         )
@@ -381,10 +395,15 @@ class MatchHistoryCommand(Command):
             formatted_entries.append(match_str)
 
         header = f"--- Match history for **{api_util.SUPPORTED_GAMES[game]}** ---"
+        header = self.format_stat_response(header)
+
+        if not formatted_entries:
+            await self.message.channel.send(self.format_stat_response("No matches found."))
+            return
 
         await self.client.paginate(self.message.channel, formatted_entries, 0, 1, header)
 
-class ChampionCommand(Command):
+class ChampionCommand(StatCommand):
     NAME = "champion"
     DESCRIPTION = "Show your or someone else's stats on a specific champion."
     ACCESS_LEVEL = "self"
@@ -406,13 +425,13 @@ class ChampionCommand(Command):
             target_id = role
             role = None
 
-        with self.client.game_databases["lol"] as database:
-            champ_name, winrate, games = get_winrate(self.client, champ_id, game, target_id, role)
+        with self.game_databases["lol"] as database:
+            champ_name, winrate, games = get_winrate(self.client, champ_id, game, target_id, role, database)
             user_name = self.client.get_discord_nick(target_id, self.message.guild.id)
 
             if winrate is None or games == 0:
                 response = f"{user_name} has not played enough games on {champ_name}."
-                await self.message.channel.send(response)
+                await self.message.channel.send(self.format_stat_response(response))
                 return
 
             doinks = database.get_played_doinks_count(target_id, champ_id, role)()
@@ -465,7 +484,7 @@ class ChampionCommand(Command):
                     f"Can't display stat rankings on {champ_name}, "
                     f"because {user_name} has not played at least {min_games} games with them."
                 )
-                await self.message.channel.send(response)
+                await self.message.channel.send(self.format_stat_response(response))
                 return
 
             totals = []
@@ -523,9 +542,9 @@ class ChampionCommand(Command):
             response += f"**Best**: Who has the best rank on a stat with {game_description}\n"
         response += f"*A minimum of **{min_games}** games on a champ is required"
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
 
-class RankCommand(Command):
+class RankCommand(StatCommand):
     NAME = "rank"
     DESCRIPTION = "Show your current rank in the given game."
     MANDATORY_PARAMS = [CommandParam("queue")]
@@ -533,7 +552,7 @@ class RankCommand(Command):
 
     async def handle(self, queue: str, game: str, target_id: int):
         nickname = self.client.get_discord_nick(target_id, self.message.guild.id)
-        database = self.client.game_databases[game]
+        database = self.game_databases[game]
         main_player_id = database.game_users[target_id].player_id[0]
         rank_info = database.get_current_rank(main_player_id)
         fmt_stat_names = get_formatted_stat_names(game)
@@ -543,16 +562,22 @@ class RankCommand(Command):
             queue_names = [fmt_stat_names["rank_solo"], fmt_stat_names["rank_flex"]]
         elif game == "cs2":
             queues = ["premier"]
-            queue_names = [fmt_stat_names["rank_premier"]]
+            queue_names = ["Premier"]
 
         if queue not in queues:
             response = f"Invalid rank type, should be one of {', '.join(queues)}."
-            await self.message.channel.send(response)
+            await self.message.channel.send(self.format_stat_response(response))
             return
 
-        rank = get_formatted_stat_value(game, f"rank_{queue}", rank_info[queues.index(queue)])
+        rank_value = rank_info[queues.index(queue)] if rank_info is not None else None
+        if rank_value is None:
+            await self.message.channel.send(self.format_stat_response(f"No recorded rank found for {nickname}."))
+            return
+        rank = get_formatted_stat_value(game, f"rank_{queue}", rank_value)
         name = queue_names[queues.index(queue)]
 
         response = f"{nickname} is currently **{rank}** in **{name}**"
+        if self.stat_period is not None:
+            response = f"{nickname}'s latest recorded rank was **{rank}** in **{name}**"
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))

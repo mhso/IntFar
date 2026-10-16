@@ -155,6 +155,12 @@ class UsageCommand(Command):
         cmd_obj: Command = commands_util.get_main_command(command)(self.client, self.message, self.called_name)
         response = f"Usage: `{cmd_obj}`\n"
         response += cmd_obj.DESCRIPTION
+        if isinstance(cmd_obj, StatCommand):
+            response += (
+                "\n\nStats cover all time by default. Add `year` at the end for "
+                "the current calendar year, or a specific year such as `2025`. "
+                "Calendar years use Europe/Copenhagen time."
+            )
 
         if cmd_obj.ACCESS_LEVEL is not None:
             response += "\n\n*Note: This command requires you to be registered to Int-Far"
@@ -179,7 +185,7 @@ class UptimeCommand(Command):
         uptime_formatted = get_uptime(self.client.time_initialized)
         await self.message.channel.send(f"Int-Far™ Tracker™ has been online for {uptime_formatted}")
 
-class StatusCommand(Command):
+class StatusCommand(StatCommand):
     NAME = "status"
     DESCRIPTION = "Show overall stats about Int-Far for a game."
     OPTIONAL_PARAMS = [GameParam("game")]
@@ -206,7 +212,7 @@ class StatusCommand(Command):
             games_ratios,
             intfar_ratios,
             intfar_multi_ratios,
-        ) = self.client.game_databases[game].get_meta_stats()
+        ) = self.game_databases[game].get_meta_stats()
 
         pct_games_won = (games_won / games) * 100
         playtime_hours = playtime / 60 / 60
@@ -217,6 +223,12 @@ class StatusCommand(Command):
         longest_game_date = datetime.fromtimestamp(longest_game_time).strftime("%Y-%m-%d")
 
         sounds = self.client.audio_handler.get_sounds("alphabetical")
+        if self.stat_period is not None:
+            start, end = self.stat_period.timestamps
+            sounds = [
+                sound for sound in self.client.meta_database.get_sounds("alphabetical")
+                if start <= sound[3] < end
+            ]
         unique_owners = set(sound_data[1] for sound_data in sounds)
 
         pct_intfar = int((intfars / games) * 100)
@@ -224,7 +236,7 @@ class StatusCommand(Command):
         earliest_time = datetime.fromtimestamp(earliest_game).strftime("%Y-%m-%d")
         latest_time = datetime.fromtimestamp(latest_game).strftime("%Y-%m-%d")
         doinks_emote = self.client.insert_emotes("{emote_Doinks}")
-        all_bets = self.client.game_databases[game].get_bets(False)
+        all_bets = self.game_databases[game].get_bets(False)
 
         tokens_name = self.client.config.betting_tokens
         bets_won = 0
@@ -283,7 +295,7 @@ class StatusCommand(Command):
             f"- **{games}** games of **{api_util.SUPPORTED_GAMES[game]}** have been played in {unique_game_guilds} servers (**{pct_games_won:.1f}%** was won)\n"
             f"- That amounts to a total of **{playtime_hours:.1f}** hours of game time!\n"
             f"- Longest game lasted **{longest_game_fmt}**, played on {longest_game_date}\n"
-            f"- **{users}** users have signed up for this game\n"
+            f"- **{users}** users are currently signed up for this game\n"
             f"- **{intfars}** Int-Far awards have been given\n"
             f"- **{total_doinks}** {doinks_emote} have been earned\n"
             f"- **{len(sounds)}** sounds have been uploaded by **{len(unique_owners)}** people\n"
@@ -304,7 +316,7 @@ class StatusCommand(Command):
             f"{reason_multi_ratio_msg}"
         )
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
 
 class WebsiteCommand(Command):
     NAME = "website"

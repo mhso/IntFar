@@ -2,8 +2,8 @@ from intfar.api import util as api_util
 from intfar.api.awards import get_intfar_reasons, get_intfar_criterias_desc, organize_intfar_stats
 from intfar.discbot.commands.base import *
 
-def get_intfar_relation_stats(client: DiscordClient, game: str, target_id: int):
-    database = client.game_databases[game]
+def get_intfar_relation_stats(client: DiscordClient, game: str, target_id: int, database=None):
+    database = client.game_databases[game] if database is None else database
     data = []
     games_relations, intfars_relations = database.get_intfar_relations(target_id)
     total_intfars = len(database.get_intfar_stats(target_id)[1])
@@ -11,14 +11,14 @@ def get_intfar_relation_stats(client: DiscordClient, game: str, target_id: int):
         intfars = intfars_relations.get(disc_id, 0)
         data.append(
             (
-                disc_id, total_games, intfars, int((intfars / total_intfars) * 100),
+                disc_id, total_games, intfars, int((intfars / total_intfars) * 100) if total_intfars else 0,
                 int((intfars / total_games) * 100)
             )
         )
 
     return sorted(data, key=lambda x: x[2], reverse=True)
 
-class IntfarCommand(Command):
+class IntfarCommand(StatCommand):
     NAME = "intfar"
     DESCRIPTION = (
         "Show how many times you (or someone else) has been the Int-Far. " +
@@ -29,9 +29,10 @@ class IntfarCommand(Command):
     OPTIONAL_PARAMS = [GameParam("game"), TargetParam("person")]
 
     async def handle(self, game, target_id):
-        database = self.client.game_databases[game]
+        database = self.game_databases[game]
         current_month = api_util.current_month()
         intfar_reasons = get_intfar_reasons(game)
+        include_monthly = self.stat_period is None
 
         def format_for_all(disc_id, monthly=False):
             person_to_check = self.client.get_discord_nick(disc_id, self.message.guild.id)
@@ -46,7 +47,7 @@ class IntfarCommand(Command):
             person_to_check = self.client.get_discord_nick(disc_id, self.message.guild.id)
             games_played, intfar_reason_ids = database.get_intfar_stats(disc_id, False)
             games_played, intfars, intfar_counts, pct_intfar = organize_intfar_stats(game, games_played, intfar_reason_ids)
-            intfars_of_the_month = database.get_intfars_of_the_month()
+            intfars_of_the_month = database.get_intfars_of_the_month() if include_monthly else []
             user_is_ifotm = intfars_of_the_month != [] and intfars_of_the_month[0][0] == disc_id
 
             played_id, played_count = database.get_played_with_most_intfars(disc_id)()
@@ -58,14 +59,14 @@ class IntfarCommand(Command):
             msg = f"{person_to_check} has been Int-Far **{intfars}** times "
             msg += "{emote_unlimited_chins}"
             if intfars > 0:
-                monthly_games, monthly_infar_ids = database.get_intfar_stats(disc_id, True)
-                monthly_games, monthly_intfars, _, pct_monthly = organize_intfar_stats(game, monthly_games, monthly_infar_ids)
-
                 ratio_desc = f"\nHe has inted the most when playing **{played_name}** (**{played_count}** times).\n"
                 ratio_desc += f"In total, he was Int-Far in **{pct_intfar:.2f}%** of his "
                 ratio_desc += f"{games_played} games played.\n"
-                ratio_desc += f"In {current_month}, he was Int-Far in **{monthly_intfars}** "
-                ratio_desc += f"of his {monthly_games} games played (**{pct_monthly:.2f}%**).\n"
+                if include_monthly:
+                    monthly_games, monthly_infar_ids = database.get_intfar_stats(disc_id, True)
+                    monthly_games, monthly_intfars, _, pct_monthly = organize_intfar_stats(game, monthly_games, monthly_infar_ids)
+                    ratio_desc += f"In {current_month}, he was Int-Far in **{monthly_intfars}** "
+                    ratio_desc += f"of his {monthly_games} games played (**{pct_monthly:.2f}%**).\n"
 
                 reason_desc = "Int-Fars awarded so far:\n"
                 for reason_id, reason in enumerate(intfar_reasons):
@@ -83,12 +84,15 @@ class IntfarCommand(Command):
                     no_streak_desc += f"(ended **{date_ended})** "
                 no_streak_desc += "{emote_pog}\n"
 
-                relations_data = get_intfar_relation_stats(self.client, game, disc_id)[0]
-                most_intfars_nick = self.client.get_discord_nick(relations_data[0], self.message.guild.id)
-                relations_desc = f"He has inted the most when playing with {most_intfars_nick} "
-                relations_desc += f"where he inted **{relations_data[2]}** games (out of a total **{relations_data[1]}** "
-                relations_desc += f"games played with this person, equal to **{relations_data[3]}%** of all games)"
-                relations_desc += "{emote_smol_gual}"
+                relations = get_intfar_relation_stats(self.client, game, disc_id, database)
+                relations_desc = ""
+                if relations:
+                    relations_data = relations[0]
+                    most_intfars_nick = self.client.get_discord_nick(relations_data[0], self.message.guild.id)
+                    relations_desc = f"He has inted the most when playing with {most_intfars_nick} "
+                    relations_desc += f"where he inted **{relations_data[2]}** games (out of a total **{relations_data[1]}** "
+                    relations_desc += f"games played with this person, equal to **{relations_data[3]}%** of all games)"
+                    relations_desc += "{emote_smol_gual}"
 
                 msg += ratio_desc + reason_desc + streak_desc + no_streak_desc + relations_desc
                 if user_is_ifotm:
@@ -104,20 +108,25 @@ class IntfarCommand(Command):
             messages_monthly = []
             for disc_id in database.game_users.keys():
                 resp_str_all_time, intfars, pct_all_time, _ = format_for_all(disc_id)
-                resp_str_month, intfars_month, pct_month, games_played = format_for_all(disc_id, monthly=True)
 
                 messages_all_time.append((resp_str_all_time, intfars, pct_all_time))
-                if games_played > 0: # Don't include users with no games this month.
-                    messages_monthly.append((resp_str_month, intfars_month, pct_month))
+                if include_monthly:
+                    resp_str_month, intfars_month, pct_month, games_played = format_for_all(disc_id, monthly=True)
+                    if games_played > 0: # Don't include users with no games this month.
+                        messages_monthly.append((resp_str_month, intfars_month, pct_month))
 
             messages_all_time.sort(key=lambda x: (x[1], x[2]), reverse=True)
             messages_monthly.sort(key=lambda x: (x[1], x[2]), reverse=True)
 
-            response = "**--- All time stats ---**"
+            response = "**--- All time stats ---**" if self.stat_period is None else f"**--- Stats for {self.stat_period.year} ---**"
             for data in messages_all_time:
                 response += f"\n- {data[0]}"
 
-            await self.message.channel.send(response)
+            if not include_monthly:
+                await self.message.channel.send(response)
+                return
+
+            await self.message.channel.send(self.format_stat_response(response))
 
             response = f"**--- Stats for {current_month} ---**"
 
@@ -130,16 +139,16 @@ class IntfarCommand(Command):
         else: # Check intfar stats for a specific person.
             response = format_for_single(target_id)
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
 
-class IntfarRelationsCommand(Command):
+class IntfarRelationsCommand(StatCommand):
     NAME = "intfar_relations"
     DESCRIPTION = "Show who you (or someone else) int the most games with."
     ACCESS_LEVEL = "self"
     OPTIONAL_PARAMS = [GameParam("game"), TargetParam("person")]
 
     async def handle(self, game: str, target_id: int):
-        data = get_intfar_relation_stats(self.client, game, target_id)
+        data = get_intfar_relation_stats(self.client, game, target_id, self.game_databases[game])
 
         response = (
             f"Breakdown of players {self.client.get_discord_nick(target_id, self.message.guild.id)} "
@@ -150,7 +159,7 @@ class IntfarRelationsCommand(Command):
             response += f"- {nick}: **{intfars}** times (**{intfar_ratio}%**) "
             response += f"(**{games_ratio}%** of **{total_games}** games)\n"
 
-        await self.message.channel.send(response)
+        await self.message.channel.send(self.format_stat_response(response))
 
 class IntfarCriteriaCommand(Command):
     NAME = "intfar_criteria"
