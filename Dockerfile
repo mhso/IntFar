@@ -1,4 +1,4 @@
-FROM python:3.14-trixie
+FROM python:3.14-trixie AS base
 WORKDIR /intfar
 
 # Expose the provided port for Flask
@@ -23,8 +23,12 @@ RUN curl -sSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -
 # Copy pyproject.toml
 COPY pyproject.toml uv.lock ./
 
-# Download UV and install requirements
+# Download uv and install requirements
 RUN curl -LsSf https://astral.sh/uv/install.sh | bash && uv sync --no-dev && uv run playwright install firefox
+
+FROM base AS build
+
+WORKDIR /intfar
 
 # Copy code and resources
 COPY src ./src

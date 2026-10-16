@@ -1,13 +1,12 @@
+import signal
 from argparse import ArgumentParser
-from run_flask import run_app as run_flask_app
-from run_discord_bot import run_client as run_discord_client
-
 from time import sleep
 from multiprocessing import Process, Pipe, Manager
 
-from discord.opus import load_opus
 from mhooge_flask.logging import logger
 
+from run_flask import run_app as run_flask_app
+from run_discord_bot import run_client as run_discord_client
 from intfar.api.config import Config, Environment
 from intfar.api.meta_database import MetaDatabase
 from intfar.api.game_databases import get_database_client
@@ -108,6 +107,11 @@ def main(flask_port: int):
     bot_process, _ = start_discord_process(*discord_args)
 
     processes = [flask_process, bot_process, proxy_manager]
+
+    def kill_handler(signum, frame):
+        kill_all_processes(processes)
+
+    signal.signal(signal.SIGTERM, kill_handler)
 
     while True:
         try:

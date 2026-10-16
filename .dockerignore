@@ -9,3 +9,8 @@ resources/team_comps.txt
 
 src/dummy.txt
 src/query_db.py
+src/intfar/app/static/champ_data
+src/intfar/app/static/img/avatars
+src/intfar/app/static/img/champions
+src/intfar/app/static/img/items
+src/intfar/app/static/sounds
