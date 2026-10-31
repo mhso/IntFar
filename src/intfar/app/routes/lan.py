@@ -401,8 +401,52 @@ def get_data(lan_info, database, lan_date):
 def _allowed_access(lan_info, user_id):
     return lan_api.TESTING or (lan_info is not None and user_id is not None and user_id in lan_info.participants)
 
-@lan_page.route('/')
-def lan_view():
+@lan_page.route("/")
+def lan_overview():
+    # Display overview of all LAN parties
+    database: LoLGameDatabase = flask.current_app.config["GAME_DATABASES"]["lol"]
+
+    logged_in_user = app_util.get_user_details()[0]
+
+    if logged_in_user is None:
+        return app_util.make_template_context("error.html", 401, error_code=401)
+
+    lan_overview = {}
+    for date_key in reversed(lan_api.LAN_PARTIES):
+        lan_info = lan_api.LAN_PARTIES[date_key]
+
+        if not _allowed_access(lan_info, logged_in_user):
+            continue
+
+        games_stats = database.get_games_results(
+            time_after=lan_info.start_time,
+            time_before=lan_info.end_time,
+            guild_id=lan_info.guild_id
+        )
+
+        data = {
+            "date": datetime.fromtimestamp(lan_info.start_time).strftime("%Y/%m/%d"),
+            "location": lan_info.location,
+        }
+
+        if games_stats != []:
+            # Games played and won
+            game_results = [win for win, _ in games_stats]
+            games_played = len(games_stats)
+            games_won = len(list(filter(lambda x: x == 1, game_results)))
+            winrate = f"{(games_won / games_played * 100):.2f}"
+
+            data["games"] = games_played
+            data["wins"] = games_won
+            data["winrate"] = winrate
+            data["image"] = f"img/lan_pics/{date_key}.jpg"
+
+        lan_overview[date_key] = data
+
+    return app_util.make_template_context("lan_overview.html", 200, lan_data=lan_overview)
+
+@lan_page.route("/latest")
+def latest_lan_view():
     # Display view for latest LAN party.
     return flask.redirect(
         flask.url_for("lan.lan_view_for_date", _external=True, date=lan_api.LATEST_LAN_PARTY)
@@ -464,7 +508,7 @@ def lan_view_for_date(date):
     logged_in_user = app_util.get_user_details()[0]
 
     if not _allowed_access(lan_info, logged_in_user):
-        return flask.abort(404) # User not logged in or not a part of the LAN.
+        return flask.abort(401) # User not logged in or not a part of the LAN.
 
     database: LoLGameDatabase = flask.current_app.config["GAME_DATABASES"]["lol"]
     with database:

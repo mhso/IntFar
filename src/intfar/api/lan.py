@@ -205,6 +205,19 @@ LAN_PARTIES = {
         },
         "core"
     ),
+    "november_26": LANInfo(
+        datetime(2026, 11, 7, 10, 0).timestamp(),
+        datetime(2026, 11, 8, 10, 0).timestamp(),
+        "Dave",
+        {
+                115142485579137029: "Dave",
+                172757468814770176: "Murt",
+                267401734513491969: "Gual",
+                331082926475182081: "Muds",
+                347489125877809155: "Nønø",
+        },
+        "core"
+    ),
 }
 LATEST_LAN_PARTY: str = max(LAN_PARTIES.keys(), key=lambda k: LAN_PARTIES[k].start_time)
 
@@ -333,7 +346,7 @@ class BingoSolver:
             else:
                 gold_them += participants[participant_id]["totalGold"]
 
-        if self.parsed_data.win == 1 and gold_us - gold_them >= 8000:
+        if self.parsed_data.win == 1 and gold_us - gold_them >= 7000:
             self.progress = 1
 
     def bounty_gold(self):
@@ -453,7 +466,7 @@ class BingoSolver:
 # BINGO CHALLENGES
 BINGO_WIDTH = 5
 BINGO_CHALLENGE_NAMES = {
-    "big_lead": ("Win With 8K Lead", 1),
+    "big_lead": ("Win With 7K Lead", 1),
     "bounty_gold": ("Shutdown Gold", 4000),
     "buff_steals": ("Buffs Stolen", 10),
     "damage_dealt": ("Damage Dealt", 1_000_000),
@@ -465,7 +478,7 @@ BINGO_CHALLENGE_NAMES = {
     "fast_win": ("Win before 22 Mins", 1),
     "flawless_ace": ("Flawless Ace", 1),
     "fountain_kill": ("Fountain Kill", 1),
-    "cheese_kills": ("Cheese Kills", 5),
+    "cheese_kills": ("Cheese Kills", 6),
     "jungle_doinks": ("Jungle Doinks", 1),
     "killing_sprees": ("Killing Sprees", 15),
     "kills": ("Kills", 100),
@@ -474,7 +487,7 @@ BINGO_CHALLENGE_NAMES = {
     "solo_kills": ("Solo Kills", 10),
     "spells_casted": ("Spell Casts", 5000),
     "spells_dodged": ("Skillshots Dodged", 200),
-    "spells_hit": ("Skillshots Hit", 500),
+    "spells_hit": ("Skillshots Hit", 600),
     "steals": ("Objective Steals", 2),
     "two_barons": ("Two Barons, One Game", 1),
     "wins": ("Won Games", 5),

@@ -222,7 +222,7 @@ class TestFuncs:
         print(x, y)
 
     def test_items(self):
-        with open(f"{self.config.resources_folder}/game_data/lol//items-14.3.1.json", encoding="utf-8") as fp:
+        with open(f"{self.config.resources_folder}/game_data/lol/items-14.3.1.json", encoding="utf-8") as fp:
             items = json.load(fp)
 
         with open("items.txt", "w", encoding="utf-8") as fp:
@@ -439,6 +439,9 @@ class TestFuncs:
     async def announce_jeoparty_winner(self, player_data):
         client = create_client(self.config, self.meta_database, self.game_databases)
         await client.announce_jeopardy_winner(json.loads(player_data), str(util.MY_GUILD_ID))
+
+    def download_items(self):
+        self.riot_api.get_item_icons()
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()

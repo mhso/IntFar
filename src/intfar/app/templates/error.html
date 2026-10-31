@@ -23,6 +23,9 @@
             <a href="{{ url_for('cs2.index.index', _external=True) }}">
                 <button class="standard-btn">Go To Counter Strike 2</button>
             </a>
+            {% elif error_code == 401 %}
+            <p>You are not authorized to view this page.</p>
+            <img src="{{ url_for('static', _external=True, filename='img/lan_gual.png') }}">
             {% elif error_code == 400 %}
             <p>You provided an invalid game</p>
             <img src="{{ url_for('static', _external=True, filename='img/david.png') }}">

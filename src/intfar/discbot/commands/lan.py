@@ -290,7 +290,7 @@ class JeopardyJoinCommand(BaseLANCommand):
         join_url = data["join_url"]
 
         response_dm = "Go to this link to join the Jeoparty!\n"
-        response_dm += f"{join_url}/lan?user_id={author_id}"
+        response_dm += f"{join_url}?user_id={author_id}"
 
         mention = self.client.get_mention_str(author_id, self.message.guild.id)
         response_server = (

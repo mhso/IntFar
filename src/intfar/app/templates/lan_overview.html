@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LAN Parties</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-32.ico') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', _external=True, filename='img/favicon-48.ico') }}" sizes="48x48">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/style.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', _external=True, filename='css/lan.css') }}">
+</head>
+<body style="overflow-y: auto">
+    <div id="lan-overview-wrapper">
+        <h1>LAN Parties Overview</h1>
+
+        {% if not lan_data %}
+        <p>No info about LAN parties were found.</p>
+        {% else %}
+
+        <div>
+            {% for date_key in lan_data %}
+            <div class="lan-overview-entry" onclick="window.location.href='{{ url_for('lan.lan_view_for_date', date=date_key) }}'">
+                <h2>{{ lan_data[date_key]['date'] }} at {{ lan_data[date_key]['location'] }}</h2>
+
+                <p>Games played: <strong>{{ lan_data[date_key]['games'] }}</strong></p>
+                <p>Wins: <strong>{{ lan_data[date_key]['wins'] }}</strong></p>
+                <p>Winrate: <strong>{{ lan_data[date_key]['winrate'] }}%</strong></p>
+                <image src="{{ url_for('static', filename=lan_data[date_key]['image']) }}" alt="LAN image">
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+</body>
+</html>

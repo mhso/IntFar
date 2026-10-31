@@ -64,6 +64,48 @@ h2 {
     margin-top: 0.75rem;
 }
 
+#lan-overview-wrapper {
+    margin-top: 40px;
+    display: flex;
+    font-size: 20px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#lan-overview-wrapper > h1 {
+    margin-bottom: 30px;
+}
+
+.lan-overview-entry {
+    cursor: pointer;
+    position: relative;
+    border: 2px solid white;
+    margin-bottom: 20px;
+    overflow: hidden;
+    padding: 100px;
+    padding-top: 10px;
+    border-radius: 5px;
+}
+
+.lan-overview-entry:hover {
+    filter: contrast(0.7);
+}
+
+.lan-overview-entry > h2 {
+    color: rgb(0, 200, 255);
+}
+
+.lan-overview-entry > img {
+    filter: brightness(0.5);
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: -1;
+}
+
 #lan-wrapper > h2 {
     color: #ff00ef;
     font-weight: 1000;
